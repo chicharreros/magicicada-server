@@ -1,0 +1,17 @@
+before_install:
+    - sudo apt-get update -qq
+    - sudo apt-get install -qq bzr make python-transaction protobuf-compiler
+        python-setuptools gcc python-dev python-twisted-web postgresql-9.1
+        python-yaml python-psycopg2 postgresql-contrib supervisor
+        postgresql-plpython-9.1 python-boto squid
+        python-protobuf python-psutil python-testresources
+        python-tz python-bson python-iso8601 python-openid python-meliae
+    - sudo apt-get install -qq python-gobject dbus python-dbus python-pyinotify
+        python-twisted-names python-httplib2 python-mocker python-testtools
+
+install:
+    - bzr branch lp:magicicada-server
+
+script:
+    - cd magicicada-server
+    - make test
