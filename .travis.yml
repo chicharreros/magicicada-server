@@ -9,9 +9,5 @@ before_install:
     - sudo apt-get install -qq python-gobject dbus python-dbus python-pyinotify
         python-twisted-names python-httplib2 python-mocker python-testtools
 
-install:
-    - bzr branch lp:magicicada-server
-
 script:
-    - cd magicicada-server
     - make test
