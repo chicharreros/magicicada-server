@@ -10,4 +10,4 @@ before_install:
         python-twisted-names python-httplib2 python-mocker python-testtools
 
 script:
-    - make test
+    - make test SOURCEDEPS_DIR=.sourcedeps_cache
