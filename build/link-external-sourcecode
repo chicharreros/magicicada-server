@@ -56,12 +56,12 @@ def get_branch_config(config_file):
 
 def main(config_file, parent_dir, target_dir, verbose):
     """Do the deed."""
-
-    try:
-        os.makedirs(parent_dir)
-    except OSError, e:
-        if e.errno != errno.EEXIST:
-            raise
+    for folder in (parent_dir, target_dir):
+        try:
+            os.makedirs(folder)
+        except OSError, e:
+            if e.errno != errno.EEXIST:
+                raise
 
     branches = sorted(get_branch_config(config_file).items())
     for branch_name, (quoted_branch_spec, revspec) in branches:
