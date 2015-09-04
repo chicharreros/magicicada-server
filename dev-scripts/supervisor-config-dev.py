@@ -29,6 +29,9 @@ from supervisor_templates import TEMPLATES
 
 ROOTDIR = utils.get_rootdir()
 TMPDIR = os.path.join(ROOTDIR, 'tmp')
+if not os.path.exists(TMPDIR):
+    os.mkdir(TMPDIR)
+
 
 config_spec = {
     "basepath": ROOTDIR,

@@ -18,7 +18,10 @@
 """Metric services."""
 
 from metrics import get_meter
-from versioninfo import version_info
+try:
+    from versioninfo import version_info
+except ImportError:
+    version_info = {'revno': 'Undefined'}
 
 
 def oops_saved(report=None, context=None):

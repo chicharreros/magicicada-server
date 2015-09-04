@@ -20,6 +20,7 @@ FLAKE8 = flake8
 PYTHON = python
 SRC_DIR = $(CURDIR)/src
 LIB_DIR = $(CURDIR)/lib
+ENV = $(CURDIR)/env
 PYTHONPATH := $(SRC_DIR):$(LIB_DIR):$(CURDIR):$(PYTHONPATH)
 DJANGO_ADMIN = $(LIB)/django/bin/django-admin.py
 DJANGO_MANAGE = $(PYTHON) manage.py
@@ -116,7 +117,9 @@ clean: stop
 	rm -rf tmp/* _trial_temp
 
 lint:
-	dev-scripts/lint.sh
+	virtualenv $(ENV)
+	$(ENV)/bin/pip install flake8
+	$(ENV)/bin/flake8 --filename='*.py' src
 
 etags: sourcedeps
 	# Generate tags for emacs
@@ -127,7 +130,7 @@ tags: sourcedeps
 	ctags-exuberant -R --language-force=python -f tags lib src
 
 version:
-	build/makeversion.sh
+	bzr version-info --format=python > lib/versioninfo.py || true
 
 start: build start-base start-filesync-dummy-group load-sample-data publish-api-port
 

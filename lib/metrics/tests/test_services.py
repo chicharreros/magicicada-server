@@ -21,8 +21,7 @@ from mock import patch
 from testtools import TestCase
 
 from metrics import METER_UTILITY, NamespaceMeter
-from metrics.services import oops_saved, revno
-from versioninfo import version_info
+from metrics.services import oops_saved, revno, version_info
 
 
 class ServicesTest(TestCase):

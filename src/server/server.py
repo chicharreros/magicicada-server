@@ -31,6 +31,7 @@ import signal
 import sys
 import time
 import urllib
+import uuid
 import weakref
 
 from functools import wraps
@@ -42,19 +43,15 @@ import oops
 import oops_datedir_repo
 
 import metrics.services
-import versioninfo
 import timeline
 
+from s3lib.s3lib import S3, ProducerStopped
 from twisted.application.service import MultiService, Service
 from twisted.application.internet import TCPServer
 from twisted.internet.defer import maybeDeferred, inlineCallbacks
 from twisted.internet.protocol import Factory
 from twisted.internet import defer, reactor, error, task, stdio
 from twisted.python.failure import Failure
-
-from s3lib.s3lib import S3, ProducerStopped
-
-import uuid
 
 from metrics import get_meter
 from metrics.metricsconnector import MetricsConnector
@@ -67,6 +64,15 @@ from ubuntuone.storage.rpcdb import inthread
 from ubuntuone.storage.server import auth, content, errors, stats
 from ubuntuone.storageprotocol import protocol_pb2, request, sharersp
 from ubuntuone.supervisor import utils as supervisor_utils
+
+try:
+    from versioninfo import version_info
+except ImportError:
+    version_info = {
+        'branch_nick': 'Unavailable',
+        'revno': 'Unavailable',
+    }
+
 
 # this is the minimal cap we support (to avoid hardcoding it in the code)
 MIN_CAP = frozenset(["no-content", "account-info", "resumable-uploads",
@@ -130,8 +136,8 @@ def configure_oops():
     """Configure the oopses."""
     oops_config = oops.Config()
     oops_config.on_create.append(_prettify_traceback)
-    vers_info = dict(branch_nick=versioninfo.version_info['branch_nick'],
-                     revno=versioninfo.version_info['revno'])
+    vers_info = dict(branch_nick=version_info['branch_nick'],
+                     revno=version_info['revno'])
     oops_config.template.update(vers_info)
     datedir_repo = oops_datedir_repo.DateDirRepo(config.oops.path,
                                                  inherit_id=True)
@@ -451,8 +457,7 @@ class StorageServer(request.RequestHandler):
         self.factory.protocols.append(self)
         self.log.info("Connection Made")
         self.transport.write("%d filesync server revision %s.\r\n" %
-                             (self.PROTOCOL_VERSION,
-                              versioninfo.version_info['revno']))
+                             (self.PROTOCOL_VERSION, version_info['revno']))
         self.ping_loop.start()
         self.factory.metrics.meter("connection_made", 1)
         self.factory.metrics.increment("connections_active")
