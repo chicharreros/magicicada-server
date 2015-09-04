@@ -1,1 +1,0 @@
-../../.sourcecode/ubuntuone-client/ubuntuone/clientdefs.py
