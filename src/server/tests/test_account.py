@@ -55,7 +55,7 @@ class QuotaTest(TestWithDatabase):
         when over quota."""
         self.usr0.update(max_storage_bytes=2 ** 16)
         # need to do something that just can't happen normally
-        store = dbmanager.get_storage_store()
+        store = dbmanager.get_filesync_store()
         info = store.get(model.StorageUserInfo, 0)
         info.used_storage_bytes = 2 ** 17
         store.commit()

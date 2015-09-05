@@ -778,7 +778,7 @@ class TestSharesWithDataLegacy(TestWithDatabase):
         subfile = subdir.make_file(u"subfile")
         subsubdir = subdir.make_subdirectory(u"subsubdir")
         subsubfile = subsubdir.make_file(u"subsubfile")
-        store = dbmanager.get_storage_store()
+        store = dbmanager.get_filesync_store()
         # set all files with an empty hash
         store.find(
             model.StorageObject, model.StorageObject.kind == 'File').set(

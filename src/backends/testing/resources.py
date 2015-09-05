@@ -31,7 +31,7 @@ import transaction
 from backends.db.schemas import account as account_schema
 from backends.db.schemas import storage as storage_schema
 from backends.db.dbwatcher import DatabaseWatcher
-from backends.db.db_admin_store import get_admin_store
+from backends.db.store import get_filesync_store
 from backends.filesync.data.dbmanager import filesync_tm
 
 DEBUG_RESOURCES = bool(os.environ.get("DEBUG_RESOURCES"))
@@ -41,12 +41,11 @@ class DatabaseResource(testresources.TestResource):
     """A resource that resets a database to a known state for each test."""
     _watcher = None
 
-    def __init__(self, dbname, schema_modules, store_name, autocommit=False,
+    def __init__(self, dbname, schema_modules, autocommit=False,
                  tx_manager=transaction):
         super(DatabaseResource, self).__init__()
         self.dbname = dbname
         self.schema_modules = schema_modules
-        self.store_name = store_name
         self.autocommit = autocommit
         self.saw_commit = False
         self.schemas = None
@@ -72,7 +71,7 @@ class DatabaseResource(testresources.TestResource):
         watcher.enable(self.dbname)
         if self.schemas is None:
             self.schemas = [s.create_schema() for s in self.schema_modules]
-        store = get_admin_store(self.store_name)
+        store = get_filesync_store()
         transaction.abort()
         for s in self.schemas:
             s.upgrade(store)
@@ -94,7 +93,7 @@ class DatabaseResource(testresources.TestResource):
         self.tx_manager.abort()
         # Someone committed to the database: clean it up.
         if self.saw_commit:
-            store = get_admin_store(self.store_name)
+            store = get_filesync_store()
             for s in reversed(self.schemas):
                 s.delete(store)
             transaction.commit()
@@ -116,5 +115,4 @@ class DatabaseResource(testresources.TestResource):
 FilesyncDatabaseResource = DatabaseResource(
     dbname='filesync',
     schema_modules=[account_schema, storage_schema],
-    store_name='filesync',
     tx_manager=filesync_tm)

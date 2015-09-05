@@ -88,9 +88,9 @@ def get_store(store_name, zstorm=None):
     return zstorm.get(store_name, default_uri=uri)
 
 
-def get_filesync_store(store_name):
+def get_filesync_store():
     """Get a store using the filesync_tm."""
-    return get_store(store_name, zstorm=filesync_zstorm)
+    return get_store('filesync', zstorm=filesync_zstorm)
 
 
 @contextlib.contextmanager

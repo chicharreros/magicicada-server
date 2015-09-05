@@ -28,7 +28,7 @@ class StoreTestCase(DatabaseResourceTestCase):
 
     def test_get_filesync_store(self):
         """Test get_filesync_store returns the expected store."""
-        db = store.get_filesync_store('filesync').get_database()
+        db = store.get_filesync_store().get_database()
         self.assertTrue(isinstance(db, store.FilesyncDatabase))
         self.assertEqual('filesync', db.name)
 

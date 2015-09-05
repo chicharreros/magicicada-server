@@ -20,7 +20,7 @@
 import uuid
 
 from backends.filesync.data import model
-from backends.filesync.data.dbmanager import get_storage_store, filesync_tm
+from backends.filesync.data.dbmanager import get_filesync_store, filesync_tm
 from backends.filesync.data.testing.testcase import DAOObjectFactory
 from backends.filesync.data.testing.testdata import get_fake_hash
 
@@ -178,4 +178,4 @@ class ORMObjectFactory(DAOObjectFactory):
     @property
     def store(self):
         """Get the store, dont cache, threading issues may arise"""
-        return get_storage_store()
+        return get_filesync_store()

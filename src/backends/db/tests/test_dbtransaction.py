@@ -39,7 +39,7 @@ from backends.testing import testcase
 
 from backends.db import errors
 
-from backends.db.store import get_store
+from backends.db.store import get_filesync_store
 from backends.db.dbtransaction import (
     _check_stores_and_invalidate,
     retryable_transaction,
@@ -767,11 +767,11 @@ class TestCheckStoresAndInvalidate(testcase.DatabaseResourceTestCase):
         logger.addHandler(h)
 
         make_storage_user(1, u'foo', u'foo', 10000)
-        sto = get_store('filesync', filesync_zstorm)
-        self._sto = sto  # for later cleanup
+        store = get_filesync_store()
+        self._sto = store  # for later cleanup
         obj = StorageObject(1, u'foo', u'File')
-        sto.add(obj)
-        sto.flush()
+        store.add(obj)
+        store.flush()
         self.assertFalse(obj.__storm_object_info__.get("invalidated", False))
         _check_stores_and_invalidate(filesync_zstorm)
         self.assertTrue(obj.__storm_object_info__.get("invalidated", False))

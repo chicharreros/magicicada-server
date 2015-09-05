@@ -23,7 +23,7 @@ from itertools import count
 
 from backends.filesync.data import utils, filesync_tm
 from backends.filesync.data.gateway import SystemGateway
-from backends.filesync.data.dbmanager import get_storage_store
+from backends.filesync.data.dbmanager import get_filesync_store
 from backends.filesync.data.testing.testdata import get_fake_hash
 from backends.testing.testcase import DatabaseResourceTestCase
 
@@ -35,7 +35,7 @@ class StorageDALTestCase(DatabaseResourceTestCase):
         """Set up."""
         super(StorageDALTestCase, self).setUp()
         self.obj_factory = DAOObjectFactory()
-        self.store = get_storage_store()
+        self.store = get_filesync_store()
         self.save_utils_set_public_uuid = utils.set_public_uuid
 
     def tearDown(self):

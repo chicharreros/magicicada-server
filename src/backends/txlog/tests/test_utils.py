@@ -133,7 +133,7 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
                 """
                 return type('DummyResultSet', (object,), dict(rowcount=0))
 
-        with patch.object(dbmanager, 'get_storage_store') as mock_get:
+        with patch.object(dbmanager, 'get_filesync_store') as mock_get:
             mock_get.return_value = DummyStore()
 
             self.assertRaises(

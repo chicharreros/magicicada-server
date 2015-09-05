@@ -17,7 +17,7 @@
 
 """Services provided for administrative access to storage data."""
 
-from backends.filesync.data import get_storage_store, model, dao
+from backends.filesync.data import get_filesync_store, model, dao
 from backends.filesync.data.gateway import StorageUserGateway
 from backends.filesync.data.dbmanager import fsync_readonly
 
@@ -34,7 +34,7 @@ class StorageUserFinder(object):
 
     def _find_users(self):
         """Perform storm query based on current filter."""
-        store = get_storage_store()
+        store = get_filesync_store()
         conditions = []
         if self.filter is not None:
             filter = unicode("%" + self.filter + "%")

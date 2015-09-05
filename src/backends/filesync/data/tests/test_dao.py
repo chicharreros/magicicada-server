@@ -33,7 +33,7 @@ from backends.filesync.data.testing.testcase import StorageDALTestCase
 from backends.filesync.data.testing.testdata import (
     get_test_contentblob, get_fake_hash)
 from backends.filesync.data import model, dao, errors, services, utils
-from backends.filesync.data.dbmanager import get_storage_store
+from backends.filesync.data.dbmanager import get_filesync_store
 
 
 class DAOInitTestCase(TestCase):
@@ -1460,7 +1460,7 @@ class TestSQLStatementCount(StorageDALTestCase):
 
     def _flush_store(self):
         """Flushes the store used in tests."""
-        get_storage_store().flush()
+        get_filesync_store().flush()
 
     def _create_directory_with_five_files(self):
         """Creates a DirectoryNode with 5 files inside it."""

@@ -25,7 +25,7 @@ import backends.db.schemas.account as account_schema
 import backends.db.schemas.storage as storage_schema
 import backends.db.schemas.txlog as txlog_schema
 
-from backends.db.store import get_store
+from backends.db.store import get_filesync_store
 from optparse import OptionParser
 
 
@@ -44,9 +44,6 @@ def main(argv):
     parser.add_option("-a", "--all",
                       dest="all", default=False, action="store_true",
                       help="Create all schemas known")
-    parser.add_option("--store", dest="store_name",
-                      help="Used in conjunction with schema to upgrade one "
-                           "schema.")
     parser.add_option("--schema", dest="schema_name",
                       help="Used in conjunction with store to upgrade "
                            "one schema")
@@ -56,18 +53,17 @@ def main(argv):
 
     (options, args) = parser.parse_args()
 
-    def create(schema_name, store_name='filesync'):
+    def create(schema_name):
         """Create the schema using the store."""
         schema = schemas[schema_name]
         if options.dryrun:
             print '*' * 80
-            print 'Dry run of %s schema in %s store' % (
-                schema_name, store_name)
+            print 'Dry run of %s schema' % schema_name
             print '*' * 80
             ddl = schema.create_schema().preview()
             print ddl
         else:
-            target_store = get_store(store_name)
+            target_store = get_filesync_store()
             schema.create_schema().upgrade(target_store)
 
     if options.all:
@@ -79,8 +75,8 @@ def main(argv):
         create('storage')
         create('txlog')
 
-    elif options.store_name and options.schema_name:
-        create(options.schema_name, options.store_name)
+    elif options.schema_name:
+        create(options.schema_name)
     else:
         print "Must be called with --all or --schema and --store"
 

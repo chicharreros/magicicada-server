@@ -19,7 +19,7 @@
 
 from mock import patch
 
-from backends.filesync.data.dbmanager import get_storage_store
+from backends.filesync.data.dbmanager import get_filesync_store
 from backends.filesync.data.gateway import SystemGateway
 from backends.filesync.data.model import (
     PublicNode, STATUS_DEAD, StorageObject, StorageUser, UserVolume)
@@ -441,7 +441,7 @@ class TestTransactionLog(BaseTransactionLogTestCase):
 
         user = StorageUser.new(self.store, user_id, name, visible_name)
 
-        store = get_storage_store()
+        store = get_filesync_store()
         txlog = store.find(TransactionLog, owner_id=user.id).one()
         self.assertTxLogDetailsMatchesUserDetails(user, txlog)
 
@@ -528,7 +528,7 @@ class TestTransactionLog(BaseTransactionLogTestCase):
 
         TransactionLog.bootstrap(user)
 
-        txlog = get_storage_store().find(
+        txlog = get_filesync_store().find(
             TransactionLog, op_type=TransactionLog.OP_USER_CREATED).one()
         self.assertTxLogDetailsMatchesUserDetails(user, txlog)
 
@@ -540,7 +540,7 @@ class TestTransactionLog(BaseTransactionLogTestCase):
 
         TransactionLog.bootstrap(user)
 
-        txlog = get_storage_store().find(
+        txlog = get_filesync_store().find(
             TransactionLog, op_type=TransactionLog.OP_SHARE_ACCEPTED).one()
         expected_attrs = self._get_dict_with_txlog_attrs_from_share(
             share, directory, TransactionLog.OP_SHARE_ACCEPTED)

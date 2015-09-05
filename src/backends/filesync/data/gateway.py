@@ -38,7 +38,7 @@ from metrics.metricsconnector import MetricsConnector
 from backends.db.dbtransaction import db_timeout, TRANSACTION_MAX_TIME
 from backends.filesync.data import model, errors, dao, utils
 from backends.filesync.notifier.notifier import get_notifier
-from backends.filesync.data.dbmanager import get_storage_store
+from backends.filesync.data.dbmanager import get_filesync_store
 from config import config
 
 
@@ -162,7 +162,7 @@ class GatewayBase(object):
     @property
     def store(self):
         """The main storage store."""
-        return get_storage_store()
+        return get_filesync_store()
 
 
 class SystemGateway(GatewayBase):
@@ -185,7 +185,7 @@ class SystemGateway(GatewayBase):
             user.status = 'Live'
             user.subscription_status = 'Live'
         # initialize the user's data
-        store = get_storage_store()
+        store = get_filesync_store()
         # create or update the user info table
         user_info = store.get(model.StorageUserInfo, user_id)
         if user_info is None:
@@ -306,7 +306,7 @@ class SystemGateway(GatewayBase):
                       download_key=None):
         """Make a new download object."""
         self.get_user(user_id)
-        store = get_storage_store()
+        store = get_filesync_store()
         download = model.Download(
             user_id, volume_id, file_path, download_url, download_key)
         store.add(download)
@@ -315,7 +315,7 @@ class SystemGateway(GatewayBase):
     def _get_download(self, user_id, download_id):
         """Internal function to get the download and owner."""
         user = self.get_user(user_id)
-        store = get_storage_store()
+        store = get_filesync_store()
         download = store.get(model.Download, download_id)
         return user, download
 
@@ -323,7 +323,7 @@ class SystemGateway(GatewayBase):
                      download_key=None):
         """Get a download by its UDF, file path and download key."""
         self.get_user(user_id)
-        store = get_storage_store()
+        store = get_filesync_store()
         download = store.find(
             model.Download,
             model.Download.owner_id == user_id,
@@ -382,7 +382,7 @@ class SystemGateway(GatewayBase):
 
     def get_failed_downloads(self, start_date, end_date):
         """Get failed downloads."""
-        store = get_storage_store()
+        store = get_filesync_store()
         result = store.find(
             model.Download,
             model.Download._status == model.DOWNLOAD_STATUS_ERROR,
@@ -393,7 +393,7 @@ class SystemGateway(GatewayBase):
 
     def get_node(self, node_id):
         """Get a node for the specified node_id."""
-        store = get_storage_store()
+        store = get_filesync_store()
         node = store.find(
             model.StorageObject,
             model.StorageObject.status == model.STATUS_LIVE,
@@ -404,7 +404,7 @@ class SystemGateway(GatewayBase):
 
     def get_user_info(self, user_id):
         """Get the UserInfo DAO for user_id"""
-        store = get_storage_store()
+        store = get_filesync_store()
         user_info = store.get(model.StorageUserInfo, user_id)
         if user_info is None:
             raise errors.DoesNotExist(self.user_dne_error)
@@ -413,13 +413,13 @@ class SystemGateway(GatewayBase):
     def cleanup_uploadjobs(self, uploadjobs):
         """Delete uploadjobs."""
         uploadjob_ids = [job.id for job in uploadjobs]
-        store = get_storage_store()
+        store = get_filesync_store()
         store.find(model.UploadJob,
                    model.UploadJob.uploadjob_id.is_in(uploadjob_ids)).remove()
 
     def get_abandoned_uploadjobs(self, last_active, limit=1000):
         """Get uploadjobs that are older than last_active."""
-        store = get_storage_store()
+        store = get_filesync_store()
         jobs = store.find(
             model.UploadJob,
             model.UploadJob.when_last_active < last_active)[:limit]
@@ -431,7 +431,7 @@ class SystemGateway(GatewayBase):
         query = """SELECT id FROM StorageUser
         ORDER BY RANDOM()
         LIMIT 1"""
-        store = get_storage_store()
+        store = get_filesync_store()
         result = store.execute(SQL(query)).get_one()
         return result[0]
 
@@ -455,7 +455,7 @@ class StorageUserGateway(GatewayBase):
         This typically only happens when a user's subscription changes.
         """
         user = self.store.get(model.StorageUser, self.user.id)
-        store = get_storage_store()
+        store = get_filesync_store()
 
         # update the subscription in the user
         if subscription is not None:
@@ -482,14 +482,14 @@ class StorageUserGateway(GatewayBase):
     @timing_metric
     def get_quota(self):
         """Get the user's quota information."""
-        store = get_storage_store()
+        store = get_filesync_store()
         info = store.get(model.StorageUserInfo, self.user.id)
         return dao.UserInfo(info, gateway=self)
 
     @timing_metric
     def recalculate_quota(self):
         """Recalculate a user's quota."""
-        store = get_storage_store()
+        store = get_filesync_store()
         info = store.get(model.StorageUserInfo, self.user.id)
         info.recalculate_used_bytes()
         return dao.UserInfo(info, gateway=self)
@@ -504,7 +504,7 @@ class StorageUserGateway(GatewayBase):
         if not self.user.is_active:
             raise errors.NoPermission(self.inactive_user_error)
         # sanity check
-        store = get_storage_store()
+        store = get_filesync_store()
         udf = store.find(
             model.UserVolume,
             model.UserVolume.owner_id == self.user.id,
@@ -743,7 +743,7 @@ class StorageUserGateway(GatewayBase):
         """Create a UDF."""
         if not self.user.is_active:
             raise errors.NoPermission(self.inactive_user_error)
-        store = get_storage_store()
+        store = get_filesync_store()
         # need a lock here.
         info = store.get(model.StorageUserInfo, self.user.id)
         info.lock_for_update()
@@ -770,7 +770,7 @@ class StorageUserGateway(GatewayBase):
         """Get a UDF by the path parts."""
         if not self.user.is_active:
             raise errors.NoPermission(self.inactive_user_error)
-        store = get_storage_store()
+        store = get_filesync_store()
         path = path.rstrip('/')
         if from_full_path:
             udfs = store.find(
@@ -796,7 +796,7 @@ class StorageUserGateway(GatewayBase):
         """Delete a UDF."""
         if not self.user.is_active:
             raise errors.NoPermission(self.inactive_user_error)
-        store = get_storage_store()
+        store = get_filesync_store()
         udf = store.find(
             model.UserVolume,
             model.UserVolume.id == udf_id,
@@ -819,7 +819,7 @@ class StorageUserGateway(GatewayBase):
         """Get a UDF."""
         if not self.user.is_active:
             raise errors.NoPermission(self.inactive_user_error)
-        store = get_storage_store()
+        store = get_filesync_store()
         udf = store.find(
             model.UserVolume,
             model.UserVolume.id == udf_id,
@@ -835,7 +835,7 @@ class StorageUserGateway(GatewayBase):
         """Return Live UDFs."""
         if not self.user.is_active:
             raise errors.NoPermission(self.inactive_user_error)
-        store = get_storage_store()
+        store = get_filesync_store()
         udfs = store.find(
             model.UserVolume,
             model.UserVolume.owner_id == self.user.id,
@@ -848,7 +848,7 @@ class StorageUserGateway(GatewayBase):
     @timing_metric
     def get_downloads(self):
         """Get all downloads for a user."""
-        store = get_storage_store()
+        store = get_filesync_store()
         return [dao.Download(download)
                 for download in store.find(
                     model.Download,
@@ -857,7 +857,7 @@ class StorageUserGateway(GatewayBase):
     @timing_metric
     def get_public_files(self):
         """Get all public files for a user."""
-        store = get_storage_store()
+        store = get_filesync_store()
         nodes = store.find(
             model.StorageObject,
             model.StorageObject.status == model.STATUS_LIVE,
@@ -871,7 +871,7 @@ class StorageUserGateway(GatewayBase):
     @timing_metric
     def get_public_folders(self):
         """Get all public folders for a user."""
-        store = get_storage_store()
+        store = get_filesync_store()
         nodes = store.find(
             model.StorageObject,
             model.StorageObject.status == model.STATUS_LIVE,
@@ -899,7 +899,7 @@ class StorageUserGateway(GatewayBase):
     @timing_metric
     def get_share_generation(self, share):
         """Get the generation of the speficied share."""
-        store = get_storage_store()
+        store = get_filesync_store()
         vol = store.find(
             model.UserVolume,
             model.UserVolume.id == model.StorageObject.volume_id,
@@ -939,7 +939,7 @@ class StorageUserGateway(GatewayBase):
             WHERE o.id = t.parent_id::UUID AND
                   o.volume_id=u.id AND u.status = E'Live' ;
             """ % dict(owner_id=self.user.id)
-        store = get_storage_store()
+        store = get_filesync_store()
         nodes = store.execute(SQL(sql))
         gws = {}
         for n in nodes:
@@ -978,7 +978,7 @@ class StorageUserGateway(GatewayBase):
 
     def _get_reusable_content(self, hash_value, magic_hash):
         """Get a contentblob for reusable content."""
-        store = get_storage_store()
+        store = get_filesync_store()
 
         # check to see if we have the content blob for that hash
         contentblob = store.find(
@@ -1104,7 +1104,7 @@ class ReadOnlyVolumeGateway(GatewayBase):
     @property
     def store(self):
         """The storm store to use."""
-        return get_storage_store()
+        return get_filesync_store()
 
     def _get_root_node(self):
         """Get the root node for this volume."""
@@ -1142,7 +1142,7 @@ class ReadOnlyVolumeGateway(GatewayBase):
         """Make sure the share is still good."""
         if self.share:
             # if this is a share, make sure it's still valid
-            store = get_storage_store()
+            store = get_filesync_store()
             share = store.find(
                 model.Share,
                 model.Share.id == self.share.id,
@@ -2214,10 +2214,10 @@ def fix_udfs_with_generation_out_of_sync(store, user_ids, logger):
 
 def fix_all_udfs_with_generation_out_of_sync(
         logger, sleep=0, dry_run=False, batch_size=500):
-    from backends.filesync.data.dbmanager import get_storage_store
+    from backends.filesync.data.dbmanager import get_filesync_store
     if dry_run:
         logger.info("Dry-run enabled; not committing any changes.")
-    store = get_storage_store()
+    store = get_filesync_store()
     query = "SELECT id FROM StorageUser"
     user_ids = [row[0] for row in store.execute(query)]
     start = time.time()

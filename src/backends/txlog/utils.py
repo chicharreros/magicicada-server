@@ -46,7 +46,7 @@ def get_last_row(worker_name):
     fsync_commit.
     """
     worker_name = unicode(worker_name)
-    store = dbmanager.get_storage_store()
+    store = dbmanager.get_filesync_store()
 
     last_row = store.execute(u"""SELECT row_id, timestamp
         FROM txlog_db_worker_last_row
@@ -73,7 +73,7 @@ def update_last_row(worker_name, row_id, timestamp):
     decorated with fsync_commit.
     """
     worker_name = unicode(worker_name)
-    store = dbmanager.get_storage_store()
+    store = dbmanager.get_filesync_store()
     result = store.execute(u"""UPDATE txlog_db_worker_last_row
         SET row_id=?, timestamp=?
         WHERE worker_id=?""", (row_id, timestamp, worker_name))
@@ -111,7 +111,7 @@ def get_txn_recs(num_recs, last_id=0,
     """
     if expire_secs is None:
         expire_secs = UNSEEN_EXPIRES
-    store = dbmanager.get_storage_store()
+    store = dbmanager.get_filesync_store()
     parameters = (last_id, )
     select = u"""
         SELECT txlog.id, owner_id, node_id, volume_id, op_type, path,
@@ -195,7 +195,7 @@ def delete_expired_unseen(worker_id, unseen_ids=None,
     if expire_secs is None:
         expire_secs = UNSEEN_EXPIRES
     worker_id = unicode(worker_id)
-    store = dbmanager.get_storage_store()
+    store = dbmanager.get_filesync_store()
     deleted = 0
     condition = (u"created < TIMEZONE('UTC'::text, NOW()) "
                  "     - INTERVAL '{} seconds'".format(expire_secs))
@@ -234,7 +234,7 @@ def delete_old_txlogs(timestamp_limit, quantity_limit=None):
     be deleted.
     """
 
-    store = dbmanager.get_storage_store()
+    store = dbmanager.get_filesync_store()
     parameters = [timestamp_limit]
     inner_select = "SELECT id FROM txlog_transaction_log WHERE timestamp <= ?"
 
@@ -257,7 +257,7 @@ def delete_txlogs_slice(date, quantity_limit):
     precisely from the provided date (a datetime.date object). Also, the
     quantity_limit parameter is mandatory."""
 
-    store = dbmanager.get_storage_store()
+    store = dbmanager.get_filesync_store()
     parameters = [date, quantity_limit]
     inner_select = ("SELECT id FROM txlog_transaction_log "
                     "WHERE timestamp::date = ? LIMIT ?")
@@ -271,7 +271,7 @@ def delete_txlogs_slice(date, quantity_limit):
 
 def get_row_by_time(timestamp):
     """Return the smaller txlog row id in that timestamp (or greater)."""
-    store = dbmanager.get_storage_store()
+    store = dbmanager.get_filesync_store()
     query = """
         SELECT id, timestamp FROM txlog_transaction_log
         WHERE timestamp >= ? ORDER BY id LIMIT 1;
@@ -287,7 +287,7 @@ def get_row_by_time(timestamp):
 def keep_last_rows_for_worker_names(worker_names):
     """Clean rows from txlog_db_worker_last_row that don't match the given
     worker names."""
-    store = dbmanager.get_storage_store()
+    store = dbmanager.get_filesync_store()
     query = ("DELETE FROM txlog_db_worker_last_row "
              "WHERE worker_id NOT IN ?;")
     store.execute(query, (tuple(worker_names), ))

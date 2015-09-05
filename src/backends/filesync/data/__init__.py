@@ -85,7 +85,7 @@ so all transaction management is handled in the DataServices Layer
 
 from ubuntuone.storageprotocol.content_hash import content_hash_factory
 
-from backends.filesync.data.dbmanager import get_storage_store  # NOQA
+from backends.filesync.data.dbmanager import get_filesync_store  # NOQA
 from backends.filesync.data.dbmanager import filesync_tm  # NOQA
 
 EMPTY_CONTENT_HASH = content_hash_factory().content_hash()

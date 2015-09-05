@@ -25,7 +25,7 @@ from storm.expr import Join, LeftJoin
 from storm.locals import Int, DateTime, Enum, Store, Unicode
 from storm.store import AutoReload
 
-from backends.filesync.data.dbmanager import get_storage_store
+from backends.filesync.data.dbmanager import get_filesync_store
 from backends.filesync.data.model import (
     STATUS_LIVE,
     Share,
@@ -112,7 +112,7 @@ class TransactionLog(object):
 
     @classmethod
     def bootstrap(cls, user):
-        store = get_storage_store()
+        store = get_filesync_store()
         cls.record_user_created(user)
         # Number of TransactionLog rows we inserted.
         rows = 1
@@ -177,7 +177,8 @@ class TransactionLog(object):
         conditions = [Share.shared_by == user.id,
                       Share.status == STATUS_LIVE,
                       Share.accepted == True]  # NOQA
-        shares = get_storage_store().using(share_join).find(Share, *conditions)
+        shares = get_filesync_store().using(share_join).find(
+            Share, *conditions)
         for share in shares:
             cls.record_share_accepted(share)
             rows += 1
@@ -233,7 +234,7 @@ class TransactionLog(object):
         txlog = cls(
             None, user.id, None, cls.OP_USER_CREATED, None, None,
             extra_data=extra_data.decode('ascii'))
-        store = get_storage_store()
+        store = get_filesync_store()
         return store.add(txlog)
 
     @classmethod
@@ -329,7 +330,7 @@ class TransactionLog(object):
 
     @classmethod
     def _record_share_accepted_or_deleted(cls, share, op_type):
-        store = get_storage_store()
+        store = get_filesync_store()
         node = store.get(StorageObject, share.subtree)
         when_last_changed = share.when_last_changed
         extra_data = dict(

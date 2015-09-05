@@ -17,7 +17,7 @@
 
 """Manage database connections and stores to the storage database."""
 
-from backends.db.store import get_filesync_store
+from backends.db.store import get_filesync_store  # NOQA
 from backends.db.dbtransaction import (
     get_storm_commit,
     get_storm_readonly,
@@ -28,11 +28,3 @@ from backends.db.dbtransaction import retryable_transaction  # NOQA
 fsync_commit = get_storm_commit(filesync_tm)
 fsync_readonly = get_storm_readonly(filesync_tm)
 fsync_readonly_slave = get_storm_readonly(filesync_tm, use_ro_store=True)
-
-
-def get_storage_store():
-    """Return the default storage store.
-
-    This is primarily for legacy tests while transaction handling is migrated
-    """
-    return get_filesync_store('filesync')

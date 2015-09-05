@@ -26,7 +26,7 @@ from twisted.internet import threads, defer
 from twisted.internet.protocol import connectionDone
 
 
-from backends.filesync.data import get_storage_store, model, filesync_tm
+from backends.filesync.data import get_filesync_store, model, filesync_tm
 
 from ubuntuone.storageprotocol import request, client
 from ubuntuone.storageprotocol.content_hash import content_hash_factory, crc32
@@ -152,7 +152,7 @@ class TestThrottling(TestWithDatabase):
                 def _check_file():
                     filesync_tm.begin()
                     try:
-                        store = get_storage_store()
+                        store = get_filesync_store()
                         content_blob = store.get(model.ContentBlob, hash_value)
                         if not content_blob:
                             raise ValueError("content blob is not there")
@@ -205,7 +205,7 @@ class TestThrottling(TestWithDatabase):
                 def _check_file():
                     filesync_tm.begin()
                     try:
-                        store = get_storage_store()
+                        store = get_filesync_store()
                         content_blob = store.get(model.ContentBlob, hash_value)
                         if not content_blob:
                             raise ValueError("content blob is not there")
