@@ -40,26 +40,26 @@ elif zlib.ZLIB_VERSION == '1.2.3.4':
 
 
 # from inflate.h
-#/*
+# /*
 #     gzip header information passed to and from zlib routines.  See RFC 1952
-#  for more details on the meanings of these fields.
-#*/
-#typedef struct gz_header_s {
-#    int     text;       /* true if compressed data believed to be text */
-#    uLong   time;       /* modification time */
-#    int     xflags;     /* extra flags (not used when writing a gzip file) */
-#    int     os;         /* operating system */
-#    Bytef   *extra;     /* pointer to extra field or Z_NULL if none */
-#    uInt    extra_len;  /* extra field length (valid if extra != Z_NULL) */
-#    uInt    extra_max;  /* space at extra (only when reading header) */
-#    Bytef   *name;      /* pointer to zero-terminated file name or Z_NULL */
-#    uInt    name_max;   /* space at name (only when reading header) */
-#    Bytef   *comment;   /* pointer to zero-terminated comment or Z_NULL */
-#    uInt    comm_max;   /* space at comment (only when reading header) */
-#    int     hcrc;       /* true if there was or will be a header crc */
-#    int     done;       /* true when done reading gzip header (not used
-#                           when writing a gzip file) */
-#} gz_header;
+#     for more details on the meanings of these fields.
+# */
+# typedef struct gz_header_s {
+#     int     text;       /* true if compressed data believed to be text */
+#     uLong   time;       /* modification time */
+#     int     xflags;     /* extra flags (not used when writing a gzip file) */
+#     int     os;         /* operating system */
+#     Bytef   *extra;     /* pointer to extra field or Z_NULL if none */
+#     uInt    extra_len;  /* extra field length (valid if extra != Z_NULL) */
+#     uInt    extra_max;  /* space at extra (only when reading header) */
+#     Bytef   *name;      /* pointer to zero-terminated file name or Z_NULL */
+#     uInt    name_max;   /* space at name (only when reading header) */
+#     Bytef   *comment;   /* pointer to zero-terminated comment or Z_NULL */
+#     uInt    comm_max;   /* space at comment (only when reading header) */
+#     int     hcrc;       /* true if there was or will be a header crc */
+#     int     done;       /* true when done reading gzip header (not used
+#                            when writing a gzip file) */
+# } gz_header;
 
 Bytefp = ctypes.POINTER(ctypes.c_ubyte)
 
@@ -84,24 +84,24 @@ class GZHeader(ctypes.Structure):
     ]
 
 
-#/* Structure for decoding tables.  Each entry provides either the
-#   information needed to do the operation requested by the code that
-#   indexed that table entry, or it provides a pointer to another
-#   table that indexes more bits of the code.  op indicates whether
-#   the entry is a pointer to another table, a literal, a length or
-#   distance, an end-of-block, or an invalid code.  For a table
-#   pointer, the low four bits of op is the number of index bits of
-#   that table.  For a length or distance, the low four bits of op
-#   is the number of extra bits to get after the code.  bits is
-#   the number of bits in this code or part of the code to drop off
-#   of the bit buffer.  val is the actual byte to output in the case
-#   of a literal, the base length or distance, or the offset from
-#   the current table to the next table.  Each entry is four bytes. */
-#typedef struct {
-#    unsigned char op;           /* operation, extra bits, table bits */
-#    unsigned char bits;         /* bits in this part of the code */
-#    unsigned short val;         /* offset in table or code value */
-#} code;
+# /* Structure for decoding tables.  Each entry provides either the
+#    information needed to do the operation requested by the code that
+#    indexed that table entry, or it provides a pointer to another
+#    table that indexes more bits of the code.  op indicates whether
+#    the entry is a pointer to another table, a literal, a length or
+#    distance, an end-of-block, or an invalid code.  For a table
+#    pointer, the low four bits of op is the number of index bits of
+#    that table.  For a length or distance, the low four bits of op
+#    is the number of extra bits to get after the code.  bits is
+#    the number of bits in this code or part of the code to drop off
+#    of the bit buffer.  val is the actual byte to output in the case
+#    of a literal, the base length or distance, or the offset from
+#    the current table to the next table.  Each entry is four bytes. */
+# typedef struct {
+#     unsigned char op;           /* operation, extra bits, table bits */
+#     unsigned char bits;         /* bits in this part of the code */
+#     unsigned short val;         /* offset in table or code value */
+# } code;
 
 class Code(ctypes.Structure):
     """code structure."""
@@ -112,46 +112,47 @@ class Code(ctypes.Structure):
         ('val', ctypes.c_ushort),
     ]
 
-#/* state maintained between inflate() calls.  Approximately 7K bytes. */
-#struct inflate_state {
-#    inflate_mode mode;          /* current inflate mode */
-#    int last;                   /* true if processing last block */
-#    int wrap;                   /* bit 0 true for zlib, bit 1 true for gzip */
-#    int havedict;               /* true if dictionary provided */
-#    int flags;                  /* gzip header method and flags (0 if zlib) */
-#    unsigned dmax;              /* zlib header max distance (INFLATE_STRICT)*/
-#    unsigned long check;        /* protected copy of check value */
-#    unsigned long total;        /* protected copy of output count */
-#    gz_headerp head;            /* where to save gzip header information */
-#        /* sliding window */
-#    unsigned wbits;             /* log base 2 of requested window size */
-#    unsigned wsize;             /* window size or zero if not using window */
-#    unsigned whave;             /* valid bytes in the window */
-#    unsigned write;             /* window write index */
-#    unsigned char FAR *window;  /* allocated sliding window, if needed */
-#        /* bit accumulator */
-#    unsigned long hold;         /* input bit accumulator */
-#    unsigned bits;              /* number of bits in "in" */
-#        /* for string and stored block copying */
-#    unsigned length;            /* literal or length of data to copy */
-#    unsigned offset;            /* distance back to copy string from */
-#        /* for table and code decoding */
-#    unsigned extra;             /* extra bits needed */
-#        /* fixed and dynamic code tables */
-#    code const FAR *lencode;    /* starting table for length/literal codes */
-#    code const FAR *distcode;   /* starting table for distance codes */
-#    unsigned lenbits;           /* index bits for lencode */
-#    unsigned distbits;          /* index bits for distcode */
-#        /* dynamic table building */
-#    unsigned ncode;             /* number of code length code lengths */
-#    unsigned nlen;              /* number of length code lengths */
-#    unsigned ndist;             /* number of distance code lengths */
-#    unsigned have;              /* number of code lengths in lens[] */
-#    code FAR *next;             /* next available space in codes[] */
-#    unsigned short lens[320];   /* temporary storage for code lengths */
-#    unsigned short work[288];   /* work area for code table building */
-#    code codes[ENOUGH];         /* space for code tables */
-#};
+# /* state maintained between inflate() calls.  Approximately 7K bytes. */
+# struct inflate_state {
+#     inflate_mode mode;         /* current inflate mode */
+#     int last;                  /* true if processing last block */
+#     int wrap;                  /* bit 0 true for zlib, bit 1 true for gzip */
+#     int havedict;              /* true if dictionary provided */
+#     int flags;                 /* gzip header method and flags (0 if zlib) */
+#     unsigned dmax;             /* zlib header max distance (INFLATE_STRICT)*/
+#     unsigned long check;       /* protected copy of check value */
+#     unsigned long total;       /* protected copy of output count */
+#     gz_headerp head;           /* where to save gzip header information */
+#         /* sliding window */
+#     unsigned wbits;            /* log base 2 of requested window size */
+#     unsigned wsize;            /* window size or zero if not using window */
+#     unsigned whave;            /* valid bytes in the window */
+#     unsigned write;            /* window write index */
+#     unsigned char FAR *window; /* allocated sliding window, if needed */
+#         /* bit accumulator */
+#     unsigned long hold;        /* input bit accumulator */
+#     unsigned bits;             /* number of bits in "in" */
+#         /* for string and stored block copying */
+#     unsigned length;           /* literal or length of data to copy */
+#     unsigned offset;           /* distance back to copy string from */
+#         /* for table and code decoding */
+#     unsigned extra;            /* extra bits needed */
+#         /* fixed and dynamic code tables */
+#     code const FAR *lencode;   /* starting table for length/literal codes */
+#     code const FAR *distcode;  /* starting table for distance codes */
+#     unsigned lenbits;          /* index bits for lencode */
+#     unsigned distbits;         /* index bits for distcode */
+#         /* dynamic table building */
+#     unsigned ncode;            /* number of code length code lengths */
+#     unsigned nlen;             /* number of length code lengths */
+#     unsigned ndist;            /* number of distance code lengths */
+#     unsigned have;             /* number of code lengths in lens[] */
+#     code FAR *next;            /* next available space in codes[] */
+#     unsigned short lens[320];  /* temporary storage for code lengths */
+#     unsigned short work[288];  /* work area for code table building */
+#     code codes[ENOUGH];        /* space for code tables */
+# };
+
 if zlib.ZLIB_VERSION == '1.2.3.4':
     extra_fields = [
         ('sane', ctypes.c_int),
@@ -216,15 +217,15 @@ class InflateState(ctypes.Structure):
         # head will be always a NULL pointer, as we use raw in/delfate
         state = {}
         # first get the pointers offsets
-        #lencode = ctypes.string_at(self.lencode, ctypes.sizeof(Code))
+        # lencode = ctypes.string_at(self.lencode, ctypes.sizeof(Code))
         lencode_addr = ctypes.addressof(self.lencode.contents)
         codes_start = ctypes.addressof(self.codes)
         lencode = lencode_addr - codes_start
 
-        #distcode = ctypes.string_at(self.distcode, ctypes.sizeof(Code))
+        # distcode = ctypes.string_at(self.distcode, ctypes.sizeof(Code))
         distcode = ctypes.addressof(self.distcode.contents) - codes_start
 
-        #next = ctypes.string_at(self.next, ctypes.sizeof(Code))
+        # next = ctypes.string_at(self.next, ctypes.sizeof(Code))
         next = ctypes.addressof(self.next.contents) - codes_start
 
         # now get the raw memory data

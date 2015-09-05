@@ -42,8 +42,7 @@ from ubuntuone.storageprotocol.content_hash import (
     crc32,
     magic_hash_factory,
 )
-from ubuntuone.storage import rhashlib, rzlib
-from ubuntuone.storage.server import errors
+from ubuntuone.storage.server import errors, rhashlib, rzlib
 
 logger = logging.getLogger("storage.server.upload")
 

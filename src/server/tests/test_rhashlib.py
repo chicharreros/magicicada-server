@@ -21,7 +21,7 @@ import os
 import hashlib
 import unittest
 
-from ubuntuone.storage import rhashlib
+from ubuntuone.storage.server import rhashlib
 from ubuntuone.storageprotocol.content_hash import magic_hash_factory
 
 

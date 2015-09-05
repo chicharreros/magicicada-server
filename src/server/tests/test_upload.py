@@ -28,8 +28,7 @@ from twisted.trial.unittest import TestCase
 from s3lib import producers, s3lib
 from s4 import s4
 
-from ubuntuone.storage import rhashlib, rzlib
-from ubuntuone.storage.server import upload, errors
+from ubuntuone.storage.server import errors, rhashlib, rzlib, upload
 from ubuntuone.storage.server.auth import DummyAuthProvider
 from ubuntuone.storage.server.testing import testcase
 from ubuntuone.storageprotocol.content_hash import (

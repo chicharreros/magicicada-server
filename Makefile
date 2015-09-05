@@ -108,7 +108,7 @@ tarball: build-for-deployment
 raw-test:
 	./test $(TESTFLAGS)
 
-test: sourcedeps clean lint version start-base start-dbus raw-test stop
+test: lint sourcedeps clean version start-base start-dbus raw-test stop
 
 ci-test:
 	$(MAKE) test TESTFLAGS="-1 $(TESTFLAGS)"

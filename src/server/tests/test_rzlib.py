@@ -23,7 +23,7 @@ import os
 import zlib
 import unittest
 
-from ubuntuone.storage import rzlib
+from ubuntuone.storage.server import rzlib
 
 
 class TestRZlib(unittest.TestCase):
@@ -233,7 +233,7 @@ class TestRZlib(unittest.TestCase):
             inflated_data += do.decompress(deflated_data[part:part * 2])
             self.assertRaises(zlib.error, do.decompress, data[part * 2:])
 
-    ##### stdlib zlib tests #####
+    # stdlib zlib tests #
 
     def test_decompressobj_badflush(self):
         """Verify failure on calling decompressobj.flush with bad params."""
@@ -297,7 +297,7 @@ class TestRZlib(unittest.TestCase):
         bufs = []
         cb = combuf
         while cb:
-            #max_length = 1 + len(cb)//10
+            # max_length = 1 + len(cb)//10
             chunk = dco.decompress(cb, dcx)
             self.failIf(len(chunk) > dcx,
                         'chunk too big (%d>%d)' % (len(chunk), dcx))

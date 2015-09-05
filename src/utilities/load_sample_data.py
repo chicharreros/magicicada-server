@@ -20,10 +20,6 @@
 Called by the namesake in the top level utilities/ directory.
 """
 
-import warnings
-#enjoy the silence
-warnings.simplefilter("ignore")
-
 from utilities.userutils import (
     add_auth_info_to_keyfile,
     delete_all_data,
@@ -48,7 +44,7 @@ SAMPLE_USERS = [
 
 def main():
     """Preload the website with some data."""
-    #clear out existing data
+    # clear out existing data
     delete_all_data()
     for user_data in SAMPLE_USERS:
         username = user_data['username']
