@@ -61,7 +61,7 @@ local.register_local_port("carbon_query_port", carbon_query_port)
 port = local.allocate_ports()[0]
 local.register_local_port("graphite-devserver", port)
 
-syncdb = "/usr/bin/django-admin syncdb --noinput"
+syncdb = 'make manage ARGS="migrate --noinput"'
 
 status, output = commands.getstatusoutput(syncdb)
 if status > 0:

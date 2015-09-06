@@ -150,8 +150,8 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         dicts = []
         for txlog in txlogs:
             dicts.append(dict(
-                txn_id=txlog.id, node_id=str(txlog.node_id),
-                owner_id=txlog.owner_id, volume_id=str(txlog.volume_id),
+                txn_id=txlog.id, node_id=txlog.node_id,
+                owner_id=txlog.owner_id, volume_id=txlog.volume_id,
                 op_type=txlog.op_type, path=txlog.path,
                 generation=txlog.generation, timestamp=txlog.timestamp,
                 mimetype=txlog.mimetype, old_path=txlog.old_path,
@@ -254,8 +254,9 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
                   self.obj_factory.make_transaction_log(tx_id=3)]
         worker_id = self.obj_factory.get_unique_unicode()
         txlist = utils.get_txn_recs(num_recs=3, worker_id=worker_id)
-        self.assertEqual(
-            self._convert_txlogs_to_dicts([txlogs[0], txlogs[1]]), txlist)
+
+        expected = self._convert_txlogs_to_dicts([txlogs[0], txlogs[1]])
+        self.assertEqual(expected, txlist)
         unseen = self.obj_factory.make_transaction_log(tx_id=2)
         txlist = utils.get_txn_recs(
             num_recs=3, last_id=txlogs[1].id, worker_id=worker_id)

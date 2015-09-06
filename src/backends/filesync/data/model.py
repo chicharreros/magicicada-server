@@ -927,7 +927,7 @@ class StorageObject(Storm):
         )
         select id from parents where status='Live';
         """ % str(self.parent_id)
-        return [uuid.UUID(r[0]) for r in Store.of(self).execute(sql)]
+        return [r[0] for r in Store.of(self).execute(sql)]
 
 
 class MoveFromShare(StorageObject):

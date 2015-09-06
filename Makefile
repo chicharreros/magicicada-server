@@ -22,7 +22,7 @@ SRC_DIR = $(CURDIR)/src
 LIB_DIR = $(CURDIR)/lib
 ENV = $(CURDIR)/env
 PYTHONPATH := $(SRC_DIR):$(LIB_DIR):$(CURDIR):$(PYTHONPATH)
-DJANGO_ADMIN = $(LIB)/django/bin/django-admin.py
+DJANGO_ADMIN = $(LIB_DIR)/django/bin/django-admin.py
 DJANGO_MANAGE = $(PYTHON) manage.py
 
 MAKEFLAGS:=$(MAKEFLAGS) --no-print-directory
@@ -152,7 +152,7 @@ $(DB_TAG):
 start-db: $(DB_TAG) schema
 
 schema:
-	$(DJANGO_MANAGE) syncdb --noinput
+	$(DJANGO_MANAGE) migrate --noinput
 	./lib/backends/db/scripts/schema --all
 
 stop-db:
@@ -197,6 +197,15 @@ publish-api-port:
 
 load-sample-data:
 	DJANGO_SETTINGS_MODULE=$(DJANGO_SETTINGS_MODULE) $(PYTHON) dev-scripts/load_sample_data.py
+
+shell:
+	$(DJANGO_MANAGE) shell
+
+manage:
+	$(DJANGO_MANAGE) $(ARGS)
+
+admin:
+	$(DJANGO_ADMIN) $(ARGS)
 
 .PHONY: sourcedeps link-sourcedeps build-sourcedeps build-deploy-sourcedeps \
 	build clean version lint test ci-test schema \

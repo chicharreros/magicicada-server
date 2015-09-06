@@ -946,9 +946,9 @@ class StorageUserGateway(GatewayBase):
             (node_id, volume_id, generation, generation_created, kind, name,
                 owner_id, parent_id, path, public_uuid, status, when_created,
                 when_last_modified) = n
-            node_id = uuid.UUID(node_id)
-            volume_id = uuid.UUID(volume_id)
-            public_uuid = uuid.UUID(public_uuid) if public_uuid else None
+            node_id = node_id
+            volume_id = volume_id
+            public_uuid = public_uuid if public_uuid else None
             vgw = gws.get(volume_id)
             if not vgw:
                 if volume_id == self.user.root_volume_id:

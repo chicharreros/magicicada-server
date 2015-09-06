@@ -17,5 +17,9 @@
 
 """RPC DB module."""
 
+import django
+
+django.setup()
+
 # constants to be used to specify which backend the client will use
 DAL_BACKEND, AUTH_BACKEND = "dal", "auth"
