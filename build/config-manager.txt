@@ -23,7 +23,6 @@
 ./.sourcecode/configglue                  ~configglue/configglue/trunk;revno=1
 ./.sourcecode/dirspec                     ~ubuntuone-control-tower/dirspec/trunk;revno=14
 ./.sourcecode/django                      ~ubuntuone-pqm-team/django/stable;revno=15
-./.sourcecode/django-openid-auth          ~ubuntuone-pqm-team/django-openid-auth/stable;revno=107
 ./.sourcecode/mock                        ~ubuntuone-pqm-team/python-mock/stable;revno=1
 ./.sourcecode/oauthlib                    ~ubuntuone-pqm-team/oauthlib/stable;revno=209
 ./.sourcecode/oops                        ~canonical-launchpad-branches/python-oops/trunk;revno=37
@@ -31,7 +30,6 @@
 ./.sourcecode/oops-timeline               ~canonical-launchpad-branches/python-oops-timeline/trunk;revno=3
 ./.sourcecode/requests                    ~ubuntuone-pqm-team/requests/stable;revno=816
 ./.sourcecode/requests_oauthlib           ~ubuntuone-pqm-team/requests-oauthlib/stable;revno=16
-./.sourcecode/ssoclient                   ~ubuntuone-pqm-team/canonical-identity-provider/ssoclient;revno=16
 ./.sourcecode/storm                       ~storm/storm/trunk;revno=475
 ./.sourcecode/timeline                    ~canonical-launchpad-branches/python-timeline/trunk;revno=10
 ./.sourcecode/txstatsd                    ~txstatsd-dev/txstatsd/trunk;revno=109

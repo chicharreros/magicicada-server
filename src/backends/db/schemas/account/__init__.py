@@ -149,8 +149,5 @@ DELETE = [
     "DELETE FROM auth_user",
     "DELETE FROM auth_user_groups",
     "DELETE FROM auth_user_user_permissions",
-    "DELETE FROM django_openid_auth_association",
-    "DELETE FROM django_openid_auth_nonce",
-    "DELETE FROM django_openid_auth_useropenid",
     "ALTER SEQUENCE auth_user_id_seq RESTART WITH 1",
 ]

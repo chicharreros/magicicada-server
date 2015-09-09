@@ -65,7 +65,7 @@ Install tools and dependencies:
         python-yaml python-psycopg2 postgresql-contrib supervisor \
         postgresql-plpython-9.1 python-boto squid python-virtualenv \
         python-protobuf python-psutil python-testresources \
-        python-tz python-bson python-iso8601 python-openid python-meliae
+        python-tz python-bson python-iso8601 python-meliae
 
 For running the tests, install these extra deps:
 
