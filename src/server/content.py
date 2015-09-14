@@ -36,7 +36,7 @@ from twisted.python.failure import Failure
 from s3lib.s3lib import ProducerStopped
 from s3lib.producers import S3Producer, NullConsumer
 from backends.filesync.data import errors as dataerrors
-from config import config
+from filesync import settings
 from ubuntuone.storage.server import errors, upload
 from ubuntuone.storageprotocol import protocol_pb2
 
@@ -130,7 +130,7 @@ class Node(object):
         else:
             headers = None
 
-        producer = yield self._get_producer(config.api_server.s3_bucket,
+        producer = yield self._get_producer(settings.api_server.S3_BUCKET,
                                             str(storage_key), headers, user)
         defer.returnValue(producer)
 
@@ -352,7 +352,7 @@ class BaseUploadJob(object):
         # replace self.producer with a hashing proxy
         self.producer = upload.ProxyHashingProducer(self.producer)
         self.factory = self.s3.put(
-            config.api_server.s3_bucket,
+            settings.api_server.S3_BUCKET,
             str(self._storage_key), self.producer,
             headers={'Content-Length': str(self.deflated_size_hint)},
             streaming=True)
@@ -370,8 +370,8 @@ class BaseUploadJob(object):
         # implementation in the currently available sources) is 1032:1."""
         # http://zlib.net/zlib_tech.html
         self.producer.dataReceived(data)
-        if (not self.blob_exists and
-                self.buffers_size >= config.api_server.upload_buffer_max_size):
+        max_size = settings.api_server.UPLOAD_BUFFER_MAX_SIZE
+        if not self.blob_exists and self.buffers_size >= max_size:
             raise errors.BufferLimit("Buffer limit reached.")
 
     def registerProducer(self, producer):
@@ -691,7 +691,7 @@ class MultipartUploadJob(BaseUploadJob):
         if self.multipart_id and self.multipart_key_name:
             try:
                 self.mp_upload = yield self.s3.get_multipart_upload(
-                    config.api_server.s3_bucket, self.multipart_key_name,
+                    settings.api_server.S3_BUCKET, self.multipart_key_name,
                     self.multipart_id)
             except twisted.web.error.Error as e:
                 # FIXME: we should handle here generic storage errors
@@ -709,10 +709,10 @@ class MultipartUploadJob(BaseUploadJob):
                 # create a new one and reset self.multipart_id
                 self.uploadjob.multipart_id = None
                 self.mp_upload = yield self.s3.create_multipart_upload(
-                    config.api_server.s3_bucket, self.multipart_key_name)
+                    settings.api_server.S3_BUCKET, self.multipart_key_name)
         else:
             self.mp_upload = yield self.s3.create_multipart_upload(
-                config.api_server.s3_bucket, self.multipart_key_name)
+                settings.api_server.S3_BUCKET, self.multipart_key_name)
 
     @defer.inlineCallbacks
     def part_done_callback(self, chunk_count, chunk_size, inflated_size, crc32,
@@ -734,7 +734,7 @@ class MultipartUploadJob(BaseUploadJob):
         # generate a new storage_key for this upload
         self._storage_key = self.multipart_key_name
         self.factory = upload.MultipartUploadFactory(
-            self.mp_upload, config.api_server.storage_chunk_size,
+            self.mp_upload, settings.api_server.STORAGE_CHUNK_SIZE,
             total_size=self.deflated_size_hint,
             offset=self.offset,
             inflated_size=self.uploadjob.inflated_size,
@@ -1123,7 +1123,7 @@ class User(object):
 
         # only use multipart upload if the content does not exist and we're
         # above the minimum file size (if configured)
-        multipart_threshold = config.api_server.multipart_threshold
+        multipart_threshold = settings.api_server.MULTIPART_THRESHOLD
         if (not blob_exists and
                 multipart_threshold > 0 and
                 deflated_size >= multipart_threshold):

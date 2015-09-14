@@ -28,15 +28,12 @@ import time
 import uuid
 import weakref
 
-from config import config
 from metrics.metricsconnector import MetricsConnector
 from mocker import expect, Mocker, MockerTestCase, ARGS, KWARGS, ANY
-
 from twisted.python.failure import Failure
 from twisted.python import log
 from twisted.internet import defer, task, error as txerror
 from twisted.trial.unittest import TestCase as TwistedTestCase
-
 from txstatsd.metrics.extendedmetrics import ExtendedMetrics
 from txstatsd.metrics.gaugemetric import GaugeMetric
 from txstatsd.metrics.metermetric import MeterMetric
@@ -44,6 +41,7 @@ from txstatsd.metrics.metermetric import MeterMetric
 from s3lib import s3lib
 
 from backends.filesync.data import errors as dataerror
+from filesync import settings
 from ubuntuone.devtools.handlers import MementoHandler
 from ubuntuone.storage.server import errors, server
 from ubuntuone.storage.server.server import (
@@ -371,28 +369,20 @@ class StorageServerTestCase(BaseStorageServerTestCase):
 
     def test_protocol_ref_enabled(self):
         """Test that protocol weakref is disabled in tests."""
-        try:
-            _server = StorageServer()
-            old = config.api_server.protocol_weakref
-            config.api_server['protocol_weakref'] = True
-            response = StorageServerRequestResponse(
-                protocol=_server, message=protocol_pb2.Message())
-            self.assertEqual(_server, response._protocol_ref())
-            self.assertEqual(weakref.ref, type(response._protocol_ref))
-        finally:
-            config.api_server['protocol_weakref'] = old
+        self.patch(settings.api_server, 'PROTOCOL_WEAKREF', True)
+        _server = StorageServer()
+        response = StorageServerRequestResponse(
+            protocol=_server, message=protocol_pb2.Message())
+        self.assertEqual(_server, response._protocol_ref())
+        self.assertEqual(weakref.ref, type(response._protocol_ref))
 
     def test_protocol_ref_disabled(self):
         """Test that protocol weakref is disabled in tests."""
-        try:
-            _server = StorageServer()
-            old = config.api_server.protocol_weakref
-            config.api_server['protocol_weakref'] = False
-            response = StorageServerRequestResponse(
-                protocol=_server, message=protocol_pb2.Message())
-            self.assertEqual(_server, response._protocol_ref)
-        finally:
-            config.api_server['protocol_weakref'] = old
+        self.patch(settings.api_server, 'PROTOCOL_WEAKREF', False)
+        _server = StorageServer()
+        response = StorageServerRequestResponse(
+            protocol=_server, message=protocol_pb2.Message())
+        self.assertEqual(_server, response._protocol_ref)
 
     def test_looping_ping_enabled(self):
         """Test that the server instantiates the looping ping."""
@@ -418,7 +408,7 @@ class StorageServerTestCase(BaseStorageServerTestCase):
         # set up
         user = FakeUser()
         assert user.username == 'username'
-        standard_name = config.api_server.logger_name
+        standard_name = settings.api_server.LOGGER_NAME
         assert self.server.logger.name == standard_name
         self.server.factory.trace_users = ['username']
 
@@ -2655,10 +2645,7 @@ class GetDeltaResponseTestCase(SimpleRequestResponseTestCase):
 
     def test_reset_send_delta_info_counter(self):
         """Test that the count is reset on each iteration."""
-        old_max_delta_info = config.api_server.max_delta_info
-        config.api_server['max_delta_info'] = 5
-        self.addCleanup(setattr, config.api_server,
-                        'max_delta_info', old_max_delta_info)
+        self.patch(settings.api_server, 'MAX_DELTA_INFO', 5)
         # create a few fake nodes
         nodes = []
         now = datetime.datetime.utcnow()
@@ -2733,7 +2720,7 @@ class RescanFromScratchResponseTestCase(SimpleRequestResponseTestCase):
     @defer.inlineCallbacks
     def test_chunked_get_from_scratch(self):
         """Get the nodes list in chunks."""
-        config.api_server['get_from_scratch_limit'] = 5
+        self.patch(settings.api_server, 'GET_FROM_SCRATCH_LIMIT', 5)
         # build fake nodes
         nodes = []
         now = datetime.datetime.now()
@@ -2944,9 +2931,7 @@ class StorageServerFactoryTests(TwistedTestCase):
     def test_trace_users(self):
         """Check trace users are correctly set."""
         # set a specific config to test
-        old = config.api_server.trace_users
-        config.api_server.trace_users = ['foo', 'bar', 'baz']
-        self.addCleanup(setattr, config.api_server, 'trace_users', old)
+        self.patch(settings.api_server, 'TRACE_USERS', ['foo', 'bar', 'baz'])
         factory = StorageServerFactory(None, None, None, None, None)
         self.assertEqual(factory.trace_users, set(['foo', 'bar', 'baz']))
 

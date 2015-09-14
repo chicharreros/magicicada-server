@@ -1,4 +1,5 @@
 # Copyright 2008-2015 Canonical
+# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -28,8 +29,32 @@ https://docs.djangoproject.com/en/1.8/ref/settings/
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 import os
+import urllib
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+from psycopg2.extensions import ISOLATION_LEVEL_REPEATABLE_READ
+
+
+def get_postgres_uri(store_settings):
+    """Return a postgres connection uri."""
+    db_name = store_settings['NAME']
+    host = urllib.quote(store_settings['HOST'], safe='')
+    port = store_settings['PORT']
+    username = store_settings['USER']
+    password = store_settings.get('PASSWORD', '')
+    options = store_settings.get('OPTIONS')
+    if password:
+        password = ':' + password
+    uri = 'postgres://'
+    if username:
+        uri += '%s%s@' % (username, password)
+    uri += '%s:%s/%s' % (host, port, db_name)
+    if options:
+        uri += '?%s' % urllib.urlencode(options)
+    return uri
+
+
+BASE_DIR = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 # Quick-start development settings - unsuitable for production
@@ -97,10 +122,17 @@ DATABASES = {
         'NAME': 'filesync',
         'HOST': '/dev/shm/pg_filesync',
         'USER': 'postgres',
+        'OPTIONS': {
+            'isolation_level': ISOLATION_LEVEL_REPEATABLE_READ,
+        },
     },
     'filesync': {
         'ENGINE': 'storm.django.backend',
         'NAME': 'filesync',
+        'HOST': '/dev/shm/pg_filesync',
+        'PORT': 5432,
+        'USER': 'postgres',
+        'OPTIONS': {'isolation': 'repeatable-read'},
     },
 }
 
@@ -111,9 +143,9 @@ DATABASE_PASSWORD = ''
 DATABASE_HOST = ''
 DATABASE_PORT = ''
 
-# import the external settings
-from backends.db.store import get_django_stores
-STORM_STORES = get_django_stores()
+STORM_STORES = {
+    'filesync': get_postgres_uri(DATABASES['filesync']),
+}
 
 
 # Internationalization
@@ -127,7 +159,7 @@ USE_I18N = True
 
 USE_L10N = True
 
-USE_TZ = True
+USE_TZ = False
 
 
 # Static files (CSS, JavaScript, Images)
@@ -135,7 +167,34 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 
+
+# Custom settings
+
+APP_NAME = 'filesync'
+ENVIRONMENT_NAME = 'development'
+GRAPHITE_ADMIN_PASSWORD = 'pwadmin'
+GRAPHITE_ADMIN_USER = 'admin'
+INSTANCE_ID = 1
+LOG_FOLDER = os.path.join(BASE_DIR, 'tmp')
+LOG_FORMAT = '%(asctime)s %(levelname)-8s %(name)s[%(process)d]: %(message)s'
+LOG_LEVEL = 5
+LOG_TO_SYSLOG = False
+OOPS_PATH = os.path.join(BASE_DIR, 'tmp', 'oops')
+SERVICE_GROUP = 'filesync'
+SERVICE_NAME = 'server'
+STATSD_SERVERS = 'localhost:8125'
+STORAGE_PROXY_PORT = None
+SYSLOG_FORMAT = (
+    '%(processName)-13s %(levelname)-8s %(name)s[%(process)d]: %(message)s')
+UPDOWN_PUBLIC_URL_PREFIX = 'http://some_url/p/'
+UPDOWN_PUBLIC_URL_PREFIX_2 = 'http://some_url/'
+
+from . import api_server
+from . import aws
+from . import ssl_proxy
+
+
 try:
-    from filesync.local_settings import *  # noqa
+    from filesync.settings.local import *  # noqa
 except ImportError:
     pass

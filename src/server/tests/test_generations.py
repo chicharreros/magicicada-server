@@ -137,7 +137,7 @@ class TestGetDelta(GenerationsTestCase):
             yield client.dummy_authenticate("open sesame")
             # create some nodes to get a delta
             limit = 10
-            self.patch(server.config.api_server, 'delta_max_size', limit)
+            self.patch(server.settings.api_server, 'DELTA_MAX_SIZE', limit)
             for i in range(20):
                 self.usr0.root.make_file(u"name%s" % i)
             req = yield client.get_delta(request.ROOT, 5)
@@ -180,7 +180,7 @@ class TestGetDelta(GenerationsTestCase):
         def auth(client):
             yield client.dummy_authenticate("open sesame")
             # create some nodes to get a delta
-            self.patch(server.config.api_server, 'max_delta_info', 5)
+            self.patch(server.settings.api_server, 'MAX_DELTA_INFO', 5)
             for i in range(20):
                 self.usr0.root.make_file(u"name%s" % i)
             req = yield client.get_delta(request.ROOT, 5)
@@ -246,7 +246,7 @@ class TestRescanFromScratch(GenerationsTestCase):
         def auth(client):
             yield client.dummy_authenticate("open sesame")
             # create some nodes to get a delta
-            self.patch(server.config.api_server, 'max_delta_info', 5)
+            self.patch(server.settings.api_server, 'MAX_DELTA_INFO', 5)
             for i in range(20):
                 self.usr0.root.make_file(u"name%s" % i)
             req = yield client.get_delta(request.ROOT, 5)

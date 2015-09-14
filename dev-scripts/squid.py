@@ -25,31 +25,46 @@ import subprocess
 
 import _pythonpath  # NOQA
 
-from config import config
+from filesync import settings
 from utilities import utils
-from utilities.localendpoints import allocate_ports, register_local_port
+from utilities.localendpoints import (
+    allocate_ports, register_local_port, get_local_server, get_local_port)
+
+
+def development_ports():
+    """Augment the configuration with branch-local port numbers."""
+    settings.STATSD_SERVERS = get_local_server('statsd')
+    settings.aws.S3_PORT = settings.aws.KEYSTONE_PORT = get_local_port('s4')
+    settings.aws.S3_PROXY_HOST = settings.aws.KEYSTONE_PROXY_HOST = 'localhost'
+    proxy_port = get_local_port('storage-proxy')
+    settings.aws.S3_PROXY_PORT = settings.aws.KEYSTONE_PROXY_PORT = proxy_port
 
 
 def main():
     """Start the squid service."""
+    development_ports()
+
     service_name, config_template = sys.argv[1:3]
     squid_bin = "/usr/sbin/squid3"
-    port = config.storage_proxy.port
+    port = settings.STORAGE_PROXY_PORT
     if not port:
         port = allocate_ports()[0]
         register_local_port(service_name, port, ssl=False)
 
     tmp_dir = utils.get_tmpdir()
     conffile_path = os.path.join(tmp_dir, '%s.conf' % service_name)
+    s3_dstssl = int(settings.aws.S3_PORT) == 443 and "ssl" or ""
+    swift_dstssl = int(settings.aws.KEYSTONE_PORT) == 443 and "ssl" or ""
+
     with open(conffile_path, 'w') as config_out:
         with open(config_template, 'r') as config_in:
             config_out.write(config_in.read().format(
-                s3_dstdomain=config.aws_s3.host,
-                s3_dstport=config.aws_s3.port,
-                s3_dstssl=int(config.aws_s3.port) == 443 and "ssl" or "",
-                swift_dstdomain=config.keystone.host,
-                swift_dstport=config.keystone.port,
-                swift_dstssl=int(config.keystone.port) == 443 and "ssl" or "",
+                s3_dstdomain=settings.aws.S3_HOST,
+                s3_dstport=settings.aws.S3_PORT,
+                s3_dstssl=s3_dstssl,
+                swift_dstdomain=settings.aws.KEYSTONE_HOST,
+                swift_dstport=settings.aws.KEYSTONE_PORT,
+                swift_dstssl=swift_dstssl,
                 service_name=service_name,
                 tmpdir=tmp_dir,
                 port=port))

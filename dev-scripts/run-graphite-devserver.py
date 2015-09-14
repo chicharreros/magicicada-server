@@ -26,7 +26,7 @@ import commands
 import signal
 import subprocess
 
-from config import config
+from django.conf import settings
 import utilities.localendpoints as local
 from utilities.utils import kill_group, get_tmpdir
 
@@ -45,12 +45,8 @@ try:
 except OSError:
     pass
 
-# User our settings instead of graphite.settings
-os.environ['DJANGO_SETTINGS_MODULE'] = \
-    'metrics.graphite_frontend.local_settings'
-
-ADMIN_USER = config.secret.graphite_admin_user
-ADMIN_PASS = config.secret.graphite_admin_password
+ADMIN_USER = settings.GRAPHITE_ADMIN_USER
+ADMIN_PASS = settings.GRAPHITE_ADMIN_PASSWORD
 
 (carbon_line_port, carbon_pickle_port,
  carbon_query_port) = local.allocate_ports(3)
@@ -121,8 +117,10 @@ subprocess.Popen(carbon_cache_command + ['start'],
                  env={"PYTHONPATH": os.pathsep.join(sys.path),
                       "GRAPHITE_ROOT": TMP_DIR}).wait()
 try:
-    subprocess.Popen(["/usr/bin/django-admin",
-                      "runserver", "0.0.0.0:%s" % port]).wait()
+    subprocess.Popen(
+        ["python", "manage.py", "runserver", "0.0.0.0:%s" % port],
+        env={"PYTHONPATH": os.pathsep.join(sys.path),
+             "DJANGO_SETTINGS_MODULE": 'filesync.settings'}).wait()
 except KeyboardInterrupt:
     pass
 subprocess.Popen(carbon_cache_command + ['stop'],

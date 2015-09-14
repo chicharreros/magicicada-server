@@ -40,9 +40,9 @@ from ubuntuone.storage.server.testing.testcase import (
     create_test_user,
 )
 
-from config import config
 from backends.filesync.data import model
 from backends.filesync.data.testing.testcase import StorageDALTestCase
+from filesync import settings
 from ubuntuone.storage.server import ssl_proxy
 from ubuntuone.storageprotocol import request, sharersp, client
 from ubuntuone.storageprotocol.content_hash import content_hash_factory, crc32
@@ -338,7 +338,7 @@ class TestWithDatabase(BaseProtocolTestCase, StorageDALTestCase):
                                                   0,  # port
                                                   "localhost", self.port,
                                                   "ssl-proxy-test", 0)
-        self.patch(config.ssl_proxy, "heartbeat_interval",
+        self.patch(settings.ssl_proxy, 'HEARTBEAT_INTERVAL',
                    self.ssl_proxy_heartbeat_interval)
         yield self.ssl_service.startService()
 

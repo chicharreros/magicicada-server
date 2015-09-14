@@ -29,9 +29,9 @@ import logging
 
 from functools import partial
 from logging.handlers import TimedRotatingFileHandler, WatchedFileHandler
-from twisted.python import log
 
-from config import config
+from django.conf import settings
+from twisted.python import log
 
 
 # disable storm txn logger
@@ -124,21 +124,21 @@ def configure_handler(folder=None, filename=None,
                       log_to_syslog=None, syslog_name=None):
     """Configure a logging handler."""
     if folder is None:
-        folder = config.general.log_folder
+        folder = settings.LOG_FOLDER
     if log_format is None:
-        log_format = config.general.log_format
+        log_format = settings.LOG_FORMAT
     if logger_class is None:
         logger_class = SignalAwareFileHandler
     if log_to_syslog is None:
-        log_to_syslog = config.general.log_to_syslog
+        log_to_syslog = settings.LOG_TO_SYSLOG
     if syslog_name is None:
-        syslog_name = config.general.app_name
+        syslog_name = settings.APP_NAME
 
     datefmt = None
     if log_to_syslog:
         datefmt = "%Y-%m-%dT%H:%M:%S"
         log_format = " ".join(["%(asctime)s.%(msecs)03dZ", platform.node(),
-                               syslog_name, config.general.syslog_format])
+                               syslog_name, settings.SYSLOG_FORMAT])
         handler = SysLogHandler()
     else:
         if filename is not None:
@@ -165,7 +165,7 @@ def configure_logger(name=None, logger=None, filename=None, folder=None,
                      log_to_syslog=None):
     """Configure the logger."""
     if level is None:
-        level = config.general.log_level
+        level = settings.LOG_LEVEL
     if syslog_name is None:
         syslog_name = name
 
@@ -202,6 +202,6 @@ def configure_logger(name=None, logger=None, filename=None, folder=None,
 
 def setup_logging(name, logger=None, start_observer=False):
     """Setting up logging."""
-    cfg = getattr(config, name)
+    cfg = getattr(settings, name)
     return configure_logger(name, logger=logger, filename=cfg.log_filename,
                             propagate=False, start_observer=start_observer)

@@ -42,7 +42,6 @@ for td in TESTDIRS:
 def setup_environment(django_settings):
     """Setup the envrionment for running tests."""
     ROOTDIR = os.path.abspath(os.path.curdir)
-    os.environ['CONFIG'] = os.path.join(ROOTDIR, 'configs', "development.yaml")
     os.environ["DJANGO_SETTINGS_MODULE"] = django_settings
     os.environ["XDG_CACHE_HOME"] = os.path.join(ROOTDIR, 'tmp', 'xdg_cache')
 

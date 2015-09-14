@@ -31,10 +31,9 @@ from twisted.python import failure
 from twisted.web import client, error as web_error
 from twisted.trial.unittest import TestCase
 
-from config import config
-
-from ubuntuone.devtools.handlers import MementoHandler
+from filesync import settings
 from metrics.metricsconnector import MetricsConnector
+from ubuntuone.devtools.handlers import MementoHandler
 from ubuntuone.storage.server.testing.testcase import TestWithDatabase
 from ubuntuone.storage.server import ssl_proxy
 from ubuntuone.storage.server.server import PREFERRED_CAP
@@ -52,13 +51,13 @@ class SSLProxyServiceTest(TestWithDatabase):
     def setUp(self):
         yield super(SSLProxyServiceTest, self).setUp()
         self.configure_logging()
-        self._old_heartbeat_interval = config.ssl_proxy.heartbeat_interval
         self.metrics = MetricReceiver()
-        namespace = config.ssl_proxy.metrics_namespace
+        namespace = settings.ssl_proxy.METRICS_NAMESPACE
         instance = MetricsConnector.new_txmetrics(connection=self.metrics,
                                                   namespace=namespace)
         MetricsConnector.register_metrics("ssl-proxy", namespace, instance)
-        config.ssl_proxy.heartbeat_interval = self.ssl_proxy_heartbeat_interval
+        self.patch(settings.ssl_proxy, 'HEARTBEAT_INTERVAL',
+                   self.ssl_proxy_heartbeat_interval)
 
     def configure_logging(self):
         """Configure logging for the tests."""
@@ -71,7 +70,6 @@ class SSLProxyServiceTest(TestWithDatabase):
 
     @defer.inlineCallbacks
     def tearDown(self):
-        config.ssl_proxy.heartbeat_interval = self._old_heartbeat_interval
         yield super(SSLProxyServiceTest, self).tearDown()
         MetricsConnector.unregister_metrics()
 
@@ -103,12 +101,12 @@ class SSLProxyTestCase(TestWithDatabase):
                                                   "ssl-proxy-test", 0)
         # keep metrics in our MetricReceiver
         self.metrics = MetricReceiver()
-        namespace = config.ssl_proxy.metrics_namespace
+        namespace = settings.ssl_proxy.METRICS_NAMESPACE
         instance = MetricsConnector.new_txmetrics(connection=self.metrics,
                                                   namespace=namespace)
         MetricsConnector.register_metrics("ssl-proxy", namespace, instance)
-        self._old_heartbeat_interval = config.ssl_proxy.heartbeat_interval
-        config.ssl_proxy.heartbeat_interval = self.ssl_proxy_heartbeat_interval
+        self.patch(settings.ssl_proxy, 'HEARTBEAT_INTERVAL',
+                   self.ssl_proxy_heartbeat_interval)
         yield self.ssl_service.startService()
 
     def configure_logging(self):
@@ -122,7 +120,6 @@ class SSLProxyTestCase(TestWithDatabase):
 
     @defer.inlineCallbacks
     def tearDown(self):
-        config.ssl_proxy.heartbeat_interval = self._old_heartbeat_interval
         yield super(SSLProxyTestCase, self).tearDown()
         yield self.ssl_service.stopService()
         MetricsConnector.unregister_metrics()

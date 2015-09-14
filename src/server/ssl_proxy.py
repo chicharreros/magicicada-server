@@ -31,7 +31,7 @@ from twisted.protocols import portforward, basic
 from twisted.web import server, resource
 from zope.component.interfaces import ComponentLookupError
 
-from config import config
+from filesync import settings
 from metrics.metricsconnector import MetricsConnector
 from ubuntuone.storage.server.logger import configure_logger
 from ubuntuone.storage.server.server import get_service_port
@@ -142,7 +142,7 @@ class SSLProxyFactory(portforward.ProxyFactory):
         try:
             self.metrics = MetricsConnector.get_metrics("ssl-proxy")
         except ComponentLookupError:
-            namespace = config.ssl_proxy.metrics_namespace
+            namespace = settings.ssl_proxy.METRICS_NAMESPACE
             MetricsConnector.register_metrics("ssl-proxy", namespace)
             self.metrics = MetricsConnector.get_metrics("ssl-proxy")
         self.metrics.meter("server_start", 1)
@@ -251,7 +251,7 @@ class ProxyService(MultiService):
         self.status_service = create_status_service(self.factory, status_port)
         self.status_service.setServiceParent(self)
         # disable ssl compression
-        if config.ssl_proxy.disable_ssl_compression:
+        if settings.ssl_proxy.DISABLE_SSL_COMPRESSION:
             disable_ssl_compression(logger)
 
     @property
@@ -271,7 +271,7 @@ class ProxyService(MultiService):
         # setup stats in the factory
         yield MultiService.startService(self)
         # only start the HeartbeatWriter if the interval is > 0
-        heartbeat_interval = float(config.ssl_proxy.heartbeat_interval)
+        heartbeat_interval = float(settings.ssl_proxy.HEARTBEAT_INTERVAL)
         if heartbeat_interval > 0:
             self.heartbeat_writer = stdio.StandardIO(
                 supervisor_utils.HeartbeatWriter(heartbeat_interval, logger))
@@ -289,11 +289,11 @@ class ProxyService(MultiService):
 
 def create_service():
     """Create the service instance."""
-    configure_logger(logger=logger, filename=config.ssl_proxy.log_filename,
+    configure_logger(logger=logger, filename=settings.ssl_proxy.LOG_FILENAME,
                      level=logging.DEBUG, propagate=False, start_observer=True)
-    server_key = config.secret.api_server_key
-    server_crt = config.secret.api_server_crt
-    server_crt_chain = config.secret.api_server_crt_chain
+    server_key = settings.api_server.KEY
+    server_crt = settings.api_server.CRT
+    server_crt_chain = settings.api_server.CRT_CHAIN
 
     ssl_cert = crypto.load_certificate(crypto.FILETYPE_PEM, server_crt)
     if server_crt_chain:
@@ -304,11 +304,11 @@ def create_service():
     ssl_key = crypto.load_privatekey(crypto.FILETYPE_PEM, server_key)
 
     ssl_proxy = ProxyService(ssl_cert, ssl_key, ssl_cert_chain,
-                             config.ssl_proxy.port,
+                             settings.ssl_proxy.PORT,
                              '127.0.0.1',
-                             config.api_server.tcp_port,
-                             config.ssl_proxy.server_name,
-                             config.ssl_proxy.status_port)
+                             settings.api_server.TCP_PORT,
+                             settings.ssl_proxy.SERVER_NAME,
+                             settings.ssl_proxy.STATUS_PORT)
     return ssl_proxy
 
 

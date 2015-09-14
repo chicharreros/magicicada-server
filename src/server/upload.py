@@ -30,13 +30,14 @@ import zlib
 
 from cStringIO import StringIO
 
-from twisted.internet import defer, interfaces
-from twisted.python.failure import Failure
 import twisted.internet.error
-from zope.interface import implements
 
 from s3lib.producers import ConsumerToBuffer
-from config import config
+from twisted.internet import defer, interfaces
+from twisted.python.failure import Failure
+from zope.interface import implements
+
+from filesync import settings
 from ubuntuone.storageprotocol.content_hash import (
     content_hash_factory,
     crc32,
@@ -317,7 +318,7 @@ class MultipartUploadFactory(HashingMixin):
             else:
                 self._send(data)
         # check buffer size
-        if self.buffer_size >= config.api_server.upload_buffer_max_size:
+        if self.buffer_size >= settings.api_server.UPLOAD_BUFFER_MAX_SIZE:
             # we should pause the client transport/conn
             self.producer.pauseProducing()
 

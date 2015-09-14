@@ -28,14 +28,13 @@ import psutil
 
 from supervisor import childutils, states
 
+from django.conf import settings
 from metrics.metricsconnector import MetricsConnector
 from txstatsd.process import (
     report_file_stats, report_counters, report_system_stats,
     parse_meminfo, parse_loadavg, parse_netdev, ProcessReport)
 
 from ubuntuone.storage.server.logger import configure_logger
-
-from config import config
 
 
 SYSTEM_STATS = (
@@ -169,7 +168,7 @@ if __name__ == '__main__':
 
     if not options.metric_namespace_prefix:
         options.metric_namespace_prefix = "%s.%s" % (
-            config.general.environment_name, platform.node())
+            settings.ENVIRONMENT_NAME, platform.node())
 
     # start the process
     rpc = childutils.getRPCInterface(os.environ)

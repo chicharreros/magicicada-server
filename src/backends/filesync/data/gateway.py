@@ -30,6 +30,7 @@ import uuid
 
 from functools import wraps
 
+from django.conf import settings
 from storm.locals import SQL
 from storm.expr import Or, LeftJoin, Desc, And
 from storm.info import ClassAlias
@@ -39,14 +40,13 @@ from backends.db.dbtransaction import db_timeout, TRANSACTION_MAX_TIME
 from backends.filesync.data import model, errors, dao, utils
 from backends.filesync.notifier.notifier import get_notifier
 from backends.filesync.data.dbmanager import get_filesync_store
-from config import config
 
 
 class TimingMetrics(object):
     """Class to hold everything related to the timing metrics of DB calls."""
 
     def __init__(self):
-        namespace = config.general.environment_name + ".filesync.DAL"
+        namespace = settings.ENVIRONMENT_NAME + ".filesync.DAL"
         self.reporter = MetricsConnector.new_metrics(namespace=namespace)
 
     def __call__(self, orig_func):

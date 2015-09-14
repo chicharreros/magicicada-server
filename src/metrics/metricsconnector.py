@@ -17,13 +17,12 @@
 
 """Report metric samples to statsd."""
 
+from django.conf import settings
 from txstatsd.client import (
     StatsDClientProtocol, TwistedStatsDClient,
     UdpStatsDClient, ConsistentHashingClient)
 from txstatsd.metrics.extendedmetrics import ExtendedMetrics
 from txstatsd.metrics.imetrics import IMetrics
-
-from config import config
 
 from zope.component import globalSiteManager as gsm
 
@@ -75,7 +74,7 @@ class MetricsConnector(object):
     @classmethod
     def _realise_connection(cls, async):
         """Return a configured statsd client connection."""
-        servers = config.statsd.servers
+        servers = settings.STATSD_SERVERS
         if servers is None:
             raise LookupError('Unable to obtain the statsd configuration')
 

@@ -33,13 +33,13 @@ reactor.suggestThreadPoolSize(30)
 
 import _pythonpath  # NOQA
 
+from filesync import settings
 from s4 import s4
 from ubuntuone.storage.server import server
 from utilities import utils
-from config import config
 
-s3host = config.aws_s3.host
-s3port = int(os.getenv('S4PORT', config.aws_s3.port))
+s3host = settings.aws.S3_HOST
+s3port = int(os.getenv('S4PORT', settings.aws.S3_PORT))
 
 tmp_dir = os.path.join(utils.get_rootdir(), 'tmp')
 api_port_filename = os.path.join(tmp_dir, "filesyncserver.port")
@@ -57,9 +57,9 @@ def cleanup():
 def main():
     """Start the server."""
 
-    status_port = int(os.getenv('API_STATUS_PORT',
-                                config.api_server.status_port))
-    service = server.create_service(s3host, s3port, config.aws_s3.use_ssl,
+    status_port = int(
+        os.getenv('API_STATUS_PORT', settings.api_server.STATUS_PORT))
+    service = server.create_service(s3host, s3port, settings.aws.S3_USE_SSL,
                                     s4.AWS_DEFAULT_ACCESS_KEY_ID,
                                     s4.AWS_DEFAULT_SECRET_ACCESS_KEY,
                                     status_port)

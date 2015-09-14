@@ -22,7 +22,7 @@ import re
 import unicodedata
 import uuid
 
-from config import config
+from django.conf import settings
 
 MAX_IS_IN_SIZE = 50
 
@@ -199,11 +199,11 @@ def get_node_public_key(node, from_uuid=False):
 
 def get_public_file_url(node):
     """Return the url to a public file."""
-    if config.updown.public_url_prefix_2 and node.public_uuid:
-        return "%s%s" % (config.updown.public_url_prefix_2,
+    if settings.UPDOWN_PUBLIC_URL_PREFIX_2 and node.public_uuid:
+        return "%s%s" % (settings.UPDOWN_PUBLIC_URL_PREFIX_2,
                          get_node_public_key(node, True))
     elif node.publicfile_id:
-        return "%s%s/" % (config.updown.public_url_prefix,
+        return "%s%s/" % (settings.UPDOWN_PUBLIC_URL_PREFIX,
                           get_node_public_key(node, False))
 
 

@@ -28,7 +28,6 @@ warnings.simplefilter("ignore")
 import _pythonpath  # NOQA
 
 # fix environment before further imports
-os.environ['CONFIG'] = "configs/development.yaml"
 os.environ["DJANGO_SETTINGS_MODULE"] = "filesync.settings"
 
 from django.contrib.auth.models import User

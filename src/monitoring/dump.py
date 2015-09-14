@@ -21,7 +21,7 @@ import os
 import gc
 import datetime
 
-from config import config
+from django.conf import settings
 
 
 SIGMELIAE = 44
@@ -32,7 +32,7 @@ def meliae_dump():
     try:
         from meliae import scanner
 
-        dump_dir = config.general.log_folder
+        dump_dir = settings.LOG_FOLDER
         filename = os.path.join(dump_dir, 'meliae-%s.json' % (
             datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S",)))
         gc.collect()
@@ -48,7 +48,7 @@ def meliae_dump():
 def gc_dump():
     """Dump GC usage."""
     try:
-        dump_dir = config.general.log_folder
+        dump_dir = settings.LOG_FOLDER
         tstamp = datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S")
         fname = os.path.join(dump_dir, 'gcdump-%s.txt' % (tstamp,))
         fh = open(fname, "w")

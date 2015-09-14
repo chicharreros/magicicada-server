@@ -35,7 +35,6 @@ export PYTHONPATH
 export DJANGO_SETTINGS_MODULE
 export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION
 export ROOTDIR ?= $(CURDIR)
-export CONFIG = $(CURDIR)/configs/development.yaml
 
 SOURCEDEPS_TAG = .sourcecode/sourcedeps-tag
 SOURCEDEPS_DIR ?= ../sourcedeps
@@ -193,7 +192,9 @@ stop-%:
 	-@dev-scripts/supervisorctl-dev stop $*
 
 publish-api-port:
-	python -c 'from config import config; print >> file("tmp/filesyncserver.port", "w"), config.api_server.tcp_port; print >> file("tmp/filesyncserver.port.ssl", "w"), config.ssl_proxy.port; print >> file("tmp/filesyncserver-status.port", "w"), config.api_server.status_port'
+	python -c 'from filesync import settings; print >> file("tmp/filesyncserver.port", "w"), settings.api_server.TCP_PORT'
+	python -c 'from filesync import settings; print >> file("tmp/filesyncserver.port.ssl", "w"), settings.ssl_proxy.PORT'
+	python -c 'from filesync import settings; print >> file("tmp/filesyncserver-status.port", "w"), settings.api_server.STATUS_PORT'
 
 load-sample-data:
 	DJANGO_SETTINGS_MODULE=$(DJANGO_SETTINGS_MODULE) $(PYTHON) dev-scripts/load_sample_data.py

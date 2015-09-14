@@ -21,7 +21,7 @@ import gc
 import shutil
 import tempfile
 
-from config import config
+from django.conf import settings
 from mocker import MockerTestCase, ANY
 
 from ubuntuone.monitoring.dump import gc_dump, meliae_dump
@@ -32,10 +32,10 @@ class TestDump(MockerTestCase):
 
     def setUp(self):
         super(TestDump, self).setUp()
-        log_folder = config.general.log_folder
+        log_folder = settings.LOG_FOLDER
         temp_folder = tempfile.mkdtemp()
-        config.general.update([("log_folder", temp_folder)])
-        self.addCleanup(config.general.update, [("log_folder", log_folder)])
+        settings.LOG_FOLDER = temp_folder
+        self.addCleanup(setattr, settings, 'LOG_FOLDER', log_folder)
         self.addCleanup(shutil.rmtree, temp_folder)
 
     def test_meliae_dump(self):

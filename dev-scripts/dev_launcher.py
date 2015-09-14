@@ -25,7 +25,6 @@ import sys
 import _pythonpath
 
 # fix environment before further imports
-os.environ['CONFIG'] = "configs/development.yaml"
 os.environ["DJANGO_SETTINGS_MODULE"] = "filesync.settings"
 
 from utilities import dev_launcher

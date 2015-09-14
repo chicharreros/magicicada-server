@@ -27,7 +27,6 @@ import inspect
 import logging
 import os
 import re
-import signal
 import sys
 import time
 import urllib
@@ -57,8 +56,8 @@ from metrics import get_meter
 from metrics.metricsconnector import MetricsConnector
 from backends.filesync.data import errors as dataerror
 from backends.filesync.notifier import notifier
+from filesync import settings
 from ubuntuone.storage.server.logger import configure_logger, TRACE
-from config import config
 from ubuntuone.monitoring.reactor import ReactorInspector
 from ubuntuone.storage.rpcdb import inthread
 from ubuntuone.storage.server import auth, content, errors, stats
@@ -91,19 +90,6 @@ SUGGESTED_REDIRS = {
 }
 
 MAX_OOPS_LINE = 300
-
-
-def install_signal_handlers():
-    """Install custom SIGUSR2 handler."""
-    reactor.callWhenRunning(signal.signal, signal.SIGUSR2, sigusr2_handler)
-
-
-def sigusr2_handler(signum, frame):
-    """Handle SIGUSR2 to reload the config."""
-    import config
-    logger = logging.getLogger("storage.server")
-    logger.info('Reloading config file')
-    config.config = config._Config()
 
 
 def loglevel(lvl):
@@ -139,7 +125,7 @@ def configure_oops():
     vers_info = dict(branch_nick=version_info['branch_nick'],
                      revno=version_info['revno'])
     oops_config.template.update(vers_info)
-    datedir_repo = oops_datedir_repo.DateDirRepo(config.oops.path,
+    datedir_repo = oops_datedir_repo.DateDirRepo(settings.OOPS_PATH,
                                                  inherit_id=True)
 
     oops_config.publisher = oops.publishers.publish_to_many(
@@ -332,14 +318,14 @@ class StorageServer(request.RequestHandler):
         self.user = None
         self.factory = None
         self.session_id = uuid.uuid4()
-        self.logger = logging.getLogger(config.api_server.logger_name)
+        self.logger = logging.getLogger(settings.api_server.LOGGER_NAME)
         self.log = StorageServerLogger(self)
         self.shutting_down = False
         self.request_locked = False
         self.pending_requests = collections.deque()
         self.ping_loop = LoopingPing(StorageServer.PING_INTERVAL,
                                      StorageServer.PING_TIMEOUT,
-                                     config.api_server.idle_timeout,
+                                     settings.api_server.IDLE_TIMEOUT,
                                      self)
 
         # capabilities that the server is working with
@@ -354,7 +340,7 @@ class StorageServer(request.RequestHandler):
         self.user = user
         if user.username in self.factory.trace_users:
             # set up the logger to use the hackers' one
-            hackers_logger = config.api_server.logger_name + '.hackers'
+            hackers_logger = settings.api_server.LOGGER_NAME + '.hackers'
             self.logger = logging.getLogger(hackers_logger)
 
     def poison(self, tag):
@@ -713,7 +699,7 @@ class BaseRequestResponse(request.RequestResponse):
 
     def __init__(self, protocol, message):
         """Create the request response."""
-        self.use_protocol_weakref = config.api_server.protocol_weakref
+        self.use_protocol_weakref = settings.api_server.PROTOCOL_WEAKREF
         self._protocol_ref = None
         self.timeline = timeline.Timeline(format_stack=None)
         super(BaseRequestResponse, self).__init__(protocol, message)
@@ -1915,7 +1901,7 @@ class PutContentResponse(SimpleRequestResponse):
     def _get_upload_job(self):
         """Get the uploadjob."""
         share_id = self.convert_share_id(self.source_message.put_content.share)
-        if config.api_server.magic_upload_active:
+        if settings.api_server.MAGIC_UPLOAD_ACTIVE:
             magic_hash = self.source_message.put_content.magic_hash or None
         else:
             magic_hash = None
@@ -1979,7 +1965,7 @@ class GetDeltaResponse(SimpleRequestResponse):
         msg = self.source_message
         share_id = self.convert_share_id(msg.get_delta.share)
         from_generation = msg.get_delta.from_generation
-        delta_max_size = config.api_server.delta_max_size
+        delta_max_size = settings.api_server.DELTA_MAX_SIZE
         delta_info = yield self.protocol.user.get_delta(
             share_id, from_generation, limit=delta_max_size)
         nodes, vol_generation, free_bytes = delta_info
@@ -2014,7 +2000,7 @@ class GetDeltaResponse(SimpleRequestResponse):
         """Build and send the DELTA_INFO for each node."""
         count = 0
         for node in nodes:
-            if count == config.api_server.max_delta_info:
+            if count == settings.api_server.MAX_DELTA_INFO:
                 count = 0
                 yield
             message = protocol_pb2.Message()
@@ -2055,7 +2041,7 @@ class RescanFromScratchResponse(GetDeltaResponse):
     def _process(self):
         """Get all the live nodes and send DeltaInfos."""
         msg = self.source_message
-        limit = config.api_server.get_from_scratch_limit
+        limit = settings.api_server.GET_FROM_SCRATCH_LIMIT
         share_id = self.convert_share_id(msg.get_delta.share)
         # get the first chunk
         delta_info = yield self.protocol.user.get_from_scratch(
@@ -2407,7 +2393,7 @@ class StorageServerFactory(Factory):
     @cvar protocol: The class of the server.
     """
     protocol = StorageServer
-    graceful_shutdown = config.api_server.graceful_shutdown
+    graceful_shutdown = settings.api_server.GRACEFUL_SHUTDOWN
 
     def __init__(self, s3_host, s3_port, s3_ssl, s3_key, s3_secret,
                  s3_proxy_host=None, s3_proxy_port=None,
@@ -2462,7 +2448,7 @@ class StorageServerFactory(Factory):
 
         self.protocols = []
         self.reactor = reactor
-        self.trace_users = set(config.api_server.trace_users)
+        self.trace_users = set(settings.api_server.TRACE_USERS)
 
         # oops and log observer
         self.oops_config = oops_config
@@ -2750,27 +2736,27 @@ class StorageServerService(OrderedMultiService):
         OrderedMultiService.__init__(self)
         self.heartbeat_writer = None
         if heartbeat_interval is None:
-            heartbeat_interval = float(config.api_server.heartbeat_interval)
+            heartbeat_interval = float(settings.api_server.HEARTBEAT_INTERVAL)
         self.heartbeat_interval = heartbeat_interval
         self.rpcdal_client = None
         self.rpcauth_client = None
         self.logger = logging.getLogger("storage.server")
-        self.servername = config.api_server.servername
+        self.servername = settings.api_server.SERVERNAME
         self.logger.info("Starting %s", self.servername)
         self.logger.info(
             "protocol buffers implementation: %s",
             os.environ.get("PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION", "None"))
 
-        namespace = config.api_server.metrics_namespace
+        namespace = settings.api_server.METRICS_NAMESPACE
         # Register all server metrics components
         MetricsConnector.register_metrics("root", namespace)
         # Important:  User activity is in a global namespace!
-        environment = config.general.environment_name
+        environment = settings.ENVIRONMENT_NAME
         user_namespace = environment + ".storage.user_activity"
         MetricsConnector.register_metrics("user", user_namespace)
         MetricsConnector.register_metrics("reactor_inspector",
                                           namespace + ".reactor_inspector")
-        sli_metric_namespace = config.api_server.sli_metric_namespace
+        sli_metric_namespace = settings.api_server.SLI_METRIC_NAMESPACE
         MetricsConnector.register_metrics('sli', sli_metric_namespace)
 
         self.metrics = get_meter(scope='service')
@@ -2798,7 +2784,7 @@ class StorageServerService(OrderedMultiService):
             self, listeners, status_port)
 
         self.next_log_loop = None
-        stats_log_interval = config.api_server.stats_log_interval
+        stats_log_interval = settings.api_server.STATS_LOG_INTERVAL
         self.stats_worker = stats.StatsWorker(self, stats_log_interval,
                                               self.servername)
 
@@ -2872,18 +2858,18 @@ def create_service(s3_host, s3_port, s3_ssl, s3_key, s3_secret,
     """Start the StorageServer service."""
 
     # configure logs
-    logger = logging.getLogger(config.api_server.logger_name)
+    logger = logging.getLogger(settings.api_server.LOGGER_NAME)
     handler = configure_logger(logger=logger, propagate=False,
-                               filename=config.api_server.log_filename,
+                               filename=settings.api_server.LOG_FILENAME,
                                start_observer=True)
 
     # set up s3
     s3_logger = logging.getLogger('s3lib')
-    s3_logger.setLevel(config.general.log_level)
+    s3_logger.setLevel(settings.LOG_LEVEL)
     s3_logger.addHandler(handler)
 
     # set up the hacker's logger always in TRACE
-    h_logger = logging.getLogger(config.api_server.logger_name + ".hackers")
+    h_logger = logging.getLogger(settings.api_server.LOGGER_NAME + ".hackers")
     h_logger.setLevel(TRACE)
     h_logger.propagate = False
     h_logger.addHandler(handler)
@@ -2903,17 +2889,17 @@ def create_service(s3_host, s3_port, s3_ssl, s3_key, s3_secret,
             logger.debug('activated heapy remote monitor')
 
     # set GC's debug
-    if config.api_server.gc_debug:
+    if settings.api_server.GC_DEBUG:
         import gc
         gc.set_debug(gc.DEBUG_UNCOLLECTABLE)
         logger.debug("set gc debug on")
 
     if status_port is None:
-        status_port = config.api_server.status_port
+        status_port = settings.api_server.STATUS_PORT
 
     # create the service
     service = StorageServerService(
-        config.api_server.tcp_port, s3_host, s3_port, s3_ssl, s3_key,
+        settings.api_server.TCP_PORT, s3_host, s3_port, s3_ssl, s3_key,
         s3_secret, s3_proxy_host, s3_proxy_port, auth_provider_class,
         oops_config, status_port)
     return service

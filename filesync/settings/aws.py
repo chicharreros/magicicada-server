@@ -1,4 +1,5 @@
 # Copyright 2008-2015 Canonical
+# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -15,24 +16,14 @@
 #
 # For further info, check  http://launchpad.net/filesync-server
 
-"""Provides a test connection with admin access to the databases"""
-
-from storm.zope.zstorm import global_zstorm as zstorm
-
-from backends.db.dbconfig import get_connection_settings, get_postgres_uri
-
-
-def _format_postgres_admin_uri(store_name):
-    """Internal function that formats a URI for a local admin connection"""
-    cfg = get_connection_settings()[store_name]
-    # bypass username & password to get an admin config
-    cfg['username'] = None
-    cfg['password'] = None
-    cfg['options'] = None
-    return get_postgres_uri(cfg)
-
-
-def get_admin_store(store_name):
-    """ Return the Storm.Store With and admin connection"""
-    uri = _format_postgres_admin_uri(store_name)
-    return zstorm.get("%s_admin" % store_name, uri)
+ACCESS_KEY_ID = 'aws_key'
+SECRET_ACCESS_KEY = 'aws_secret'
+KEYSTONE_HOST = 'swift.local'
+KEYSTONE_PORT = 0
+S3_HOST = 's3.local'
+S3_PORT = 0
+S3_PROXY_HOST = 'None'
+S3_PROXY_PORT = 'None'
+S3_USE_SSL = False
+S_FOUR_LOG_FILENAME = 'S4.log'
+S_FOUR_STORAGEPATH = 'tmp/s4storage'

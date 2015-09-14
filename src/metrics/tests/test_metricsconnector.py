@@ -19,19 +19,14 @@
 
 import os
 
+from django.conf import settings
 from metrics.metricsconnector import MetricsConnector
-
 from mocker import Mocker
-
 from twisted.internet.defer import inlineCallbacks
 from twisted.trial.unittest import TestCase
-
 from txstatsd.client import TwistedStatsDClient
 from txstatsd.metrics.extendedmetrics import ExtendedMetrics
-
 from zope.component import ComponentLookupError
-
-from config import config
 
 from utilities import utils
 
@@ -56,7 +51,7 @@ class TestMetricsConnector(TestCase):
     @inlineCallbacks
     def test_configured_statsd(self):
         """Test configuring of Metrics using supplied configuration."""
-        self.patch(config.statsd, 'servers', "localhost:8125")
+        self.patch(settings, 'STATSD_SERVERS', "localhost:8125")
 
         metrics = MetricsConnector.new_metrics()
         self.failIf(metrics.connection is None)

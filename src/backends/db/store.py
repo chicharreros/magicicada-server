@@ -19,13 +19,9 @@
 
 import contextlib
 
+from django.conf import settings
 from storm.database import register_scheme
 from storm.databases.postgres import Postgres
-
-from backends.db.dbconfig import (
-    get_postgres_uri,
-    get_connection_settings,
-)
 
 from backends.db.dbtransaction import (
     filesync_tm,
@@ -62,35 +58,18 @@ class FilesyncDatabase(Postgres):
 register_scheme("postgres", FilesyncDatabase)
 
 
-def get_django_stores():
-    """Return a dictionary of configured stores for django."""
-    settings = get_connection_settings()
-    storm_stores = {}
-    for key, cfg in settings.items():
-        storm_stores[key] = get_postgres_uri(cfg)
-    return storm_stores
-
-
-def get_store(store_name, zstorm=None):
-    """Return the Storm.Store for the given schema"""
-    if not zstorm:
-        zstorm = filesync_zstorm
-    settings = get_connection_settings()
+def get_filesync_store():
+    """Get a store using the filesync_tm."""
+    store_name = 'filesync'
     # get the current transaction and see if it has the ro_store flag set
-    txn = zstorm.transaction_manager.get()
+    txn = filesync_zstorm.transaction_manager.get()
     if getattr(txn, 'use_ro_store', False):
         # only use it if there is a config for it.
         ro_store_name = 'ro-%s' % store_name
-        if ro_store_name in settings:
+        if ro_store_name in settings.DATABASES:
             store_name = ro_store_name
-    store_settings = settings[store_name]
-    uri = get_postgres_uri(store_settings)
-    return zstorm.get(store_name, default_uri=uri)
-
-
-def get_filesync_store():
-    """Get a store using the filesync_tm."""
-    return get_store('filesync', zstorm=filesync_zstorm)
+    uri = settings.STORM_STORES[store_name]
+    return filesync_zstorm.get(store_name, default_uri=uri)
 
 
 @contextlib.contextmanager

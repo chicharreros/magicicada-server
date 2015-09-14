@@ -26,6 +26,7 @@ import sys
 
 from StringIO import StringIO
 
+from django.conf import settings
 from mocker import Mocker, ANY
 from twisted.internet import reactor, defer
 from twisted.internet.error import ConnectionDone
@@ -33,7 +34,6 @@ from twisted.web import client, error
 
 import metrics
 import metrics.services
-from config import config
 from ubuntuone.devtools.handlers import MementoHandler
 from ubuntuone.storageprotocol import request
 from ubuntuone.storage.server.testing.testcase import TestWithDatabase
@@ -445,11 +445,11 @@ class DumpTest(TestWithDatabase):
     def setUp(self):
         """Set up."""
         tmp_dir = os.path.join(os.getcwd(), self.mktemp())
-        self.patch(config.general, 'log_folder', tmp_dir)
+        self.patch(settings, 'LOG_FOLDER', tmp_dir)
         yield super(DumpTest, self).setUp()
-        if os.path.exists(config.general.log_folder):
-            shutil.rmtree(config.general.log_folder)
-        os.makedirs(config.general.log_folder)
+        if os.path.exists(settings.LOG_FOLDER):
+            shutil.rmtree(settings.LOG_FOLDER)
+        os.makedirs(settings.LOG_FOLDER)
         self.addCleanup(shutil.rmtree, tmp_dir)
 
     @defer.inlineCallbacks

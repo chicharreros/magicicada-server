@@ -77,18 +77,17 @@ Branch the project and get into that dir:
     cd ~/filesync
     bzr branch lp:magicicada-server
 
-Edit the `configs/development.yaml` file and in the `secret` section set
-the `api_server_crt` key with the content of `cacert.pem` file, and the
-`api_server_key` key with the content of `privkey.pem` file (both files
-produced in the "Before server or client" section).
+Ensure the files 'privkey.pem' and 'cacert.pem' produced in the "Before server
+or client" section are copied into the ~/filesync/magicicada-server/certs
+folder.
 
 Start the server:
 
     cd ~/filesync/magicicada-server
     make start-oauth
 
-Note that the server will listen on port 21101, so you need to assure
-than the client could reach it (open it in your firewall config, etc).
+Note that the server will listen on port 21101, so you need to assure that the
+client could reach it (open the whole it in your firewall config, etc).
 
 Finally, create all the users you want:
 

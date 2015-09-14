@@ -20,12 +20,8 @@
 import json
 import os
 
-import warnings
-# enjoy the silence
-warnings.simplefilter("ignore")
-
 from backends.filesync.data.dbmanager import fsync_commit
-from backends.db.db_admin_store import get_admin_store
+from backends.db.store import get_filesync_store
 from backends.db.schemas.storage import create_schema as storage
 
 from utilities import utils
@@ -38,7 +34,7 @@ AUTH_TOKENFILE = os.path.join(TMP_DIR, 'authkeys.json')
 def delete_all_data():
     """Delete all data from the database."""
     # they must be reversed to avoid dependency issues
-    storage().delete(get_admin_store('filesync'))
+    storage().delete(get_filesync_store())
 
 
 def add_auth_info_to_keyfile(username, auth_info, filename=AUTH_TOKENFILE):

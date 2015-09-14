@@ -25,17 +25,17 @@ from functools import wraps
 from threading import Lock
 from Queue import Full
 
-from config import config
+from django.conf import settings
 
 
 def get_service_name():
     """Get the service name."""
-    return os.environ.get("FSYNC_SERVICE_NAME", config.general.service_name)
+    return os.environ.get("FSYNC_SERVICE_NAME", settings.SERVICE_NAME)
 
 
 def get_instance_id():
     """Get the instance id."""
-    inst_id = os.environ.get("FSYNC_INSTANCE_ID", config.general.instance_id)
+    inst_id = os.environ.get("FSYNC_INSTANCE_ID", settings.INSTANCE_ID)
     return "%03d" % int(inst_id)
 
 
@@ -81,8 +81,8 @@ def get_meter(scope=None):
 
 def get_resources_meter_name():
     """Return the meter name for reporting resources info."""
-    assert config.general.environment_name, "Missing environment_name setting"
-    return "%s.%s.resources" % (config.general.environment_name,
+    assert settings.ENVIRONMENT_NAME, "Missing environment_name value"
+    return "%s.%s.resources" % (settings.ENVIRONMENT_NAME,
                                 platform.node())
 
 
@@ -93,10 +93,10 @@ def get_instance_meter_name():
 
 def get_service_meter_name():
     """Return the meter name for current environment and service."""
-    assert config.general.environment_name, "Missing environment_name setting"
-    assert config.general.service_group, "Missing service_group setting"
-    return "%s.%s.%s" % (config.general.environment_name,
-                         config.general.service_group,
+    assert settings.ENVIRONMENT_NAME, "Missing environment_name value"
+    assert settings.SERVICE_GROUP, "Missing service_group value"
+    return "%s.%s.%s" % (settings.ENVIRONMENT_NAME,
+                         settings.SERVICE_GROUP,
                          get_service_name())
 
 
