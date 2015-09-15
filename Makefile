@@ -104,7 +104,6 @@ tarball: build-for-deployment
 	tar czf ../filesync-server.tgz $(TAR_EXTRA) .
 
 bootstrap:
-	sudo apt-get update
 	cat dependencies.txt | sudo xargs apt-get install -y --no-install-recommends
 	cat dependencies-devel.txt | sudo xargs apt-get install -y --no-install-recommends
 
