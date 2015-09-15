@@ -1,0 +1,8 @@
+dbus
+python-dbus
+python-gobject
+python-httplib2
+python-mocker
+python-pyinotify
+python-testtools
+python-twisted-names

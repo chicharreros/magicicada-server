@@ -86,7 +86,6 @@ build-sourcedeps: build-deploy-sourcedeps
 		-e 's|\@GETTEXT_PACKAGE\@|ubuntuone-client|g' \
 		-e 's|\@VERSION\@|0.0.0|g' < clientdefs.py.in > clientdefs.py
 
-
 build-deploy-sourcedeps:
 	@echo "Building Python extensions"
 
@@ -103,6 +102,11 @@ build-deploy-sourcedeps:
 
 tarball: build-for-deployment
 	tar czf ../filesync-server.tgz $(TAR_EXTRA) .
+
+bootstrap:
+	sudo apt-get update
+	cat dependencies.txt | sudo xargs apt-get install -y --no-install-recommends
+	cat dependencies-devel.txt | sudo xargs apt-get install -y --no-install-recommends
 
 raw-test:
 	./test $(TESTFLAGS)

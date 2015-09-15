@@ -58,19 +58,10 @@ Then you need to start the LXC instance and ssh into it:
     sudo lxc-start -n filesync-precise
     ssh filesync-precise
 
-Install tools and dependencies:
+Install tools and dependencies (you will be prompted for your password for sudo
+access):
 
-    sudo apt-get install bzr make python-transaction protobuf-compiler \
-        python-setuptools gcc python-dev python-twisted-web postgresql-9.1 \
-        python-yaml python-psycopg2 postgresql-contrib supervisor \
-        postgresql-plpython-9.1 python-boto squid python-virtualenv \
-        python-protobuf python-psutil python-testresources \
-        python-tz python-bson python-iso8601 python-meliae
-
-For running the tests, install these extra deps:
-
-    sudo apt-get install python-gobject dbus python-dbus python-pyinotify \
-        python-twisted-names python-httplib2 python-mocker python-testtools
+    make bootstrap
 
 Branch the project and get into that dir:
 
