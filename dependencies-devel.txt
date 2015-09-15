@@ -1,4 +1,5 @@
 dbus
+openssl
 python-dbus
 python-gobject
 python-httplib2

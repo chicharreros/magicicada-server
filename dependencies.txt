@@ -10,6 +10,7 @@ python-bson
 python-dev
 python-iso8601
 python-meliae
+python-openssl
 python-protobuf
 python-psutil
 python-psycopg2
