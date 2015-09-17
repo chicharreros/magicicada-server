@@ -1,4 +1,5 @@
 # Copyright 2008-2015 Canonical
+# Copyright 2015 Chicharreros
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -13,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-# For further info, check  http://launchpad.net/filesync-server
+# For further info, check  http://launchpad.net/magicicada-server
 
 """Tests for the stats helpers."""
 
@@ -24,7 +25,6 @@ from twisted.internet import defer, task
 from metrics.metricsconnector import MetricsConnector
 from s3lib import producers
 from s3lib.contrib import http_client
-from ubuntuone.storage.server import upload
 from ubuntuone.storage.server.stats import StatsWorker
 from ubuntuone.storage.server.testing.testcase import TestWithDatabase
 
@@ -96,11 +96,6 @@ class TestStats(TestWithDatabase):
         stats_worker = StatsWorker(self.service, 10)
         # add some info the all the buffers we know
         mock = mocker.Mocker()
-        producer = mock.mock()
-        upload.MultipartUploadFactory.buffers_size = 0
-        mp = upload.MultipartUploadFactory(None, producer, 1024, 2048,
-                                           0, 1042, 10)
-        mp.dataReceived('a' * 10)
         client = mock.mock()
         http_client.HTTPProducer.buffers_size = 0
         http_prod = http_client.HTTPProducer(client)
@@ -112,8 +107,6 @@ class TestStats(TestWithDatabase):
 
         stats_worker.runtime_info()
         self.assertIn(('gauge', 'buffers_size.HTTPProducer', 20),
-                      self.metrics.calls)
-        self.assertIn(('gauge', 'buffers_size.MultipartUploadFactory', 10),
                       self.metrics.calls)
         self.assertIn(('gauge', 'buffers_size.S3Producer', 30),
                       self.metrics.calls)

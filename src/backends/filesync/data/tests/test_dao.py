@@ -1,4 +1,5 @@
 # Copyright 2008-2015 Canonical
+# Copyright 2015 Chicharreros
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -13,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-# For further info, check  http://launchpad.net/filesync-server
+# For further info, check  http://launchpad.net/magicicada-server
 
 """Test the Data Access Objects."""
 
@@ -237,8 +238,7 @@ class VolumeProxyTestCase(StorageDALTestCase):
         # the root on the volume proxy is an uninitialized DirectoryNode
         # the id is set to 'root' until it get's resolve.
         self.assertTrue(isinstance(root, dao.DirectoryNode))
-        # the root won't get resolved until a db operation
-        # is needed
+        # the root won't get resolved until a db operation is needed
         self.assertEqual(volume.root.id, 'root')
         self.assertEqual(root.id, 'root')
         # we'll force it to load, by doing something
@@ -697,7 +697,7 @@ class DAOTestCase(StorageDALTestCase):
         self.assertFalse(root.has_children())
         self.assertFalse(root.has_children(kind='File'))
         self.assertFalse(root.has_children(kind='Directory'))
-        #
+
         # do it the lazy way:
         #
         dir = user.volume().root.make_subdirectory(u"LazyDir")
@@ -907,7 +907,7 @@ class DAOTestCase(StorageDALTestCase):
                           "WRONG OLD HASH", new_hash, crc, 300, deflated_size)
         upload_job = file.make_uploadjob(file.content_hash, new_hash, crc,
                                          size, deflated_size)
-        job = user.get_uploadjob(upload_job.id)
+        job = user.volume().get_uploadjob(upload_job.id)
         self.assertEqual(job.id, upload_job.id)
         jobs = user.get_uploadjobs()
         self.assertEqual(jobs[0].id, upload_job.id)

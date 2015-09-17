@@ -1,4 +1,5 @@
 # Copyright 2008-2015 Canonical
+# Copyright 2015 Chicharreros
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -13,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-# For further info, check  http://launchpad.net/filesync-server
+# For further info, check  http://launchpad.net/magicicada-server
 
 """Provides a layer to handle all the database objects from twisted.
 
@@ -31,12 +32,10 @@ import twisted.internet.error
 import twisted.web.error
 
 from twisted.internet import defer
-from twisted.python.failure import Failure
 
 from s3lib.s3lib import ProducerStopped
-from s3lib.producers import S3Producer, NullConsumer
+from s3lib.producers import S3Producer
 from backends.filesync.data import errors as dataerrors
-from filesync import settings
 from ubuntuone.storage.server import errors, upload
 from ubuntuone.storageprotocol import protocol_pb2
 
@@ -60,6 +59,10 @@ class FalseProducer(object):
         if self.consumer:
             self.consumer.write(self.data)
         self.deferred.callback(True)
+
+    def startProducing(self, consumer):
+        """Start producing."""
+        self.consumer = consumer
 
     def stopProducing(self):
         """Stop producing."""
@@ -105,55 +108,25 @@ class Node(object):
         self.node = node
         self.logger = logging.getLogger('storage.server')
 
-    @defer.inlineCallbacks
-    def get_content(self, start=None, end=None, previous_hash=None, user=None):
+    def get_content(self, start=None, previous_hash=None, user=None):
         """Get the content for this node.
 
         @param start: the start offset
-        @param end: the end offset
         @param previous_hash: not used for FileNode.
         @param user: the user doing the request, useful for logging.
         """
         if not self.is_file:
             raise TypeError("Content can be retrieved only on Files.")
         storage_key = self.storage_key
-        size = self.deflated_size
         if storage_key == ZERO_LENGTH_CONTENT_KEY:
             # we send the compressed empty string
-            producer = FalseProducer(zlib.compress(""))
-            defer.returnValue(producer)
-            return
-        if start is not None or end is not None:
-            headers = {'Range': 'bytes=%d-%d' % (
-                start if start is not None else 0,
-                end if end is not None else size)}
-        else:
-            headers = None
+            return FalseProducer(zlib.compress(""))
 
-        producer = yield self._get_producer(settings.api_server.S3_BUCKET,
-                                            str(storage_key), headers, user)
-        defer.returnValue(producer)
-
-    def _get_from_s3(self, bucket, key, headers, streaming):
-        """Inner function to handle s3.get."""
-        s3 = self.manager.factory.s3()
-        return s3.get(bucket, key, headers=headers, streaming=streaming)
-
-    @defer.inlineCallbacks
-    def _get_producer(self, bucket, storage_key,
-                      headers, user, streaming=True):
-        """Return the content Producer."""
-        try:
-            get_response = self._get_from_s3(bucket, str(storage_key),
-                                             headers, streaming)
-            producer = yield get_response.deferred
-        except Exception as exc:
-            # FIXME: convert this 'Exception' to something more appropiate
-            # when returning errors from storage backend
-            yield self._handle_s3_errors(Failure(exc), user)
-
-        producer.deferred.addErrback(self._handle_s3_errors, user)
-        defer.returnValue(producer)
+        # TODO: we should get bytes from a 'start' point, there are not
+        # test cases for this, did this work at all or client always sent 0?
+        producer = self.manager.factory.diskstorage.get(str(storage_key))
+        producer.deferred.addErrback(self._handle_errors, user)
+        return producer
 
     def _context_msg(self, user):
         """Return a string with the context."""
@@ -167,10 +140,9 @@ class Node(object):
         return ("%(session_ids)s - %(username)s (%(user_id)s) - "
                 "node_id=%(node_id)s" % context)
 
-    def _handle_s3_errors(self, failure, user):
-        """Transform storage backend errors in something more appropiate."""
+    def _handle_errors(self, failure, user):
+        """Transform storage backend errors into something more appropiate."""
         ctx = self._context_msg(user)
-        # FIXME: here we'll need to support generic storage errors
         self.logger.warning("%s - storage backend error: %s", ctx, failure)
         raise errors.NotAvailable(failure.getErrorMessage())
 
@@ -220,29 +192,38 @@ class DBUploadJob(object):
         self.multipart_id = multipart_id
         return self.user.rpc_dal.call('set_uploadjob_multipart_id',
                                       user_id=self.user.id,
+                                      volume_id=self.volume_id,
                                       uploadjob_id=self.uploadjob_id,
                                       multipart_id=multipart_id)
 
-    def add_part(self, chunk_size, inflated_size, crc32,
-                 hash_context, magic_hash_context, decompress_context):
+    def add_part(self, chunk_size):
         """Add a part to an upload job."""
-        kwargs = dict(user_id=self.user.id, uploadjob_id=self.uploadjob_id,
-                      chunk_size=chunk_size, inflated_size=inflated_size,
-                      crc32=crc32, hash_context=hash_context,
-                      magic_hash_context=magic_hash_context,
-                      decompress_context=decompress_context)
+        # TODO: change the rest of the chain (from here to the DB itself) to
+        # not use all these parameters
+        kwargs = dict(user_id=self.user.id, volume_id=self.volume_id,
+                      uploadjob_id=self.uploadjob_id,
+                      chunk_size=chunk_size, inflated_size=0, crc32=0,
+                      hash_context='', magic_hash_context='',
+                      decompress_context='')
         return self.user.rpc_dal.call('add_part_to_uploadjob', **kwargs)
 
+    @defer.inlineCallbacks
     def delete(self):
         """Delete an upload job."""
-        return self.user.rpc_dal.call('delete_uploadjob', user_id=self.user.id,
-                                      uploadjob_id=self.uploadjob_id)
+        try:
+            yield self.user.rpc_dal.call('delete_uploadjob',
+                                         user_id=self.user.id,
+                                         volume_id=self.volume_id,
+                                         uploadjob_id=self.uploadjob_id)
+        except dataerrors.DoesNotExist:
+            pass
 
     @defer.inlineCallbacks
     def touch(self):
         """Touch an upload job."""
         r = yield self.user.rpc_dal.call('touch_uploadjob',
                                          user_id=self.user.id,
+                                         volume_id=self.volume_id,
                                          uploadjob_id=self.uploadjob_id)
         self.when_last_active = r['when_last_active']
 
@@ -268,11 +249,12 @@ class BaseUploadJob(object):
         self.session_id = session_id
         self.magic_hash = magic_hash
         self.producer = None
-        self.factory = None
+        self.consumer = None
+        self.ops = defer.succeed(None)
         self.deferred = defer.Deferred()
+        self.deferred.addErrback(self._handle_errors)
         self.s3 = None
         self._initial_data = True
-        # this are used to track keys uploaded into s3
         self._storage_key = None
         self.canceling = False
         self.logger = logging.getLogger('storage.server')
@@ -285,10 +267,10 @@ class BaseUploadJob(object):
         self.file_node = file_node
         self.blob_exists = blob_exists
 
-    @property
-    def buffers_size(self):
-        """The total size of the buffer in this upload."""
-        raise NotImplementedError("subclass responsability.")
+    def add_operation(self, operation_func, error_handler):
+        """Add an operation and error handler to ops deferred."""
+        self.ops.addCallback(operation_func)
+        self.ops.addErrback(error_handler)
 
     @property
     def upload_id(self):
@@ -300,64 +282,33 @@ class BaseUploadJob(object):
         """The offset of this upload."""
         raise NotImplementedError("subclass responsability.")
 
-    @property
-    def inflated_size(self):
-        """The inflated size of this upload."""
-        return self.producer.inflated_size
-
-    @property
-    def crc32(self):
-        """The crc32 of this upload."""
-        return self.producer.crc32
-
-    @property
-    def hash_object(self):
-        """The hash_object of this upload."""
-        return self.producer.hash_object
-
-    @property
-    def magic_hash_object(self):
-        """The magic_hash_object of this upload."""
-        return self.producer.magic_hash_object
-
-    @defer.inlineCallbacks
     def connect(self):
-        """Setup the producer and consumer (S3 connection)."""
-        if self.s3 is None:
-            self.s3 = self.user.manager.factory.s3()
+        """Setup the producer and consumer."""
         if self.blob_exists:
-            # we have a storage object like this already
-            # wrap the S3Producer to only hash and discard the bytes
-            self.producer = upload.ProxyHashingProducer(self.producer)
-            self.factory = NullConsumer()
-            self.factory.registerProducer(self.producer)
-            self.producer.resumeProducing()
+            # we have a storage object like this already (not magic upload
+            # because other user); wrap the producer to only hash and
+            # discard the bytes
+            self.producer = upload.ProxyHashingProducer(self.producer, True)
+            self.consumer = upload.NullConsumer()
+            self.consumer.registerProducer(self.producer)
             self.deferred.callback(None)
         else:
             # we need to upload this content, get ready for it
-            d = self._start_receiving()
-            d.addErrback(self._handle_connection_done)
-            d.addErrback(self._handle_s3_errors)
-            yield d
-            # at this point, self.factory is set...if it's not it's ok to
-            # blowup
-            self.factory.deferred.addErrback(self._handle_connection_done)
-            self.factory.deferred.addErrback(self._handle_s3_errors)
-            self.factory.deferred.chainDeferred(self.deferred)
+            self._start_receiving()
 
     def _start_receiving(self):
         """Prepare the upload job to start receiving streaming bytes."""
-        # generate a new storage_key for this upload
-        self._storage_key = uuid.uuid4()
-        # replace self.producer with a hashing proxy
-        self.producer = upload.ProxyHashingProducer(self.producer)
-        self.factory = self.s3.put(
-            settings.api_server.S3_BUCKET,
-            str(self._storage_key), self.producer,
-            headers={'Content-Length': str(self.deflated_size_hint)},
-            streaming=True)
-        return self.factory.connect_deferred
+        self._storage_key = self.uploadjob.multipart_key
+        offset = self.uploadjob.uploaded_bytes
 
+        self.consumer = self.user.manager.factory.diskstorage.put(
+            str(self._storage_key), offset)
+
+        streaming = offset == 0  # hash on the fly if receive from start
+        self.producer = upload.ProxyHashingProducer(self.consumer, streaming)
+        self.consumer.registerProducer(self.producer, True)  # push producer
+
+    @defer.inlineCallbacks
     def add_data(self, data):
         """Add data to this upload."""
         # add data is called by the server with the bytes that arrive in a
@@ -369,26 +320,13 @@ class BaseUploadJob(object):
         # """the theoretical limit for the zlib format (as opposed to its
         # implementation in the currently available sources) is 1032:1."""
         # http://zlib.net/zlib_tech.html
-        self.producer.dataReceived(data)
-        max_size = settings.api_server.UPLOAD_BUFFER_MAX_SIZE
-        if not self.blob_exists and self.buffers_size >= max_size:
-            raise errors.BufferLimit("Buffer limit reached.")
+        try:
+            self.producer.dataReceived(data)
+        except Exception as err:
+            self.deferred.errback(err)
+        else:
+            yield self.uploadjob.add_part(len(data))
 
-    def registerProducer(self, producer):
-        """Register a producer, this is the client connection."""
-        # by default do nothing, only MultipartUploadJob care about this.
-        pass
-
-    def unregisterProducer(self):
-        """Unregister the producer."""
-        # by default do nothing, only MultipartUploadJob care about this.
-        pass
-
-    def cancel(self):
-        """Cancel this upload job."""
-        return self._stop_producer_and_factory()
-
-    @defer.inlineCallbacks
     def _stop_producer_and_factory(self):
         """Cancel this upload job.
 
@@ -396,7 +334,6 @@ class BaseUploadJob(object):
         - Stop the producer if not yet stopped.
         - Cancel the factory if one exists.
         """
-        self.unregisterProducer()
         self.canceling = True
         if self.producer is not None:
             # upload already started
@@ -406,8 +343,14 @@ class BaseUploadJob(object):
                 # dont't care if stopped it in the middle, we're
                 # canceling!
                 pass
-        if self.factory is not None:
-            yield self.factory.cancel()
+        if self.consumer is not None:
+            self.consumer.unregisterProducer()
+        if not self.deferred.called:
+            self.deferred.callback(None)
+
+    def cancel(self):
+        """Cancel this upload job."""
+        return self._stop_producer_and_factory()
 
     def stop(self):
         """Stop the upload and cleanup."""
@@ -422,8 +365,8 @@ class BaseUploadJob(object):
             raise errors.UploadCanceled("Connection closed prematurely.")
         return failure
 
-    def _handle_s3_errors(self, failure):
-        """Handle s3lib twisted.web.error.Error and TimeoutError."""
+    def _handle_errors(self, failure):
+        """Handle all internal errors."""
 
         def context_msg():
             """Return a str with the context for this upload."""
@@ -437,66 +380,59 @@ class BaseUploadJob(object):
                 session_ids=session_ids or 'No sessions?',
                 volume_id=self.file_node.volume_id,
                 node_id=self.file_node.id,
-                bytes_received=(self.producer.bytes_received
-                                if self.producer else 0),
-                bytes_sent=(self.producer.bytes_sent
-                            if self.producer else 0))
-            context_msg = (
-                '%(session_ids)s - %(username)s (%(user_id)s) - ' +
-                'node: %(volume_id)s::%(node_id)s - ' +
-                'recv: %(bytes_received)s - sent: %(bytes_sent)s - ')
+                bytes_sent=self.producer.deflated_size if self.producer else 0,
+            )
+            context_msg = ('%(session_ids)s - %(username)s (%(user_id)s) - '
+                           'node=%(volume_id)s::%(node_id)s '
+                           'sent=%(bytes_sent)s')
             return context_msg % upload_context
 
-        if failure.check(twisted.internet.error.TimeoutError,
-                         twisted.internet.error.ConnectionLost):
-            self.logger.warning(context_msg() + "S3 connection threw a "
-                                "TimeoutError while receiving data (returning "
-                                "TRY_AGAIN) ")
-            raise errors.S3UploadError(failure.value)
-
-        if failure.check(twisted.web.error.Error):
-            # FIXME: here we should handle generic storage errors
-            self.logger.warning("%s - storage backend error: %s",
-                                context_msg(), failure)
-            raise errors.S3UploadError(failure.value)
-
-        return failure
-
-    def flush_decompressor(self):
-        """Flush the decompresor and handle the data."""
-        # by default the producer do the hashing
-        self.producer.flush_decompressor()
-
-    def commit(self, put_result):
-        """Simple commit, overwrite for more detailed behaviour."""
-        return self._commit(put_result)
+        self.logger.warning("%s - storage backend error: %s",
+                            context_msg(), failure)
+        if failure.check(errors.UploadCorrupt):
+            return failure
+        raise errors.TryAgain(failure.value)
 
     @defer.inlineCallbacks
-    def _commit(self, put_result):
+    def commit(self):
+        """Simple commit, overwrite for more detailed behaviour."""
+        try:
+            new_gen = yield self._commit()
+        except Exception as ex1:
+            try:
+                yield self.uploadjob.delete()
+            except Exception as ex2:
+                self.logger.warning(
+                    "%s: while deleting uploadjob after an error, %s",
+                    ex2.__class__.__name__, ex2)
+            raise ex1
+        defer.returnValue(new_gen)
+
+    @defer.inlineCallbacks
+    def _commit(self):
         """Make this upload the current content for the node."""
-        if self.producer is not None:
-            assert self.producer.finished, "producer hasn't finished"
-        self.flush_decompressor()
+        self.producer.stopProducing()
+        yield self.producer.flush_decompressor()
+
         # size matches hint
-        if self.deflated_size != self.deflated_size_hint:
+        if self.producer.deflated_size != self.deflated_size_hint:
             raise errors.UploadCorrupt(self._deflated_size_hint_mismatch)
-        if self.inflated_size != self.inflated_size_hint:
+        if self.producer.inflated_size != self.inflated_size_hint:
             raise errors.UploadCorrupt(self._inflated_size_hint_mismatch)
 
         # get the magic hash value here, don't log it, don't save it
-        magic_hash = self.magic_hash_object.content_hash()
+        magic_hash = self.producer.magic_hash_object.content_hash()
         magic_hash_value = magic_hash._magic_hash
         # magic hash should match the one sent by the client
         if self.magic_hash is not None and magic_hash_value != self.magic_hash:
             raise errors.UploadCorrupt(self._magic_hash_hint_mismatch)
 
         # hash matches hint
-        hash = self.hash_object.content_hash()
-        if hash != self.hash_hint:
+        if self.producer.hash_object.content_hash() != self.hash_hint:
             raise errors.UploadCorrupt(self._content_hash_hint_mismatch)
 
         # crc matches hint
-        if self.crc32 != self.crc32_hint:
+        if self.producer.crc32 != self.crc32_hint:
             raise errors.UploadCorrupt(self._crc32_hint_mismatch)
 
         storage_key = self._storage_key
@@ -533,35 +469,23 @@ class UploadJob(BaseUploadJob):
 
     def __init__(self, user, file_node, previous_hash, hash_hint, crc32_hint,
                  inflated_size_hint, deflated_size_hint,
-                 session_id, blob_exists, magic_hash):
+                 session_id, blob_exists, magic_hash, upload):
         super(UploadJob, self).__init__(user, file_node, previous_hash,
                                         hash_hint, crc32_hint,
                                         inflated_size_hint, deflated_size_hint,
                                         session_id, blob_exists,
                                         magic_hash)
-        self.deflated_size = 0
         self.producer = S3Producer(self.deflated_size_hint)
+        self.uploadjob = upload
 
     @property
     def upload_id(self):
         """Return the upload_id for this upload job."""
-        return ''
+        return self.uploadjob.multipart_key
 
     @property
     def offset(self):
-        return 0
-
-    @property
-    def buffers_size(self):
-        """The size of the producer buffer in this upload."""
-        if self.producer:
-            return self.producer.buffer_size
-        else:
-            return 0
-
-    def add_data(self, data):
-        super(UploadJob, self).add_data(data)
-        self.deflated_size += len(data)
+        return self.uploadjob.uploaded_bytes
 
 
 class MagicUploadJob(BaseUploadJob):
@@ -595,259 +519,16 @@ class MagicUploadJob(BaseUploadJob):
         """The initial offset is all the file."""
         return self.deflated_size_hint
 
-    @property
-    def buffers_size(self):
-        """The size of the producer buffer in this upload."""
-        return 0
-
     def add_data(self, data):
         """No data should be added!"""
         raise RuntimeError("No data should be added to the MagicUploadJob!")
 
     def connect(self):
-        """Nothing to do."""
+        """Nothing to do, as magic uploads won't push bytes to backend."""
 
-    def commit(self, put_result):
+    def commit(self):
         """Make this upload the current content for the node."""
         return self._commit_content(self.storage_key, self.magic_hash)
-
-
-class MultipartUploadJob(BaseUploadJob):
-    """A multipart/resumable upload job."""
-
-    def __init__(self, user, file_node, previous_hash, hash_hint, crc32_hint,
-                 inflated_size_hint, deflated_size_hint, uploadjob, session_id,
-                 blob_exists, magic_hash):
-        super(MultipartUploadJob, self).__init__(
-            user, file_node, previous_hash, hash_hint, crc32_hint,
-            inflated_size_hint, deflated_size_hint, session_id, blob_exists,
-            magic_hash)
-        self.mp_upload = None
-        self.uploadjob = uploadjob
-
-    @property
-    def buffers_size(self):
-        """The size of the producer buffer in this upload."""
-        size = 0
-        if self.factory:
-            size = self.factory.buffer_size
-        return size
-
-    @property
-    def upload_id(self):
-        """Return the upload_id for this upload job."""
-        return self.multipart_key_name
-
-    @property
-    def offset(self):
-        """Return the offset."""
-        return self.uploadjob.uploaded_bytes
-
-    @property
-    def deflated_size(self):
-        """Return the deflated_size."""
-        return self.factory.deflated_size
-
-    @property
-    def inflated_size(self):
-        """Return the inflated_size."""
-        return self.factory.inflated_size
-
-    @property
-    def crc32(self):
-        """Return the crc32."""
-        return self.factory.crc32
-
-    @property
-    def hash_object(self):
-        """Return the hash_object."""
-        return self.factory.hash_object
-
-    @property
-    def magic_hash_object(self):
-        """Return the magic_hash_object."""
-        return self.factory.magic_hash_object
-
-    @property
-    def multipart_id(self):
-        """Return the multipart_id."""
-        return self.uploadjob.multipart_id
-
-    @property
-    def multipart_key_name(self):
-        """Return the multipart_key_name."""
-        return self.uploadjob.multipart_key
-
-    @property
-    def chunk_count(self):
-        """Return the chunk_count."""
-        return self.uploadjob.chunk_count
-
-    @defer.inlineCallbacks
-    def load_s3_multipart_upload(self):
-        """Fetch or create a multipart upload in S3."""
-        if self.s3 is None:
-            self.s3 = self.user.manager.factory.s3()
-        if self.multipart_id and self.multipart_key_name:
-            try:
-                self.mp_upload = yield self.s3.get_multipart_upload(
-                    settings.api_server.S3_BUCKET, self.multipart_key_name,
-                    self.multipart_id)
-            except twisted.web.error.Error as e:
-                # FIXME: we should handle here generic storage errors
-                upload_context = dict(
-                    user_id=self.user.id,
-                    username=self.user.username.replace('%', '%%'),
-                    volume_id=self.uploadjob.volume_id,
-                    node_id=str(self.uploadjob.node_id))
-                context_msg = (
-                    '%(username)s - (%(user_id)s) - '
-                    'node: %(volume_id)s::%(node_id)s - ') % upload_context
-                self.logger.warning("%s - Multipart upload doesn't exist "
-                                    "(Got %r from storage)", context_msg,
-                                    e.status)
-                # create a new one and reset self.multipart_id
-                self.uploadjob.multipart_id = None
-                self.mp_upload = yield self.s3.create_multipart_upload(
-                    settings.api_server.S3_BUCKET, self.multipart_key_name)
-        else:
-            self.mp_upload = yield self.s3.create_multipart_upload(
-                settings.api_server.S3_BUCKET, self.multipart_key_name)
-
-    @defer.inlineCallbacks
-    def part_done_callback(self, chunk_count, chunk_size, inflated_size, crc32,
-                           hash_context, magic_hash_context,
-                           decompress_context):
-        """Process the info for each uploaded part"""
-        yield self.uploadjob.add_part(chunk_size, inflated_size, crc32,
-                                      hash_context, magic_hash_context,
-                                      decompress_context)
-
-    @defer.inlineCallbacks
-    def _start_receiving(self):
-        """Prepare the upload job to start receiving streaming bytes."""
-        # get/create the mp_upload info from/in S3
-        yield self.load_s3_multipart_upload()
-        # persist the multipart upload id
-        if self.multipart_id is None:
-            yield self.uploadjob.set_multipart_id(self.mp_upload.id)
-        # generate a new storage_key for this upload
-        self._storage_key = self.multipart_key_name
-        self.factory = upload.MultipartUploadFactory(
-            self.mp_upload, settings.api_server.STORAGE_CHUNK_SIZE,
-            total_size=self.deflated_size_hint,
-            offset=self.offset,
-            inflated_size=self.uploadjob.inflated_size,
-            crc32=self.uploadjob.crc32,
-            chunk_count=self.chunk_count,
-            hash_context=self.uploadjob.hash_context,
-            magic_hash_context=self.uploadjob.magic_hash_context,
-            decompress_context=self.uploadjob.decompress_context,
-            part_done_cb=self.part_done_callback)
-        # the factory is also the producer
-        self.producer = self.factory
-        self.factory.startFactory()
-        yield self.factory.connect_deferred
-
-    def flush_decompressor(self):
-        """Flush the decompressor object and handle pending bytes."""
-        self.factory.flush_decompressor()
-
-    @defer.inlineCallbacks
-    def _complete_upload(self):
-        """Complete the multipart upload."""
-        try:
-            # complete the S3 multipart upload
-            yield self.mp_upload.complete()
-        except twisted.web.error.Error as e:
-            # if we get 404, this means that the upload was cancelled or
-            # completed, but isn't there any more.
-            if e.status == '404' and self.canceling:
-                raise dataerrors.DoesNotExist("The multipart upload "
-                                              "doesn't exists")
-            # propagate the error
-            raise
-
-    @defer.inlineCallbacks
-    def commit(self, put_result):
-        """Make this upload the current content for the node."""
-        # unregister the client transport
-        self.unregisterProducer()
-        # if this is a real multipart upload to S3, call complete
-        # this can be none if we already have the content blob and we are just
-        # checking the hash
-        if self.mp_upload is not None:
-            try:
-                yield self._complete_upload()
-            except twisted.web.error.Error as e:
-                # if we get 404, this means that the upload was cancelled or
-                # completed, but isn't there any more.
-                if e.status == '404' and self.canceling:
-                    raise dataerrors.DoesNotExist("The multipart upload "
-                                                  "doesn't exists")
-                # propagate the error
-                raise
-
-        try:
-            new_gen = yield super(MultipartUploadJob, self).commit(put_result)
-        except Exception as ex1:
-            try:
-                yield self.delete()
-            except Exception as ex2:
-                self.logger.warning("%s: while deleting uploadjob after "
-                                    "an error, %s", ex2.__class__.__name__,
-                                    ex2)
-            raise ex1
-        else:
-            try:
-                yield self.delete()
-            except Exception as delete_exc:
-                self.logger.warning("%s: while deleting uploadjob after "
-                                    "commit, %s",
-                                    delete_exc.__class__.__name__, delete_exc)
-        defer.returnValue(new_gen)
-
-    @defer.inlineCallbacks
-    def delete(self):
-        """ Cancel and clean up after the current upload job."""
-        try:
-            yield self.uploadjob.delete()
-        except dataerrors.DoesNotExist:
-            pass
-
-    @defer.inlineCallbacks
-    def cancel(self):
-        """Cancel this upload."""
-        # unregister the client transport
-        yield super(MultipartUploadJob, self).cancel()
-
-        # delete the upload_job
-        d = self.delete()
-        d.addErrback(self._handle_connection_done)
-        yield d
-
-        # abort/cancel the mp upload in s3
-        if self.mp_upload:
-            try:
-                yield self.mp_upload.cancel()
-            except twisted.web.error.Error as e:
-                # check if the upload isn't in S3 ignore the error
-                if e.status != '404':
-                    raise
-
-    def add_data(self, data):
-        """Add data to this upload."""
-        # override default add_data to never raise BufferLimit
-        self.producer.dataReceived(data)
-
-    def registerProducer(self, producer):
-        """Register a producer, this is the client connection."""
-        self.producer.registerProducer(producer)
-
-    def unregisterProducer(self):
-        """Unregister the producer."""
-        if self.producer:
-            self.producer.unregisterProducer()
 
 
 class User(object):
@@ -1121,29 +802,16 @@ class User(object):
                 blob_exists)
             defer.returnValue(upload_job)
 
-        # only use multipart upload if the content does not exist and we're
-        # above the minimum file size (if configured)
-        multipart_threshold = settings.api_server.MULTIPART_THRESHOLD
-        if (not blob_exists and
-                multipart_threshold > 0 and
-                deflated_size >= multipart_threshold):
-            # this is a multipart upload
-            multipart_key = uuid.uuid4()
-            upload_job = yield self._get_multipart_upload_job(
-                vol_id, node_id, previous_hash, hash_value, crc32,
-                inflated_size, deflated_size, multipart_key,
-                session_id, upload_id, blob_exists, magic_hash)
-        else:
-            upload_job = yield self._get_upload_job(
-                vol_id, node_id,
-                previous_hash, hash_value, crc32, inflated_size,
-                deflated_size, session_id, blob_exists, magic_hash)
+        upload_job = yield self._get_upload_job(
+            vol_id, node_id,
+            previous_hash, hash_value, crc32, inflated_size,
+            deflated_size, session_id, blob_exists, magic_hash, upload_id)
         defer.returnValue(upload_job)
 
     @defer.inlineCallbacks
     def _get_upload_job(self, vol_id, node_id, previous_hash, hash_value,
                         crc32, inflated_size, deflated_size,
-                        session_id, blob_exists, magic_hash):
+                        session_id, blob_exists, magic_hash, upload_id):
         """Create an upload reservation for a node.
 
         @param vol_id: the volume id this node belongs to.
@@ -1159,9 +827,52 @@ class User(object):
         if not node["is_file"]:
             raise dataerrors.NoPermission("Can only put content on files.")
         file_node = Node(self.manager, node)
+
+        upload = None
+        if upload_id:
+            # check if there is already a job.
+            try:
+                uploadid = uuid.UUID(upload_id)
+            except ValueError:
+                # invalid upload_id, just ignore it a create a new upload.
+                upload = None
+            else:
+                try:
+                    upload = yield DBUploadJob.get(self, vol_id, node_id,
+                                                   uploadid, hash_value, crc32,
+                                                   inflated_size,
+                                                   deflated_size)
+                except dataerrors.DoesNotExist:
+                    # there is no uploadjob with the specified id
+                    upload = None
+
+        # TODO: only get an upload if deflated size is bigger than some limit
+        # (so we just don't do all the mambo jambo for files smaller than what
+        # we get in a simple message... say, <64K).
+        if upload is None:
+            # no uploadjob found, create a new one.
+            try:
+                multipart_key = uuid.uuid4()
+                upload = yield DBUploadJob.make(self, vol_id, node_id,
+                                                previous_hash, hash_value,
+                                                crc32, inflated_size,
+                                                deflated_size, multipart_key)
+
+                # TODO: this multipart id can be deprecated as we don't have
+                # an ID on S3 side anymore; will do in other branch just to not
+                # accumulate changes in this one
+                yield upload.set_multipart_id(str(uuid.uuid4()))
+
+            except dataerrors.HashMismatch:
+                raise errors.ConflictError("Previous hash does not match.")
+        else:
+            # update the when_last_active value.
+            yield upload.touch()
+
         uj = UploadJob(self, file_node, previous_hash, hash_value,
                        crc32, inflated_size, deflated_size,
-                       session_id, blob_exists, magic_hash)
+                       session_id, blob_exists, magic_hash, upload)
+
         defer.returnValue(uj)
 
     @defer.inlineCallbacks
@@ -1188,66 +899,6 @@ class User(object):
         uj = MagicUploadJob(self, file_node, previous_hash, hash_value,
                             crc32, inflated_size, deflated_size,
                             storage_key, magic_hash, session_id, blob_exists)
-        defer.returnValue(uj)
-
-    @defer.inlineCallbacks
-    def _get_multipart_upload_job(self, vol_id, node_id, previous_hash,
-                                  hash_value, crc32, inflated_size,
-                                  deflated_size, multipart_key,
-                                  session_id, upload_id, blob_exists,
-                                  magic_hash):
-        """Create an multipart upload reservation for a node.
-
-        @param vol_id: the volume id this node belongs to.
-        @param node_id: the node to upload to.
-        @param previous_hash: the current hash of the node.
-        @param hash_value: the hash of the new content.
-        @param crc32: the crc32 of the new content.
-        @param size: the uncompressed size of the new content.
-        @param deflated_size: the compressed size of the new content.
-        @param multipart_key: the key name of the upload.
-        @param upload_id: the upload_id sent by the client.
-        """
-        node = yield self.rpc_dal.call('get_node', user_id=self.id,
-                                       volume_id=vol_id, node_id=node_id)
-        if not node["is_file"]:
-            raise dataerrors.NoPermission("Can only put content on files.")
-        file_node = Node(self.manager, node)
-
-        upload = None
-        if upload_id:
-            # check if there is already a job.
-            try:
-                uploadid = uuid.UUID(upload_id)
-            except ValueError:
-                # invalid upload_id, just ignore it a create a new upload.
-                upload = None
-            else:
-                try:
-                    upload = yield DBUploadJob.get(self, vol_id, node_id,
-                                                   uploadid, hash_value, crc32,
-                                                   inflated_size,
-                                                   deflated_size)
-                except dataerrors.DoesNotExist:
-                    # there is no uploadjob with the specified id
-                    upload = None
-
-        if upload is None:
-            # no uploadjob found, create a new one.
-            try:
-                upload = yield DBUploadJob.make(self, vol_id, node_id,
-                                                previous_hash, hash_value,
-                                                crc32, inflated_size,
-                                                deflated_size, multipart_key)
-            except dataerrors.HashMismatch:
-                raise errors.ConflictError("Previous hash does not match.")
-        else:
-            # update the when_last_active value.
-            yield upload.touch()
-
-        uj = MultipartUploadJob(self, file_node, previous_hash, hash_value,
-                                crc32, inflated_size, deflated_size,
-                                upload, session_id, blob_exists, magic_hash)
         defer.returnValue(uj)
 
     @defer.inlineCallbacks

@@ -1,4 +1,5 @@
 # Copyright 2008-2015 Canonical
+# Copyright 2015 Chicharreros
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -13,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-# For further info, check  http://launchpad.net/filesync-server
+# For further info, check  http://launchpad.net/magicicada-server
 
 """Storage server stats helpers."""
 
@@ -28,15 +29,13 @@ from metrics.metricsconnector import MetricsConnector
 from s3lib import producers
 from s3lib.contrib import http_client
 from txstatsd.process import report_reactor_stats
-from ubuntuone.storage.server import upload
 from ubuntuone.monitoring import dump
 
 logger = logging.getLogger("storage.server.stat")
 status_log = logging.getLogger("storage.server.status")
 
 # list of buffers to watch, we will use
-BUFFERS = (upload.MultipartUploadFactory,
-           http_client.HTTPProducer,
+BUFFERS = (http_client.HTTPProducer,
            producers.S3Producer)
 
 

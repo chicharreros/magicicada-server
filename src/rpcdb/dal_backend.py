@@ -1,4 +1,5 @@
 # Copyright 2008-2015 Canonical
+# Copyright 2015 Chicharreros
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -13,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-# For further info, check  http://launchpad.net/filesync-server
+# For further info, check  http://launchpad.net/magicicada-server
 
 """The DAL entry point as a service."""
 
@@ -366,34 +367,35 @@ class DAL(object):
                                  multipart_key=multipart_key)
         return self._process_uploadjob(uj)
 
-    def set_uploadjob_multipart_id(self, user_id, uploadjob_id, multipart_id):
+    def set_uploadjob_multipart_id(self, user_id, volume_id,
+                                   uploadjob_id, multipart_id):
         """Set the multipart id for an upload job."""
         user = self._get_user(user_id)
-        uj = user.get_uploadjob(uploadjob_id)
+        uj = user.volume(volume_id).get_uploadjob(uploadjob_id)
         uj.set_multipart_id(multipart_id)
         return {}
 
-    def delete_uploadjob(self, user_id, uploadjob_id):
+    def delete_uploadjob(self, user_id, volume_id, uploadjob_id):
         """Delete an upload job."""
         user = self._get_user(user_id)
-        uj = user.get_uploadjob(uploadjob_id)
+        uj = user.volume(volume_id).get_uploadjob(uploadjob_id)
         uj.delete()
         return {}
 
-    def add_part_to_uploadjob(self, user_id, uploadjob_id, chunk_size,
-                              inflated_size, crc32, hash_context,
+    def add_part_to_uploadjob(self, user_id, volume_id, uploadjob_id,
+                              chunk_size, inflated_size, crc32, hash_context,
                               magic_hash_context, decompress_context):
         """Add a part to an upload job."""
         user = self._get_user(user_id)
-        uj = user.get_uploadjob(uploadjob_id)
+        uj = user.volume(volume_id).get_uploadjob(uploadjob_id)
         uj.add_part(chunk_size, inflated_size, crc32,
                     hash_context, magic_hash_context, decompress_context)
         return {}
 
-    def touch_uploadjob(self, user_id, uploadjob_id):
+    def touch_uploadjob(self, user_id, volume_id, uploadjob_id):
         """Touch an upload job."""
         user = self._get_user(user_id)
-        uj = user.get_uploadjob(uploadjob_id)
+        uj = user.volume(volume_id).get_uploadjob(uploadjob_id)
         uj.touch()
         return dict(when_last_active=uj.when_last_active)
 

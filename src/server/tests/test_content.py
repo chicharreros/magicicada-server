@@ -1,4 +1,5 @@
 # Copyright 2008-2015 Canonical
+# Copyright 2015 Chicharreros
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -13,14 +14,12 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-# For further info, check  http://launchpad.net/filesync-server
+# For further info, check  http://launchpad.net/magicicada-server
 
 """Test content operations."""
 
 import logging
 import os
-import re
-import s3lib
 import uuid
 import zlib
 
@@ -29,16 +28,14 @@ from StringIO import StringIO
 from mocker import Mocker, expect, ARGS, KWARGS, ANY
 from oops_datedir_repo import serializer
 from twisted.python.failure import Failure
-from twisted.internet import defer, reactor, threads, error, task, address
+from twisted.internet import defer, reactor, threads, task, address
 from twisted.trial.unittest import TestCase
-from twisted.web import http
-from twisted.web import error as web_error
 from twisted.test.proto_helpers import StringTransport
 
 from backends.filesync.data import errors, model
 from filesync import settings
-from ubuntuone.storage.server import server, content, errors as storage_errors
 from ubuntuone.devtools.handlers import MementoHandler
+from ubuntuone.storage.server import server, content, diskstorage
 from ubuntuone.storage.server.testing.testcase import (
     TestWithDatabase,
     BufferedConsumer,
@@ -55,9 +52,6 @@ from ubuntuone.storageprotocol.content_hash import (
     crc32,
     magic_hash_factory,
 )
-from s3lib.s3lib import ProducerStopped
-from s3lib.producers import S3Producer
-from s3lib.multipart import MultipartUpload
 
 
 NO_CONTENT_HASH = ""
@@ -419,13 +413,6 @@ class TestGetContent(TestWithDatabase):
             d.addCallback(hc.store_getcontent_result)
         return self.callback_test(auth)
 
-    def test_getcontent_with_s3_500(self):
-        """Test getting content when s3 throws a 500"""
-        self.s4_site.resource.fail_next_get()
-        d = self.test_getcontent_file(check_file_content=False)
-        self.assertFails(d, 'NOT_AVAILABLE')
-        return d
-
     def test_getcontent_doesnt_exist(self):
         """Get the content from an unexistent node."""
 
@@ -451,7 +438,7 @@ class TestGetContent(TestWithDatabase):
 
         producer = mocker.mock()
         expect(producer.deferred).count(2).result(defer.Deferred())
-        producer.consumer = ANY
+        expect(producer.startProducing(ANY))
 
         node = mocker.mock()
         expect(node.deflated_size).result(0)
@@ -702,63 +689,6 @@ class TestPutContent(TestWithDatabase):
 
         d = self.callback_test(auth)
         self.assertFails(d, 'DOES_NOT_EXIST')
-        return d
-
-    def test_putcontent_with_s3_500(self):
-        """Test putting content when s3 throws a 500"""
-        self.s4_site.resource.fail_next_put()
-        d = self.test_putcontent()
-        self.assertFails(d, 'TRY_AGAIN')
-        return d
-
-    def test_putcontent_twice_with_s3_500_in_the_middle(self):
-        """Test putting content when s3 throws a 500"""
-        self.s4_site.resource.fail_next_put()
-        data = os.urandom(300000)
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
-
-        def auth(client):
-
-            def check_file(result):
-
-                def _check_file():
-                    try:
-                        self.usr0.volume().get_content(hash_value)
-                    except errors.DoesNotExist:
-                        raise ValueError("content blob is not there")
-
-                d = threads.deferToThread(_check_file)
-                return d
-
-            d = client.dummy_authenticate("open sesame")
-            d.addCallbacks(lambda _: client.get_root(), client.test_fail)
-            d.addCallbacks(
-                lambda root: client.make_file(request.ROOT, root, 'foo'),
-                client.test_fail)
-            d.addCallback(lambda mk: setattr(self, 'file_id', mk.new_id))
-            d.addCallbacks(
-                lambda _: client.put_content(
-                    request.ROOT,
-                    self.file_id, NO_CONTENT_HASH, hash_value,
-                    crc32_value, size, deflated_size,
-                    StringIO(deflated_data)),
-                client.test_fail)
-            d.addErrback(
-                lambda _: client.put_content(request.ROOT, self.file_id,
-                                             NO_CONTENT_HASH, hash_value,
-                                             crc32_value, size, deflated_size,
-                                             StringIO(deflated_data)))
-            d.addCallback(check_file)
-            d.addCallbacks(client.test_done, client.test_fail)
-            return d
-        d = self.callback_test(auth)
-
         return d
 
     def test_putcontent_duplicated(self):
@@ -1156,7 +1086,6 @@ class TestPutContent(TestWithDatabase):
         expect(upload_job.deferred).result(defer.succeed(None))
         expect(upload_job.offset).result(0)
         expect(upload_job.connect()).result(defer.succeed(None))
-        expect(upload_job.registerProducer(ARGS))
         expect(upload_job.upload_id).result("hola")
         expect(user.username).count(2).result('')
         storage_server.user = user
@@ -1273,19 +1202,11 @@ class TestPutContent(TestWithDatabase):
         pc = server.PutContentResponse(storage_server, message)
         pc.id = 123
 
-        # s3 put should fail early
-        s3_class = self.service.factory.s3_class
-
-        def s3_put(*args, **kwargs):
-            """s3lib put that always fails."""
-            factory = s3lib.contrib.http_client.HTTPStreamingClientFactory(
-                'http://example.com', method='GET', postdata={}, headers={},
-                agent="S3lib", streaming=True)
-            factory.connect_deferred.callback(None)
-            factory.deferred.errback(error.TimeoutError())
-            return factory
-
-        self.patch(s3_class, 'put', s3_put)
+        # make the consumer crash
+        def crash(*_):
+            """Make it crash."""
+            raise ValueError("test problem")
+        self.patch(diskstorage.FileWriterConsumer, 'write', crash)
 
         # start uploading
         pc.start()
@@ -1299,81 +1220,7 @@ class TestPutContent(TestWithDatabase):
         # check the error
         error_type, comment = yield error_d
         self.assertEqual(error_type, protocol_pb2.Error.TRY_AGAIN)
-        self.assertEqual(
-            comment,
-            'TryAgain (TimeoutError: User timeout caused connection failure.)')
-        # check that the put_content response is properly termintated
-        yield pc.deferred
-        self.assertTrue(pc.finished)
-
-    @defer.inlineCallbacks
-    def test_putcontent_skip_BYTES_on_error_in_uploadjob_deferred(self):
-        """PutContent should skip BYTES after an error.
-
-        Test that a PutContent fails and that BYTES messages are ignored after
-        the error.
-        """
-        chunk_size = settings.api_server.STORAGE_CHUNK_SIZE
-        user, content_user = self._get_users(chunk_size ** 2)
-        # create the file
-        a_file = user.root.make_file(u"A new file")
-        # build the upload data
-        data = os.urandom(int(chunk_size * 1.5))
-        size = len(data)
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        deflated_size = len(deflated_data)
-
-        # get a server instance
-        storage_server = self.service.factory.buildProtocol('addr')
-        storage_server.transport = StringTransport()
-        # twisted 10.0.0 (lucid) returns an invalid peer in transport.getPeer()
-        peerAddr = address.IPv4Address('TCP', '192.168.1.1', 54321)
-        storage_server.transport.peerAddr = peerAddr
-        storage_server.user = content_user
-        storage_server.working_caps = server.PREFERRED_CAP
-
-        message = protocol_pb2.Message()
-        message.put_content.share = ''
-        message.put_content.node = str(a_file.id)
-        message.put_content.previous_hash = ''
-        message.put_content.hash = hash_value
-        message.put_content.crc32 = crc32_value
-        message.put_content.size = size
-        message.put_content.deflated_size = deflated_size
-        message.id = 10
-        message.type = protocol_pb2.Message.PUT_CONTENT
-
-        error_d = defer.Deferred()
-        self.patch(
-            server.PutContentResponse, 'sendError',
-            lambda _, error, comment: error_d.callback((error, comment)))
-        pc = server.PutContentResponse(storage_server, message)
-        pc.id = 123
-
-        # s3 put should fail early
-        def s3_put(*args, **kwargs):
-            """s3lib put that always fails."""
-            factory = s3lib.contrib.http_client.HTTPStreamingClientFactory(
-                'http://example.com', method='GET', postdata={}, headers={},
-                agent="S3lib", streaming=True)
-            factory.deferred.errback(error.TimeoutError())
-            return factory
-
-        self.patch(content.UploadJob, '_start_receiving',
-                   lambda *r: defer.fail(error.TimeoutError()))
-
-        # start uploading
-        pc.start()
-        # check the error
-        error_type, comment = yield error_d
-        self.assertEquals(error_type, protocol_pb2.Error.TRY_AGAIN)
-        self.assertEqual(
-            comment,
-            'TryAgain (TimeoutError: User timeout caused connection failure.)')
+        self.assertEqual(comment, 'TryAgain (ValueError: test problem)')
         # check that the put_content response is properly termintated
         yield pc.deferred
         self.assertTrue(pc.finished)
@@ -1696,42 +1543,6 @@ class TestPutContent(TestWithDatabase):
 
         return self.callback_test(auth, add_default_callbacks=True)
 
-    def test_putcontent_buffer_limit(self):
-        """Put content hitting the buffer limit."""
-        self.patch(settings.api_server, 'MULTIPART_THRESHOLD', 1024 * 1024)
-        self.patch(settings.api_server, 'UPLOAD_BUFFER_MAX_SIZE', 1024 * 10)
-        size = settings.api_server.MULTIPART_THRESHOLD // 2
-        self.usr0.update(max_storage_bytes=size * 2)
-        data = os.urandom(size)
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
-        # patch the S3Producer to never resume and buffer everything
-        self.patch(S3Producer, 'resumeProducing', lambda s: None)
-
-        @defer.inlineCallbacks
-        def test(client):
-            """Test."""
-            yield client.dummy_authenticate("open sesame")
-            # create the dir
-            root_id = yield client.get_root()
-            make_req = yield client.make_file(request.ROOT, root_id, "hola")
-
-            # put content and check
-            args = (request.ROOT, make_req.new_id, NO_CONTENT_HASH, hash_value,
-                    crc32_value, size, deflated_size, StringIO(deflated_data))
-            try:
-                yield client.put_content(*args)
-            except protoerrors.TryAgainError:
-                pass
-            else:
-                self.fail('Should fail with TryAgainError.')
-        return self.callback_test(test, add_default_callbacks=True)
-
     def test_put_content_on_a_dir_normal(self):
         """Test putting content in a dir."""
         data = os.urandom(300000)
@@ -1851,10 +1662,10 @@ class TestMultipartPutContent(TestWithDatabase):
                 except errors.DoesNotExist:
                     raise ValueError("content blob is not there")
                 # check upload stat and log, with the offset sent
-                self.assertIn(('MultipartUploadJob.upload', 0), gauge)
-                self.assertIn(('MultipartUploadJob.upload.begin', 1), meter)
+                self.assertIn(('UploadJob.upload', 0), gauge)
+                self.assertIn(('UploadJob.upload.begin', 1), meter)
                 self.assertTrue(self.handler.check_debug(
-                    "MultipartUploadJob begin content from offset 0"))
+                    "UploadJob begin content from offset 0"))
 
         yield self.callback_test(auth, timeout=self.timeout,
                                  add_default_callbacks=True)
@@ -1872,7 +1683,6 @@ class TestMultipartPutContent(TestWithDatabase):
         """Test that the client can resume a putcontent request."""
         self.patch(settings.api_server, 'MULTIPART_THRESHOLD', 1024 * 512)
         self.patch(settings.api_server, 'STORAGE_CHUNK_SIZE', 1024 * 64)
-        chunk_size = settings.api_server.STORAGE_CHUNK_SIZE
         size = settings.api_server.MULTIPART_THRESHOLD * 2
         self.usr0.update(max_storage_bytes=size * 2)
         data = os.urandom(size)
@@ -1897,20 +1707,9 @@ class TestMultipartPutContent(TestWithDatabase):
         gauge = []
         self.service.factory.metrics.gauge = lambda *a: gauge.append(a)
 
-        called = []
-        # patch part_done callback to know when the parts are done
-        orig_part_done = content.MultipartUploadJob.part_done_callback
-
-        @defer.inlineCallbacks
-        def part_done(*args, **kwargs):
-            if len(called) == 0:
-                yield orig_part_done(*args, **kwargs)
-            called.append(1)
-
-        self.patch(content.MultipartUploadJob, 'part_done_callback', part_done)
-
         # patch BytesMessageProducer in order to avoid sending the whole file
         orig_go = sp_client.BytesMessageProducer.go
+        called = []
 
         def my_go(myself):
             data = myself.fh.read(request.MAX_PAYLOAD_SIZE)
@@ -1919,6 +1718,7 @@ class TestMultipartPutContent(TestWithDatabase):
                 myself.producing = False
                 myself.finished = True
                 return
+            called.append(1)
             if data:
                 response = protocol_pb2.Message()
                 response.type = protocol_pb2.Message.BYTES
@@ -1941,10 +1741,10 @@ class TestMultipartPutContent(TestWithDatabase):
         except EOFError:
             # check upload stat and log, with the offset sent,
             # first time tarts from beginning.
-            self.assertTrue(('MultipartUploadJob.upload', 0) in gauge)
-            self.assertTrue(('MultipartUploadJob.upload.begin', 1) in meter)
-            self.assertTrue(self.handler.check_debug("MultipartUploadJob "
-                            "begin content from offset 0"))
+            self.assertTrue(('UploadJob.upload', 0) in gauge)
+            self.assertTrue(('UploadJob.upload.begin', 1) in meter)
+            self.assertTrue(self.handler.check_debug(
+                            "UploadJob begin content from offset 0"))
         else:
             self.fail("Should raise EOFError.")
         yield client.kill()
@@ -1982,9 +1782,6 @@ class TestMultipartPutContent(TestWithDatabase):
         yield req.deferred
 
         message = yield begin_content_d
-        # check that the offset is one chunk
-        self.assertEqual(chunk_size, message.begin_content.offset)
-        self.assertEqual(message.begin_content.upload_id, '')
         offset_sent = message.begin_content.offset
         try:
             node_content = self.usr0.volume().get_content(hash_value)
@@ -1998,8 +1795,8 @@ class TestMultipartPutContent(TestWithDatabase):
 
         # check upload stat and log, with the offset sent, second time it
         # resumes from the first chunk
-        self.assertTrue(('MultipartUploadJob.upload', offset_sent) in gauge)
-        self.assertTrue(self.handler.check_debug("MultipartUploadJob "
+        self.assertTrue(('UploadJob.upload', offset_sent) in gauge)
+        self.assertTrue(self.handler.check_debug("UploadJob "
                         "begin content from offset %d" % offset_sent))
 
         yield client.kill()
@@ -2042,10 +1839,10 @@ class TestMultipartPutContent(TestWithDatabase):
                 StringIO(deflated_data), upload_id="invalid id",
                 upload_id_cb=upload_id.append)
             yield req.deferred
-            self.assertTrue(('MultipartUploadJob.upload', 0) in gauge)
-            self.assertTrue(('MultipartUploadJob.upload.begin', 1) in meter)
+            self.assertTrue(('UploadJob.upload', 0) in gauge)
+            self.assertTrue(('UploadJob.upload.begin', 1) in meter)
             self.assertTrue(self.handler.check_debug(
-                "MultipartUploadJob begin content from offset 0"))
+                "UploadJob begin content from offset 0"))
             self.assertEqual(len(upload_id), 1)
             self.assertIsInstance(uuid.UUID(upload_id[0]), uuid.UUID)
 
@@ -2155,68 +1952,6 @@ class TestMultipartPutContent(TestWithDatabase):
             d.addCallbacks(client.test_done, client.test_fail)
         return self.callback_test(auth)
 
-    def test_putcontent_pause_client_transport(self):
-        """Put content hitting the buffer limit pause client transport."""
-        self.patch(settings.api_server, 'MULTIPART_THRESHOLD', 1024 * 512)
-        self.patch(settings.api_server, 'STORAGE_CHUNK_SIZE', 1024 * 64)
-        self.patch(settings.api_server, 'UPLOAD_BUFFER_MAX_SIZE', 1024 * 10)
-        size = settings.api_server.MULTIPART_THRESHOLD * 2
-        self.usr0.update(max_storage_bytes=size * 2)
-        data = os.urandom(size)
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
-
-        # patch MultipartUploadJob.registerProducer to intercept
-        # calls to the transport
-        called = []
-
-        def collect(f):
-            """Decorator to collect calls."""
-
-            def wrapper():
-                """The wrapper."""
-                called.append(f.im_func.func_name)
-                return f()
-
-            return wrapper
-
-        orig_registerProducer = content.MultipartUploadJob.registerProducer
-
-        def registerProducer(s, p):
-            """registerProducer that also decorates the transport."""
-            p.pauseProducing = collect(p.pauseProducing)
-            p.resumeProducing = collect(p.resumeProducing)
-            return orig_registerProducer(s, p)
-
-        self.patch(content.MultipartUploadJob, 'registerProducer',
-                   registerProducer)
-
-        @defer.inlineCallbacks
-        def test(client):
-            """Test."""
-            yield client.dummy_authenticate("open sesame")
-            # create the dir
-            root_id = yield client.get_root()
-            make_req = yield client.make_file(request.ROOT, root_id, "hola")
-
-            # put content and check
-            args = (request.ROOT, make_req.new_id, NO_CONTENT_HASH, hash_value,
-                    crc32_value, size, deflated_size, StringIO(deflated_data))
-            yield client.put_content(*args)
-            self.assertIn('pauseProducing', called)
-            self.assertIn('resumeProducing', called)
-            paused = len([i for i in called if 'pause' in i])
-            resumed = len([i for i in called if 'resume' in i])
-            self.assertTrue(
-                paused <= resumed,
-                "We should have equal or more calls to resumeProducing")
-        return self.callback_test(test, add_default_callbacks=True)
-
     def test_put_content_on_a_dir(self):
         """Test putting content in a dir."""
         data = os.urandom(300000)
@@ -2310,19 +2045,11 @@ class TestPutContentInternalError(TestWithDatabase):
         pc = server.PutContentResponse(storage_server, message)
         pc.id = 123
 
-        # s3 put should fail early
-        s3_class = self.service.factory.s3_class
-
-        def s3_put(*args, **kwargs):
-            """s3lib put that always fails."""
-            factory = s3lib.contrib.http_client.HTTPStreamingClientFactory(
-                'http://example.com', method='GET', postdata={}, headers={},
-                agent="S3lib", streaming=True)
-            factory.connect_deferred.callback(None)
-            factory.deferred.errback(ValueError("Fail!"))
-            return factory
-
-        self.patch(s3_class, 'put', s3_put)
+        # make the consumer crash
+        def crash(*_):
+            """Make it crash."""
+            raise ValueError("Fail!")
+        self.patch(content.BaseUploadJob, 'add_data', crash)
 
         # start uploading
         pc.start()
@@ -2426,18 +2153,28 @@ class TestChunkedContent(TestWithDatabase):
             def _put_fail(result):
                 # this will allow the server to split the data into chunks but
                 # fail to put it back together in a single blob
-                if put_fail == 400:
-                    self.s4_site.resource.fail_next_put(
-                        error=http.BAD_REQUEST, message="RequestTimeout")
-                elif put_fail:
-                    self.s4_site.resource.fail_next_put()
+                if put_fail:
+                    # make the consumer crash
+                    def crash(*_):
+                        """Make it crash."""
+                        raise ValueError("test problem")
+                    self.patch(diskstorage.FileWriterConsumer, 'write', crash)
                 return result
 
             def _get_fail(result):
                 # this will allow the server to split the data into chunks but
                 # fail to put it back together in a single blob
                 if get_fail:
-                    self.s4_site.resource.fail_next_get()
+                    # make the producer crash
+                    orig_func = diskstorage.FileReaderProducer.startProducing
+
+                    def mitm(*a):
+                        """MITM to return a failed deferred, not real one."""
+                        deferred = orig_func(*a)
+                        deferred.errback(ValueError())
+                        return deferred
+                    self.patch(diskstorage.FileReaderProducer,
+                               'startProducing', mitm)
                 return result
 
             d = client.dummy_authenticate("open sesame")
@@ -2460,36 +2197,17 @@ class TestChunkedContent(TestWithDatabase):
             return d
         return self.callback_test(auth, timeout=10)
 
-    def test_putcontent_chunked_putfail_500(self):
+    def test_putcontent_chunked_putfail(self):
         '''Assures that chunked putcontent fails with "try again".'''
         d = self.test_putcontent_chunked(put_fail=True)
         self.assertFails(d, 'TRY_AGAIN')
         return d
 
-    def test_putcontent_chunked_getfail_500(self):
+    def test_putcontent_chunked_getfail(self):
         '''Assures that chunked putcontent fails with "try again".'''
         d = self.test_putcontent_chunked(get_fail=True)
         self.assertFails(d, 'NOT_AVAILABLE')
         return d
-
-    @defer.inlineCallbacks
-    def test_putcontent_chunked_putfail_400(self):
-        '''Assures that chunked putcontent fails with "try again".'''
-        logger = logging.getLogger('storage.server')
-        hdlr = MementoHandler()
-        hdlr.setLevel(logging.WARNING)
-        logger.addHandler(hdlr)
-        try:
-            yield self.test_putcontent_chunked(put_fail=400)
-        except protoerrors.TryAgainError:
-            # check that we have all the expected info in the logs
-            log_msg = hdlr.records[-1].message
-            uuid_regexp = "[a-z0-9]+-[a-z0-9]+-[a-z0-9]+-[a-z0-9]+-[a-z0-9]+"
-            self.assertTrue(re.match(uuid_regexp, log_msg))
-        else:
-            self.fail("Should fail with TryAgain")
-        finally:
-            logger.removeHandler(hdlr)
 
 
 class UserTest(TestWithDatabase):
@@ -2559,75 +2277,6 @@ class UserTest(TestWithDatabase):
         # this will create a new uploadjob
         upload_job = yield self.user.get_upload_job(
             None, node_id, NO_CONTENT_HASH, 'foo', 10, size / 2, size / 4,
-            True)
-        self.assertTrue(isinstance(upload_job, content.UploadJob),
-                        upload_job.__class__)
-
-    @defer.inlineCallbacks
-    def test_get_upload_job_multipart(self):
-        """Test for _get_multipart_upload_job."""
-        root_id, _ = yield self.user.get_root()
-        volume_id = yield self.user.get_volume_id(root_id)
-        node_id, _, _ = yield self.user.make_file(volume_id, root_id,
-                                                  u"name", True)
-        size = settings.api_server.MULTIPART_THRESHOLD
-        # this will create a new uploadjob
-        upload_job = yield self.user.get_upload_job(
-            None, node_id, NO_CONTENT_HASH, 'foo', 10, size * 4, size * 2,
-            True)
-        self.assertTrue(isinstance(upload_job, content.MultipartUploadJob),
-                        upload_job.__class__)
-        # set the multipart_id so we resume it
-        yield upload_job.uploadjob.set_multipart_id('foobar')
-        # get the same uploadjob using the upload_id
-        same_upload_job = yield self.user.get_upload_job(
-            None, node_id, NO_CONTENT_HASH, 'foo', 10, size * 4, size * 2,
-            True, upload_id=str(upload_job.upload_id))
-        self.assertEqual(same_upload_job.uploadjob.uploadjob_id,
-                         upload_job.uploadjob.uploadjob_id)
-        self.assertTrue(same_upload_job.uploadjob.when_last_active
-                        > upload_job.uploadjob.when_last_active)
-
-    @defer.inlineCallbacks
-    def test_get_upload_job_multipart_invalid_upload_id(self):
-        """Test for _get_multipart_upload_job with an invalid upload_id."""
-        root_id, _ = yield self.user.get_root()
-        volume_id = yield self.user.get_volume_id(root_id)
-        node_id, _, _ = yield self.user.make_file(volume_id, root_id,
-                                                  u"name", True)
-        size = settings.api_server.MULTIPART_THRESHOLD
-        # this will create a new uploadjob
-        upload_job = yield self.user.get_upload_job(
-            None, node_id, NO_CONTENT_HASH, 'foo', 10, size * 4, size * 2,
-            True, upload_id="hola")
-        self.assertTrue(isinstance(upload_job, content.MultipartUploadJob),
-                        upload_job.__class__)
-        # set the multipart_id so we resume it
-        yield upload_job.uploadjob.set_multipart_id('foobar')
-        # get the same uploadjob using the upload_id
-        same_upload_job = yield self.user.get_upload_job(
-            None, node_id, NO_CONTENT_HASH, 'foo', 10, size * 4, size * 2,
-            True, upload_id=str(upload_job.upload_id))
-        self.assertEqual(same_upload_job.uploadjob.uploadjob_id,
-                         upload_job.uploadjob.uploadjob_id)
-        self.assertTrue(same_upload_job.uploadjob.when_last_active >
-                        upload_job.uploadjob.when_last_active)
-
-    @defer.inlineCallbacks
-    def test_get_upload_job_big_file(self):
-        """Test for get_upload_job.
-
-        This is with a file size >= multipart_threshold but with a
-        deflated_size < multipart_threshold.
-        """
-        root_id, _ = yield self.user.get_root()
-        volume_id = yield self.user.get_volume_id(root_id)
-        node_id, _, _ = yield self.user.make_file(volume_id, root_id,
-                                                  u"name", True)
-        size = settings.api_server.MULTIPART_THRESHOLD
-        # this will create a new uploadjob
-        upload_job = yield self.user.get_upload_job(
-            None, node_id, NO_CONTENT_HASH, 'foo', 10, size * 4, size / 2,
             True)
         self.assertTrue(isinstance(upload_job, content.UploadJob),
                         upload_job.__class__)
@@ -2742,10 +2391,14 @@ class TestUploadJob(TestWithDatabase):
             size=0, deflated_size=0, storage_key=None)
         node_id = r['node_id']
         node = yield c_user.get_node(self.user.root_volume_id, node_id, None)
+        args = (c_user, self.user.root_volume_id, node_id, node.content_hash,
+                hash_value, crc32_value, size,
+                deflated_size, str(uuid.uuid4()))
+        upload = yield content.DBUploadJob.make(*args)
         upload_job = self.upload_class(c_user, node, node.content_hash,
                                        hash_value, crc32_value, size,
                                        deflated_size, None, False,
-                                       magic_hash_value)
+                                       magic_hash_value, upload)
         defer.returnValue((deflated_data, hash_value, upload_job))
 
     @defer.inlineCallbacks
@@ -2754,9 +2407,8 @@ class TestUploadJob(TestWithDatabase):
         size = self.half_size
         deflated_data, hash_value, upload_job = yield self.make_upload(size)
         yield upload_job.connect()
-        upload_job.add_data(deflated_data)
-        result = yield upload_job.deferred
-        yield upload_job.commit(result)
+        yield upload_job.add_data(deflated_data)
+        yield upload_job.commit()
         node_id = upload_job.file_node.id
         node = yield self.content_user.get_node(self.user.root_volume_id,
                                                 node_id, None)
@@ -2768,6 +2420,7 @@ class TestUploadJob(TestWithDatabase):
         size = self.double_size
         deflated_data, hash_value, upload_job = yield self.make_upload(size)
         yield upload_job.connect()
+        all_sent_deferred = defer.Deferred()
 
         # now let's upload some data
         def data_iter(chunk_size=request.MAX_MESSAGE_SIZE):
@@ -2775,34 +2428,33 @@ class TestUploadJob(TestWithDatabase):
             for part in range(0, len(deflated_data), chunk_size):
                 yield upload_job.add_data(
                     deflated_data[part:part + chunk_size])
+            all_sent_deferred.callback(True)
 
         self._cooperator.coiterate(data_iter())
-        result = yield upload_job.deferred
-        yield upload_job.commit(result)
+        yield all_sent_deferred
+        yield upload_job.commit()
+
+        # verify node content
         node_id = upload_job.file_node.id
         node = yield self.content_user.get_node(self.user.root_volume_id,
                                                 node_id, None)
         self.assertEqual(node.content_hash, hash_value)
-        f = upload_job.s3.get(settings.api_server.S3_BUCKET,
-                              upload_job._storage_key)
-        s3_data = yield f.deferred
-        self.assertEqual(s3_data, deflated_data)
 
+    @defer.inlineCallbacks
     def test_upload_fail_with_conflict(self):
         """Test UploadJob conflict."""
         size = self.half_size
         deflated_data, _, upload_job = yield self.make_upload(size)
         yield upload_job.connect()
-        upload_job.add_data(deflated_data)
-        result = yield upload_job.deferred
+        yield upload_job.add_data(deflated_data)
         # poison the upload
         upload_job.original_file_hash = "sha1:fakehash"
         try:
-            yield upload_job.commit(result)
+            yield upload_job.commit()
         except server.errors.ConflictError as e:
             self.assertEquals(str(e), 'The File changed while uploading.')
         else:
-            yield defer.fail("Should fail with ConflictError")
+            self.fail("Should fail with ConflictError")
 
     @defer.inlineCallbacks
     def test_upload_corrupted_deflated(self):
@@ -2811,85 +2463,78 @@ class TestUploadJob(TestWithDatabase):
         deflated_data, _, upload_job = yield self.make_upload(size)
         yield upload_job.connect()
         # change the deflated data to trigger a UploadCorrupt error
-        upload_job.add_data(deflated_data + '10')
-        result = yield upload_job.deferred
+        yield upload_job.add_data(deflated_data + '10')
         try:
-            yield upload_job.commit(result)
+            yield upload_job.commit()
         except server.errors.UploadCorrupt as e:
             self.assertEquals(str(e), upload_job._deflated_size_hint_mismatch)
         else:
-            yield defer.fail("Should fail with UploadCorrupt")
+            self.fail("Should fail with UploadCorrupt")
 
+    @defer.inlineCallbacks
     def test_upload_corrupted_inflated(self):
         """Test corruption of inflated data in UploadJob."""
         # now test corruption of the inflated data
         size = self.half_size
         deflated_data, _, upload_job = yield self.make_upload(size)
         yield upload_job.connect()
-        upload_job.add_data(deflated_data)
-        result = yield upload_job.deferred
+        yield upload_job.add_data(deflated_data)
         # change the inflated size hint to trigger the error
-        upload_job._set_inflated_size(10)
+        upload_job.producer.inflated_size += 10
         try:
-            yield upload_job.commit(result)
+            yield upload_job.commit()
         except server.errors.UploadCorrupt as e:
-            self.assertEquals(str(e), upload_job._inflated_size_hint_mismatch)
+            self.assertEqual(str(e), upload_job._inflated_size_hint_mismatch)
         else:
-            yield defer.fail("Should fail with UploadCorrupt")
+            self.fail("Should fail with UploadCorrupt")
 
+    @defer.inlineCallbacks
     def test_upload_corrupted_hash(self):
         """Test corruption of hash in UploadJob."""
         # now test corruption of the content hash hint
         size = self.half_size
         deflated_data, _, upload_job = yield self.make_upload(size)
-        orig_hash_hint = self.upload_class.hash_hint
         yield upload_job.connect()
-        self.upload_class.hash_hint = 'sha1:fakehash'
-        upload_job.add_data(deflated_data)
-        result = yield upload_job.deferred
+        upload_job.hash_hint = 'sha1:fakehash'
+        yield upload_job.add_data(deflated_data)
         try:
-            yield upload_job.commit(result)
+            yield upload_job.commit()
         except server.errors.UploadCorrupt as e:
             self.assertEquals(str(e), upload_job._content_hash_hint_mismatch)
-            self.upload_class.hash_hint = orig_hash_hint
         else:
-            yield defer.fail("Should fail with UploadCorrupt")
+            self.fail("Should fail with UploadCorrupt")
 
+    @defer.inlineCallbacks
     def test_upload_corrupted_magic_hash(self):
         """Test corruption of magic hash in UploadJob."""
         # now test corruption of the content hash hint
         size = self.half_size
         deflated_data, _, upload_job = yield self.make_upload(size)
-        orig_hash_hint = self.upload_class.hash_hint
         yield upload_job.connect()
-        self.upload_class.magic_hash = 'sha1:fakehash'
-        upload_job.add_data(deflated_data)
-        result = yield upload_job.deferred
+        upload_job.magic_hash = 'sha1:fakehash'
+        yield upload_job.add_data(deflated_data)
         try:
-            yield upload_job.commit(result)
+            yield upload_job.commit()
         except server.errors.UploadCorrupt as e:
-            self.assertEquals(str(e), upload_job._content_hash_hint_mismatch)
-            self.upload_class.hash_hint = orig_hash_hint
+            self.assertEquals(str(e), upload_job._magic_hash_hint_mismatch)
         else:
-            yield defer.fail("Should fail with UploadCorrupt")
+            self.fail("Should fail with UploadCorrupt")
 
+    @defer.inlineCallbacks
     def test_upload_corrupted_crc32(self):
         """Test corruption of crc32 in UploadJob."""
         # now test corruption of the crc32 hint
         size = self.half_size
         deflated_data, _, upload_job = yield self.make_upload(size)
-        orig_crc32_hint = self.upload_class.crc32_hint
-        self.upload_class.crc32_hint = 'bad crc32'
+        upload_job.crc32_hint = 'bad crc32'
         yield upload_job.connect()
-        upload_job.add_data(deflated_data)
-        result = yield upload_job.deferred
+        yield upload_job.add_data(deflated_data)
         try:
-            yield upload_job.commit(result)
+            yield upload_job.commit()
         except server.errors.UploadCorrupt as e:
             self.assertEquals(str(e), upload_job._crc32_hint_mismatch)
-            self.upload_class.crc32_hint = orig_crc32_hint
         else:
-            yield defer.fail("Should fail with UploadCorrupt")
+            self.fail("Should fail with UploadCorrupt")
 
     @defer.inlineCallbacks
     def test_commit_return_node_with_gen(self):
@@ -2898,9 +2543,8 @@ class TestUploadJob(TestWithDatabase):
         deflated_data, hash_value, upload_job = yield self.make_upload(size)
         previous_generation = upload_job.file_node.generation
         yield upload_job.connect()
-        upload_job.add_data(deflated_data)
-        result = yield upload_job.deferred
-        new_generation = yield upload_job.commit(result)
+        yield upload_job.add_data(deflated_data)
+        new_generation = yield upload_job.commit()
         self.assertEqual(new_generation, previous_generation + 1)
 
     @defer.inlineCallbacks
@@ -2909,8 +2553,8 @@ class TestUploadJob(TestWithDatabase):
         size = self.half_size
         deflated_data, hash_value, upload_job = yield self.make_upload(size)
         yield upload_job.connect()
-        self.assertRaises(server.errors.UploadCorrupt, upload_job.add_data,
-                          'Neque porro quisquam est qui dolorem ipsum...')
+        yield upload_job.add_data('Neque porro quisquam est qui dolorem ipsum')
+        self.assertFailure(upload_job.deferred, server.errors.UploadCorrupt)
         yield upload_job.cancel()
 
     def test_upload_id(self):
@@ -2919,24 +2563,6 @@ class TestUploadJob(TestWithDatabase):
         deflated_data, _, upload_job = yield self.make_upload(size)
         # regular upload job always has '' as the upload_id
         self.assertEqual(upload_job.upload_id, '')
-
-    @defer.inlineCallbacks
-    def test_buffers_size(self):
-        """Test the buffers_size property."""
-        size = self.half_size
-        deflated_data, hash_value, upload_job = yield self.make_upload(size)
-        yield upload_job.connect()
-        deflated_size = len(deflated_data)
-        upload_job.add_data(deflated_data[:deflated_size / 2])
-        upload_job.add_data(deflated_data[deflated_size / 2:])
-        self.assertEqual(deflated_size, upload_job.buffers_size)
-        self.assertEqual(deflated_size, upload_job.producer.buffer_size)
-        result = yield upload_job.deferred
-        yield upload_job.commit(result)
-        node_id = upload_job.file_node.id
-        node = yield self.content_user.get_node(self.user.root_volume_id,
-                                                node_id, None)
-        self.assertEqual(node.content_hash, hash_value)
 
     def test_stop_sets_canceling(self):
         """Set canceling on stop."""
@@ -2971,292 +2597,17 @@ class TestUploadJob(TestWithDatabase):
             yield upload_job.stop()
 
     @defer.inlineCallbacks
-    def test_wait_for_s3_connection(self):
-        """UploadJob.connect waits for s3 connection."""
-        size = self.half_size
-        deflated_data, _, upload_job = yield self.make_upload(size)
-        yield upload_job.connect()
-        client = upload_job.factory.http_client
-        self.assertEqual(client.transport.connected, 1)
-        self.assertTrue(upload_job.factory.connect_deferred.called)
-        self.assertTrue(client.factory.connect_deferred.called)
-        yield upload_job.cancel()
-
-
-class TestMultipartUploadJob(TestUploadJob):
-    """Tests for MultipartUploadJob class."""
-
-    upload_class = content.MultipartUploadJob
-
-    @defer.inlineCallbacks
-    def setUp(self):
-        """Setup the test."""
-        yield super(TestMultipartUploadJob, self).setUp()
-        # tune the config for this tests
-        self.patch(settings.api_server, 'MULTIPART_THRESHOLD', 1024)
-        self.patch(settings.api_server, 'STORAGE_CHUNK_SIZE', 100)
-        size = settings.api_server.MULTIPART_THRESHOLD * 2
-        self.half_size = size
-        self.double_size = size
-
-    @defer.inlineCallbacks
-    def tearDown(self):
-        yield super(TestMultipartUploadJob, self).tearDown()
-
-    @defer.inlineCallbacks
-    def make_upload(self, size):
-        """Create the storage UploadJob object.
-
-        @param size: the size of the upload
-        @return: a tuple (deflated_data, hash_value, upload_job)
-        """
-        data = os.urandom(size)
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        magic_hash_value = get_magic_hash(data)
-        crc32_value = crc32(data)
-        deflated_size = len(deflated_data)
-        root, _ = yield self.content_user.get_root()
-        c_user = self.content_user
-        rpcdal = self.service.factory.content.rpcdal_client
-        r = yield rpcdal.call(
-            'make_file_with_content', user_id=c_user.id,
-            volume_id=self.user.root_volume_id, parent_id=root,
-            name=u"A new file", node_hash=model.EMPTY_CONTENT_HASH, crc32=0,
-            size=0, deflated_size=0, storage_key=None)
-        node_id = r['node_id']
-        node = yield c_user.get_node(self.user.root_volume_id, node_id, None)
-
-        args = (c_user, self.user.root_volume_id, node_id, node.content_hash,
-                hash_value, crc32_value, size,
-                deflated_size, str(uuid.uuid4()))
-        upload = yield content.DBUploadJob.make(*args)
-        upload_job = self.upload_class(c_user, node, node.content_hash,
-                                       hash_value, crc32_value, size,
-                                       deflated_size, upload, None, False,
-                                       magic_hash_value)
-        defer.returnValue((deflated_data, hash_value, upload_job))
-
-    @defer.inlineCallbacks
-    def test_add_bad_data(self):
-        """Test MultipartUploadJob.add_data with invalid data."""
-        size = self.half_size
-        deflated_data, hash_value, upload_job = yield self.make_upload(size)
-        yield upload_job.connect()
-
-        # upload the whole thing, we don't check the data on multipart uploads
-        # during the upload
-        chunk_size = 512
-        msg = 'Neque porro quisquam est qui dolorem ipsum...'
-        for part in range(0, len(deflated_data), chunk_size):
-            data = deflated_data[part:part + chunk_size]
-            if part == chunk_size * 0:
-                yield upload_job.add_data(msg * 100)
-            else:
-                yield upload_job.add_data(data)
-        try:
-            yield upload_job.deferred
-        except server.errors.UploadCorrupt as e:
-            self.assertIn("-3 while decompressing", str(e))
-        else:
-            self.fail("Should fail with UploadCorrupt")
-        finally:
-            yield upload_job.cancel()
-
-    @defer.inlineCallbacks
-    def test_upload_corrupted_deflated(self):
-        """Test corruption of deflated data in UploadJob."""
-        size = self.half_size
-        deflated_data, _, upload_job = yield self.make_upload(size)
-        deflated_data += '10'
-        yield upload_job.connect()
-        upload_job.add_data(deflated_data)
-        result = yield upload_job.deferred
-        # change the deflated size to force a failure in upload_job.commit
-        upload_job.factory.deflated_size += 1
-        try:
-            yield upload_job.commit(result)
-        except server.errors.UploadCorrupt as e:
-            self.assertEquals(str(e), upload_job._deflated_size_hint_mismatch)
-        else:
-            yield defer.fail("Should fail with UploadCorrupt")
-
-    def test_upload_id(self):
-        """Test the upload_id generation."""
-        size = self.half_size
-        deflated_data, _, upload_job = yield self.make_upload(size)
-        self.assertEqual(upload_job.upload_id, upload_job.multipart_key_name)
-
-    @defer.inlineCallbacks
-    def test_buffers_size(self):
-        """Test the buffers_size property."""
-        size = self.half_size
-        deflated_data, hash_value, upload_job = yield self.make_upload(size)
-        yield upload_job.connect()
-        deflated_size = len(deflated_data)
-        upload_job.add_data(deflated_data[:deflated_size / 2])
-        self.assertEqual(deflated_size / 2, upload_job.buffers_size)
-        self.assertEqual(deflated_size / 2, upload_job.factory.buffer_size)
-        # pause the producer again
-        upload_job.producer.pauseProducing()
-        upload_job.add_data(deflated_data[deflated_size / 2:])
-        self.assertEqual(deflated_size, upload_job.buffers_size)
-        self.assertApproximates(deflated_size,
-                                upload_job.factory.buffer_size, 1)
-        result = yield upload_job.deferred
-        yield upload_job.commit(result)
-        node = yield self.content_user.get_node(self.user.root_volume_id,
-                                                upload_job.file_node.id, None)
-        self.assertEqual(node.content_hash, hash_value)
-
-    @defer.inlineCallbacks
-    def test_unregisterProducer_on_cancel(self):
-        """unregisterProducer is called on cancel."""
-        size = self.half_size
-        deflated_data, _, upload_job = yield self.make_upload(size)
-        mocker = Mocker()
-        producer = mocker.mock()
-        self.patch(upload_job, 'producer', producer)
-        # cancel
-        expect(producer.unregisterProducer())
-        expect(producer.stopProducing())
-        with mocker:
-            yield upload_job.cancel()
-
-    @defer.inlineCallbacks
-    def test_unregisterProducer_on_stop(self):
-        """unregisterProducer is called on stop too."""
-        size = self.half_size
-        deflated_data, _, upload_job = yield self.make_upload(size)
-        mocker = Mocker()
-        producer = mocker.mock()
-        self.patch(upload_job, 'producer', producer)
-        # stop
-        expect(producer.stopProducing())
-        expect(producer.unregisterProducer())
-        with mocker:
-            yield upload_job.stop()
-
-    @defer.inlineCallbacks
-    def test_stopProducing_no_ProducerStopped_on_stop(self):
-        """If stopProducing raises ProducerSopped, we catch it on stop."""
-        size = self.half_size
-        deflated_data, _, upload_job = yield self.make_upload(size)
-        mocker = Mocker()
-        producer = mocker.mock()
-        self.patch(upload_job, 'producer', producer)
-        # stop
-        expect(producer.stopProducing()).throw(ProducerStopped())
-        expect(producer.unregisterProducer())
-        with mocker:
-            yield upload_job.stop()
-
-    @defer.inlineCallbacks
-    def test_unregisterProducer_on_commit(self):
-        """unregisterProducer is called on commit too."""
-        mocker = Mocker()
-        size = self.half_size
-        deflated_data, hash_value, upload_job = yield self.make_upload(size)
-        yield upload_job.connect()
-        upload_job.add_data(deflated_data)
-        upload_job.producer = mocker.patch(upload_job.producer)
-        result = yield upload_job.deferred
-        with mocker:
-            yield upload_job.commit(result)
-        node_id = upload_job.file_node.id
-        node = yield self.content_user.get_node(self.user.root_volume_id,
-                                                node_id, None)
-        self.assertEqual(node.content_hash, hash_value)
-
-    @defer.inlineCallbacks
-    def test_wait_for_s3_connection(self):
-        """UploadJob.connect waits for s3 connection."""
-        size = self.half_size
-        deflated_data, _, upload_job = yield self.make_upload(size)
-        yield upload_job.connect()
-        client = upload_job.factory._current_client_factory.http_client
-        self.assertEqual(client.transport.connected, 1)
-        self.assertTrue(upload_job.factory.connect_deferred.called)
-        self.assertTrue(client.factory.connect_deferred.called)
-        yield upload_job.cancel()
-
-    @defer.inlineCallbacks
-    def test_s3_connection_failure_doesnt_blow_up(self):
-        """Test that failure to connect to to S3 reports a reasonable error."""
-        size = self.half_size
-        deflated_data, _, upload_job = yield self.make_upload(size)
-        # Make sure the S3 connection fails before we actually setup a producer
-        fake_s3_deferred = defer.Deferred()
-        reactor.callLater(
-            0, fake_s3_deferred.errback, web_error.Error("Boom!"))
-
-        class FakeS3:
-            """Creates upload that is destined to fail."""
-
-            def create_multipart_upload(self, *args):
-                """Just return the fake deferred."""
-                return fake_s3_deferred
-
-        upload_job.s3 = FakeS3()
-        try:
-            yield upload_job.connect()
-            self.fail("Expected Exception to be thrown!")
-        except storage_errors.TryAgain as e:
-            self.assertTrue("Boom!" in e.message)
-
-    @defer.inlineCallbacks
-    def test_mp_upload_missing_from_s3(self):
-        """Client tries to resume, but the upload isn't in S3.
-
-        It receives a new upload_id.
-        """
-        size = self.half_size
-        deflated_data, _, upload_job = yield self.make_upload(size)
-        # set a fake multipart_id
-        upload_job.uploadjob.multipart_id = str(uuid.uuid4())
-        # Make sure the S3 connection fails before we actually setup a producer
-        fake_s3_deferred = defer.Deferred()
-        reactor.callLater(0, fake_s3_deferred.errback, web_error.Error("404"))
-        mp_upload = MultipartUpload(None, "bucket", "key", "upload_id")
-
-        class FakeS3:
-            """Creates upload that is destined to fail."""
-
-            def get_multipart_upload(self, *args):
-                """Just return a deferred that fails with 404."""
-                return fake_s3_deferred
-
-            def create_multipart_upload(self, *args):
-                """Just return the fake deferred."""
-                return defer.succeed(mp_upload)
-
-        class FakeConsumer(object):
-            """A fake consumer."""
-            deferred = defer.Deferred()
-            connect_deferred = defer.succeed(None)
-
-        upload_job.s3 = FakeS3()
-        self.patch(mp_upload, "_upload_part", lambda *a: FakeConsumer())
-        yield upload_job.connect()
-        self.assertIdentical(mp_upload, upload_job.mp_upload)
-        # check that we have the new id
-        self.assertEqual(upload_job.multipart_id, "upload_id")
-
-    @defer.inlineCallbacks
     def test_commit_and_delete_fails(self):
         """Commit and delete fails, log in warning."""
         size = self.half_size
         deflated_data, _, upload_job = yield self.make_upload(size)
         yield upload_job.connect()
-        upload_job.add_data(deflated_data)
-        result = yield upload_job.deferred
+        yield upload_job.add_data(deflated_data)
         # make commit fail
         self.patch(upload_job, "_commit",
-                   lambda _: defer.fail(ValueError("boom")))
+                   lambda: defer.fail(ValueError("boom")))
         # also delete
-        self.patch(upload_job, "delete",
+        self.patch(upload_job.uploadjob, "delete",
                    lambda: defer.fail(ValueError("delete boom")))
         logger = logging.getLogger('storage.server')
         hdlr = MementoHandler()
@@ -3265,7 +2616,7 @@ class TestMultipartUploadJob(TestUploadJob):
         self.addCleanup(logger.removeHandler, hdlr)
         hdlr.debug = True
         try:
-            yield upload_job.commit(result)
+            yield upload_job.commit()
         except ValueError as e:
             self.assertEqual(str(e), "boom")
             self.assertTrue(hdlr.check_warning("delete boom"))
@@ -3278,15 +2629,14 @@ class TestMultipartUploadJob(TestUploadJob):
         size = self.half_size
         deflated_data, _, upload_job = yield self.make_upload(size)
         yield upload_job.connect()
-        upload_job.add_data(deflated_data)
-        result = yield upload_job.deferred
+        yield upload_job.add_data(deflated_data)
         logger = logging.getLogger('storage.server')
         hdlr = MementoHandler()
         hdlr.setLevel(logging.WARNING)
         logger.addHandler(hdlr)
         self.addCleanup(logger.removeHandler, hdlr)
         hdlr.debug = True
-        yield upload_job.commit(result)
+        yield upload_job.commit()
         node = upload_job.file_node
         # check that the upload is no more
         d = content.DBUploadJob.get(self.content_user, node.volume_id,
@@ -3296,6 +2646,30 @@ class TestMultipartUploadJob(TestUploadJob):
                                     upload_job.inflated_size_hint,
                                     upload_job.deflated_size_hint)
         yield self.assertFailure(d, errors.DoesNotExist)
+
+    @defer.inlineCallbacks
+    def test_add_operation_ok(self):
+        _, _, upload_job = yield self.make_upload(20)
+        called = []
+        fake_operation = lambda _: called.append('operation')
+        fake_error_handler = lambda _: called.append('error')
+        upload_job.add_operation(fake_operation, fake_error_handler)
+        yield upload_job.ops
+        self.assertEqual(called, ['operation'])
+
+    @defer.inlineCallbacks
+    def test_add_operation_error(self):
+        _, _, upload_job = yield self.make_upload(20)
+        called = []
+
+        def crash(_):
+            called.append('operation')
+            raise ValueError("crash")
+        fake_error_handler = \
+            lambda failure: called.append('error: ' + str(failure.value))
+        upload_job.add_operation(crash, fake_error_handler)
+        yield upload_job.ops
+        self.assertEqual(called, ['operation', 'error: crash'])
 
 
 class TestNode(TestWithDatabase):
@@ -3352,14 +2726,17 @@ class TestNode(TestWithDatabase):
             size=0, deflated_size=0, storage_key=None)
         node_id = r['node_id']
         node = yield content_user.get_node(user.root_volume_id, node_id, None)
+        args = (content_user, self.user.root_volume_id, node_id,
+                node.content_hash, hash_value, crc32_value, size,
+                deflated_size, str(uuid.uuid4()))
+        upload = yield content.DBUploadJob.make(*args)
         upload_job = content.UploadJob(content_user, node, node.content_hash,
                                        hash_value, crc32_value, size,
                                        deflated_size, None, False,
-                                       magic_hash_value)
+                                       magic_hash_value, upload)
         yield upload_job.connect()
-        upload_job.add_data(deflated_data)
-        result = yield upload_job.deferred
-        yield upload_job.commit(result)
+        yield upload_job.add_data(deflated_data)
+        yield upload_job.commit()
         node = yield content_user.get_node(user.root_volume_id, node_id, None)
         self.assertEqual(hash_value, node.content_hash)
         defer.returnValue((node, deflated_data))
@@ -3371,7 +2748,7 @@ class TestNode(TestWithDatabase):
         producer = yield node.get_content(previous_hash=node.content_hash)
         consumer = BufferedConsumer(producer)
         # resume producing
-        consumer.resumeProducing()
+        producer.startProducing(consumer)
         yield producer.deferred
         self.assertEqual(len(consumer.buffer.getvalue()), len(deflated_data))
         self.assertEqual(consumer.buffer.getvalue(), deflated_data)
@@ -3383,37 +2760,25 @@ class TestNode(TestWithDatabase):
         defer.returnValue((self.suser, node))
 
     @defer.inlineCallbacks
-    def test_get_producer_adds_handles3error_on_producer_errback(self):
-        """_handle_s3_errors is called if the producer has a problem."""
+    def test_handles_producing_error(self):
         user, node = yield self._get_user_node()
 
-        # make it fail when asking for the producer
-        err = web_error.Error('500')
+        # make the consumer crash
+        orig_func = diskstorage.FileReaderProducer.startProducing
 
-        class DeferredContainer(object):
-            """Just something that has a deferred in it."""
+        def mitm(*a):
+            """MITM to return a failed deferred instead of real one."""
+            deferred = orig_func(*a)
+            deferred.errback(ValueError("crash"))
+            return deferred
+        self.patch(diskstorage.FileReaderProducer, 'startProducing', mitm)
 
-            def __init__(self):
-                self.deferred = defer.Deferred()
-
-        fake_response = DeferredContainer()
-        fake_producer = DeferredContainer()
-        fake_response.deferred.callback(fake_producer)
-        node._get_from_s3 = lambda *a: fake_response
-
-        # flag if was called, storing the failure and user, and
-        # returning the failure
-        called = []
-        node._handle_s3_errors = lambda *a: called.extend(a)
-
-        # get the producer, check it still wasn't called
-        yield node._get_producer('bucket', 'storage_key', 'headers', user)
-        self.assertFalse(called)
-
-        # errback the deferred and check
-        fake_producer.deferred.errback(err)
-        self.assertEqual(called[0].value, err)
-        self.assertEqual(called[1], user)
+        producer = yield node.get_content(previous_hash=node.content_hash,
+                                          user=user)
+        consumer = BufferedConsumer(producer)
+        # resume producing
+        producer.startProducing(consumer)
+        yield self.assertFailure(producer.deferred, server.errors.NotAvailable)
 
 
 class TestGenerations(TestWithDatabase):
@@ -3753,25 +3118,22 @@ class DBUploadJobTestCase(TestCase):
         method, attribs = self.user.recorded
         self.assertEqual(method, 'set_uploadjob_multipart_id')
         should = dict(user_id='fake_user_id', uploadjob_id='uploadjob_id',
-                      multipart_id='multipart_id')
+                      multipart_id='multipart_id', volume_id='volume_id')
         self.assertEqual(attribs, should)
 
     @defer.inlineCallbacks
     def test_add_part(self):
         """Test add_part method."""
         dbuj = yield self._make_uj()
-        yield dbuj.add_part('chunk_size', 'inflated_size', 'crc32',
-                            'hash_context', 'magic_hash_context',
-                            'decompress_context')
+        yield dbuj.add_part('chunk_size')
 
         # check it called rpcdal correctly
         method, attribs = self.user.recorded
         self.assertEqual(method, 'add_part_to_uploadjob')
         should = dict(user_id='fake_user_id', uploadjob_id='uploadjob_id',
-                      chunk_size='chunk_size', inflated_size='inflated_size',
-                      crc32='crc32', hash_context='hash_context',
-                      magic_hash_context='magic_hash_context',
-                      decompress_context='decompress_context')
+                      chunk_size='chunk_size', inflated_size=0, crc32=0,
+                      hash_context='', magic_hash_context='',
+                      decompress_context='', volume_id='volume_id')
         self.assertEqual(attribs, should)
 
     @defer.inlineCallbacks
@@ -3783,7 +3145,8 @@ class DBUploadJobTestCase(TestCase):
         # check it called rpcdal correctly
         method, attribs = self.user.recorded
         self.assertEqual(method, 'delete_uploadjob')
-        should = dict(user_id='fake_user_id', uploadjob_id='uploadjob_id')
+        should = dict(user_id='fake_user_id', uploadjob_id='uploadjob_id',
+                      volume_id='volume_id')
         self.assertEqual(attribs, should)
 
     @defer.inlineCallbacks
@@ -3796,7 +3159,8 @@ class DBUploadJobTestCase(TestCase):
         # check it called rpcdal correctly
         method, attribs = self.user.recorded
         self.assertEqual(method, 'touch_uploadjob')
-        should = dict(user_id='fake_user_id', uploadjob_id='uploadjob_id')
+        should = dict(user_id='fake_user_id', uploadjob_id='uploadjob_id',
+                      volume_id='volume_id')
         self.assertEqual(attribs, should)
 
         # check updated attrib

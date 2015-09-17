@@ -1,4 +1,5 @@
 # Copyright 2008-2015 Canonical
+# Copyright 2015 Chicharreros
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -13,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-# For further info, check  http://launchpad.net/filesync-server
+# For further info, check  http://launchpad.net/magicicada-server
 
 """Tests for the DAL entry point."""
 
@@ -1055,11 +1056,12 @@ class DALTestCase(TestCase):
         # user
         user = mocker.mock()
         self.dal._get_user = lambda *a: user
-        expect(user.get_uploadjob('uploadjob_id')).result(uj)
+        expect(user.volume('volume_id')
+               .get_uploadjob('uploadjob_id')).result(uj)
 
         with mocker:
             d = dict(user_id='user_id', uploadjob_id='uploadjob_id',
-                     multipart_id='multipart_id')
+                     multipart_id='multipart_id', volume_id='volume_id')
             result = self.dal.set_uploadjob_multipart_id(**d)
 
         self.assertEqual(result, {})
@@ -1075,10 +1077,12 @@ class DALTestCase(TestCase):
         # user
         user = mocker.mock()
         self.dal._get_user = lambda *a: user
-        expect(user.get_uploadjob('uploadjob_id')).result(uj)
+        expect(user.volume('volume_id')
+               .get_uploadjob('uploadjob_id')).result(uj)
 
         with mocker:
-            d = dict(user_id='user_id', uploadjob_id='uploadjob_id')
+            d = dict(user_id='user_id', uploadjob_id='uploadjob_id',
+                     volume_id='volume_id')
             result = self.dal.delete_uploadjob(**d)
 
         self.assertEqual(result, {})
@@ -1096,14 +1100,16 @@ class DALTestCase(TestCase):
         # user
         user = mocker.mock()
         self.dal._get_user = lambda *a: user
-        expect(user.get_uploadjob('uploadjob_id')).result(uj)
+        expect(user.volume('volume_id')
+               .get_uploadjob('uploadjob_id')).result(uj)
 
         with mocker:
             d = dict(user_id='user_id', uploadjob_id='uploadjob_id',
                      chunk_size='chunk_size', inflated_size='inflated_size',
                      crc32='crc32', hash_context='hash_context',
                      magic_hash_context='magic_hash_context',
-                     decompress_context='decompress_context')
+                     decompress_context='decompress_context',
+                     volume_id='volume_id')
             result = self.dal.add_part_to_uploadjob(**d)
 
         self.assertEqual(result, {})
@@ -1120,10 +1126,12 @@ class DALTestCase(TestCase):
         # user
         user = mocker.mock()
         self.dal._get_user = lambda *a: user
-        expect(user.get_uploadjob('uploadjob_id')).result(uj)
+        expect(user.volume('volume_id')
+               .get_uploadjob('uploadjob_id')).result(uj)
 
         with mocker:
-            d = dict(user_id='user_id', uploadjob_id='uploadjob_id')
+            d = dict(user_id='user_id', uploadjob_id='uploadjob_id',
+                     volume_id='volume_id')
             result = self.dal.touch_uploadjob(**d)
 
         self.assertEqual(result, dict(when_last_active='when_last_active'))

@@ -1,4 +1,5 @@
 # Copyright 2008-2015 Canonical
+# Copyright 2015 Chicharreros
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -13,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-# For further info, check  http://launchpad.net/filesync-server
+# For further info, check  http://launchpad.net/magicicada-server
 
 """The Storage network server.
 
@@ -58,6 +59,7 @@ from backends.filesync.data import errors as dataerror
 from backends.filesync.notifier import notifier
 from filesync import settings
 from ubuntuone.storage.server.logger import configure_logger, TRACE
+from ubuntuone.storage.server.diskstorage import DiskStorage
 from ubuntuone.monitoring.reactor import ReactorInspector
 from ubuntuone.storage.rpcdb import inthread
 from ubuntuone.storage.server import auth, content, errors, stats
@@ -1423,11 +1425,10 @@ class BytesMessageProducer(object):
     payload_size = request.MAX_PAYLOAD_SIZE
 
     def __init__(self, bytes_producer, request):
-        """Create a BytesMessageProducer."""
         self.producer = bytes_producer
-        bytes_producer.consumer = self
         self.request = request
         self.logger = request.log
+        bytes_producer.startProducing(self)
 
     def resumeProducing(self):
         """IPushProducer interface."""
@@ -1747,8 +1748,6 @@ class PutContentResponse(SimpleRequestResponse):
         if self.upload_job is not None:
             self.log.debug("Stoping the upload job after an error")
             yield self.upload_job.stop()
-            # and unregister the transport from the upload_job
-            self.upload_job.unregisterProducer()
 
         # handle all the TRY_AGAIN cases
         if failure.check(*self._try_again_errors):
@@ -1800,14 +1799,16 @@ class PutContentResponse(SimpleRequestResponse):
 
         elif message.type == protocol_pb2.Message.EOF:
             self.state = self.states.commiting
-            self.upload_job.deferred.addCallback(self._commit_uploadjob)
-            self.upload_job.deferred.addErrback(self._generic_error)
+            self.upload_job.add_operation(
+                self._commit_uploadjob, self._generic_error)
 
         elif message.type == protocol_pb2.Message.BYTES:
             # process BYTES, stay here in UPLOADING
             received_bytes = message.bytes.bytes
             self.transferred += len(received_bytes)
-            self.upload_job.add_data(received_bytes)
+            self.upload_job.add_operation(
+                lambda _: self.upload_job.add_data(received_bytes),
+                self._generic_error)
             self.last_good_state_ts = time.time()
 
         else:
@@ -1844,7 +1845,7 @@ class PutContentResponse(SimpleRequestResponse):
         self.done()
 
     @defer.inlineCallbacks
-    def _commit_uploadjob(self, result):
+    def _commit_uploadjob(self, _):
         """Callback for uploadjob when it's complete."""
         commit_time = time.time()
         if self.state != self.states.commiting:
@@ -1856,7 +1857,7 @@ class PutContentResponse(SimpleRequestResponse):
             if self.state != self.states.commiting:
                 # Request has been canceled since we last checked
                 return defer.succeed(None)
-            return self.upload_job.commit(result)
+            return self.upload_job.commit()
 
         # queue the commit work
         new_generation = yield self.queue_action(commit)
@@ -1891,10 +1892,9 @@ class PutContentResponse(SimpleRequestResponse):
             return
         yield self.upload_job.connect()
         # register the client transport as the producer
-        self.upload_job.registerProducer(self.protocol.transport)
         self.protocol.release(self)
-        yield self._send_begin()
         self.state = self.states.uploading
+        yield self._send_begin()
 
     @defer.inlineCallbacks
     @cancel_filter
@@ -2412,6 +2412,8 @@ class StorageServerFactory(Factory):
         self.s3_secret = s3_secret
         self.s3_proxy_host = s3_proxy_host
         self.s3_proxy_port = s3_proxy_port
+        # NOTE: put this in a real configured place
+        self.diskstorage = DiskStorage("/tmp/testfs")
         self.logger = logging.getLogger("storage.server")
 
         self.metrics = MetricsConnector.get_metrics("root")

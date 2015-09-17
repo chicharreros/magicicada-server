@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright 2008-2015 Canonical
+# Copyright 2015 Chicharreros
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -15,7 +16,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-# For further info, check  http://launchpad.net/filesync-server
+# For further info, check  http://launchpad.net/magicicada-server
 
 """Test Storage Server requests/responses."""
 
@@ -91,7 +92,8 @@ class FakeUser(object):
 
 class FakeProducer(object):
     """A fake producer."""
-    resumeProducing = stopProducing = pauseProducing = lambda s: None
+    dummy = lambda *s: None
+    resumeProducing = stopProducing = pauseProducing = startProducing = dummy
 
 
 class FakedStats(object):
@@ -1325,20 +1327,20 @@ class GetContentResponseTestCase(SimpleRequestResponseTestCase):
         class FakeProducer:
             """Fake source of data to download."""
             def __init__(self):
-                """Just setup the expecte attributes."""
                 self.deferred = defer.Deferred()
                 self.consumer = None
 
             def resumeProducing(self):
                 """Do nothing."""
-            def pauseProducing(self):
-                """Do nothing."""
-            def stopProducing(self):
-                """Do nothing."""
+            pauseProducing = stopProducing = resumeProducing
+
+            def startProducing(self, consumer):
+                """Wait a little."""
+                time.sleep(.1)
+                consumer.write("abc")
 
         fake_producer = FakeProducer()
         self.response.send(fake_producer)
-        fake_producer.consumer.write("abc")
         self.assertTrue(self.response.last_good_state_ts > after)
 
     def test_start_sends_comment_on_error(self):
@@ -1517,6 +1519,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
         def __init__(self):
             self.bytes = ''
             self.inflated_size_hint = 1000
+            self.ops = defer.succeed(None)
             self.deferred = defer.Deferred()
             self.called = []
 
@@ -1542,6 +1545,10 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
         def unregisterProducer(self):
             """Unregister the producer."""
             self.called.append('unregisterProducer')
+
+        def add_operation(self, op, err):
+            self.ops.addCallback(op)
+            self.ops.addErrback(err)
 
     def test_user_activity_indicator(self):
         """Check the user_activity value."""
@@ -1615,10 +1622,8 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
         # fake uploadjob
         uploadjob = mocker.mock()
         expect(uploadjob.deferred).result(defer.Deferred())
-        expect(uploadjob.registerProducer(ANY))
         expect(uploadjob.connect()).result(defer.succeed(None))
         expect(uploadjob.stop()).result(defer.succeed(None))
-        expect(uploadjob.unregisterProducer())
         self.patch(self.response, '_get_upload_job',
                    lambda: defer.succeed(uploadjob))
 
@@ -1687,29 +1692,6 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
         self.mocker.replay()
         response._start()
 
-    def test_start_upload_register_producer(self):
-        """Test _start starts an upload."""
-        upload_job = self.FakeUploadJob()
-        upload_job.offset = 0
-        upload_job.upload_id = str(uuid.uuid4())
-        user = self.mocker.mock()
-        self.response.protocol.user = user
-        transport = self.mocker.mock()
-        self.server.transport = transport
-        response = self.mocker.patch(self.response)
-
-        expect(response._log_start())
-        expect(response.upload_job).result(upload_job).count(6)
-        expect(response.protocol.transport).result(transport).count(1)
-        expect(transport.getPeer()).result(FakedPeer()).count(1)
-        expect(user.username).result('username').count(1)
-        expect(user.get_upload_job(ARGS, KWARGS)).result(upload_job)
-        expect(upload_job.registerProducer(transport))
-
-        self.mocker.replay()
-        response._start()
-        self.assertEqual(response.state, PutContentResponse.states.uploading)
-
     def test_upload_last_good_state(self):
         """Test that last_good_state_ts gets updated as expected."""
         upload_job = self.FakeUploadJob()
@@ -1723,7 +1705,6 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
 
         expect(response._log_start())
         expect(response.upload_job).result(upload_job).count(1, None)
-        expect(response.protocol.transport).result(transport).count(1)
         expect(transport.getPeer()).result(FakedPeer()).count(1, None)
         expect(user.username).result('username').count(1, None)
         expect(user.get_upload_job(ARGS, KWARGS)).result(upload_job)
@@ -1903,7 +1884,6 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
         self.response.upload_job = upload_job
         expect(upload_job.stop())
         expect(upload_job.inflated_size_hint)
-        expect(upload_job.unregisterProducer())
 
         with mocker:
             self.response._generic_error(NameError('foo'))
@@ -1927,7 +1907,6 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
         self.assertEqual(e.orig_error, exc)
         self.assertEqual(done, 'done')
 
-        self.assertIn('unregisterProducer', self.response.upload_job.called)
         self.assert_oopsless()
 
     def test_genericerror_try_again_handling_error(self):
@@ -1951,7 +1930,6 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
         called, = called
         self.assertEqual(called[0], 'error')
         self.assertEqual(called[1].value, exc)
-        self.assertIn('unregisterProducer', self.response.upload_job.called)
 
     def test_genericerror_try_again_done_error(self):
         """Test how a TRY_AGAIN error is handled."""
@@ -1975,7 +1953,6 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
         self.assertEqual(handle, 'handle')
         self.assertEqual(done[0], 'error')
         self.assertEqual(done[1].value, exc)
-        self.assertIn('unregisterProducer', self.response.upload_job.called)
 
     def test_try_again_handling(self):
         """Test how a TRY_AGAIN error is handled."""
@@ -2041,7 +2018,6 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
         self.mocker.replay()
         response._generic_error(failure)
         self.assertEqual(response.state, PutContentResponse.states.error)
-        self.assertIn('unregisterProducer', self.response.upload_job.called)
         self.assertTrue(self.handler.check_debug("NameError", str(1000)))
 
     def test_genericerror_other_errors_problem_sendprotocolerror(self):
@@ -2239,34 +2215,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
         self.response._process_while_uploading(message)
         self.assertEqual(self.response.state,
                          PutContentResponse.states.commiting)
-
-        # trigger the deferred ok, it should just commit
-        result = object()
-        self.response.upload_job.deferred.callback(result)
-        self.assertEqual(called, [('commt', result)])
-
-    def test_processwhileuploading_eof_error_uploadjob(self):
-        """Got an eof while uploading, but it ended in error."""
-        self.response.state = PutContentResponse.states.uploading
-        message = protocol_pb2.Message()
-        message.type = protocol_pb2.Message.EOF
-        self.response.upload_job = self.FakeUploadJob()
-
-        # check what is called
-        called = []
-        self.response._commit_uploadjob = lambda _: called.append('commit')
-        self.response._generic_error = lambda f: called.append(('error', f))
-
-        # call, it should change the state and set up the callbacks
-        self.response._process_while_uploading(message)
-        self.assertEqual(self.response.state,
-                         PutContentResponse.states.commiting)
-
-        # trigger the deferred with a failure, it will not
-        # commit, but handle the error
-        failure = Failure(Exception())
-        self.response.upload_job.deferred.errback(failure)
-        self.assertEqual(called, [('error', failure)])
+        self.assertEqual(called, [('commt', None)])
 
     def test_processwhileuploading_eof_error_commiting(self):
         """Got an eof while uploading, got an error while commiting."""
@@ -2286,12 +2235,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
         self.response._process_while_uploading(message)
         self.assertEqual(self.response.state,
                          PutContentResponse.states.commiting)
-
-        # trigger the deferred with a failure, it will not
-        # commit, but handle the error
-        result = object()
-        self.response.upload_job.deferred.callback(result)
-        self.assertEqual(called, [('commit', result), ('error', failure)])
+        self.assertEqual(called, [('commit', None), ('error', failure)])
 
     def test_processwhileuploading_bytes(self):
         """Got some bytes while uploading."""
@@ -2394,7 +2338,6 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
         self.mocker.replay()
         response._start_upload()
         self.assertEqual(response.state, PutContentResponse.states.uploading)
-        self.assertEqual(['registerProducer'], upload_job.called)
 
     def _test_startupload_canceling_while_getting_uploadjob(self, state):
         """State changes while waiting for the upload job."""

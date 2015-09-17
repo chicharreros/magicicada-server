@@ -1,4 +1,5 @@
 # Copyright 2008-2015 Canonical
+# Copyright 2015 Chicharreros
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -13,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-# For further info, check  http://launchpad.net/filesync-server
+# For further info, check  http://launchpad.net/magicicada-server
 
 """The Data Access Objects (DAO) for Storage Database.
 
@@ -236,15 +237,6 @@ class StorageUser(DAOBase):
             self._volumes[udf.id] = vp
             gws.append(vp)
         return gws
-
-    @fsync_readonly
-    def get_uploadjob(self, uploadjob_id):
-        """Get the user's UploadJobs for this user.
-
-        @param node_id: optionally only gets jobs for a specific file
-        """
-        gw = self._gateway.get_root_gateway()
-        return gw.get_uploadjob(uploadjob_id)
 
     @fsync_readonly
     def get_uploadjobs(self, node_id=None):
@@ -987,6 +979,11 @@ class VolumeProxy(object):
                 if self._gateway is None:
                     raise errors.DoesNotExist("Invalid Volume")
         return self._gateway
+
+    @fsync_readonly
+    def get_uploadjob(self, uploadjob_id):
+        """Get the upload job from this volume."""
+        return self.gateway.get_uploadjob(uploadjob_id)
 
     @fsync_readonly
     def get_quota(self):
