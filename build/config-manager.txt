@@ -1,4 +1,5 @@
 # Copyright 2008-2015 Canonical
+# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -13,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-# For further info, check  http://launchpad.net/filesync-server
+# For further info, check  http://launchpad.net/magicicada-server
 
 # After making changes to this file, to ensure that your sourcedeps are
 # up-to-date do:
@@ -37,7 +38,7 @@
 ./.sourcecode/ubuntu-sso-client           ~ubuntuone-control-tower/ubuntu-sso-client/trunk;revno=1030
 ./.sourcecode/ubuntuone-client            ~facundo/ubuntuone-client/opensourcing;revno=1406
 ./.sourcecode/ubuntuone-dev-tools         ~ubuntuone-control-tower/ubuntuone-dev-tools/trunk;revno=78
-./.sourcecode/s3lib                       ~nataliabidart/s3lib/no-more-config;revno=4
+./.sourcecode/s3lib                       ~nataliabidart/s3lib/no-more-config;revno=5
 ./.sourcecode/ubuntuone-storage-protocol  ~facundo/ubuntuone-storage-protocol/opensourcing;revno=165
 ./.sourcecode/zope.component              ~ztk-steering-group/zope.component/trunk;revno=217
 ./.sourcecode/zope.event                  ~ztk-steering-group/zope.event/trunk;revno=120

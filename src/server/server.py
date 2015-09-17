@@ -1,5 +1,5 @@
 # Copyright 2008-2015 Canonical
-# Copyright 2015 Chicharreros
+# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -57,7 +57,7 @@ from metrics import get_meter
 from metrics.metricsconnector import MetricsConnector
 from backends.filesync.data import errors as dataerror
 from backends.filesync.notifier import notifier
-from filesync import settings
+from magicicada import settings
 from ubuntuone.storage.server.logger import configure_logger, TRACE
 from ubuntuone.storage.server.diskstorage import DiskStorage
 from ubuntuone.monitoring.reactor import ReactorInspector
@@ -444,7 +444,7 @@ class StorageServer(request.RequestHandler):
         request.RequestHandler.connectionMade(self)
         self.factory.protocols.append(self)
         self.log.info("Connection Made")
-        self.transport.write("%d filesync server revision %s.\r\n" %
+        self.transport.write("%d magicicada server revision %s.\r\n" %
                              (self.PROTOCOL_VERSION, version_info['revno']))
         self.ping_loop.start()
         self.factory.metrics.meter("connection_made", 1)

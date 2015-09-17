@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright 2008-2015 Canonical
+# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -16,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-# For further info, check  http://launchpad.net/filesync-server
+# For further info, check  http://launchpad.net/magicicada-server
 
 """Run the graphite development server."""
 
@@ -120,7 +121,7 @@ try:
     subprocess.Popen(
         ["python", "manage.py", "runserver", "0.0.0.0:%s" % port],
         env={"PYTHONPATH": os.pathsep.join(sys.path),
-             "DJANGO_SETTINGS_MODULE": 'filesync.settings'}).wait()
+             "DJANGO_SETTINGS_MODULE": 'magicicada.settings'}).wait()
 except KeyboardInterrupt:
     pass
 subprocess.Popen(carbon_cache_command + ['stop'],

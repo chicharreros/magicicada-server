@@ -1,6 +1,7 @@
 #! /bin/bash
 
 # Copyright 2008-2015 Canonical
+# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -15,7 +16,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-# For further info, check  http://launchpad.net/filesync-server
+# For further info, check  http://launchpad.net/magicicada-server
 
 ROOTDIR=${ROOTDIR:-`bzr root`}
 if [ ! -d "$ROOTDIR"  ]; then
@@ -30,9 +31,9 @@ else
 fi
 
 # setting PGDATA tells pg_ctl which DB to talk to
-export PGDATA=/dev/shm/pg_filesync/data/
+export PGDATA=/dev/shm/pg_magicicada/data/
 $PGBINDIR/pg_ctl status > /dev/null
 if [ $? = 0 ]; then
     $PGBINDIR/pg_ctl stop -t 60 -w -m fast
 fi
-rm -rf /dev/shm/pg_filesync
+rm -rf /dev/shm/pg_magicicada

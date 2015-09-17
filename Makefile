@@ -1,4 +1,5 @@
 # Copyright 2008-2015 Canonical
+# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -13,9 +14,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-# For further info, check  http://launchpad.net/filesync-server
+# For further info, check  http://launchpad.net/magicicada-server
 
-DJANGO_SETTINGS_MODULE ?= filesync.settings
+DJANGO_SETTINGS_MODULE ?= magicicada.settings
 FLAKE8 = flake8
 PYTHON = python
 SRC_DIR = $(CURDIR)/src
@@ -63,7 +64,7 @@ endif
 	$(MAKE) build-sourcedeps
 	touch $(SOURCEDEPS_TAG)
 
-DB_TAG=/dev/shm/pg_filesync/.s.PGSQL.5432.lock
+DB_TAG=/dev/shm/pg_magicicada/.s.PGSQL.5432.lock
 
 build: link-sourcedeps build-sourcedeps version
 
@@ -195,9 +196,9 @@ stop-%:
 	-@dev-scripts/supervisorctl-dev stop $*
 
 publish-api-port:
-	python -c 'from filesync import settings; print >> file("tmp/filesyncserver.port", "w"), settings.api_server.TCP_PORT'
-	python -c 'from filesync import settings; print >> file("tmp/filesyncserver.port.ssl", "w"), settings.ssl_proxy.PORT'
-	python -c 'from filesync import settings; print >> file("tmp/filesyncserver-status.port", "w"), settings.api_server.STATUS_PORT'
+	python -c 'from magicicada import settings; print >> file("tmp/filesyncserver.port", "w"), settings.api_server.TCP_PORT'
+	python -c 'from magicicada import settings; print >> file("tmp/filesyncserver.port.ssl", "w"), settings.ssl_proxy.PORT'
+	python -c 'from magicicada import settings; print >> file("tmp/filesyncserver-status.port", "w"), settings.api_server.STATUS_PORT'
 
 load-sample-data:
 	DJANGO_SETTINGS_MODULE=$(DJANGO_SETTINGS_MODULE) $(PYTHON) dev-scripts/load_sample_data.py

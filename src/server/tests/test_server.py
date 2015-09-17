@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright 2008-2015 Canonical
-# Copyright 2015 Chicharreros
+# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -42,7 +42,7 @@ from txstatsd.metrics.metermetric import MeterMetric
 from s3lib import s3lib
 
 from backends.filesync.data import errors as dataerror
-from filesync import settings
+from magicicada import settings
 from ubuntuone.devtools.handlers import MementoHandler
 from ubuntuone.storage.server import errors, server
 from ubuntuone.storage.server.server import (

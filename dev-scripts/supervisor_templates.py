@@ -1,4 +1,5 @@
 # Copyright 2008-2015 Canonical
+# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -13,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-# For further info, check  http://launchpad.net/filesync-server
+# For further info, check  http://launchpad.net/magicicada-server
 
 """Templates to generate supervisor config."""
 
@@ -24,8 +25,8 @@ FILESYNC_TEMPLATE = (
     '/usr/bin/twistd --pidfile %(pid_folder)s/fsync_slave_%(instance)s.pid '
     '-n -y %(basepath)s/lib/ubuntuone/storage/server/server.tac '
     '--reactor=epoll\n'
-    'environment=DJANGO_SETTINGS_MODULE="filesync.settings",'
-    'PYTHONPATH="%(basepath)s:%(basepath)s/lib",'
+    'environment=DJANGO_SETTINGS_MODULE="magicicada.settings",'
+    'PYTHONPATH="%(basepath)s/lib",'
     'FSYNC_INSTANCE_ID=%(instance)03d,'
     'CONFIG="%(basepath)s/configs/%(config)s"%(environment_vars)s\n'
     'autostart=false\n'
@@ -41,8 +42,8 @@ SSL_PROXY_TEMPLATE = (
     '--pidfile %(pid_folder)s/ssl-proxy-%(instance)s.pid '
     '-n -y %(basepath)s/lib/ubuntuone/storage/server/ssl_proxy.tac '
     '--reactor=epoll\n'
-    'environment=DJANGO_SETTINGS_MODULE="filesync.settings",'
-    'PYTHONPATH="%(basepath)s:%(basepath)s/lib",'
+    'environment=DJANGO_SETTINGS_MODULE="magicicada.settings",'
+    'PYTHONPATH="%(basepath)s/lib",'
     'FSYNC_INSTANCE_ID=%(instance)03d,'
     'CONFIG="%(basepath)s/configs/%(config)s",'
     'FSYNC_SERVICE_NAME="ssl-proxy"%(environment_vars)s\n'

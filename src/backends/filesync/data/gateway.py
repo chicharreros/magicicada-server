@@ -1,4 +1,5 @@
 # Copyright 2008-2015 Canonical
+# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -13,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-# For further info, check  http://launchpad.net/filesync-server
+# For further info, check  http://launchpad.net/magicicada-server
 
 """Gateway objects for accessing Data Access Objects (DAO) from the database.
 
@@ -46,7 +47,7 @@ class TimingMetrics(object):
     """Class to hold everything related to the timing metrics of DB calls."""
 
     def __init__(self):
-        namespace = settings.ENVIRONMENT_NAME + ".filesync.DAL"
+        namespace = settings.ENVIRONMENT_NAME + ".magicicada.DAL"
         self.reporter = MetricsConnector.new_metrics(namespace=namespace)
 
     def __call__(self, orig_func):

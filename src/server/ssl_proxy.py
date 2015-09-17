@@ -1,4 +1,5 @@
 # Copyright 2008-2015 Canonical
+# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -13,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-# For further info, check  http://launchpad.net/filesync-server
+# For further info, check  http://launchpad.net/magicicada-server
 
 """An SSL proxy/unwrapper for the api/filesync server."""
 
@@ -31,7 +32,7 @@ from twisted.protocols import portforward, basic
 from twisted.web import server, resource
 from zope.component.interfaces import ComponentLookupError
 
-from filesync import settings
+from magicicada import settings
 from metrics.metricsconnector import MetricsConnector
 from ubuntuone.storage.server.logger import configure_logger
 from ubuntuone.storage.server.server import get_service_port

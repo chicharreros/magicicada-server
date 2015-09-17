@@ -1,4 +1,5 @@
 # Copyright 2008-2015 Canonical
+# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -13,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-# For further info, check  http://launchpad.net/filesync-server
+# For further info, check  http://launchpad.net/magicicada-server
 
 """Supervisord config helpers."""
 
@@ -33,7 +34,7 @@ programs=%(programs)s
 HEARTBEAT_LISTENER_TEMPLATE = '\n'.join((
     "[eventlistener:heartbeat]",
     "command=python %(basepath)s/lib/ubuntuone/supervisor/heartbeat_listener.py --interval=%(interval)s --timeout=%(timeout)s --log_level=%(log_level)s --log_file=%(log_folder)s/heartbeat_listener.log --groups=%(groups)s %(processes)s",  # NOQA
-    'environment=PYTHONPATH="%(basepath)s:%(basepath)s/lib",DJANGO_SETTINGS_MODULE="filesync.settings"',  # NOQA
+    'environment=PYTHONPATH="%(basepath)s:%(basepath)s/lib",DJANGO_SETTINGS_MODULE="magicicada.settings"',  # NOQA
     "events=PROCESS_COMMUNICATION,TICK_5",
     "buffer_size=%(buffer_size)s",
 ))
@@ -41,7 +42,7 @@ HEARTBEAT_LISTENER_TEMPLATE = '\n'.join((
 STATS_WORKER_TEMPLATE = '\n'.join((
     "[program:stats-worker]",
     "command=python %(basepath)s/lib/ubuntuone/monitoring/stats_worker.py --log_file=%(log_folder)s/stats_worker.log --metric_namespace_prefix=%(env)s.%(hostname)s",  # NOQA
-    'environment=PYTHONPATH="%(basepath)s:%(basepath)s/lib",DJANGO_SETTINGS_MODULE="filesync.settings"',  # NOQA
+    'environment=PYTHONPATH="%(basepath)s:%(basepath)s/lib",DJANGO_SETTINGS_MODULE="magicicada.settings"',  # NOQA
 ))
 
 CONFIG_TEMPLATE = """; supervisor config file

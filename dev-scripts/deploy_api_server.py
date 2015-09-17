@@ -1,6 +1,7 @@
 #!/usr/bin/python -Wignore
 
 # Copyright 2008-2015 Canonical
+# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -15,9 +16,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-# For further info, check  http://launchpad.net/filesync-server
+# For further info, check  http://launchpad.net/magicicada-server
 
-"""Deployment script for loading the Filesync Server.
+"""Deployment script for loading the Magicicada Server.
 
 Usage:
 
@@ -33,7 +34,7 @@ reactor.suggestThreadPoolSize(30)
 
 import _pythonpath  # NOQA
 
-from filesync import settings
+from magicicada import settings
 from s4 import s4
 from ubuntuone.storage.server import server
 from utilities import utils

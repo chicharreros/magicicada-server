@@ -1,5 +1,5 @@
 # Copyright 2008-2015 Canonical
-# Copyright 2015 Chicharreros
+# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -33,7 +33,7 @@ from twisted.trial.unittest import TestCase
 from twisted.test.proto_helpers import StringTransport
 
 from backends.filesync.data import errors, model
-from filesync import settings
+from magicicada import settings
 from ubuntuone.devtools.handlers import MementoHandler
 from ubuntuone.storage.server import server, content, diskstorage
 from ubuntuone.storage.server.testing.testcase import (

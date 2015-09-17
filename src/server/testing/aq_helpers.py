@@ -1,4 +1,5 @@
 # Copyright 2008-2015 Canonical
+# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -13,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-# For further info, check  http://launchpad.net/filesync-server
+# For further info, check  http://launchpad.net/magicicada-server
 
 """Assorted stuff used by test_action_queue."""
 
@@ -42,7 +43,7 @@ from ubuntuone.storage.server.testing.testcase import (
 
 from backends.filesync.data import model
 from backends.filesync.data.testing.testcase import StorageDALTestCase
-from filesync import settings
+from magicicada import settings
 from ubuntuone.storage.server import ssl_proxy
 from ubuntuone.storageprotocol import request, sharersp, client
 from ubuntuone.storageprotocol.content_hash import content_hash_factory, crc32
@@ -314,7 +315,7 @@ class TestWithDatabase(BaseProtocolTestCase, StorageDALTestCase):
 
         # Patch AQ's deferreds, to support these tests still being run
         # in Lucid, but while code calls .cancel() on them
-        # Remove this code when filesync project is taken to Precise.
+        # Remove this code when magicicada project is taken to Precise.
         defer.Deferred.cancel = lambda self: None
         defer.DeferredList.cancel = lambda self: None
 

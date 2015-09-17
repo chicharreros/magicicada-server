@@ -1,6 +1,7 @@
-#!/usr/bin/python -Wignore
+#!/usr/bin/python
 
 # Copyright 2008-2015 Canonical
+# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -15,7 +16,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-# For further info, check  http://launchpad.net/filesync-server
+# For further info, check  http://launchpad.net/magicicada-server
 
 """Script starting the squid server."""
 
@@ -25,7 +26,7 @@ import subprocess
 
 import _pythonpath  # NOQA
 
-from filesync import settings
+from magicicada import settings
 from utilities import utils
 from utilities.localendpoints import (
     allocate_ports, register_local_port, get_local_server, get_local_port)

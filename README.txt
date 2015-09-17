@@ -1,4 +1,4 @@
-How to setup Filesync Server and Client
+How to setup Magicicada Server and Client
 =======================================
 
 These are the general instructions to do all the needed setup to have
@@ -6,13 +6,13 @@ a proper file synchronization service up and running.
 
 Let's assume you will work on a given directory, such as:
 
-~/filesync
+~/magicicada
 
 Let's create that folder and cd into it, and you should run all the following
-instructions using ~/filesync as your cwd (current working directory):
+instructions using ~/magicicada as your cwd (current working directory):
 
-    mkdir ~/filesync
-    cd ~/filesync
+    mkdir ~/magicicada
+    cd ~/magicicada
 
 
 Before server or client
@@ -21,12 +21,12 @@ Before server or client
 Create the SSL certificates for client to communicate with server
 securely. These certificates need to be stored in the folder:
 
-~/filesync/certs
+~/magicicada/certs
 
 To do so:
 
-    mkdir ~/filesync/certs
-    cd ~/filesync/certs
+    mkdir ~/magicicada/certs
+    cd ~/magicicada/certs
 
 Now, generate a private key:
 
@@ -51,12 +51,12 @@ Server setup
 Start with a clean Ubuntu Precise environment (for example, in a VPS, or using
 an LXC). As example, if you want to create a precise LXC, you can use:
 
-    sudo lxc-create -t ubuntu -n filesync-precise -- -r precise -a amd64 -b $USER
+    sudo lxc-create -t ubuntu -n magicicada-precise -- -r precise -a amd64 -b $USER
 
 Then you need to start the LXC instance and ssh into it:
 
-    sudo lxc-start -n filesync-precise
-    ssh filesync-precise
+    sudo lxc-start -n magicicada-precise
+    ssh magicicada-precise
 
 Install tools and dependencies (you will be prompted for your password for sudo
 access):
@@ -65,16 +65,16 @@ access):
 
 Branch the project and get into that dir:
 
-    cd ~/filesync
+    cd ~/magicicada
     bzr branch lp:magicicada-server
 
 Ensure the files 'privkey.pem' and 'cacert.pem' produced in the "Before server
-or client" section are copied into the ~/filesync/magicicada-server/certs
+or client" section are copied into the ~/magicicada/magicicada-server/certs
 folder.
 
 Start the server:
 
-    cd ~/filesync/magicicada-server
+    cd ~/magicicada/magicicada-server
     make start-oauth
 
 Note that the server will listen on port 21101, so you need to assure that the
@@ -107,13 +107,13 @@ First, install tools and dependencies:
 Following the folder structure we started above, branch the client and the
 protocol so the final layout will be as follow:
 
-    ~/filesync/magicicada-protocol   <-- this is a subproject needed by the client
-    ~/filesync/magicicada-client   <-- this is the proper filesync client
-    ~/filesync/certs   <-- this is where you'll store the SSL certs for the client
+    ~/magicicada/magicicada-protocol   <-- this is a subproject needed by the client
+    ~/magicicada/magicicada-client   <-- this is the proper magicicada client
+    ~/magicicada/certs   <-- this is where you'll store the SSL certs for the client
 
 So, branch and build the storage protocol:
 
-    cd ~/filesync
+    cd ~/magicicada
     bzr branch lp:magicicada-protocol
     cd magicicada-protocol
     ./setup.py build
@@ -121,7 +121,7 @@ So, branch and build the storage protocol:
 Ensure the proper certificate is the right folder, for the client you only need
 'cacert.pem':
 
-    ls ~/filesync/certs
+    ls ~/magicicada/certs
 
 You should see something like:
 
@@ -129,17 +129,17 @@ You should see something like:
 
 Also branch and build the client:
 
-    cd ~/filesync
+    cd ~/magicicada
     bzr branch lp:magicicada-client
     cd magicicada-client/ubuntuone
-    ln -s ~/filesync/magicicada-protocol/ubuntuone/storageprotocol .
+    ln -s ~/magicicada/magicicada-protocol/ubuntuone/storageprotocol .
     cd ..
     ./setup.py build
 
 Finally, start the client
 
     export $(dbus-launch)  # seems this is needed if you're inside a LXC or VPS
-    PYTHONPATH=. SSL_CERTIFICATES_DIR=~/filesync/certs bin/ubuntuone-syncdaemon \
+    PYTHONPATH=. SSL_CERTIFICATES_DIR=~/magicicada/certs bin/ubuntuone-syncdaemon \
         --auth=testuser:testpass --host=testfsyncserver \
         --port=21101 --logging-level=DEBUG
 
