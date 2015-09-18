@@ -444,7 +444,7 @@ class StorageServer(request.RequestHandler):
         request.RequestHandler.connectionMade(self)
         self.factory.protocols.append(self)
         self.log.info("Connection Made")
-        self.transport.write("%d magicicada server revision %s.\r\n" %
+        self.transport.write("%d filesync server revision %s.\r\n" %
                              (self.PROTOCOL_VERSION, version_info['revno']))
         self.ping_loop.start()
         self.factory.metrics.meter("connection_made", 1)
