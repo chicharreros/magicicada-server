@@ -18,6 +18,8 @@
 
 """Support for getting metrics sent over to statsd."""
 
+from __future__ import unicode_literals
+
 import os
 import platform
 import time

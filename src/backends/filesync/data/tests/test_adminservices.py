@@ -18,6 +18,8 @@
 
 """Tests for the adminservices features."""
 
+from __future__ import unicode_literals
+
 from backends.filesync.data.testing.testcase import StorageDALTestCase
 from backends.filesync.data import dao, services
 from backends.filesync.data import adminservices as admin
@@ -28,7 +30,7 @@ class AdminServicesTestCase(StorageDALTestCase):
 
     def _make_users(self):
         """Create users for tests."""
-        usernames = [u'bob', u'bobby', u'inez', u'juan', u'tim']
+        usernames = ['bob', 'bobby', 'inez', 'juan', 'tim']
         for i, name in zip(range(5), usernames):
             services.make_storage_user(i, name, name, 2 ** 30)
 

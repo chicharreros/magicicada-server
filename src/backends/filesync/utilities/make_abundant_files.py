@@ -20,6 +20,8 @@
 
 """Given a user, create UDFs, folders and files to help with manual testing."""
 
+from __future__ import unicode_literals
+
 import sys
 import random
 
@@ -38,7 +40,7 @@ def make_udf(user, sample):
     paths = []
     for j in range(random.randint(1, 4)):
         paths.append(sample.pop())
-    udf = user.make_udf(u'~/' + u'/'.join(paths) + u'/' + name)
+    udf = user.make_udf('~/' + '/'.join(paths) + '/' + name)
     return user.volume(udf.id).get_node(udf.root_id)
 
 
@@ -65,7 +67,7 @@ def main(username, sharer, wlist, num):
         progress = lambda l: None
 
     # UDF
-    udf = user.make_udf(u'~/abundant-files')
+    udf = user.make_udf('~/abundant-files')
     folders.append(user.volume(udf.id).get_node(udf.root_id))
 
     # some UDFs
@@ -89,7 +91,7 @@ def main(username, sharer, wlist, num):
     for i in range(num / 20):
         progress(sample)
         name = sample.pop()
-        filename = u'shared by ' + sharer.username
+        filename = 'shared by ' + sharer.username
         readonly = random.choice((False, True))
         if readonly:
             name += ' (ro)'
@@ -102,7 +104,7 @@ def main(username, sharer, wlist, num):
     for i in random.sample(folders, len(folders) / 4):
         progress(sample)
         name = sample.pop()
-        filename = u'shared by ' + user.username
+        filename = 'shared by ' + user.username
         readonly = random.choice((False, True))
         if readonly:
             name += ' (ro)'
@@ -122,7 +124,7 @@ def main(username, sharer, wlist, num):
         progress(sample)
         name = sample.pop()
         random.choice(folders).make_file_with_content(
-            name, fake_hash, 12345, 100, 10000, uuid.uuid4(), u'image/tiff')
+            name, fake_hash, 12345, 100, 10000, uuid.uuid4(), 'image/tiff')
 
     if sys.stdout.isatty():
         sys.stdout.write(home + curses.tigetstr('el'))

@@ -574,7 +574,7 @@ def test_disconnect_modify_connect(udf_name, sd1, sd2, sd3, prefix):
 
     debug(prefix, 'expected sym diff actual',
           expected.symmetric_difference(actual))
-    assert expected.difference(actual) == set([u'renamed_third_dir']), \
+    assert expected.difference(actual) == set(['renamed_third_dir']), \
         'SD1 home must have the same as SD2 except for renamed_third_dir.'
     assert actual.difference(expected) == set([]), \
         'SD2 home must have nothing extra than the SD1\'s.'

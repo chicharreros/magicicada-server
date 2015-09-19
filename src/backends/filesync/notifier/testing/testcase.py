@@ -21,6 +21,8 @@
 Base classes to do all the testing.
 """
 
+from __future__ import unicode_literals
+
 from backends.filesync.notifier.notifier import event_classes
 
 

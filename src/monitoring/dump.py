@@ -38,9 +38,9 @@ def meliae_dump():
             datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S",)))
         gc.collect()
         scanner.dump_all_objects(filename)
-    except ImportError, e:
+    except ImportError as e:
         return "Meliae not available: %s" % (e,)
-    except Exception, e:
+    except Exception as e:
         return "Error while trying to dump memory: %s" % (e,)
     else:
         return 'Output written to: %s' % (filename,)
@@ -65,12 +65,12 @@ def gc_dump():
             c += 1
             try:
                 line = repr(x)
-            except Exception, e:
+            except Exception as e:
                 line = "Error str'ing an object: " + str(e)
             fh.write(line + "\n")
         fh.close()
         m = 'GC count is %s and %d garbage items written to: %s' % (
             count, c, fname)
         return m
-    except Exception, e:
+    except Exception as e:
         return "Error while trying to dump GC: %s" % (e,)

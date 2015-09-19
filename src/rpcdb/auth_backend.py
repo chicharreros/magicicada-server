@@ -18,6 +18,8 @@
 
 """The Auth entry point as a service."""
 
+from __future__ import unicode_literals
+
 from django.contrib.auth import authenticate
 
 

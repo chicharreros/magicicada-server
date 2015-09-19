@@ -21,6 +21,8 @@
 Called by the namesake in the top level utilities/ directory.
 """
 
+from __future__ import unicode_literals
+
 from utilities.userutils import (
     add_auth_info_to_keyfile,
     delete_all_data,
@@ -28,18 +30,18 @@ from utilities.userutils import (
 from ubuntuone.storage.server.testing.testcase import create_test_user
 
 SAMPLE_USERS = [
-    {'username': u"hola", 'password': "23456789",
-     'full_name': u"Hola Frijoles",
-     'email': u"hola@somemail.com"},
-    {'username': u"crazyhacker", 'password': "crazyhacker",
-     'full_name': u"Hacker ForLife",
-     'email': u"crazyhacker@somemail.com"},
-    {'username': u"chico", 'password': "23456789",
-     'full_name': u"Chico Frijoles",
-     'email': u"chico@somemail.com"},
-    {'username': u"miguel", 'password': "23456789",
-     'full_name': u"Miguel Hernandez",
-     'email': u"miguel@somemail.com"},
+    {'username': "hola", 'password': "23456789",
+     'full_name': "Hola Frijoles",
+     'email': "hola@somemail.com"},
+    {'username': "crazyhacker", 'password': "crazyhacker",
+     'full_name': "Hacker ForLife",
+     'email': "crazyhacker@somemail.com"},
+    {'username': "chico", 'password': "23456789",
+     'full_name': "Chico Frijoles",
+     'email': "chico@somemail.com"},
+    {'username': "miguel", 'password': "23456789",
+     'full_name': "Miguel Hernandez",
+     'email': "miguel@somemail.com"},
 ]
 
 

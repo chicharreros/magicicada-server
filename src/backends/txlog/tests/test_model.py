@@ -18,6 +18,8 @@
 
 """Test for the txlog models."""
 
+from __future__ import unicode_literals
+
 from mock import patch
 
 from backends.filesync.data.dbmanager import get_filesync_store
@@ -60,7 +62,7 @@ class BaseTransactionLogTestCase(ORMTestCase):
 
 class TestTransactionLog(BaseTransactionLogTestCase):
 
-    mimetype = u'image/jpeg'
+    mimetype = 'image/jpeg'
 
     def assert_txlog_correct(self, txlog, expected):
         # self.assertEqual(txlog.extra_data_dict, expected['extra_data_dict'])
@@ -253,12 +255,12 @@ class TestTransactionLog(BaseTransactionLogTestCase):
     def test_record_move_for_directory(self):
         user = self.obj_factory.make_user()
         new_parent = self.obj_factory.make_directory(
-            user=user, name=u'new-parent')
+            user=user, name='new-parent')
         current_parent = self.obj_factory.make_directory(
-            user=user, name=u'current-parent')
+            user=user, name='current-parent')
         dir1 = self.obj_factory.make_directory(
-            name=u'dir1', parent=current_parent)
-        f = self._make_file(name=u'f.jpg', parent=dir1, mimetype=self.mimetype)
+            name='dir1', parent=current_parent)
+        f = self._make_file(name='f.jpg', parent=dir1, mimetype=self.mimetype)
         f_orig_path = f.full_path
         dir_orig_path = dir1.full_path
         dir1.move(new_parent.id, dir1.name)
@@ -288,19 +290,19 @@ class TestTransactionLog(BaseTransactionLogTestCase):
         #             |-- f11.jpg
         user = self.obj_factory.make_user()
         parent = self.obj_factory.make_directory(
-            user=user, name=u'current-parent')
-        dir1 = self.obj_factory.make_directory(name=u'dir1', parent=parent)
-        dir11 = self.obj_factory.make_directory(name=u'dir1.1', parent=dir1)
+            user=user, name='current-parent')
+        dir1 = self.obj_factory.make_directory(name='dir1', parent=parent)
+        dir11 = self.obj_factory.make_directory(name='dir1.1', parent=dir1)
         f1 = self._make_file(
-            name=u'f1.jpg', parent=dir1, mimetype=self.mimetype)
+            name='f1.jpg', parent=dir1, mimetype=self.mimetype)
         f11 = self._make_file(
-            name=u'f11.jpg', parent=dir11, mimetype=self.mimetype)
+            name='f11.jpg', parent=dir11, mimetype=self.mimetype)
         nodes = [(dir1, dir1.full_path), (dir11, dir11.full_path),
                  (f1, f1.full_path), (f11, f11.full_path)]
 
         # Now move dir1 to new_parent.
         new_parent = self.obj_factory.make_directory(
-            user=user, name=u'new-parent')
+            user=user, name='new-parent')
         dir1.move(new_parent.id, dir1.name)
 
         expected = {}
@@ -319,15 +321,15 @@ class TestTransactionLog(BaseTransactionLogTestCase):
     def test_txlog_when_renaming_a_directory(self):
         user = self.obj_factory.make_user()
         current_parent = self.obj_factory.make_directory(
-            user=user, name=u'current-parent')
+            user=user, name='current-parent')
         dir1 = self.obj_factory.make_directory(
-            name=u'dir1', parent=current_parent)
+            name='dir1', parent=current_parent)
         f = self._make_file(
-            name=u'f.jpg', parent=dir1, mimetype=self.mimetype)
+            name='f.jpg', parent=dir1, mimetype=self.mimetype)
 
         dir1_orig_path = dir1.full_path
         f_orig_path = f.full_path
-        dir1.move(dir1.parent.id, u'new-name')
+        dir1.move(dir1.parent.id, 'new-name')
 
         # All TransactionLog entries created will have the moved directory's
         # generation because in a move() we only update the directory's
@@ -448,11 +450,11 @@ class TestTransactionLog(BaseTransactionLogTestCase):
 
     def test_bootstrap_picks_up_only_files_owned_by_the_given_user(self):
         user = self.obj_factory.make_user(user_id=1)
-        photos = self._create_files_for_user(user, u'image/jpeg')
+        photos = self._create_files_for_user(user, 'image/jpeg')
         # These files do not belong to the user we're bootstrapping now, so
         # they won't show up on the TXLog.
         self._create_files_for_user(
-            self.obj_factory.make_user(user_id=2), u'image/jpeg')
+            self.obj_factory.make_user(user_id=2), 'image/jpeg')
 
         TransactionLog.bootstrap(user)
 
@@ -460,10 +462,10 @@ class TestTransactionLog(BaseTransactionLogTestCase):
 
     def test_bootstrap_picks_up_only_live_files(self):
         user = self.obj_factory.make_user()
-        photos = self._create_files_for_user(user, u'image/jpeg')
+        photos = self._create_files_for_user(user, 'image/jpeg')
         # Even though all files in this second UDF are dead, the UDF itself is
         # alive so we will have a txlog for it.
-        self._create_files_for_user(user, u'image/jpeg', status=u'Dead')
+        self._create_files_for_user(user, 'image/jpeg', status='Dead')
 
         TransactionLog.bootstrap(user)
 
@@ -473,11 +475,11 @@ class TestTransactionLog(BaseTransactionLogTestCase):
         user = self.obj_factory.make_user()
         root_udf = UserVolume.get_root(self.store, user.id)
         photo_in_root = self.obj_factory.make_file(
-            user, root_udf.root_node, u'foo.jpg', u'image/jpeg')
+            user, root_udf.root_node, 'foo.jpg', 'image/jpeg')
         dead_udf = self.obj_factory.make_udf(user=user)
         self.obj_factory.make_file(
-            user, dead_udf.root_node, u'foo-in-dead-udf.jpg',
-            u'image/jpeg')
+            user, dead_udf.root_node, 'foo-in-dead-udf.jpg',
+            'image/jpeg')
         dead_udf.delete()
         self.clear_txlogs()
 
@@ -489,10 +491,10 @@ class TestTransactionLog(BaseTransactionLogTestCase):
         user = self.obj_factory.make_user()
         root_udf = UserVolume.get_root(self.store, user.id)
         folder_in_root = self.obj_factory.make_directory(
-            user, root_udf.root_node, u'folder1', public=True)
+            user, root_udf.root_node, 'folder1', public=True)
         dead_udf = self.obj_factory.make_udf(user=user)
         self.obj_factory.make_directory(
-            user, dead_udf.root_node, u'folder2', public=True)
+            user, dead_udf.root_node, 'folder2', public=True)
         dead_udf.delete()
         self.clear_txlogs()
 
@@ -688,7 +690,7 @@ class TestTransactionLog(BaseTransactionLogTestCase):
         txlogs = self.store.find(TransactionLog)
         self.assertTransactionLogsMatch(txlogs, expected)
 
-    def _create_files_for_user(self, user, mimetype, status=u'Live'):
+    def _create_files_for_user(self, user, mimetype, status='Live'):
         """Create 5 files with the given mimetype for the given user."""
         files = []
         for i in range(0, 5):

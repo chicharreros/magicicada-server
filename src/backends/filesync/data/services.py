@@ -22,6 +22,8 @@ This may provice Data Access Objects (DAO) which can also be used to access
 the data layer. Some objects, may be provided that do not have database access
 """
 
+from __future__ import unicode_literals
+
 from backends.filesync.data import errors
 from backends.filesync.data.dbmanager import (
     retryable_transaction,

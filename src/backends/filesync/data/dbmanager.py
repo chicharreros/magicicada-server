@@ -18,6 +18,8 @@
 
 """Manage database connections and stores to the storage database."""
 
+from __future__ import unicode_literals
+
 from backends.db.store import get_filesync_store  # NOQA
 from backends.db.dbtransaction import (
     get_storm_commit,

@@ -313,12 +313,6 @@ class TestWithDatabase(BaseProtocolTestCase, StorageDALTestCase):
         yield super(TestWithDatabase, self).setUp()
         self.__root = None
 
-        # Patch AQ's deferreds, to support these tests still being run
-        # in Lucid, but while code calls .cancel() on them
-        # Remove this code when magicicada project is taken to Precise.
-        defer.Deferred.cancel = lambda self: None
-        defer.DeferredList.cancel = lambda self: None
-
         # Set up the main loop and bus connection
         self.loop = DBusGMainLoop(set_as_default=True)
         bus_address = os.environ.get('DBUS_SESSION_BUS_ADDRESS', None)

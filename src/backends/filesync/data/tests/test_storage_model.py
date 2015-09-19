@@ -18,6 +18,8 @@
 
 """Test for the storage model."""
 
+from __future__ import unicode_literals
+
 import psycopg2
 import threading
 import unittest
@@ -46,7 +48,7 @@ class TestStorageUser(ORMTestCase):
 
     def test_lock_for_update(self):
         """Make sure lock_for_update locks the user"""
-        user = self.make_user(2, u'f')
+        user = self.make_user(2, 'f')
         self.store.commit()
         user.lock_for_update()
         self.failed = False
@@ -66,18 +68,18 @@ class TestStorageUser(ORMTestCase):
 
     def test_delete_user_main_data(self):
         """Test delete_user_main_data."""
-        user1 = self.make_user(1, u"shorttimer")
-        user2 = self.make_user(2, u"sherry")
-        user3 = self.make_user(3, u"sammy")
+        user1 = self.make_user(1, 'shorttimer')
+        user2 = self.make_user(2, 'sherry')
+        user3 = self.make_user(3, 'sammy')
         self.store.add(model.PublicNode(uuid.uuid4(), user1.id))
         self.store.add(model.PublicNode(uuid.uuid4(), user2.id))
         self.store.add(model.PublicNode(uuid.uuid4(), user3.id))
         self.store.add(model.Share(
-            user1.id, uuid.uuid4(), user2.id, u"Fake1", "View"))
+            user1.id, uuid.uuid4(), user2.id, 'Fake1', 'View'))
         self.store.add(model.Share(
-            user2.id, uuid.uuid4(), user1.id, u"Fake2", "View"))
+            user2.id, uuid.uuid4(), user1.id, 'Fake2', 'View'))
         self.store.add(model.Share(
-            user3.id, uuid.uuid4(), user2.id, u"Fake3", "View"))
+            user3.id, uuid.uuid4(), user2.id, 'Fake3', 'View'))
         self.store.commit()
         self.assertEqual(3, self.store.find(model.StorageUser).count())
         self.assertEqual(3, self.store.find(model.PublicNode).count())
@@ -91,13 +93,13 @@ class TestStorageUser(ORMTestCase):
     def test_delete_user_data(self):
         """Test delete_user_data."""
         ui = self.store.add(model.StorageUserInfo(1, 2 ** 16))
-        self.store.add(model.Download(ui.id, uuid.uuid4(), u'x', u'x'))
-        udf = model.UserVolume.create(self.store, ui.id, u"~/p/n")
+        self.store.add(model.Download(ui.id, uuid.uuid4(), 'x', 'x'))
+        udf = model.UserVolume.create(self.store, ui.id, '~/p/n')
         self.store.add(model.MoveFromShare.from_move(
             udf.root_node, uuid.uuid4()))
         cb = model.ContentBlob.make_empty(self.store)
-        cb.hash = 'trashhash'
-        ob = udf.root_node.make_file(u'file.txt')
+        cb.hash = b'trashhash'
+        ob = udf.root_node.make_file('file.txt')
         ob._content_hash = cb.hash
         self.store.add(model.UploadJob(ob.id))
         self.assertEqual(1, self.store.find(model.StorageUserInfo).count())
@@ -119,32 +121,32 @@ class TestSharing(ORMTestCase):
 
     def setUp(self):
         super(TestSharing, self).setUp()
-        self.sharer = self.make_user(1, u"sammy")
-        self.user = self.make_user(2, u"sherry")
+        self.sharer = self.make_user(1, 'sammy')
+        self.user = self.make_user(2, 'sherry')
 
     def test_get_unique_name(self):
         """Test get_unique_name."""
-        name = model.Share.get_unique_name(self.store, self.user.id, u"name")
-        self.assertEqual(name, u"name")
+        name = model.Share.get_unique_name(self.store, self.user.id, 'name')
+        self.assertEqual(name, 'name')
         share = model.Share(
-            self.sharer.id, uuid.uuid4(), self.user.id, u"name", u"View")
+            self.sharer.id, uuid.uuid4(), self.user.id, 'name', 'View')
         self.store.add(share)
-        name = model.Share.get_unique_name(self.store, self.user.id, u"name")
-        self.assertEqual(name, u"name~1")
+        name = model.Share.get_unique_name(self.store, self.user.id, 'name')
+        self.assertEqual(name, 'name~1')
         self.store.add(model.Share(
-            self.sharer.id, uuid.uuid4(), self.user.id, u"name~1", u"View"))
+            self.sharer.id, uuid.uuid4(), self.user.id, 'name~1', 'View'))
         self.store.add(model.Share(
-            self.sharer.id, uuid.uuid4(), self.user.id, u"name~2", u"View"))
+            self.sharer.id, uuid.uuid4(), self.user.id, 'name~2', 'View'))
         self.store.add(model.Share(
-            self.sharer.id, uuid.uuid4(), self.user.id, u"name~3", u"View"))
-        name = model.Share.get_unique_name(self.store, self.user.id, u"name")
-        self.assertEqual(name, u"name~4")
+            self.sharer.id, uuid.uuid4(), self.user.id, 'name~3', 'View'))
+        name = model.Share.get_unique_name(self.store, self.user.id, 'name')
+        self.assertEqual(name, 'name~4')
 
     def test_claim_share(self):
         """Test claiming a share offer that was sent to an email address."""
         root = model.StorageObject.get_root(self.store, self.sharer.id)
-        share = model.Share(self.sharer.id, root.id, None, u"For friend",
-                            "View", email=u"fake@example.com")
+        share = model.Share(self.sharer.id, root.id, None, 'For friend',
+                            'View', email='fake@example.com')
         self.store.add(share)
         filesync_tm.commit()
         # Sammy has shared 1 folder
@@ -156,12 +158,12 @@ class TestSharing(ORMTestCase):
         filesync_tm.commit()
         # Sherry should now see the share
         self.assertEqual(self.user.sharedto_folders.count(), 1)
-        child = root.make_subdirectory(u"subd'1")
-        share = model.Share(self.sharer.id, child.id, None, u"For friend",
-                            "View", email=u"fake@example.com")
+        child = root.make_subdirectory("subd'1")
+        share = model.Share(self.sharer.id, child.id, None, 'For friend',
+                            'View', email='fake@example.com')
         self.store.add(share)
         share.claim_share(self.store, self.user.id)
-        self.assertEqual(share.name, u"For friend~1")
+        self.assertEqual(share.name, 'For friend~1')
 
     def test_user_shared(self):
         """Test the sharedto_folders/by of StorageUser"""
@@ -173,7 +175,7 @@ class TestSharing(ORMTestCase):
         # Sharer shares something so sherry should see shares soon
         root = model.StorageObject.get_root(self.store, self.sharer.id)
         share = model.Share(self.sharer.id, root.id, self.user.id,
-                            u"Share Name", u"View")
+                            'Share Name', 'View')
         self.store.add(share)
         filesync_tm.commit()
         # Sammy Should show sharing stuff
@@ -187,7 +189,7 @@ class TestContentBlob(ORMTestCase):
 
     def test_create(self):
         """Tests the creation of a ContentBlob."""
-        cb = self.create(model.ContentBlob, ** content_blob_args())
+        cb = self.create(model.ContentBlob, **content_blob_args())
         self.assertNotEqual(cb.when_created, None)
 
     def test_make_empty(self):
@@ -201,7 +203,7 @@ class TestContentBlob(ORMTestCase):
 class TestStorageObjectBase(ORMTestCase):
     """Base class for tests for StorageObject."""
 
-    def createStorageObject(self, fname=u"file.ext"):
+    def createStorageObject(self, fname='file.ext'):
         """Helper function to create an StorageObject."""
         self.create(model.ContentBlob, ** content_blob_args())
         u = self.obj_factory.make_user()
@@ -213,7 +215,7 @@ class TestStorageObjectBase(ORMTestCase):
         """Helper function to create an UDF's root."""
         user = self.obj_factory.make_user()
         udf = model.UserVolume.create(
-            self.store, user.id, path=u"~/Documents/Stuff/DirToUDF")
+            self.store, user.id, path='~/Documents/Stuff/DirToUDF')
         root = self.store.get(model.StorageObject, udf.root_id)
         return user, root
 
@@ -224,9 +226,9 @@ class TestStorageObject(TestStorageObjectBase):
     def test_create(self):
         """minimal test"""
         user, root, obj = self.createStorageObject()
-        self.failIf(user is None, "error creating user")
-        self.failIf(root is None, "error creating root")
-        self.failIf(obj is None, "error creating object")
+        self.failIf(user is None, 'error creating user')
+        self.failIf(root is None, 'error creating root')
+        self.failIf(obj is None, 'error creating object')
 
     def test_create_root(self):
         """Create a standard root."""
@@ -235,10 +237,10 @@ class TestStorageObject(TestStorageObjectBase):
 
         # check node properties
         self.assertEqual(node.owner_id, user.id)
-        self.assertEqual(node.path, u"/")
-        self.assertEqual(node.name, u"")
+        self.assertEqual(node.path, '/')
+        self.assertEqual(node.name, '')
         self.assertEqual(node.parent, None)
-        self.assertEqual(node.kind, "Directory")
+        self.assertEqual(node.kind, 'Directory')
         self.assertEqual(node.status, STATUS_LIVE)
         self.assertEqual(node.generation, 0)
         self.assertEqual(node.generation_created, 0)
@@ -247,12 +249,12 @@ class TestStorageObject(TestStorageObjectBase):
         """Test make_file and make_directory with no name."""
         user = self.obj_factory.make_user()
         root_node = model.StorageObject.get_root(self.store, user.id)
-        self.assertRaises(errors.StorageError, root_node.make_file, u"")
+        self.assertRaises(errors.StorageError, root_node.make_file, '')
         self.assertRaises(errors.StorageError, root_node.make_file, None)
         self.assertRaises(
-            errors.StorageError, root_node.make_subdirectory, u"")
+            errors.StorageError, root_node.make_subdirectory, '')
         self.assertRaises(
-            errors.StorageError, root_node.make_subdirectory, u"")
+            errors.StorageError, root_node.make_subdirectory, '')
 
     def test_create_a_node_in_a_root(self):
         """Create a regular node inside a standard root."""
@@ -260,14 +262,14 @@ class TestStorageObject(TestStorageObjectBase):
         root_node = model.StorageObject.get_root(self.store, user.id)
         # change the generaiton of the volume
         root_node.volume.generation = 12
-        obj = root_node.make_file(u"file.ext")
+        obj = root_node.make_file('file.ext')
 
         # check node properties
         self.assertEqual(obj.owner_id, user.id)
-        self.assertEqual(obj.path, u"/")
-        self.assertEqual(obj.name, u"file.ext")
+        self.assertEqual(obj.path, '/')
+        self.assertEqual(obj.name, 'file.ext')
         self.assertEqual(obj.parent.id, root_node.id)
-        self.assertEqual(obj.kind, "File")
+        self.assertEqual(obj.kind, 'File')
         self.assertEqual(obj.status, STATUS_LIVE)
         self.assertEqual(obj.volume_id, root_node.volume_id)
         self.assertEqual(obj.generation, 13)
@@ -276,14 +278,14 @@ class TestStorageObject(TestStorageObjectBase):
     def test_create_a_node_in_an_udf(self):
         """Create a regular node inside an UDF."""
         user, udf_node = self.createUDF()
-        obj = udf_node.make_file(u"file.ext")
+        obj = udf_node.make_file('file.ext')
 
         # check node properties
         self.assertEqual(obj.owner_id, user.id)
-        self.assertEqual(obj.path, u"/")
-        self.assertEqual(obj.name, u"file.ext")
+        self.assertEqual(obj.path, '/')
+        self.assertEqual(obj.name, 'file.ext')
         self.assertEqual(obj.parent.id, udf_node.id)
-        self.assertEqual(obj.kind, "File")
+        self.assertEqual(obj.kind, 'File')
         self.assertEqual(obj.status, STATUS_LIVE)
         self.assertEqual(obj.volume_id, udf_node.volume_id)
 
@@ -291,11 +293,11 @@ class TestStorageObject(TestStorageObjectBase):
         """Test the is_public flag on storage objects."""
         user, root, obj = self.createStorageObject()
         self.assert_(not obj.is_public,
-                     "Object should not be public by default")
+                     'Object should not be public by default')
         # Any non-null value for publicfile_id makes the file public.
         obj.publicfile_id = 42
         self.assert_(obj.is_public,
-                     "Should be possible to make object public")
+                     'Should be possible to make object public')
 
     def test_update_generation(self):
         """Test update_generation."""
@@ -307,7 +309,7 @@ class TestStorageObject(TestStorageObjectBase):
 
     def test_lock_for_update(self):
         """Make sure lock_for_update locks the object"""
-        user = self.make_user(1, u'f')
+        user = self.make_user(1, 'f')
         root = model.StorageObject.get_root(self.store, user.id)
         filesync_tm.commit()
         root.lock_for_update()
@@ -328,32 +330,32 @@ class TestStorageObject(TestStorageObjectBase):
 
     def test_path_startswith(self):
         """Make sure the path_startwith function is correct"""
-        n = model.StorageObject(1, u'NodeName', 'Directory')
+        n = model.StorageObject(1, 'NodeName', 'Directory')
         self.assertEqual(model.get_path_startswith(n), '/NodeName/')
-        n.path = u'/a/b/c/d'
+        n.path = '/a/b/c/d'
         self.assertEqual(model.get_path_startswith(n), '/a/b/c/d/NodeName/')
-        n.name = u''
+        n.name = ''
         self.assertEqual(model.get_path_startswith(n), '/a/b/c/d/')
-        n.path = u''
+        n.path = ''
         self.assertEqual(model.get_path_startswith(n), '/')
 
     def test_lock_tree_for_update(self):
         """Make sure lock_for_update locks the object"""
-        user = self.make_user(1, u'f')
+        user = self.make_user(1, 'f')
         udf = model.UserVolume.create(
-            self.store, user.id, path=u"~/Documents/Stuff/DirToUDF")
+            self.store, user.id, path='~/Documents/Stuff/DirToUDF')
         root = self.store.get(model.StorageObject, udf.root_id)
-        child = root.make_subdirectory(u"subd'1")
-        childx = root.make_subdirectory(u"subd'11")
+        child = root.make_subdirectory("subd'1")
+        childx = root.make_subdirectory("subd'11")
         # making paths are handled correctly
-        childx2 = childx.make_subdirectory(u"subd'11")
-        child2 = child.make_subdirectory(u"subd2")
+        childx2 = childx.make_subdirectory("subd'11")
+        child2 = child.make_subdirectory('subd2')
         # make sure this user's objects aren't locked
-        userA = self.make_user(2, u'a')
+        userA = self.make_user(2, 'a')
         userA_root = model.StorageObject.get_root(self.store, userA.id)
-        userA_child = userA_root.make_subdirectory(u"subd'1")
-        userA_childx = userA_child.make_subdirectory(u"subd'1")
-        userA_childx1 = userA_childx.make_subdirectory(u"subd'1")
+        userA_child = userA_root.make_subdirectory("subd'1")
+        userA_childx = userA_child.make_subdirectory("subd'1")
+        userA_childx1 = userA_childx.make_subdirectory("subd'1")
 
         filesync_tm.commit()
         child.lock_tree_for_update()
@@ -390,16 +392,16 @@ class TestStorageObject(TestStorageObjectBase):
 
     def test_lock_tree_for_update_root(self):
         """Make sure lock_for_update locks the object"""
-        user = self.make_user(1, u'f')
+        user = self.make_user(1, 'f')
         root = model.StorageObject.get_root(self.store, user.id)
-        child1 = root.make_subdirectory(u"subd'1")
-        child2 = child1.make_subdirectory(u"subd'1")
+        child1 = root.make_subdirectory("subd'1")
+        child2 = child1.make_subdirectory("subd'1")
         # create files with the same paths but on a udf (different volume_id)
         udf = model.UserVolume.create(
-            self.store, user.id, path=u"~/Documents/Stuff/DirToUDF")
+            self.store, user.id, path='~/Documents/Stuff/DirToUDF')
         udf_root = self.store.get(model.StorageObject, udf.root_id)
-        udf_child1 = udf_root.make_subdirectory(u"subd'1")
-        udf_child2 = udf_child1.make_subdirectory(u"subd'1")
+        udf_child1 = udf_root.make_subdirectory("subd'1")
+        udf_child2 = udf_child1.make_subdirectory("subd'1")
         filesync_tm.commit()
         self.failed = False
         root.lock_tree_for_update()
@@ -430,46 +432,46 @@ class TestStorageObject(TestStorageObjectBase):
     def test_filename_validation(self):
         """Tests that the model validates filenames when creating files or
         directories."""
-        user = self.make_user(1, u'f')
+        user = self.make_user(1, 'f')
         root = model.StorageObject.get_root(self.store, user.id)
         self.assertRaises(errors.InvalidFilename,
-                          root.make_subdirectory, u"Beta/Licorice")
+                          root.make_subdirectory, 'Beta/Licorice')
         self.assertRaises(errors.InvalidFilename,
-                          root.make_file, u"Beta/Licorice")
+                          root.make_file, 'Beta/Licorice')
 
     def test_has_children(self):
         """Test to make sure has_children works with different deletions."""
-        user = self.make_user(1, u'a_test_user')
+        user = self.make_user(1, 'a_test_user')
         root = model.StorageObject.get_root(self.store, user.id)
         self.assertFalse(root._has_children())
-        subdir = root.make_subdirectory(u"subdir")
-        file = root.make_file(u"file")
+        subdir = root.make_subdirectory('subdir')
+        file = root.make_file('file')
         self.assertTrue(root._has_children())
         file.unlink()
         subdir.unlink()
         self.assertFalse(root._has_children())
-        subdir = root.make_subdirectory(u"subdir")
-        subdir.make_subdirectory(u"subdir")
-        subdir.make_file(u"file2")
-        subdir.make_file(u"file3")
-        subdir.make_file(u"file4")
-        subdir.make_file(u"file5")
+        subdir = root.make_subdirectory('subdir')
+        subdir.make_subdirectory('subdir')
+        subdir.make_file('file2')
+        subdir.make_file('file3')
+        subdir.make_file('file4')
+        subdir.make_file('file5')
         self.assertTrue(root._has_children())
         subdir.unlink_tree()
         self.assertFalse(root._has_children())
 
     def test_storage_stats(self):
         """Test the storage stats for a user"""
-        user = self.make_user(1, u'f')
+        user = self.make_user(1, 'f')
         info = self.store.get(model.StorageUserInfo, 1)
         root = model.StorageObject.get_root(self.store, user.id)
-        sub = root.make_subdirectory(u"My Subfolder")
+        sub = root.make_subdirectory('My Subfolder')
         used = info.used_storage_bytes
         self.assertEqual(used, 0)
         content = self.create(model.ContentBlob, ** content_blob_args())
         self.store.add(content)
         for i in range(100):
-            file = sub.make_file(u"File%s" % i)
+            file = sub.make_file('File%s' % i)
             file.content = content
             self.store.add(file)
             if i % 2 == 0:
@@ -482,7 +484,7 @@ class TestStorageObject(TestStorageObjectBase):
         """Test the storage stats for a user using an UDF."""
         user, udf_root = self.createUDF()
         info = self.store.get(model.StorageUserInfo, user.id)
-        sub = udf_root.make_subdirectory(u"My Subfolder")
+        sub = udf_root.make_subdirectory('My Subfolder')
 
         # check when empty
         self.assertEqual(info.used_storage_bytes, 0)
@@ -491,7 +493,7 @@ class TestStorageObject(TestStorageObjectBase):
         content = self.create(model.ContentBlob, ** content_blob_args())
         self.store.add(content)
         for i in range(10):
-            file = sub.make_file(u"File%s" % i)
+            file = sub.make_file('File%s' % i)
             file.content = content
             self.store.add(file)
             if i % 2 == 0:
@@ -504,120 +506,120 @@ class TestStorageObject(TestStorageObjectBase):
     def test_get_root_udf(self):
         """Tests get_root when having an UDF."""
         user, root, obj = self.createStorageObject()
-        model.UserVolume.create(self.store, user.id, u"~/Path/Dir")
+        model.UserVolume.create(self.store, user.id, '~/Path/Dir')
         root2 = model.StorageObject.get_root(self.store, user.id)
-        self.assertEqual(root2, root, "root should be returned")
+        self.assertEqual(root2, root, 'root should be returned')
 
     def test_make_directory(self):
         """Tests make_subdirectory."""
         user, root, obj = self.createStorageObject()
-        newnode = root.make_subdirectory(u"subdir")
+        newnode = root.make_subdirectory('subdir')
         self.assertEqual(newnode.parent.id, root.id)
         self.assertEqual(newnode.volume_id, root.volume_id)
 
     def test_make_directory_udf(self):
         """Tests make_subdirectory in the udf."""
         user, udf_root = self.createUDF()
-        newnode = udf_root.make_subdirectory(u"subdir")
+        newnode = udf_root.make_subdirectory('subdir')
         self.assertEqual(newnode.parent.id, udf_root.id)
         self.assertEqual(newnode.volume_id, udf_root.volume_id)
 
     def test_path(self):
         """Tests that the path is well constructed."""
         user, root, obj = self.createStorageObject()
-        node1 = root.make_subdirectory(u"subdir")
+        node1 = root.make_subdirectory('subdir')
         filesync_tm.commit()
-        self.assertEqual(node1.path, "/")
+        self.assertEqual(node1.path, '/')
 
-        node2 = node1.make_subdirectory(u"otherdir")
-        self.assertEqual(node2.path, "/subdir")
+        node2 = node1.make_subdirectory('otherdir')
+        self.assertEqual(node2.path, '/subdir')
 
     def test_path_udf(self):
         """Tests that the path is well constructed for an udf."""
         user, udf_root = self.createUDF()
-        node1 = udf_root.make_subdirectory(u"subdir")
+        node1 = udf_root.make_subdirectory('subdir')
         filesync_tm.commit()
-        self.assertEqual(node1.path, "/")
+        self.assertEqual(node1.path, '/')
 
-        node2 = node1.make_subdirectory(u"otherdir")
-        self.assertEqual(node2.path, "/subdir")
+        node2 = node1.make_subdirectory('otherdir')
+        self.assertEqual(node2.path, '/subdir')
 
     def test_udf_trailing_slashes(self):
         """Tests that the path for an udf doesn't have trailing slashes."""
         user = self.obj_factory.make_user()
         udf = model.UserVolume.create(self.store, user.id,
-                                      path=u"~/Documents/Stuff/DirToUDF/")
+                                      path='~/Documents/Stuff/DirToUDF/')
         filesync_tm.commit()
-        self.assertEqual(udf.path, u"~/Documents/Stuff/DirToUDF")
+        self.assertEqual(udf.path, '~/Documents/Stuff/DirToUDF')
 
     def test_move_no_name(self):
         """Test to make sure move with no name errors."""
         user, root, obj = self.createStorageObject()
-        self.assertRaises(errors.InvalidFilename, obj.move, root.id, u"")
+        self.assertRaises(errors.InvalidFilename, obj.move, root.id, '')
         self.assertRaises(errors.InvalidFilename, obj.move, root.id, None)
 
     def test_path_move_file(self):
         """Tests that the path changes when moving the file."""
         user, root, obj = self.createStorageObject()
-        subdir1 = root.make_subdirectory(u"subdir1")
-        subdir11 = subdir1.make_subdirectory(u"subdir11")
-        subdir2 = root.make_subdirectory(u"subdir2")
+        subdir1 = root.make_subdirectory('subdir1')
+        subdir11 = subdir1.make_subdirectory('subdir11')
+        subdir2 = root.make_subdirectory('subdir2')
         filesync_tm.commit()
 
-        self.assertEqual(obj.path, "/")
+        self.assertEqual(obj.path, '/')
 
         obj.move(subdir1.id, obj.name)
-        self.assertEqual(obj.path, "/subdir1")
+        self.assertEqual(obj.path, '/subdir1')
 
         obj.move(subdir11.id, obj.name)
-        self.assertEqual(obj.path, "/subdir1/subdir11")
+        self.assertEqual(obj.path, '/subdir1/subdir11')
 
         obj.move(subdir2.id, obj.name)
-        self.assertEqual(obj.path, "/subdir2")
+        self.assertEqual(obj.path, '/subdir2')
 
         obj.move(root.id, obj.name)
-        self.assertEqual(obj.path, "/")
+        self.assertEqual(obj.path, '/')
 
     def test_path_move_file_udf(self):
         """Tests that the path changes when moving the file in an UDF."""
         user, udf_root = self.createUDF()
-        obj = udf_root.make_file(u"file.ext")
+        obj = udf_root.make_file('file.ext')
 
-        subdir1 = udf_root.make_subdirectory(u"subdir1")
-        subdir11 = subdir1.make_subdirectory(u"subdir11")
-        subdir2 = udf_root.make_subdirectory(u"subdir2")
+        subdir1 = udf_root.make_subdirectory('subdir1')
+        subdir11 = subdir1.make_subdirectory('subdir11')
+        subdir2 = udf_root.make_subdirectory('subdir2')
         filesync_tm.commit()
 
-        self.assertEqual(obj.path, "/")
+        self.assertEqual(obj.path, '/')
 
         obj.move(subdir1.id, obj.name)
-        self.assertEqual(obj.path, "/subdir1")
+        self.assertEqual(obj.path, '/subdir1')
 
         obj.move(subdir11.id, obj.name)
-        self.assertEqual(obj.path, "/subdir1/subdir11")
+        self.assertEqual(obj.path, '/subdir1/subdir11')
 
         obj.move(subdir2.id, obj.name)
-        self.assertEqual(obj.path, "/subdir2")
+        self.assertEqual(obj.path, '/subdir2')
 
         obj.move(udf_root.id, obj.name)
-        self.assertEqual(obj.path, "/")
+        self.assertEqual(obj.path, '/')
 
     def test_path_move_file_between_volumes(self):
         """Test that no move is allowed between volumes."""
         user, root, obj = self.createStorageObject()
         udf = model.UserVolume.create(
-            self.store, user.id, path=u"~/Documents/Stuff/DirToUDF")
+            self.store, user.id, path='~/Documents/Stuff/DirToUDF')
         udf_root = self.store.get(model.StorageObject, udf.root_id)
-        obj = root.make_file(u"file2.ext")
+        obj = root.make_file('file2.ext')
         self.assertRaises(
             errors.StorageError, obj.move, udf_root.id, obj.name)
 
     def test_path_move_dir(self):
         """Tests that the path changes when moving the dir."""
         user, root, obj = self.createStorageObject()
-        subdir1 = root.make_subdirectory(u"sub'dir1")
-        subdir11 = subdir1.make_subdirectory(u"sub'dir11")
-        subdir2 = root.make_subdirectory(u"sub'dir2")
+        subdir1 = root.make_subdirectory("sub'dir1")
+        subdir11 = subdir1.make_subdirectory("sub'dir11")
+        subdir2 = root.make_subdirectory("sub'dir2")
         filesync_tm.commit()
 
         self.assertEqual(subdir11.path, "/sub'dir1")
@@ -627,35 +629,35 @@ class TestStorageObject(TestStorageObjectBase):
     def test_path_move_dir_grandparent(self):
         """Tests a move to grandparent."""
         user, root, obj = self.createStorageObject()
-        subdir1 = root.make_subdirectory(u"dir")
-        subdir2 = subdir1.make_subdirectory(u"dir")
-        subdir3 = subdir2.make_subdirectory(u"dir")
+        subdir1 = root.make_subdirectory('dir')
+        subdir2 = subdir1.make_subdirectory('dir')
+        subdir3 = subdir2.make_subdirectory('dir')
         filesync_tm.commit()
 
-        subdir3.move(subdir1.id, u"newname")
-        self.assertEqual(subdir3.path, u"/dir")
-        self.assertEqual(subdir3.name, u"newname")
-        self.assertEqual(subdir3.full_path, u"/dir/newname")
+        subdir3.move(subdir1.id, 'newname')
+        self.assertEqual(subdir3.path, '/dir')
+        self.assertEqual(subdir3.name, 'newname')
+        self.assertEqual(subdir3.full_path, '/dir/newname')
 
     def test_path_move_deeptree(self):
         """Tests a very deep inside move."""
         user, root, obj = self.createStorageObject()
-        subdir = root.make_subdirectory(u"sub")
+        subdir = root.make_subdirectory('sub')
         all_dirs = [subdir]
         for i in range(1000):  # bigger than the limit for recursive calls
-            subdir = subdir.make_subdirectory(u'x')
+            subdir = subdir.make_subdirectory('x')
             all_dirs.append(subdir)
         filesync_tm.commit()
 
         grand_parent = all_dirs[-3]  # -1 is the tree's leaf, -2 is parent
-        subdir.move(grand_parent.id, u"y")
+        subdir.move(grand_parent.id, 'y')
 
     def test_path_move_dir_udf(self):
         """Tests that the path changes when moving the dir in an UDF."""
         _, udf_root = self.createUDF()
-        subdir1 = udf_root.make_subdirectory(u"sub'dir1")
-        subdir11 = subdir1.make_subdirectory(u"sub'dir11")
-        subdir2 = udf_root.make_subdirectory(u"sub'dir2")
+        subdir1 = udf_root.make_subdirectory("sub'dir1")
+        subdir11 = subdir1.make_subdirectory("sub'dir11")
+        subdir2 = udf_root.make_subdirectory("sub'dir2")
         filesync_tm.commit()
 
         self.assertEqual(subdir11.path, "/sub'dir1")
@@ -666,8 +668,8 @@ class TestStorageObject(TestStorageObjectBase):
         """Test that the root of an UDF can not be moved or renamed."""
         user, udf_root = self.createUDF()
         self.assertRaises(errors.StorageError, udf_root.unlink)
-        subdir1 = udf_root.make_subdirectory(u"subdir1")
-        subdir11 = subdir1.make_subdirectory(u"subdir11")
+        subdir1 = udf_root.make_subdirectory('subdir1')
+        subdir11 = subdir1.make_subdirectory('subdir11')
         filesync_tm.commit()
 
         # don't move to subdir 11
@@ -677,25 +679,25 @@ class TestStorageObject(TestStorageObjectBase):
         # don't rename
         self.assertRaises(
             errors.NoPermission,
-            udf_root.move, udf_root.parent_id, u"new name")
+            udf_root.move, udf_root.parent_id, 'new name')
 
     def test_get_descendants(self):
         """Test the get descendants method."""
         # to test this, make volumes for this user with similar paths
-        user = self.make_user(1, u'a_test_user')
+        user = self.make_user(1, 'a_test_user')
         root = model.StorageObject.get_root(self.store, user.id)
         self.assertTrue(root not in root.descendants)
         self.assertEqual(root.descendants.count(), 0)
-        r_sub1 = root.make_subdirectory(u"sub1")
-        r_sub2 = r_sub1.make_subdirectory(u"sub2")
+        r_sub1 = root.make_subdirectory('sub1')
+        r_sub2 = r_sub1.make_subdirectory('sub2')
         # an udf and three dirs in it
         udf = model.UserVolume.create(
-            self.store, user.id, path=u"~/Documents/Stuff/DirToUDF")
+            self.store, user.id, path='~/Documents/Stuff/DirToUDF')
         udf_root = self.store.get(model.StorageObject, udf.root_id)
-        u_sub1 = udf_root.make_subdirectory(u"sub1")
-        u_sub2 = u_sub1.make_subdirectory(u"sub2")
-        u_sub3 = u_sub2.make_subdirectory(u"sub3")
-        u_sub4 = u_sub2.make_subdirectory(u"sub4")
+        u_sub1 = udf_root.make_subdirectory('sub1')
+        u_sub2 = u_sub1.make_subdirectory('sub2')
+        u_sub3 = u_sub2.make_subdirectory('sub3')
+        u_sub4 = u_sub2.make_subdirectory('sub4')
         u_sub4.status = model.STATUS_DEAD
         self.assertEqual(root.descendants.count(), 2)
         self.assertEqual(udf_root.descendants.count(), 3)
@@ -708,26 +710,26 @@ class TestStorageObject(TestStorageObjectBase):
     def test_get_descendants_by_kind(self):
         """Test the get descendants filtering by kind."""
         # to test this, make volumes for this user with similar paths
-        user = self.make_user(1, u'a_test_user')
+        user = self.make_user(1, 'a_test_user')
         root = model.StorageObject.get_root(self.store, user.id)
         self.assertTrue(root not in root.descendants)
         self.assertEqual(root.descendants.count(), 0)
-        r_sub1 = root.make_subdirectory(u"sub1")
-        r_sub1.make_file(u"sub1_file.ext")
-        r_sub2 = r_sub1.make_subdirectory(u"sub2")
-        r_sub2.make_file(u"sub2_file.ext")
+        r_sub1 = root.make_subdirectory('sub1')
+        r_sub1.make_file('sub1_file.ext')
+        r_sub2 = r_sub1.make_subdirectory('sub2')
+        r_sub2.make_file('sub2_file.ext')
         # an udf and three dirs in it
         udf = model.UserVolume.create(
-            self.store, user.id, path=u"~/Documents/Stuff/DirToUDF")
+            self.store, user.id, path='~/Documents/Stuff/DirToUDF')
         udf_root = self.store.get(model.StorageObject, udf.root_id)
-        u_sub1 = udf_root.make_subdirectory(u"sub1")
+        u_sub1 = udf_root.make_subdirectory('sub1')
         # create a few files
-        u_sub1.make_file(u"sub1_file.ext")
-        u_sub2 = u_sub1.make_subdirectory(u"sub2")
-        u_sub2.make_file(u"sub2_file.ext")
-        u_sub3 = u_sub2.make_subdirectory(u"sub3")
-        u_sub3.make_file(u"sub3_file.ext")
-        u_sub4 = u_sub2.make_subdirectory(u"sub4")
+        u_sub1.make_file('sub1_file.ext')
+        u_sub2 = u_sub1.make_subdirectory('sub2')
+        u_sub2.make_file('sub2_file.ext')
+        u_sub3 = u_sub2.make_subdirectory('sub3')
+        u_sub3.make_file('sub3_file.ext')
+        u_sub4 = u_sub2.make_subdirectory('sub4')
         u_sub4.status = model.STATUS_DEAD
         self.assertEqual(root.get_descendants(kind='File').count(), 2)
         self.assertEqual(root.get_descendants(kind='Directory').count(), 2)
@@ -738,11 +740,11 @@ class TestStorageObject(TestStorageObjectBase):
 
     def test_tree_size(self):
         """Test to make sure tree size works"""
-        user = self.make_user(1, u'a_test_user')
+        user = self.make_user(1, 'a_test_user')
         info = self.store.get(model.StorageUserInfo, 1)
         info.max_storage_bytes = 50 * (2 ** 30)
         root = model.StorageObject.get_root(self.store, user.id)
-        subdir = root.make_subdirectory(u"subdir")
+        subdir = root.make_subdirectory('subdir')
         self.assertEqual(0, info.used_storage_bytes)
         self.assertEqual(0, subdir.tree_size)
         file_size = content_blob_args()['size']
@@ -752,19 +754,19 @@ class TestStorageObject(TestStorageObjectBase):
             """Add a subtree and 100 files"""
             sub = dir.make_subdirectory(name)
             for i in range(100):
-                file = sub.make_file(u"%s-%s" % (sub.name, i))
+                file = sub.make_file('%s-%s' % (sub.name, i))
                 file.content = content
             return sub
         # create 3 subdirectories (300 files)
-        subdira = add_tree_and_files(subdir, u'subdir"1')
-        subdirb = add_tree_and_files(subdira, u'subdir"11')
-        subdirc = add_tree_and_files(subdirb, u'subdir"111')
+        subdira = add_tree_and_files(subdir, "subdir'1")
+        subdirb = add_tree_and_files(subdira, "subdir'11")
+        subdirc = add_tree_and_files(subdirb, "subdir'111")
         # these folders have a similar path pattern, but will be included
         root = model.StorageObject.get_root(self.store, user.id)
-        subdirx = root.make_subdirectory(u'subdir"1')
-        subdirxx = add_tree_and_files(subdirx, u'subdir"1')
-        subdirxxx = add_tree_and_files(subdirxx, u'subdir"11')
-        add_tree_and_files(subdirxxx, u'subdir"111')
+        subdirx = root.make_subdirectory("subdir'1")
+        subdirxx = add_tree_and_files(subdirx, "subdir'1")
+        subdirxxx = add_tree_and_files(subdirxx, "subdir'11")
+        add_tree_and_files(subdirxxx, "subdir'111")
 
         self.assertEqual(file_size * 600, info.used_storage_bytes)
         self.assertEqual(info.used_storage_bytes, root.tree_size)
@@ -784,16 +786,16 @@ class TestStorageObject(TestStorageObjectBase):
         """Test to make sure tree size works"""
         # a root and two dirs in it
         user, root, obj = self.createStorageObject()
-        r_sub1 = root.make_subdirectory(u"sub1")
-        r_sub2 = r_sub1.make_subdirectory(u"sub2")
+        r_sub1 = root.make_subdirectory('sub1')
+        r_sub2 = r_sub1.make_subdirectory('sub2')
 
         # an udf and three dirs in it
         udf = model.UserVolume.create(
-            self.store, user.id, path=u"~/Documents/Stuff/DirToUDF")
+            self.store, user.id, path='~/Documents/Stuff/DirToUDF')
         udf_root = self.store.get(model.StorageObject, udf.root_id)
-        u_sub1 = udf_root.make_subdirectory(u"sub1")
-        u_sub2 = u_sub1.make_subdirectory(u"sub2")
-        u_sub3 = u_sub2.make_subdirectory(u"sub3")
+        u_sub1 = udf_root.make_subdirectory('sub1')
+        u_sub2 = u_sub1.make_subdirectory('sub2')
+        u_sub3 = u_sub2.make_subdirectory('sub3')
 
         # create a content of 100
         args = content_blob_args()
@@ -802,7 +804,7 @@ class TestStorageObject(TestStorageObjectBase):
 
         # add a file in these dirs, with that small content
         for sub in (r_sub1, r_sub2, u_sub1, u_sub2, u_sub3):
-            file = sub.make_file(u"file in %s" % (sub.name,))
+            file = sub.make_file('file in %s' % (sub.name,))
             file.content = content
         filesync_tm.commit()
 
@@ -813,63 +815,63 @@ class TestStorageObject(TestStorageObjectBase):
     def test_build_tree_from_path_basic(self):
         """Test build_tree_from_path."""
         user, root, obj = self.createStorageObject()
-        subdir = root.make_subdirectory(u"subdir")
-        d = subdir.build_tree_from_path(u"/a/b/c/d/e")
-        self.assertEqual(d.full_path, "/subdir/a/b/c/d/e")
-        d2 = subdir.build_tree_from_path(u"/a/b/c/d/e")
+        subdir = root.make_subdirectory('subdir')
+        d = subdir.build_tree_from_path('/a/b/c/d/e')
+        self.assertEqual(d.full_path, '/subdir/a/b/c/d/e')
+        d2 = subdir.build_tree_from_path('/a/b/c/d/e')
         self.assertEqual(d.id, d2.id)
-        self.assertEqual(d2.full_path, "/subdir/a/b/c/d/e")
+        self.assertEqual(d2.full_path, '/subdir/a/b/c/d/e')
         # check the subdirectories:
         nodes = self.store.find(model.StorageObject)
         paths = [n.full_path for n in nodes if n.kind == 'Directory']
         # seven directories including root
         self.assertEqual(len(paths), 7)
-        self.assertTrue(u"/" in paths)
-        self.assertTrue(u"/subdir" in paths)
-        self.assertTrue(u"/subdir/a" in paths)
-        self.assertTrue(u"/subdir/a/b" in paths)
-        self.assertTrue(u"/subdir/a/b/c" in paths)
-        self.assertTrue(u"/subdir/a/b/c/d" in paths)
-        self.assertTrue(u"/subdir/a/b/c/d/e" in paths)
+        self.assertTrue('/' in paths)
+        self.assertTrue('/subdir' in paths)
+        self.assertTrue('/subdir/a' in paths)
+        self.assertTrue('/subdir/a/b' in paths)
+        self.assertTrue('/subdir/a/b/c' in paths)
+        self.assertTrue('/subdir/a/b/c/d' in paths)
+        self.assertTrue('/subdir/a/b/c/d/e' in paths)
 
     def test_build_tree_from_path_with_file(self):
         """Test build_tree_from_path with multiple dead nodes."""
         user, root, obj = self.createStorageObject()
-        subdir = root.make_subdirectory(u"subdir")
-        d = subdir.make_subdirectory(u"a")
+        subdir = root.make_subdirectory('subdir')
+        d = subdir.make_subdirectory('a')
         d.unlink()
-        d = subdir.make_subdirectory(u"a")
+        d = subdir.make_subdirectory('a')
         d.unlink()
-        d3 = subdir.build_tree_from_path(u"/a/b/c/d/e")
-        self.assertEqual(d3.full_path, "/subdir/a/b/c/d/e")
+        d3 = subdir.build_tree_from_path('/a/b/c/d/e')
+        self.assertEqual(d3.full_path, '/subdir/a/b/c/d/e')
         # multiple calls return the same directory and path
-        d4 = subdir.build_tree_from_path(u"/a/b/c/d/e")
-        self.assertEqual(d4.full_path, "/subdir/a/b/c/d/e")
+        d4 = subdir.build_tree_from_path('/a/b/c/d/e')
+        self.assertEqual(d4.full_path, '/subdir/a/b/c/d/e')
         self.assertEqual(d3.id, d4.id)
 
     def test_build_tree_from_path_with_file2(self):
         """Test build_tree_from_path."""
         user, root, obj = self.createStorageObject()
-        subdir = root.make_subdirectory(u"subdir")
-        d = subdir.build_tree_from_path(u"/a/b/c")
+        subdir = root.make_subdirectory('subdir')
+        d = subdir.build_tree_from_path('/a/b/c')
         # create a file with the same name as a perspective directory, this
         # will end up in a different named folder path
-        d.make_file(u"d")
-        d2 = subdir.build_tree_from_path(u"/a/b/c/d/e")
-        self.assertEqual(d2.full_path, "/subdir/a/b/c/d~1/e")
+        d.make_file('d')
+        d2 = subdir.build_tree_from_path('/a/b/c/d/e')
+        self.assertEqual(d2.full_path, '/subdir/a/b/c/d~1/e')
         self.assertEqual(d.status, model.STATUS_LIVE)
         # check the subdirectories:
         nodes = self.store.find(model.StorageObject)
         paths = [n.full_path for n in nodes if n.kind == 'Directory']
         # seven directories including root
         self.assertEqual(len(paths), 7)
-        self.assertTrue(u"/" in paths)
-        self.assertTrue(u"/subdir" in paths)
-        self.assertTrue(u"/subdir/a" in paths)
-        self.assertTrue(u"/subdir/a/b" in paths)
-        self.assertTrue(u"/subdir/a/b/c" in paths)
-        self.assertTrue(u"/subdir/a/b/c/d~1" in paths)
-        self.assertTrue(u"/subdir/a/b/c/d~1/e" in paths)
+        self.assertTrue('/' in paths)
+        self.assertTrue('/subdir' in paths)
+        self.assertTrue('/subdir/a' in paths)
+        self.assertTrue('/subdir/a/b' in paths)
+        self.assertTrue('/subdir/a/b/c' in paths)
+        self.assertTrue('/subdir/a/b/c/d~1' in paths)
+        self.assertTrue('/subdir/a/b/c/d~1/e' in paths)
 
     def test_unlink_tree_exception(self):
         """Test unlink tree exceptions"""
@@ -879,14 +881,14 @@ class TestStorageObject(TestStorageObjectBase):
     def test_unlink_tree_basic(self):
         """Tests that a shared object and the Share are deleted"""
         user, root, obj = self.createStorageObject()
-        subdir = root.make_subdirectory(u"subdir")
-        subdira = subdir.make_subdirectory(u"subdira")
-        subdirab = subdira.make_subdirectory(u"subdirab")
-        subdirabc = subdirab.make_subdirectory(u"subdiraaa")
-        subdirac = subdira.make_subdirectory(u"subdiraaa")
+        subdir = root.make_subdirectory('subdir')
+        subdira = subdir.make_subdirectory('subdira')
+        subdirab = subdira.make_subdirectory('subdirab')
+        subdirabc = subdirab.make_subdirectory('subdiraaa')
+        subdirac = subdira.make_subdirectory('subdiraaa')
         # due to a bug (488412) in the path check, this was added
-        subdirxxx = root.make_subdirectory(u"subdiraa")
-        subdirxxx1 = subdirxxx.make_subdirectory(u"subdirxxx1")
+        subdirxxx = root.make_subdirectory('subdiraa')
+        subdirxxx1 = subdirxxx.make_subdirectory('subdirxxx1')
         self.assertEqual(subdirxxx.generation, 7)
         subdir.unlink_tree()
         filesync_tm.commit()
@@ -916,8 +918,8 @@ class TestStorageObject(TestStorageObjectBase):
     def test_unlink_tree_basic_bigname(self):
         """Test a big name inside the tree of what is deleted."""
         user, root, obj = self.createStorageObject()
-        subdir = root.make_subdirectory(u"subdir")
-        subdir.make_subdirectory(u"f" * 255)  # big filename
+        subdir = root.make_subdirectory('subdir')
+        subdir.make_subdirectory('f' * 255)  # big filename
         subdir.unlink_tree()
         filesync_tm.commit()
 
@@ -925,16 +927,16 @@ class TestStorageObject(TestStorageObjectBase):
         """Tests deleting things with same paths in different volumes."""
         # a root and two dirs in it
         user, root, obj = self.createStorageObject()
-        r_sub1 = root.make_subdirectory(u"sub1")
-        r_sub2 = r_sub1.make_subdirectory(u"sub2")
+        r_sub1 = root.make_subdirectory('sub1')
+        r_sub2 = r_sub1.make_subdirectory('sub2')
 
         # an udf and three dirs in it
         udf = model.UserVolume.create(
-            self.store, user.id, path=u"~/Documents/Stuff/DirToUDF")
+            self.store, user.id, path='~/Documents/Stuff/DirToUDF')
         udf_root = self.store.get(model.StorageObject, udf.root_id)
-        u_sub1 = udf_root.make_subdirectory(u"sub1")
-        u_sub2 = u_sub1.make_subdirectory(u"sub2")
-        u_sub3 = u_sub2.make_subdirectory(u"sub3")
+        u_sub1 = udf_root.make_subdirectory('sub1')
+        u_sub2 = u_sub1.make_subdirectory('sub2')
+        u_sub3 = u_sub2.make_subdirectory('sub3')
 
         # remove the sub 1 in root
         r_sub1.unlink_tree()
@@ -968,7 +970,7 @@ class TestStorageObject(TestStorageObjectBase):
     def test_unlink_udf(self):
         """Test unlinking inside an UDF."""
         _, udf_root = self.createUDF()
-        obj = udf_root.make_file(u"file.ext")
+        obj = udf_root.make_file('file.ext')
         obj.unlink()
         self.assertEqual(obj.status, STATUS_DEAD)
 
@@ -980,19 +982,19 @@ class TestStorageObject(TestStorageObjectBase):
     def test_get_unique_childname(self):
         """Test the get_unique_childname method."""
         user, root, obj = self.createStorageObject()
-        f1 = root.make_file(u"filename.ext")
-        f2 = root.make_file(u"filename2.ext")
+        f1 = root.make_file('filename.ext')
+        f2 = root.make_file('filename2.ext')
         f2.unlink()
         name = root.get_unique_childname(f1.name)
-        self.assertEqual(name, u"filename~1.ext")
+        self.assertEqual(name, 'filename~1.ext')
         # since f2 is Dead, it's name can be used.
         name = root.get_unique_childname(f2.name)
         self.assertEqual(name, f2.name)
         # it won't overwrite user created files.
         for i in range(1, 5):
-            root.make_file(u"filename~%s.ext" % i)
+            root.make_file('filename~%s.ext' % i)
         name = root.get_unique_childname(f1.name)
-        self.assertEqual(name, u"filename~5.ext")
+        self.assertEqual(name, 'filename~5.ext')
 
     def test_undelete_newparent(self):
         """Tests undelete into a new parent."""
@@ -1003,7 +1005,7 @@ class TestStorageObject(TestStorageObjectBase):
         obj.unlink()
         filesync_tm.commit()
         self.assertFalse(root._has_children())
-        parent = root.make_subdirectory(u"restore folder")
+        parent = root.make_subdirectory('restore folder')
         obj.undelete(parent)
         filesync_tm.commit()
         self.assertEqual(obj.status, STATUS_LIVE)
@@ -1016,9 +1018,9 @@ class TestStorageObject(TestStorageObjectBase):
     def test_undelete_deadparent(self):
         """Tests undelete with a dead parent."""
         user, root, obj = self.createStorageObject()
-        p1 = root.make_subdirectory(u"dir1")
-        p2 = p1.make_subdirectory(u"dir2")
-        file1 = p2.make_file(u"file.txt")
+        p1 = root.make_subdirectory('dir1')
+        p2 = p1.make_subdirectory('dir2')
+        file1 = p2.make_file('file.txt')
         filesync_tm.commit()
         self.assertEqual(p1._has_children(), True)
         self.assertEqual(p1.status, STATUS_LIVE)
@@ -1046,56 +1048,56 @@ class TestStorageObject(TestStorageObjectBase):
     def test_undelete_w_reparent(self):
         """Test undelete with conflicting name."""
         user, root, obj = self.createStorageObject()
-        p1 = root.make_subdirectory(u"dir1")
-        file1 = p1.make_file(u"file1.txt")
-        p1.make_file(u"file2.txt")
+        p1 = root.make_subdirectory('dir1')
+        file1 = p1.make_file('file1.txt')
+        p1.make_file('file2.txt')
         # delete p1
         p1.unlink_tree()
         # create a new directory with the same name
         # all files in d1 should be restored to this directory
-        p1a = root.make_subdirectory(u"dir1")
+        p1a = root.make_subdirectory('dir1')
         file1.undelete()
         # make sure the path and parent are correct
-        self.assertEqual(file1.path, u"/dir1")
+        self.assertEqual(file1.path, '/dir1')
         self.assertEqual(file1.parent_id, p1a.id)
 
     def test_undelete_volume(self):
         """Test undelete_volume."""
         user, user_root, obj = self.createStorageObject()
-        vol1 = model.UserVolume.create(self.store, user.id, u"~/v1")
-        restore_dir = vol1.root_node.make_subdirectory(u"r1")
-        a = vol1.root_node.make_subdirectory(u"a")
-        b = a.make_subdirectory(u"b")
-        c = b.make_subdirectory(u"c")
-        node1 = c.make_file(u'file1.txt')
-        node2 = c.make_file(u'file2.txt')
+        vol1 = model.UserVolume.create(self.store, user.id, '~/v1')
+        restore_dir = vol1.root_node.make_subdirectory('r1')
+        a = vol1.root_node.make_subdirectory('a')
+        b = a.make_subdirectory('b')
+        c = b.make_subdirectory('c')
+        node1 = c.make_file('file1.txt')
+        node2 = c.make_file('file2.txt')
         a.unlink_tree()
         filesync_tm.commit()
         self.assertEqual(node1.status, model.STATUS_DEAD)
         self.assertEqual(node2.status, model.STATUS_DEAD)
         model.undelete_volume(self.store, user.id, vol1.id, restore_dir)
-        self.assertEqual(node1.path, "/r1/a/b/c")
+        self.assertEqual(node1.path, '/r1/a/b/c')
         self.assertEqual(node1.status, model.STATUS_LIVE)
-        self.assertEqual(node1.parent.full_path, "/r1/a/b/c")
+        self.assertEqual(node1.parent.full_path, '/r1/a/b/c')
         self.assertEqual(node1.parent.status, model.STATUS_LIVE)
-        self.assertEqual(node2.path, "/r1/a/b/c")
+        self.assertEqual(node2.path, '/r1/a/b/c')
         self.assertEqual(node2.status, model.STATUS_LIVE)
-        self.assertEqual(node2.parent.full_path, "/r1/a/b/c")
+        self.assertEqual(node2.parent.full_path, '/r1/a/b/c')
         self.assertEqual(node2.parent.status, model.STATUS_LIVE)
         self.assertEqual(node1.parent_id, node2.parent_id)
 
     def test_undelete_volume_limit(self):
         """Test undelete_volume with limit."""
         user, user_root, obj = self.createStorageObject()
-        vol1 = model.UserVolume.create(self.store, user.id, u"~/v1")
-        restore_dir = vol1.root_node.make_subdirectory(u"r1")
-        a = vol1.root_node.make_subdirectory(u"a")
-        b = a.make_subdirectory(u"b")
-        c = b.make_subdirectory(u"c")
-        node = c.make_file(u'file.txt')
+        vol1 = model.UserVolume.create(self.store, user.id, '~/v1')
+        restore_dir = vol1.root_node.make_subdirectory('r1')
+        a = vol1.root_node.make_subdirectory('a')
+        b = a.make_subdirectory('b')
+        c = b.make_subdirectory('c')
+        node = c.make_file('file.txt')
         a.unlink_tree()
         # delete a bunch of files...these will not be restored
-        del_files = [a.make_file(u'file%s.txt' % i) for i in range(100)]
+        del_files = [a.make_file('file%s.txt' % i) for i in range(100)]
         for f in del_files:
             f.unlink()
             filesync_tm.commit()
@@ -1105,7 +1107,7 @@ class TestStorageObject(TestStorageObjectBase):
         self.assertEqual(node.status, model.STATUS_DEAD)
         model.undelete_volume(self.store, user.id, vol1.id, restore_dir,
                               limit=1)
-        self.assertEqual(node.path, "/r1/a/b/c")
+        self.assertEqual(node.path, '/r1/a/b/c')
         self.assertEqual(node.status, model.STATUS_LIVE)
         for f in del_files:
             self.assertEqual(f.status, model.STATUS_DEAD)
@@ -1113,40 +1115,40 @@ class TestStorageObject(TestStorageObjectBase):
     def test_path_middle_change(self):
         """Tests that the path changes when moving a parent of the file."""
         user, root, obj = self.createStorageObject()
-        subdir1 = root.make_subdirectory(u"subdir1")
-        subdir2 = root.make_subdirectory(u"subdir2")
+        subdir1 = root.make_subdirectory('subdir1')
+        subdir2 = root.make_subdirectory('subdir2')
         filesync_tm.commit()
         obj.move(subdir1.id, obj.name)
-        self.assertEqual(obj.path, "/subdir1")
+        self.assertEqual(obj.path, '/subdir1')
 
         subdir1.move(subdir2.id, subdir1.name)
-        self.assertEqual(obj.path, "/subdir2/subdir1")
+        self.assertEqual(obj.path, '/subdir2/subdir1')
 
-        subdir2.move(subdir2.parent.id, u"newdir2name")
-        self.assertEqual(obj.path, "/newdir2name/subdir1")
+        subdir2.move(subdir2.parent.id, 'newdir2name')
+        self.assertEqual(obj.path, '/newdir2name/subdir1')
 
         subdir1.move(root.id, subdir1.name)
-        self.assertEqual(obj.path, "/subdir1")
+        self.assertEqual(obj.path, '/subdir1')
         # when a parent is moved, dead children don't get path updates
         obj.status = model.STATUS_DEAD
         subdir1.move(subdir2.id, subdir1.name)
         # object's path is the same
-        self.assertEqual(obj.path, "/subdir1")
+        self.assertEqual(obj.path, '/subdir1')
         # object's parent is updated
-        self.assertEqual(obj.parent.path, "/newdir2name")
+        self.assertEqual(obj.parent.path, '/newdir2name')
         # since we're here, make sure the node path is rewritten on restore
         obj.undelete()
-        self.assertEqual(obj.path, "/newdir2name/subdir1")
+        self.assertEqual(obj.path, '/newdir2name/subdir1')
 
     def test_unlink_is_not_delete(self):
         """Tests that the object is deleted/removed from the store."""
         user, root, obj = self.createStorageObject()
-        subdir = root.make_subdirectory(u"subdir")
+        subdir = root.make_subdirectory('subdir')
         self.assertIsNotNone(subdir)
         filesync_tm.commit()
         parent = subdir.parent
         name = subdir.name
-        # test subdir is "there"
+        # test subdir is 'there'
         self.assertIsNotNone(self.store.get(model.StorageObject, subdir.id))
         subdir.unlink()
         subdir2 = self.store.get(model.StorageObject, subdir.id)
@@ -1158,27 +1160,27 @@ class TestStorageObject(TestStorageObjectBase):
     def test_unlink_is_not_delete_udf(self):
         """Tests that the object is deleted/removed from the udf."""
         user, udf_root = self.createUDF()
-        subdir = udf_root.make_subdirectory(u"subdir")
+        subdir = udf_root.make_subdirectory('subdir')
         filesync_tm.commit()
 
-        # test subdir is "there", and remove it
+        # test subdir is 'there', and remove it
         self.assertIsNotNone(
             self.store.get(model.StorageObject, subdir.id))
         subdir.unlink()
 
         subdir2 = self.store.get(model.StorageObject, subdir.id)
         self.assertIsNotNone(subdir2)
-        self.assertEqual(u"subdir", subdir2.name)
+        self.assertEqual('subdir', subdir2.name)
         self.assertEqual(udf_root, subdir2.parent)
         self.assertEqual(subdir2.status, STATUS_DEAD)
 
     def test_update_used_bytes(self):
         """Test the tracking of storage bytes used by a user"""
-        user = self.make_user(1, u'a_test_user')
+        user = self.make_user(1, 'a_test_user')
         info = self.store.get(model.StorageUserInfo, 1)
         info.max_storage_bytes = 2 ** 18
         root = model.StorageObject.get_root(self.store, user.id)
-        subdir = root.make_subdirectory(u"subdir")
+        subdir = root.make_subdirectory('subdir')
         self.assertEqual(0, info.used_storage_bytes)
         content = self.create(model.ContentBlob, ** content_blob_args())
         self.store.add(content)
@@ -1191,7 +1193,7 @@ class TestStorageObject(TestStorageObjectBase):
             return file
 
         for i in range(100):
-            add_file(u"File%s" % i)
+            add_file('File%s' % i)
 
         filesync_tm.commit()
         self.assertEqual(info.used_storage_bytes,
@@ -1202,7 +1204,7 @@ class TestStorageObject(TestStorageObjectBase):
         user, udf_root = self.createUDF()
         info = self.store.get(model.StorageUserInfo, user.id)
         info.max_storage_bytes = 2 ** 18
-        subdir = udf_root.make_subdirectory(u"subdir")
+        subdir = udf_root.make_subdirectory('subdir')
         filesync_tm.commit()
 
         self.assertEqual(0, info.used_storage_bytes)
@@ -1217,7 +1219,7 @@ class TestStorageObject(TestStorageObjectBase):
             return file
 
         for i in range(10):
-            add_file(u"File%s" % i)
+            add_file('File%s' % i)
 
         filesync_tm.commit()
         self.assertEqual(info.used_storage_bytes,
@@ -1225,12 +1227,12 @@ class TestStorageObject(TestStorageObjectBase):
 
     def test_recalculate_used_bytes(self):
         """Test the recalculating used bytes."""
-        user = self.make_user(1, u'a_test_user')
+        user = self.make_user(1, 'a_test_user')
         info = self.store.get(model.StorageUserInfo, user.id)
         info.max_storage_bytes = 2 ** 18
         root = model.StorageObject.get_root(self.store, user.id)
-        vol1 = model.UserVolume.create(self.store, user.id, u"~/v1")
-        vol2 = model.UserVolume.create(self.store, user.id, u"~/v2")
+        vol1 = model.UserVolume.create(self.store, user.id, '~/v1')
+        vol2 = model.UserVolume.create(self.store, user.id, '~/v2')
         filesync_tm.commit()
         self.assertEqual(0, info.used_storage_bytes)
         content = self.create(model.ContentBlob, ** content_blob_args())
@@ -1244,9 +1246,9 @@ class TestStorageObject(TestStorageObjectBase):
             self.store.add(file)
             return file
         for i in range(10):
-            add_file(root, u"File%s" % i)
-            add_file(vol1.root_node, u"File%s" % i)
-            add_file(vol2.root_node, u"File%s" % i)
+            add_file(root, 'File%s' % i)
+            add_file(vol1.root_node, 'File%s' % i)
+            add_file(vol2.root_node, 'File%s' % i)
         filesync_tm.commit()
         self.assertEqual(info.used_storage_bytes, expected_used)
         # we now have 3 volumes with data on them.
@@ -1267,16 +1269,16 @@ class TestStorageObject(TestStorageObjectBase):
         """Test the tracking of storage bytes used by a user, when files
         are deleted.
         """
-        user = self.make_user(1, u'a_test_user')
+        user = self.make_user(1, 'a_test_user')
         info = self.store.get(model.StorageUserInfo, 1)
         info.max_storage_bytes = 2 ** 18
         root = model.StorageObject.get_root(self.store, user.id)
-        subdir = root.make_subdirectory(u"subdir")
+        subdir = root.make_subdirectory('subdir')
         self.assertEqual(0, info.used_storage_bytes)
         content = self.create(model.ContentBlob, ** content_blob_args())
         self.store.add(content)
         for i in range(100):
-            file = subdir.make_file(u"File%s" % i)
+            file = subdir.make_file('File%s' % i)
             file.content = content
             self.store.add(file)
             if i % 2:
@@ -1285,7 +1287,7 @@ class TestStorageObject(TestStorageObjectBase):
         self.assertEqual(info.used_storage_bytes,
                          content_blob_args()['size'] * 50)
 
-        file = subdir.make_file(u"Blah")
+        file = subdir.make_file('Blah')
         file.content = content
         self.store.add(file)
         info.max_storage_bytes = 0
@@ -1296,12 +1298,12 @@ class TestStorageObject(TestStorageObjectBase):
         user, udf_root = self.createUDF()
         info = self.store.get(model.StorageUserInfo, user.id)
         info.max_storage_bytes = 2 ** 18
-        subdir = udf_root.make_subdirectory(u"subdir")
+        subdir = udf_root.make_subdirectory('subdir')
         self.assertEqual(0, info.used_storage_bytes)
         content = self.create(model.ContentBlob, ** content_blob_args())
         self.store.add(content)
         for i in range(10):
-            file = subdir.make_file(u"File%s" % i)
+            file = subdir.make_file('File%s' % i)
             file.content = content
             self.store.add(file)
             if i % 2:
@@ -1310,7 +1312,7 @@ class TestStorageObject(TestStorageObjectBase):
         self.assertEqual(info.used_storage_bytes,
                          content_blob_args()['size'] * 5)
 
-        file = subdir.make_file(u"Blah")
+        file = subdir.make_file('Blah')
         file.content = content
         self.store.add(file)
         info.max_storage_bytes = 0
@@ -1320,17 +1322,17 @@ class TestStorageObject(TestStorageObjectBase):
         """Test the tracking of storage bytes used by a user, when
         files are moved.
         """
-        user = self.make_user(1, u'a_test_user')
+        user = self.make_user(1, 'a_test_user')
         info = self.store.get(model.StorageUserInfo, 1)
         info.max_storage_bytes = 2 ** 18
         root = model.StorageObject.get_root(self.store, user.id)
-        subdir = root.make_subdirectory(u"subdir")
-        subdir2 = root.make_subdirectory(u"subdir2")
+        subdir = root.make_subdirectory('subdir')
+        subdir2 = root.make_subdirectory('subdir2')
         self.assertEqual(0, info.used_storage_bytes)
         content = self.create(model.ContentBlob, ** content_blob_args())
         self.store.add(content)
         for i in range(100):
-            file = subdir.make_file(u"File%s" % i)
+            file = subdir.make_file('File%s' % i)
             file.content = content
             self.store.add(file)
             if i % 2:
@@ -1341,11 +1343,11 @@ class TestStorageObject(TestStorageObjectBase):
 
     def test_update_last_modified_on_content(self):
         """Tests that when_last_modified is updated when the content changes"""
-        user = self.make_user(1, u'a_test_user')
+        user = self.make_user(1, 'a_test_user')
         content = self.create(model.ContentBlob, ** content_blob_args())
         self.store.add(content)
         root = model.StorageObject.get_root(self.store, user.id)
-        file = root.make_file(u"a_File")
+        file = root.make_file('a_File')
         before = datetime.datetime.utcnow()
         file.content = content
         after = datetime.datetime.utcnow()
@@ -1353,22 +1355,22 @@ class TestStorageObject(TestStorageObjectBase):
 
     def test_update_last_modified_on_make(self):
         """Tests that when_last_modified is updated when the contents change"""
-        user = self.make_user(1, u'a_test_user')
+        user = self.make_user(1, 'a_test_user')
         root = model.StorageObject.get_root(self.store, user.id)
-        subdir = root.make_subdirectory(u"subdir")
+        subdir = root.make_subdirectory('subdir')
         before_file = datetime.datetime.utcnow()
-        subdir.make_file(u"a_File")
+        subdir.make_file('a_File')
         after_file = datetime.datetime.utcnow()
         self.assertTrue(after_file > subdir.when_last_modified > before_file)
 
         before_dir = datetime.datetime.utcnow()
-        subdir.make_subdirectory(u"subsubdir")
+        subdir.make_subdirectory('subsubdir')
         after_dir = datetime.datetime.utcnow()
         self.assertTrue(after_dir > subdir.when_last_modified > before_dir)
 
     def test_max_used_bytes(self):
         """Tests that used_storage_bytes accepts the max bigint value. """
-        self.make_user(1, u'a_test_user')
+        self.make_user(1, 'a_test_user')
         info = self.store.get(model.StorageUserInfo, 1)
         max = 9223372036854775807  # max bigint value
         info.used_storage_bytes = max
@@ -1409,70 +1411,70 @@ class TestStorageObject(TestStorageObjectBase):
 
     def test_move_to_file(self):
         """Tests that a node can't be moved to a file."""
-        user = self.make_user(1, u'a_test_user')
+        user = self.make_user(1, 'a_test_user')
         root = model.StorageObject.get_root(self.store, user.id)
-        subdir = root.make_subdirectory(u"subdir")
-        a_file = root.make_file(u"a_file")
+        subdir = root.make_subdirectory('subdir')
+        a_file = root.make_file('a_file')
         self.assertRaises(
             errors.NotADirectory, subdir.move, a_file.id, subdir.name)
-        b_file = root.make_file(u"b_file")
+        b_file = root.make_file('b_file')
         self.assertRaises(
             errors.NotADirectory, b_file.move, a_file.id, b_file.name)
 
     def test_move_to_child(self):
         """Tests that a node can't be moved to a child."""
-        user = self.make_user(1, u'a_test_user')
+        user = self.make_user(1, 'a_test_user')
         root = model.StorageObject.get_root(self.store, user.id)
-        subdir = root.make_subdirectory(u"subdir")
-        subdir2 = subdir.make_subdirectory(u"subdir2")
+        subdir = root.make_subdirectory('subdir')
+        subdir2 = subdir.make_subdirectory('subdir2')
         self.assertRaises(
             errors.NoPermission, subdir.move, subdir2.id, subdir.name)
         # move to a child file
-        a_file = subdir2.make_file(u"a_file")
+        a_file = subdir2.make_file('a_file')
         self.assertRaises(
             errors.NotADirectory, subdir.move, a_file.id, a_file.name)
 
     def test_move_to_child_deeper(self):
         """Tests that a node can't be moved to a child."""
-        user = self.make_user(1, u'a_test_user')
+        user = self.make_user(1, 'a_test_user')
         root = model.StorageObject.get_root(self.store, user.id)
-        subdir = root.make_subdirectory(u"subdir")
-        subdir1 = subdir.make_subdirectory(u"subdir1")
-        subdir2 = subdir1.make_subdirectory(u"subdir2")
+        subdir = root.make_subdirectory('subdir')
+        subdir1 = subdir.make_subdirectory('subdir1')
+        subdir2 = subdir1.make_subdirectory('subdir2')
         self.assertRaises(
             errors.NoPermission, subdir.move, subdir2.id, subdir.name)
         # move to a child file
-        a_file = subdir2.make_file(u"a_file")
+        a_file = subdir2.make_file('a_file')
         self.assertRaises(
             errors.NotADirectory, subdir.move, a_file.id, a_file.name)
 
     def test_move_to_inner_dir_specific_case(self):
         """Test a specific case of moving it down."""
-        user = self.make_user(1, u'a_test_user')
+        user = self.make_user(1, 'a_test_user')
         root = model.StorageObject.get_root(self.store, user.id)
-        dira = root.make_subdirectory(u"dira")
-        dirb = dira.make_subdirectory(u"dirb")
-        dirc = root.make_subdirectory(u"dirc")
+        dira = root.make_subdirectory('dira')
+        dirb = dira.make_subdirectory('dirb')
+        dirc = root.make_subdirectory('dirc')
 
         # this should be just fine
         dirc.move(dirb.id, dirc.name)
 
     def test_move_to_inner_dir_similar_name_1(self):
         """Test a case of moving it down with similar name."""
-        user = self.make_user(1, u'a_test_user')
+        user = self.make_user(1, 'a_test_user')
         root = model.StorageObject.get_root(self.store, user.id)
-        dir1 = root.make_subdirectory(u"foobar")
-        dir2 = root.make_subdirectory(u"foobarX")
+        dir1 = root.make_subdirectory('foobar')
+        dir2 = root.make_subdirectory('foobarX')
 
         # this should be just fine
         dir1.move(dir2.id, dir1.name)
 
     def test_move_to_inner_dir_similar_name_2(self):
         """Test a case of moving it down with similar name."""
-        user = self.make_user(1, u'a_test_user')
+        user = self.make_user(1, 'a_test_user')
         root = model.StorageObject.get_root(self.store, user.id)
-        dir1 = root.make_subdirectory(u"foobarX")
-        dir2 = root.make_subdirectory(u"foobar")
+        dir1 = root.make_subdirectory('foobarX')
+        dir2 = root.make_subdirectory('foobar')
 
         # this should be just fine
         dir1.move(dir2.id, dir1.name)
@@ -1490,19 +1492,19 @@ class TestStorageObject(TestStorageObjectBase):
     def test_volume_id_is_correct_on_children(self):
         """volume_id is the root's no matter how deep the node is."""
         user, root, obj = self.createStorageObject()
-        subdir = root.make_subdirectory(name=u'A test')
+        subdir = root.make_subdirectory(name='A test')
         self.assertEqual(subdir.volume_id, root.volume_id)
 
-        subfile = subdir.make_file(name=u'A file test.txt')
+        subfile = subdir.make_file(name='A file test.txt')
         self.assertEqual(subfile.volume_id, root.volume_id)
 
     def test_invalid_volume_id(self):
         """volume_id should be None or a valid UUID."""
         user, root, obj = self.createStorageObject()
 
-        kwargs = dict(user_id=user.id, name=u"test.txt",
-                      volume_id=u'yaddayadda',
-                      kind="File", parent=obj)
+        kwargs = dict(user_id=user.id, name='test.txt',
+                      volume_id='yaddayadda',
+                      kind='File', parent=obj)
         self.assertRaises(TypeError, model.StorageObject, ** kwargs)
 
     def test_get_node_parent_paths(self):
@@ -1510,10 +1512,10 @@ class TestStorageObject(TestStorageObjectBase):
         user, root, node = self.createStorageObject()
         self.assertEqual(root.parent_paths, [])
         node.parent_id = uuid.uuid4()
-        node.path = u'/'
+        node.path = '/'
         expected = ['/']
         self.assertEqual(node.parent_paths, expected)
-        node.path = u'/a/b/c'
+        node.path = '/a/b/c'
         expected = ['/', '/a', '/a/b', '/a/b/c']
         self.assertEqual(node.parent_paths, expected)
 
@@ -1522,12 +1524,12 @@ class TestStorageObject(TestStorageObjectBase):
         user, root, node = self.createStorageObject()
         pids = root.get_parent_ids()
         self.assertEqual(pids, [])
-        dir1 = root.make_subdirectory(u"dir1")
-        dir2 = dir1.make_subdirectory(u"dir2")
-        dir3 = dir2.make_subdirectory(u"dir3")
-        dir4 = dir3.make_subdirectory(u"dir4")
-        dir5 = dir4.make_subdirectory(u"dir5")
-        dir6 = dir5.make_subdirectory(u"dir6")
+        dir1 = root.make_subdirectory('dir1')
+        dir2 = dir1.make_subdirectory('dir2')
+        dir3 = dir2.make_subdirectory('dir3')
+        dir4 = dir3.make_subdirectory('dir4')
+        dir5 = dir4.make_subdirectory('dir5')
+        dir6 = dir5.make_subdirectory('dir6')
         pids = dir6.get_parent_ids()
         # 6 parents including root_id
         self.assertEqual(len(pids), 6)
@@ -1543,10 +1545,10 @@ class TestStorageObject(TestStorageObjectBase):
     def test_get_node_parentids_only_live(self):
         """Test that get_node_parentids only return Live nodes."""
         _, root, _ = self.createStorageObject()
-        dir1 = root.make_subdirectory(u"dir1")
-        dir2 = dir1.make_subdirectory(u"dir2")
-        dir3 = dir2.make_subdirectory(u"dir3")
-        leaf = dir3.make_subdirectory(u"leaf")
+        dir1 = root.make_subdirectory('dir1')
+        dir2 = dir1.make_subdirectory('dir2')
+        dir3 = dir2.make_subdirectory('dir3')
+        leaf = dir3.make_subdirectory('leaf')
         pids = leaf.get_parent_ids()
         # 4 parents including root_id
         self.assertEqual(len(pids), 4)
@@ -1573,12 +1575,12 @@ class TestStorageObjectGenerations(TestStorageObjectBase):
         """
         start_gen = self.volume.generation
         # when an object is created it increments the gen.
-        node = model.StorageObject(self.usr.id, u"n", "File", parent=self.root)
+        node = model.StorageObject(self.usr.id, 'n', 'File', parent=self.root)
         self.assertEqual(node.generation, start_gen + 1)
 
     def test_publicfile_id_property(self):
         """Generation is incremented when the publicfile_id is changed"""
-        node = self.root.make_file(u"file.txt")
+        node = self.root.make_file('file.txt')
         start_gen = self.volume.generation
         node.publicfile_id = 12
         self.assertEqual(node.generation, start_gen + 1)
@@ -1586,53 +1588,53 @@ class TestStorageObjectGenerations(TestStorageObjectBase):
     def test_content_property(self):
         """Generation is incremented when content is updated."""
         cb = self.create(model.ContentBlob, ** content_blob_args())
-        node = self.root.make_file(u"file.txt")
+        node = self.root.make_file('file.txt')
         start_gen = self.volume.generation
         node.content = cb
         self.assertEqual(node.generation, start_gen + 1)
 
     def test_move(self):
         """Move updates the generation of the moved node."""
-        d1 = self.root.make_subdirectory(u"d1")
-        node = d1.make_file(u"f1.txt")
+        d1 = self.root.make_subdirectory('d1')
+        node = d1.make_file('f1.txt')
         start_gen = self.volume.generation
         node.move(self.root.id, node.name)
         self.assertEqual(node.generation, start_gen + 1)
 
     def test_move_dir_special(self):
         """Test move directory to another with a % in it."""
-        d1 = self.root.make_subdirectory(u"a%bc")
-        d2 = self.root.make_subdirectory(u"x%yz")
+        d1 = self.root.make_subdirectory('a%bc')
+        d2 = self.root.make_subdirectory('x%yz')
         d2.move(d1.id, d2.name)
-        self.assertEqual(d2.full_path, u"/a%bc/x%yz")
+        self.assertEqual(d2.full_path, '/a%bc/x%yz')
 
     def test_move_rename(self):
         """Move rename updates the generation of the moved node."""
-        node = self.root.make_subdirectory(u"d1")
+        node = self.root.make_subdirectory('d1')
         start_gen = self.volume.generation
-        node.move(self.root.id, u"newname")
+        node.move(self.root.id, 'newname')
         self.assertEqual(node.generation, start_gen + 1)
 
     def test_move_with_backslash(self):
         """Move works also with backslash in the name."""
-        node = self.root.make_subdirectory(u"break me")
+        node = self.root.make_subdirectory('break me')
         start_gen = self.volume.generation
-        node.move(self.root.id, u"break\\347\\343it really\\355bad")
+        node.move(self.root.id, 'break\\347\\343it really\\355bad')
         filesync_tm.commit()
         self.assertEqual(node.generation, start_gen + 1)
 
     def test_unlink(self):
         """Unlink updates the generation of the moved node."""
-        node = self.root.make_subdirectory(u"d1")
+        node = self.root.make_subdirectory('d1')
         start_gen = self.volume.generation
         node.unlink()
         self.assertEqual(node.generation, start_gen + 1)
 
     def test_unlink_tree(self):
         """Unlink Tree updates the generation of the moved node."""
-        node = self.root.make_subdirectory(u"d1")
-        d1 = node.make_subdirectory(u"d2")
-        d2 = d1.make_subdirectory(u"d3")
+        node = self.root.make_subdirectory('d1')
+        d1 = node.make_subdirectory('d2')
+        d2 = d1.make_subdirectory('d3')
         d1_gen = d1.generation
         d2_gen = d2.generation
         start_gen = self.volume.generation
@@ -1643,7 +1645,7 @@ class TestStorageObjectGenerations(TestStorageObjectBase):
 
     def test_undelete(self):
         """Undelete updates the generation of the moved node."""
-        node = self.root.make_subdirectory(u"d1")
+        node = self.root.make_subdirectory('d1')
         node.unlink()
         start_gen = self.volume.generation
         node.undelete()
@@ -1656,7 +1658,7 @@ class TestMoveFromShare(ORMTestCase):
     def test_create_mfs(self):
         """Basic create test."""
         u = self.obj_factory.make_user()
-        node = model.StorageObject(u.id, u"TheFile.txt", 'File')
+        node = model.StorageObject(u.id, 'TheFile.txt', 'File')
         self.store.add(node)
         share_id = uuid.uuid4()
         mnode = model.MoveFromShare.from_move(node, share_id)
@@ -1681,7 +1683,7 @@ class TestMoveFromShare(ORMTestCase):
         # create 10 StorageObjects and MoveFromShare.
         share_id = uuid.uuid4()
         for i in range(10):
-            node = model.StorageObject(u.id, u"TheFile%s.txt" % i, 'File')
+            node = model.StorageObject(u.id, 'TheFile%s.txt' % i, 'File')
             node.generation = i
             self.store.add(node)
             model.MoveFromShare.from_move(node, share_id)
@@ -1712,77 +1714,77 @@ class TestShare(ORMTestCase):
         """Attempt to create a Share with an invalid filename."""
         self.assertRaises(
             errors.InvalidFilename,
-            model.Share, 0, uuid.uuid4(), 1, u"bob/../../../", 'View')
+            model.Share, 0, uuid.uuid4(), 1, 'bob/../../../', 'View')
 
     def test_create_share(self):
         """Creates a Share."""
         # create all the needed objects
-        usr1 = self.obj_factory.make_user(0, u"user0")
-        usr2 = self.obj_factory.make_user(1, u"user1")
-        usr3 = self.obj_factory.make_user(2, u"user2")
+        usr1 = self.obj_factory.make_user(0, 'user0')
+        usr2 = self.obj_factory.make_user(1, 'user1')
+        usr3 = self.obj_factory.make_user(2, 'user2')
         root = model.StorageObject.get_root(self.store, usr1.id)
 
         # see if creation goes ok
-        share = self.create_share(usr1.id, root.id, usr2.id, u"foo", "View")
+        share = self.create_share(usr1.id, root.id, usr2.id, 'foo', 'View')
         self.assertEqual(share.shared_by, usr1.id)
         self.assertEqual(share.subtree, root.id)
         self.assertEqual(share.shared_to, usr2.id)
-        self.assertEqual(share.name, u"foo")
-        self.assertEqual(share.access, u"View")
+        self.assertEqual(share.name, 'foo')
+        self.assertEqual(share.access, 'View')
 
         # with other access level
-        share = self.create_share(usr1.id, root.id, usr3.id, u"bar", "Modify")
-        self.assertEqual(share.access, u"Modify")
+        share = self.create_share(usr1.id, root.id, usr3.id, 'bar', 'Modify')
+        self.assertEqual(share.access, 'Modify')
 
     def test_create_share_udf(self):
         """Creates a Share in an UDF."""
         # create all the needed objects
-        usr1 = self.obj_factory.make_user(0, u"user0")
-        usr2 = self.obj_factory.make_user(1, u"user1")
-        usr3 = self.obj_factory.make_user(2, u"user2")
+        usr1 = self.obj_factory.make_user(0, 'user0')
+        usr2 = self.obj_factory.make_user(1, 'user1')
+        usr3 = self.obj_factory.make_user(2, 'user2')
         udf = model.UserVolume.create(
-            self.store, usr1.id, path=u"~/Documents/Stuff/DirToUDF")
+            self.store, usr1.id, path='~/Documents/Stuff/DirToUDF')
         root = self.store.get(model.StorageObject, udf.root_id)
 
         # see if creation goes ok
-        share = self.create_share(usr1.id, root.id, usr2.id, u"foo", "View")
+        share = self.create_share(usr1.id, root.id, usr2.id, 'foo', 'View')
         self.assertEqual(share.shared_by, usr1.id)
         self.assertEqual(share.subtree, root.id)
         self.assertEqual(share.shared_to, usr2.id)
-        self.assertEqual(share.name, u"foo")
-        self.assertEqual(share.access, u"View")
+        self.assertEqual(share.name, 'foo')
+        self.assertEqual(share.access, 'View')
 
         # with other access level
-        share = self.create_share(usr1.id, root.id, usr3.id, u"bar", "Modify")
-        self.assertEqual(share.access, u"Modify")
+        share = self.create_share(usr1.id, root.id, usr3.id, 'bar', 'Modify')
+        self.assertEqual(share.access, 'Modify')
 
     def test_create_share_same_name(self):
         """Creates a Share from usr1 to usr2, different nodes, but same name"""
         # create all the needed objects
-        usr1 = self.obj_factory.make_user(0, u"user0")
-        usr2 = self.obj_factory.make_user(1, u"user1")
+        usr1 = self.obj_factory.make_user(0, 'user0')
+        usr2 = self.obj_factory.make_user(1, 'user1')
         root = model.StorageObject.get_root(self.store, usr1.id)
-        node = root.make_subdirectory(u"newdir")
+        node = root.make_subdirectory('newdir')
 
-        self.create_share(usr1.id, root.id, usr2.id, u"foo", "Modify")
+        self.create_share(usr1.id, root.id, usr2.id, 'foo', 'Modify')
         self.assertRaises(
             psycopg2.IntegrityError,
-            self.create_share, usr1.id, node.id, usr2.id, u"foo", "Modify")
+            self.create_share, usr1.id, node.id, usr2.id, 'foo', 'Modify')
 
     def test_create_same_share_after_delete(self):
         """ (re)creates a share after deleting it """
         # create all the needed objects
-        usr1 = self.obj_factory.make_user(0, u"user0")
-        usr2 = self.obj_factory.make_user(1, u"user1")
+        usr1 = self.obj_factory.make_user(0, 'user0')
+        usr2 = self.obj_factory.make_user(1, 'user1')
         root = model.StorageObject.get_root(self.store, usr1.id)
-        root.make_subdirectory(u"newdir")
+        root.make_subdirectory('newdir')
 
         # create and delete the share
         for x in range(3):
             share = self.create_share(usr1.id, root.id, usr2.id,
-                                      u"foo", "Modify")
+                                      'foo', 'Modify')
             share.delete()
-        # now make sure we have more than one share named "foo" marked as dead
+        # now make sure we have more than one share named 'foo' marked as dead
         dead_shares = self.store.find(
             model.Share,
             model.Share.shared_to == usr2.id,
@@ -1794,38 +1796,38 @@ class TestShare(ORMTestCase):
     def test_multiple_shares_same_subtree(self):
         """ checks db constraints that enforce only one share per subtree """
         # create all the needed objects
-        usr1 = self.obj_factory.make_user(0, u"user0")
-        usr2 = self.obj_factory.make_user(1, u"user1")
+        usr1 = self.obj_factory.make_user(0, 'user0')
+        usr2 = self.obj_factory.make_user(1, 'user1')
         root = model.StorageObject.get_root(self.store, usr1.id)
-        node = root.make_subdirectory(u"newdir")
+        node = root.make_subdirectory('newdir')
 
         # attempt to share same subtree as different shares should fail
         share1 = self.create_share(usr1.id, node.id, usr2.id,
-                                   u"share1", "View")
+                                   'share1', 'View')
         # we can not create another share using same or different access
         self.assertRaises(psycopg2.IntegrityError,
                           self.create_share, usr1.id, node.id, usr2.id,
-                          u"share2", "View")
+                          'share2', 'View')
         self.assertRaises(psycopg2.IntegrityError,
                           self.create_share, usr1.id, node.id, usr2.id,
-                          u"share2", "Modify")
+                          'share2', 'Modify')
         # check behavior on delete
         share1.delete()
         share2 = self.create_share(usr1.id, node.id, usr2.id,
-                                   u"share2", "View")
+                                   'share2', 'View')
         # we can not create another share using same or different access
         self.assertRaises(psycopg2.IntegrityError,
                           self.create_share, usr1.id, node.id, usr2.id,
-                          u"share1", "View")
+                          'share1', 'View')
         self.assertRaises(psycopg2.IntegrityError,
                           self.create_share, usr1.id, node.id, usr2.id,
-                          u"share1", "Modify")
+                          'share1', 'Modify')
         share2.delete()
-        # test creating shares for "self" and others
+        # test creating shares for 'self' and others
         share1 = self.create_share(usr1.id, node.id, usr1.id,
-                                   u"share1", "View")
+                                   'share1', 'View')
         share2 = self.create_share(usr1.id, node.id, usr2.id,
-                                   u"share2", "View")
+                                   'share2', 'View')
 
 
 class TestUserVolume(ORMTestCase):
@@ -1849,10 +1851,10 @@ class TestUserVolume(ORMTestCase):
         node = model.StorageObject.make_root(self.store, usr.id)
 
         # see if creation goes ok
-        volume = self.create_volume(usr.id, node.id, u"~/somepath")
+        volume = self.create_volume(usr.id, node.id, '~/somepath')
         self.assertEqual(volume.owner_id, usr.id)
         self.assertEqual(volume.root_id, node.id)
-        self.assertEqual(volume.path, u"~/somepath")
+        self.assertEqual(volume.path, '~/somepath')
         self.assertEqual(volume.status, STATUS_LIVE)
 
     def test_increment_generation(self):
@@ -1870,14 +1872,14 @@ class TestUserVolume(ORMTestCase):
         usr = self.obj_factory.make_user()
         node = model.StorageObject.get_root(self.store, usr.id)
         self.assertRaises(psycopg2.IntegrityError,
-                          self.create_volume, 999, node.id, u"~/somepath")
+                          self.create_volume, 999, node.id, '~/somepath')
 
     def test_create_volume_badnode(self):
         """Create an UDF with a wrong node."""
         usr = self.obj_factory.make_user()
         self.assertRaises(
             psycopg2.IntegrityError,
-            self.create_volume, usr.id, uuid.uuid4(), u"~/somepath")
+            self.create_volume, usr.id, uuid.uuid4(), '~/somepath')
 
     def test_create_volume_badpath(self):
         """Create an UDF with a wrong node."""
@@ -1885,14 +1887,14 @@ class TestUserVolume(ORMTestCase):
         node = model.StorageObject.get_root(self.store, usr.id)
         self.assertRaises(
             errors.InvalidVolumePath,
-            self.create_volume, usr.id, node.id, u"badpath")
+            self.create_volume, usr.id, node.id, 'badpath')
 
     def test_delete_volume(self):
         """Delete an UDF."""
         # create all the needed objects
         usr = self.obj_factory.make_user()
         node = model.StorageObject.get_root(self.store, usr.id)
-        volume = self.create_volume(usr.id, node.id, u"~/somepath")
+        volume = self.create_volume(usr.id, node.id, '~/somepath')
         generation = volume.generation
 
         # see if deletion goes ok
@@ -1905,24 +1907,24 @@ class TestUserVolume(ORMTestCase):
         user = self.obj_factory.make_user()
         self.assertRaises(
             errors.NoPermission, model.UserVolume.create,
-            self.store, user.id, u"~/Ubuntu One")
+            self.store, user.id, '~/Ubuntu One')
         volume = model.UserVolume.create(
-            self.store, user.id, path=u"~/Documents/Stuff/DirToUDF")
+            self.store, user.id, path='~/Documents/Stuff/DirToUDF')
         node = self.store.get(model.StorageObject, volume.root_id)
 
         # check node properties
         self.assertEqual(node.owner_id, user.id)
-        self.assertEqual(node.path, u"/")
-        self.assertEqual(node.name, u"")
+        self.assertEqual(node.path, '/')
+        self.assertEqual(node.name, '')
         self.assertEqual(node.parent, None)
-        self.assertEqual(node.kind, "Directory")
+        self.assertEqual(node.kind, 'Directory')
         self.assertEqual(node.status, STATUS_LIVE)
         self.assertEqual(node.volume_id, volume.id)
 
         # check volume is ok
         self.assertEqual(volume.root_id, node.id)
         self.assertEqual(volume.owner_id, user.id)
-        self.assertEqual(volume.path, u"~/Documents/Stuff/DirToUDF")
+        self.assertEqual(volume.path, '~/Documents/Stuff/DirToUDF')
         self.assertEqual(volume.status, STATUS_LIVE)
 
     def test_make_root(self):
@@ -1933,10 +1935,10 @@ class TestUserVolume(ORMTestCase):
 
         # check node properties
         self.assertEqual(node.owner_id, user.id)
-        self.assertEqual(node.path, u"/")
-        self.assertEqual(node.name, u"")
+        self.assertEqual(node.path, '/')
+        self.assertEqual(node.name, '')
         self.assertEqual(node.parent, None)
-        self.assertEqual(node.kind, "Directory")
+        self.assertEqual(node.kind, 'Directory')
         self.assertEqual(node.status, STATUS_LIVE)
         self.assertEqual(node.volume_id, volume.id)
 
@@ -1955,17 +1957,17 @@ class TestUserVolume(ORMTestCase):
 
     def add_tree_and_files(self, volume):
         """Add a subtree and 100 files to the volume"""
-        sub = volume.root_node.make_subdirectory(u"SubDir")
+        sub = volume.root_node.make_subdirectory('SubDir')
         file_size = content_blob_args()['size']
         content = self.create(model.ContentBlob, ** content_blob_args())
         for i in range(100):
-            file = sub.make_file(u"%s-%s" % (sub.name, i))
+            file = sub.make_file('%s-%s' % (sub.name, i))
             file.content = content
         return file_size * 100
 
     def test_volume_size(self):
         """Test to make sure tree size works"""
-        user = self.make_user(1, u'a_test_user')
+        user = self.make_user(1, 'a_test_user')
         info = self.store.get(model.StorageUserInfo, 1)
         info.max_storage_bytes = 50 * (2 ** 30)
         volume = model.UserVolume.make_root(self.store, user.id)
@@ -1977,7 +1979,7 @@ class TestUserVolume(ORMTestCase):
 
     def test_delete(self):
         """Test to make sure delete works."""
-        user = self.make_user(1, u'a_test_user')
+        user = self.make_user(1, 'a_test_user')
         info = self.store.get(model.StorageUserInfo, 1)
         info.max_storage_bytes = 50 * (2 ** 30)
         volume = model.UserVolume.make_root(self.store, user.id)
@@ -1995,7 +1997,7 @@ class TestUploadJob(ORMTestCase):
         """Create a model.UploadJob instance."""
         u = self.obj_factory.make_user()
         root = model.StorageObject.make_root(self.store, u.id)
-        obj = root.make_file(name=u"file.ext")
+        obj = root.make_file(name='file.ext')
 
         def _UploadJob():
             """ wrapper for the UploadJob __init__ method """
@@ -2014,9 +2016,9 @@ class TestUploadJob(ORMTestCase):
         """Test upload job creation in an UDF."""
         user = self.obj_factory.make_user()
         udf = model.UserVolume.create(
-            self.store, user.id, path=u"~/Documents/Stuff/DirToUDF")
+            self.store, user.id, path='~/Documents/Stuff/DirToUDF')
         root = self.store.get(model.StorageObject, udf.root_id)
-        obj = root.make_file(name=u"file.ext")
+        obj = root.make_file(name='file.ext')
 
         def _UploadJob():
             """Wrapper for the UploadJob __init__ method."""
@@ -2030,7 +2032,7 @@ class TestUploadJob(ORMTestCase):
         """Test creation of a new uploadjob."""
         u = self.obj_factory.make_user()
         root = model.StorageObject.make_root(self.store, u.id)
-        obj = root.make_file(name=u"file.ext")
+        obj = root.make_file(name='file.ext')
         job = model.UploadJob.new_uploadjob(self.store, obj.id)
         self.store.flush()
         self.failIf(job.uploadjob_id is None)
@@ -2040,9 +2042,9 @@ class TestUploadJob(ORMTestCase):
         """Test creation of a new uploadjob in an UDF."""
         user = self.obj_factory.make_user()
         udf = model.UserVolume.create(
-            self.store, user.id, path=u"~/Documents/Stuff/DirToUDF")
+            self.store, user.id, path='~/Documents/Stuff/DirToUDF')
         root = self.store.get(model.StorageObject, udf.root_id)
-        obj = root.make_file(name=u"file.ext")
+        obj = root.make_file(name='file.ext')
         job = model.UploadJob.new_uploadjob(self.store, obj.id)
         self.store.flush()
         self.failIf(job.uploadjob_id is None)
@@ -2052,62 +2054,63 @@ class TestUploadJob(ORMTestCase):
         """Test creation of a new multipart uploadjob."""
         u = self.obj_factory.make_user()
         root = model.StorageObject.make_root(self.store, u.id)
-        obj = root.make_file(name=u"file.ext")
-        job = model.UploadJob.new_multipart_uploadjob(self.store, obj.id,
-                                                      "foo", uuid.uuid4())
-        job.hash_hint = "bar"
+        obj = root.make_file(name='file.ext')
+        job = model.UploadJob.new_multipart_uploadjob(
+            self.store, obj.id, b'foo', uuid.uuid4())
+        job.hash_hint = b'bar'
         job.crc32_hint = 0
         job.inflated_size_hint = 10
         job.deflated_size_hint = 10
         self.store.flush()
         self.failIf(job.uploadjob_id is None)
         self.failUnless(job.uploadjob_id > 0)
-        self.assertEqual(job.multipart_id, "foo")
+        self.assertEqual(job.multipart_id, 'foo')
 
     def test_uploadjob_add_part(self):
         """Test add_part method."""
         u = self.obj_factory.make_user()
         root = model.StorageObject.make_root(self.store, u.id)
-        obj = root.make_file(name=u"file.ext")
-        job = model.UploadJob.new_multipart_uploadjob(self.store, obj.id,
-                                                      "foo", uuid.uuid4())
-        job.hash_hint = "bar"
+        obj = root.make_file(name='file.ext')
+        job = model.UploadJob.new_multipart_uploadjob(
+            self.store, obj.id, b'foo', uuid.uuid4())
+        job.hash_hint = b'bar'
         job.crc32_hint = 0
         job.inflated_size_hint = 10
         job.deflated_size_hint = 10
         self.store.flush()
-        job.add_part(10, 15, 1, "hash context", "magic hash context",
-                     "zlib context")
+        job.add_part(
+            10, 15, 1, b'hash context', b'magic hash context', b'zlib context')
         self.assertEqual(job.chunk_count, 1)
         self.assertEqual(job.crc32, 1)
         self.assertEqual(job.inflated_size, 15)
         self.assertEqual(job.uploaded_bytes, 10)
-        self.assertEqual(job.hash_context, "hash context")
-        self.assertEqual(job.magic_hash_context, "magic hash context")
-        self.assertEqual(job.decompress_context, "zlib context")
-        job.add_part(10, 30, 2, "more hash context", "more magic hash context",
-                     "more zlib context")
+        self.assertEqual(job.hash_context, 'hash context')
+        self.assertEqual(job.magic_hash_context, 'magic hash context')
+        self.assertEqual(job.decompress_context, 'zlib context')
+        job.add_part(
+            10, 30, 2, b'more hash context', b'more magic hash context',
+            b'more zlib context')
         self.assertEqual(job.chunk_count, 2)
         self.assertEqual(job.crc32, 2)
         self.assertEqual(job.inflated_size, 30)
         self.assertEqual(job.uploaded_bytes, 20)
-        self.assertEqual(job.hash_context, "more hash context")
-        self.assertEqual(job.magic_hash_context, "more magic hash context")
-        self.assertEqual(job.decompress_context, "more zlib context")
+        self.assertEqual(job.hash_context, 'more hash context')
+        self.assertEqual(job.magic_hash_context, 'more magic hash context')
+        self.assertEqual(job.decompress_context, 'more zlib context')
 
     def test_uploadjob_find(self):
         """Test add_part method."""
         u = self.obj_factory.make_user()
         root = model.StorageObject.make_root(self.store, u.id)
-        obj = root.make_file(name=u"file.ext")
-        job = model.UploadJob.new_multipart_uploadjob(self.store, obj.id,
-                                                      "foo", uuid.uuid4())
-        job.hash_hint = "bar"
+        obj = root.make_file(name='file.ext')
+        job = model.UploadJob.new_multipart_uploadjob(
+            self.store, obj.id, b'foo', uuid.uuid4())
+        job.hash_hint = b'bar'
         job.crc32_hint = 0
         job.inflated_size_hint = 10
         job.deflated_size_hint = 10
-        job.add_part(10, 10, 1, "hash context", "magic hash context",
-                     "zlib context")
+        job.add_part(
+            10, 10, 1, b'hash context', b'magic hash context', b'zlib context')
         self.store.flush()
         same_job = self.store.get(model.UploadJob, job.uploadjob_id)
         self.assertEqual(job.uploaded_bytes, same_job.uploaded_bytes)
@@ -2178,12 +2181,12 @@ class DownloadTests(TestStorageObjectBase):
         """Test the Download class's constructor."""
         user, udf_root = self.createUDF()
         download = model.Download(
-            user.id, udf_root.volume_id, u"file_path", u"http://download/url")
+            user.id, udf_root.volume_id, 'file_path', 'http://download/url')
         self.assertTrue(isinstance(download.id, uuid.UUID))
         self.assertEqual(download.owner_id, user.id)
         self.assertEqual(download.volume_id, udf_root.volume_id)
-        self.assertEqual(download.file_path, u"file_path")
-        self.assertEqual(download.download_url, u"http://download/url")
+        self.assertEqual(download.file_path, 'file_path')
+        self.assertEqual(download.download_url, 'http://download/url')
         self.assertEqual(download.status, model.DOWNLOAD_STATUS_QUEUED)
         self.assertTrue(
             isinstance(download.status_change_date, datetime.datetime))
@@ -2194,7 +2197,7 @@ class DownloadTests(TestStorageObjectBase):
         """The set_status() method updates the timestamp."""
         user, udf_root = self.createUDF()
         download = model.Download(
-            user.id, udf_root.volume_id, u"file_path", u"http://download/url")
+            user.id, udf_root.volume_id, 'file_path', 'http://download/url')
         old_timestamp = download.status_change_date
         download.set_status(model.DOWNLOAD_STATUS_DOWNLOADING)
         self.assertEqual(download.status, model.DOWNLOAD_STATUS_DOWNLOADING)
@@ -2206,9 +2209,9 @@ class ResumableUploadTest(TestStorageObjectBase):
     """Rest ResumableUpload model."""
 
     def test_constructor(self):
-        user = self.make_user(1, u"username")
-        vol_path = u"~/MyVolume/and/file/path.txt"
-        multipart_id = "multipart_id"
+        user = self.make_user(1, 'username')
+        vol_path = '~/MyVolume/and/file/path.txt'
+        multipart_id = b'multipart_id'
         size = 1000 * (2 ** 30)
         storage_key = uuid.uuid4()
         upload = model.ResumableUpload(
@@ -2224,20 +2227,20 @@ class ResumableUploadTest(TestStorageObjectBase):
         self.assertEqual(u.part_count, 0)
 
     def test_add_part(self):
-        user = self.make_user(1, u"username")
-        vol_path = u"~/MyVolume/and/file/path.txt"
-        multipart_id = "multipart_id"
+        user = self.make_user(1, 'username')
+        vol_path = '~/MyVolume/and/file/path.txt'
+        multipart_id = b'multipart_id'
         size = 1000 * (2 ** 30)
         storage_key = uuid.uuid4()
         upload = model.ResumableUpload(
             user.id, vol_path, size, multipart_id, storage_key)
         self.store.add(upload)
         upload.add_part(
-            10 * (2 ** 20), "hash context", "magic hash context", 55)
+            10 * (2 ** 20), b'hash context', b'magic hash context', 55)
         self.assertEqual(upload.part_count, 1)
         self.assertEqual(upload.uploaded_bytes, 10 * (2 ** 20))
-        self.assertEqual(upload.hash_context, "hash context")
-        self.assertEqual(upload.magic_hash_context, "magic hash context")
+        self.assertEqual(upload.hash_context, 'hash context')
+        self.assertEqual(upload.magic_hash_context, 'magic hash context')
         self.assertEqual(upload.crc_context, 55)
 
 
@@ -2246,7 +2249,7 @@ class AuxiliaryFunctionsTestCase(unittest.TestCase):
 
     def test_validatename_name_empty(self):
         """Validate an empty name."""
-        filename = u""
+        filename = ''
         result = model.validate_name(None, None, filename)
         self.assertEqual(result, filename)
 
@@ -2258,25 +2261,25 @@ class AuxiliaryFunctionsTestCase(unittest.TestCase):
 
     def test_validatename_name_ok(self):
         """Validate a fine name."""
-        filename = u"valid file name"
+        filename = 'valid file name'
         result = model.validate_name(None, None, filename)
         self.assertEqual(result, filename)
 
     def test_validatename_bytes(self):
         """Validate a name that are bytes."""
         self.assertRaises(errors.InvalidFilename,
-                          model.validate_name, None, None, "bytes")
+                          model.validate_name, None, None, b'bytes')
 
     def test_validatename_illegal_name(self):
         """Validate not allowed names."""
         self.assertRaises(errors.InvalidFilename,
-                          model.validate_name, None, None, u".")
+                          model.validate_name, None, None, '.')
         self.assertRaises(errors.InvalidFilename,
-                          model.validate_name, None, None, u"..")
+                          model.validate_name, None, None, '..')
 
     def test_validatename_illegal_chars(self):
         """Validate names with illegal chars."""
         self.assertRaises(errors.InvalidFilename,
-                          model.validate_name, None, None, u"with a / in it")
+                          model.validate_name, None, None, 'with a / in it')
         self.assertRaises(errors.InvalidFilename,
-                          model.validate_name, None, None, u"not \x00 null")
+                          model.validate_name, None, None, 'not \x00 null')

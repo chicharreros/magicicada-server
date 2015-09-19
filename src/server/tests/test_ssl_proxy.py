@@ -24,7 +24,6 @@ import re
 from StringIO import StringIO
 
 import OpenSSL
-import twisted
 
 from mocker import Mocker, expect
 from twisted.internet import defer, reactor, error as txerror, ssl
@@ -190,37 +189,6 @@ class BasicSSLProxyTestCase(SSLProxyTestCase):
             self.fail("Should get a ConnectionDone.")
 
     test_ssl_handshake_backend_dead.skip = 'Should fail with connectionDone'
-
-    def test_producers_registered(self):
-        """Test that both producers are registered."""
-        orig = self.ssl_service.factory.buildProtocol
-        called = []
-
-        def catcher(*a, **kw):
-            """collect calls to buildProtocol."""
-            p = orig(*a, **kw)
-            called.append(p)
-            return p
-
-        self.patch(self.ssl_service.factory, 'buildProtocol', catcher)
-
-        @defer.inlineCallbacks
-        def auth(client):
-            yield client.protocol_version()
-            proto = called[0]
-            # check that the producers match
-            # backend transport is the frontend producer
-            self.assertIdentical(
-                proto.peer.transport, proto.transport.producer)
-            # frontend transport is the backend producer
-            self.assertIdentical(
-                proto.transport, proto.peer.transport.producer)
-
-        return self.callback_test(auth, add_default_callbacks=True,
-                                  use_ssl=True)
-
-    if twisted.version.major >= 11:
-        test_producers_registered.skip = "already fixed in twisted >= 11"
 
     @defer.inlineCallbacks
     def test_server_status_ok(self):

@@ -18,6 +18,8 @@
 
 """Database access functions."""
 
+from __future__ import unicode_literals
+
 from itertools import imap
 
 from backends.filesync.data import dbmanager
@@ -49,11 +51,11 @@ def get_last_row(worker_name):
     worker_name = unicode(worker_name)
     store = dbmanager.get_filesync_store()
 
-    last_row = store.execute(u"""SELECT row_id, timestamp
+    last_row = store.execute("""SELECT row_id, timestamp
         FROM txlog_db_worker_last_row
         WHERE worker_id=?""", (worker_name,)).get_one()
     if not last_row:
-        last_row = store.execute(u"""SELECT row_id, timestamp
+        last_row = store.execute("""SELECT row_id, timestamp
             FROM txlog_db_worker_last_row
             ORDER BY row_id LIMIT 1""").get_one()
     if not last_row:
@@ -75,12 +77,12 @@ def update_last_row(worker_name, row_id, timestamp):
     """
     worker_name = unicode(worker_name)
     store = dbmanager.get_filesync_store()
-    result = store.execute(u"""UPDATE txlog_db_worker_last_row
+    result = store.execute("""UPDATE txlog_db_worker_last_row
         SET row_id=?, timestamp=?
         WHERE worker_id=?""", (row_id, timestamp, worker_name))
     if result.rowcount == 0:
         result = store.execute(
-            u"""INSERT INTO txlog_db_worker_last_row
+            """INSERT INTO txlog_db_worker_last_row
             (worker_id, row_id, timestamp) VALUES (?, ?, ?)""",
             (worker_name, row_id, timestamp))
         if result.rowcount == 0:
@@ -114,12 +116,12 @@ def get_txn_recs(num_recs, last_id=0,
         expire_secs = UNSEEN_EXPIRES
     store = dbmanager.get_filesync_store()
     parameters = (last_id, )
-    select = u"""
+    select = """
         SELECT txlog.id, owner_id, node_id, volume_id, op_type, path,
                generation, timestamp, mimetype, old_path, extra_data
         FROM txlog_transaction_log AS txlog"""
-    condition = u"WHERE id > ?"
-    order_limit = u"ORDER BY id LIMIT {}".format(num_recs)
+    condition = "WHERE id > ?"
+    order_limit = "ORDER BY id LIMIT {}".format(num_recs)
 
     if num_partitions is not None and partition_id is not None:
         unfilter_op_types = (
@@ -128,7 +130,7 @@ def get_txn_recs(num_recs, last_id=0,
         )
         unfilter_op_ids = (str(TransactionLog.OPERATIONS_MAP[id])
                            for id in unfilter_op_types)
-        condition += u" AND (MOD(owner_id, ?) = ? OR op_type in ({}))".format(
+        condition += " AND (MOD(owner_id, ?) = ? OR op_type in ({}))".format(
             ','.join(unfilter_op_ids)
         )
         parameters = parameters + (num_partitions, partition_id)
@@ -137,12 +139,12 @@ def get_txn_recs(num_recs, last_id=0,
 
     if worker_id is not None and expire_secs:
         worker_id = unicode(worker_id)
-        join = (u"NATURAL JOIN txlog_db_worker_unseen as unseen "
+        join = ("NATURAL JOIN txlog_db_worker_unseen as unseen "
                 "WHERE unseen.worker_id = ? "
                 "AND unseen.created > "
                 "TIMEZONE('UTC'::text, NOW()) - INTERVAL '{} seconds'".format(
                     expire_secs))
-        query += u" UNION ({} {} {}) {};".format(
+        query += " UNION ({} {} {}) {};".format(
             select, join, order_limit, order_limit
         )
         parameters = parameters + (worker_id,)
@@ -163,7 +165,7 @@ def get_txn_recs(num_recs, last_id=0,
     # Now insert unseen directly into db_worker_unseen, avoiding duplicates by
     # joining again with db_worker_unseen.
     if result and result[-1]["txn_id"] > last_id and worker_id is not None:
-        insert = (u"INSERT INTO txlog_db_worker_unseen (id, worker_id) "
+        insert = ("INSERT INTO txlog_db_worker_unseen (id, worker_id) "
                   "SELECT gs.id, ? FROM ("
                   "SELECT gs.id "
                   "FROM generate_series(?, ?) AS gs(id) "
@@ -198,24 +200,24 @@ def delete_expired_unseen(worker_id, unseen_ids=None,
     worker_id = unicode(worker_id)
     store = dbmanager.get_filesync_store()
     deleted = 0
-    condition = (u"created < TIMEZONE('UTC'::text, NOW()) "
+    condition = ("created < TIMEZONE('UTC'::text, NOW()) "
                  "     - INTERVAL '{} seconds'".format(expire_secs))
-    query = (u"DELETE FROM txlog_db_worker_unseen "
+    query = ("DELETE FROM txlog_db_worker_unseen "
              "WHERE worker_id = ? ")
     if unseen_ids is not None:
-        fmt = u"({})".format
+        fmt = "({})".format
         if getattr(unseen_ids, "next", None) is None:
             unseen_ids = iter(unseen_ids)
         while True:
-            unseen_args = u",".join(imap(fmt, ichunk(unseen_ids, CHUNK_SIZE)))
+            unseen_args = ",".join(imap(fmt, ichunk(unseen_ids, CHUNK_SIZE)))
             if not unseen_args:
                 break
             result = store.execute(
-                query + u"AND ({} OR id = ANY(VALUES {}));".format(
+                query + "AND ({} OR id = ANY(VALUES {}));".format(
                     condition, unseen_args), (worker_id,))
             deleted += result.rowcount
     else:
-        query += u"AND {};".format(condition)
+        query += "AND {};".format(condition)
         result = store.execute(query, (worker_id,))
         deleted = result.rowcount
     return deleted

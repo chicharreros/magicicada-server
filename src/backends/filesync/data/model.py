@@ -18,6 +18,8 @@
 
 """The Storage database model."""
 
+from __future__ import unicode_literals
+
 import datetime
 import os
 import re
@@ -55,17 +57,17 @@ __all__ = ["StorageUser", "ContentBlob", "StorageObject", "UploadJob"]
 
 #this is used by the like statements in storm
 # XXX("jdobien", "until storm has this, we need it this for escaping")
-like_escape = {ord(u"!"): u"!!", ord(u"_"): u"!_", ord(u"%"): u"!%"}
-sql_escape = {ord(u"'"): u"''", ord(u'"'): u'""'}
+like_escape = {ord("!"): "!!", ord("_"): "!_", ord("%"): "!%"}
+sql_escape = {ord("'"): "''", ord('"'): '""'}
 
-ROOT_NAME = u''
-ROOT_PATH = u'/'
+ROOT_NAME = ''
+ROOT_PATH = '/'
 ROOT_PARENTID = None
 ROOT_VOLUME = None
-ROOT_USERVOLUME_PATH = u"~/Ubuntu One"
+ROOT_USERVOLUME_PATH = "~/Ubuntu One"
 
 # info for the name validation
-ILLEGAL_FILENAMES = [u".", u".."]
+ILLEGAL_FILENAMES = [".", ".."]
 ILLEGAL_FILENAME_CHARS_RE = re.compile(r'[\000/]')
 
 
@@ -75,9 +77,9 @@ def validate_name(obj, attr, value):
         if type(value) != unicode:
             raise InvalidFilename("Filename is not unicode")
         if value in ILLEGAL_FILENAMES:
-            raise InvalidFilename(u"%s is a reserved filename" % (value,))
+            raise InvalidFilename("%s is a reserved filename" % (value,))
         if ILLEGAL_FILENAME_CHARS_RE.search(value) is not None:
-            raise InvalidFilename(u"%s contains illegal characters" % (value,))
+            raise InvalidFilename("%s contains illegal characters" % (value,))
     return value
 
 
@@ -128,7 +130,7 @@ def undelete_volume(store, owner_id, volume_id, restore_parent, limit=100):
             root = vol.root_node
         else:
             return
-    path = u""
+    path = ""
     # find deleted order by path to make sure directories are created in the
     # correct order
     deleted = store.find(
@@ -441,7 +443,7 @@ class StorageObject(Storm):
             if name == ROOT_NAME:
                 self.path = ROOT_PATH
             else:
-                self.path = u""
+                self.path = ""
 
             # both have volume and parent ids as None
             self.parent_id = ROOT_PARENTID
@@ -907,9 +909,9 @@ class StorageObject(Storm):
         if self.parent_id is None:
             return []
         if self.path == '/':
-            return [u'/']
+            return ['/']
         pp = self.path.split('/')
-        pp[0] = u'/'
+        pp[0] = '/'
         return [os.path.join(*pp[0:i]) for i in range(1, len(pp) + 1)]
 
     def get_parent_ids(self):
@@ -1227,7 +1229,7 @@ class UserVolume(Storm):
         self.id = uuid.uuid4()
         self.owner_id = user_id
         self.root_id = node_id
-        self.path = path.strip(u'/')
+        self.path = path.strip('/')
         self.status = STATUS_LIVE
         self.generation = 0
         self.when_created = datetime.datetime.utcnow()

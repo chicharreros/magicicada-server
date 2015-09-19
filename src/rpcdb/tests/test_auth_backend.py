@@ -18,6 +18,8 @@
 
 """Tests for the Auth entry point."""
 
+from __future__ import unicode_literals
+
 from backends.filesync.data.testing.testcase import StorageDALTestCase
 from ubuntuone.storage.rpcdb import auth_backend
 from ubuntuone.storage.server.testing.testcase import create_test_user
@@ -30,7 +32,7 @@ class AuthTestCase(StorageDALTestCase):
         """Set up."""
         res = super(AuthTestCase, self).setUp()
         self.auth = auth_backend.Auth()
-        self.auth_parameters = dict(username=u"user", password='testpass')
+        self.auth_parameters = dict(username="user", password='testpass')
         self.usr = create_test_user(**self.auth_parameters)
         return res
 

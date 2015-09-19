@@ -18,6 +18,8 @@
 
 """RPC DB module."""
 
+from __future__ import unicode_literals
+
 import django
 
 django.setup()

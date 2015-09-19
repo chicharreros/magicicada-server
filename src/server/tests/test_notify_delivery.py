@@ -197,9 +197,10 @@ class TestDelivery(TwistedTestCase):
         user2 = self.mocker.mock()
 
         for i in range(2):
-            expect(self.content.get_user_by_id(from_user)
-                   ).result(succeed(user))
-            expect(self.content.get_user_by_id(to_user)).result(succeed(user2))
+            expect(
+                self.content.get_user_by_id(from_user)).result(succeed(user))
+            expect(
+                self.content.get_user_by_id(to_user)).result(succeed(user2))
 
         expect(user.id).count(2).result(1)
         expect(user.broadcast).count(1).result(test_from)
@@ -426,7 +427,7 @@ class NotificationErrorsTestCase(testcase.TestWithDatabase):
     def test_share_accepted(self):
         """Test the share events."""
         event_args = (uuid.uuid4(), u"name", uuid.uuid4(), 1, 2, "View", True)
-        self.check_event(ShareAccepted(*event_args), recipient_id='test')
+        self.check_event(ShareAccepted(*event_args), recipient_id=u'test')
 
     def test_udf_delete(self):
         """Test UDF Delete."""

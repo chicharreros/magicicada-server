@@ -18,6 +18,8 @@
 
 """Services provided for administrative access to storage data."""
 
+from __future__ import unicode_literals
+
 from backends.filesync.data import get_filesync_store, model, dao
 from backends.filesync.data.gateway import StorageUserGateway
 from backends.filesync.data.dbmanager import fsync_readonly

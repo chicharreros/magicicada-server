@@ -18,6 +18,8 @@
 
 """Test storage notifier."""
 
+from __future__ import unicode_literals
+
 import unittest
 import uuid
 
@@ -50,7 +52,7 @@ class FakeShare(object):
     """Trivial fake share for testing."""
     def __init__(self):
         self.id = uuid.uuid4()
-        self.name = u'FakeShare'
+        self.name = 'FakeShare'
         self.root_id = uuid.uuid4()
         self.shared_by_id = 1
         self.shared_to_id = 2
@@ -126,7 +128,7 @@ class TestEventNotifier(unittest.TestCase):
         """Test broadcast of an udf creation."""
         udf_id = uuid.uuid4()
         root_id = uuid.uuid4()
-        suggested_path = u"foo"
+        suggested_path = "foo"
         self.notifier.queue_udf_create(0, udf_id, root_id, suggested_path)
         self.tx_manager.commit()
         self.assertEqual(self.notifications,

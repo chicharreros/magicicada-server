@@ -18,8 +18,10 @@
 
 """Exceptions raised by the data access layer."""
 
-from backends.db.errors import RetryLimitReached, IntegrityError
-_ = (RetryLimitReached, IntegrityError)  # Silence lint.
+from __future__ import unicode_literals
+
+
+from backends.db.errors import RetryLimitReached, IntegrityError  # noqa
 
 
 class StorageError(Exception):

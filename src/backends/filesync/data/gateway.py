@@ -23,6 +23,8 @@ actions based on the pricipal. In the case of a ReadWriteVolumeGateway,
 security is imposed based on the user's access to the storage objects.
 """
 
+from __future__ import unicode_literals
+
 import mimetypes
 import os
 import posixpath as pypath
@@ -758,7 +760,7 @@ class StorageUserGateway(GatewayBase):
         for prev_udf in prev_udfs:
             if prev_udf.path == path:
                 return dao.UserVolume(prev_udf, self.user)
-            prvpath = prev_udf.path + u"/"
+            prvpath = prev_udf.path + "/"
             if prvpath.startswith(path_like) or path_like.startswith(prvpath):
                 raise errors.NoPermission("UDFs can not be nested.")
         udf = model.UserVolume.create(store, self.user.id, path)
@@ -1203,7 +1205,7 @@ class ReadOnlyVolumeGateway(GatewayBase):
             root = self._get_root_node()
             return root.full_path
         else:
-            return u'/'
+            return '/'
 
     @property
     def is_root_volume(self):

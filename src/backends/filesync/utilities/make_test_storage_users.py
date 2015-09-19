@@ -20,6 +20,8 @@
 
 """Utility used for creating test Storage Users with an oauth token."""
 
+from __future__ import unicode_literals
+
 import os
 import json
 
@@ -40,12 +42,12 @@ if __name__ == "__main__":
 
     token_data = {}
     for i in range(int(options.count)):
-        username = u"testuser%s" % i
+        username = "testuser%s" % i
         userinfo = {
             'username': unicode(uuid.uuid4()),
-            'full_name': u"name %s" % i,
+            'full_name': "name %s" % i,
             'active': True,
-            'email': u"user@somemail.com",
+            'email': "user@somemail.com",
         }
         # create the user account
         user = userutils.create_user(userinfo)

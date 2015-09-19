@@ -18,7 +18,9 @@
 #
 """A set of utilites to build a REST API."""
 
-from os import path
+from __future__ import unicode_literals
+
+import os
 
 from backends.filesync.data import errors
 from backends.filesync.data.dao import VolumeProxy
@@ -117,7 +119,7 @@ class ResourceMapper(object):
     def node_repr(self, node):
         """Return a serializable representation of a node."""
         if node.vol_type == 'root':
-            volume_path = u"~/Ubuntu One"
+            volume_path = "~/Ubuntu One"
         else:
             volume_path = node.vol_udf.path
         if node.full_path == '/':
@@ -283,7 +285,7 @@ class RestHelper(object):
         # are we moving?
         new_path = node_repr.get('path')
         if new_path:
-            new_path, new_name = path.split(new_path)
+            new_path, new_name = os.path.split(new_path)
             if node.name != new_name or node.path != new_path:
                 self.log_dal("get_node_by_path", user, volume_id=node.vol_id,
                              path=unicode(new_path))

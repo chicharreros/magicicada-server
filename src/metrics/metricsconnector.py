@@ -18,6 +18,8 @@
 
 """Report metric samples to statsd."""
 
+from __future__ import unicode_literals
+
 from django.conf import settings
 from txstatsd.client import (
     StatsDClientProtocol, TwistedStatsDClient,

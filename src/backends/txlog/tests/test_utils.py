@@ -18,6 +18,8 @@
 
 """Tests for txlog utilities."""
 
+from __future__ import unicode_literals
+
 import datetime
 
 from mock import patch
@@ -35,14 +37,14 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         """Create a new entry on the txlog_db_worker_last_row table."""
         worker_name = unicode(worker_name)
         self.obj_factory.store.execute(
-            u"""INSERT INTO txlog_db_worker_last_row
+            """INSERT INTO txlog_db_worker_last_row
             (worker_id, row_id, timestamp) VALUES (?, ?, ?)""",
             params=(worker_name, txlog.id, txlog.timestamp))
 
     def _find_last_row_worker_names(self):
         """Find all worker names from the db_worker_last_row table."""
         result = self.obj_factory.store.execute(
-            u"""SELECT worker_id
+            """SELECT worker_id
             FROM txlog_db_worker_last_row""")
         return [row[0] for row in result]
 
@@ -50,7 +52,7 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         """Test the get_last_row function when no data is present."""
         # First, check the db directly to ensure it is empty.
         result = self.obj_factory.store.execute(
-            u"""SELECT row_id
+            """SELECT row_id
             FROM txlog_db_worker_last_row""")
         self.assertEqual(0, result.rowcount)
         self.assertEqual(
@@ -98,7 +100,7 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
             worker_name=worker_name, row_id=txlog.id,
             timestamp=txlog.timestamp)
         result = self.obj_factory.store.execute(
-            u"""SELECT row_id, timestamp
+            """SELECT row_id, timestamp
             FROM txlog_db_worker_last_row
             WHERE worker_id=?""", (worker_name,)).get_one()
         self.assertEqual((txlog.id, txlog.timestamp), result)
@@ -115,7 +117,7 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
             worker_name=worker_name, row_id=txlog2.id,
             timestamp=txlog2.timestamp)
         result = self.obj_factory.store.execute(
-            u"""SELECT row_id, timestamp
+            """SELECT row_id, timestamp
             FROM txlog_db_worker_last_row
             WHERE worker_id=?""", (worker_name,)).get_one()
         self.assertEqual((txlog2.id, txlog2.timestamp), result)
@@ -132,14 +134,14 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
                 """Dummy execute method that always returns a Result object
                 whose rowcount property is 0.
                 """
-                return type('DummyResultSet', (object,), dict(rowcount=0))
+                return type(b'DummyResultSet', (object,), dict(rowcount=0))
 
         with patch.object(dbmanager, 'get_filesync_store') as mock_get:
             mock_get.return_value = DummyStore()
 
             self.assertRaises(
                 RuntimeError, utils.update_last_row,
-                worker_name=u'test_worker_name', row_id=1,
+                worker_name=b'test_worker_name', row_id=1,
                 timestamp=datetime.datetime.utcnow())
 
     def _convert_txlogs_to_dicts(self, txlogs):
@@ -484,15 +486,15 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         """Test that keep_last_rows_for_worker_names removes all rows from
         workers not in the list of given names."""
         initial_workers = [
-            u'worker1',
-            u'worker2',
-            u'worker3',
-            u'worker4',
+            'worker1',
+            'worker2',
+            'worker3',
+            'worker4',
         ]
         kept_workers = [
-            u'worker1',
-            u'worker2',
-            u'worker4',
+            'worker1',
+            'worker2',
+            'worker4',
         ]
         for worker_name in initial_workers:
             txlog = self.obj_factory.make_transaction_log()

@@ -18,6 +18,8 @@
 
 """Metric services."""
 
+from __future__ import unicode_literals
+
 from metrics import get_meter
 try:
     from versioninfo import version_info

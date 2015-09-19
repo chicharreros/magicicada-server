@@ -67,7 +67,7 @@ so all transaction management is handled in the DataServices Layer
 |    Later in the code:
 |
 |
-|         user.share(share_id).dir(dir_id).make_file(u"file_name")
+|         user.share(share_id).dir(dir_id).make_file("file_name")
 |
 |   In this example, no database access is performed until the call
 |   to make_file. This way, this would translate to the following
@@ -83,6 +83,8 @@ so all transaction management is handled in the DataServices Layer
 |   lots of functions that behave differently based on the parameters passed
 |
 """
+
+from __future__ import unicode_literals
 
 from ubuntuone.storageprotocol.content_hash import content_hash_factory
 

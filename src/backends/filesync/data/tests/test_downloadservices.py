@@ -18,6 +18,8 @@
 
 """Test downloadservices functions."""
 
+from __future__ import unicode_literals
+
 import uuid
 
 from backends.filesync.data.testing.testcase import StorageDALTestCase
@@ -30,11 +32,11 @@ class DownloadServicesTestCase(StorageDALTestCase):
 
     def setUp(self):
         super(DownloadServicesTestCase, self).setUp()
-        self.user = self.obj_factory.make_user(1, u"username", u"", 1000)
+        self.user = self.obj_factory.make_user(1, "username", "", 1000)
         self.volume_id = self.user.root_volume_id
-        self.fpath = u"/a/b/c/d/e/file.txt"
-        self.dl_url = u"http://downloadme"
-        self.dl_key = u"key"
+        self.fpath = "/a/b/c/d/e/file.txt"
+        self.dl_url = "http://downloadme"
+        self.dl_key = "key"
 
     def get_or_make_it(self):
         """Make the download."""
@@ -44,20 +46,20 @@ class DownloadServicesTestCase(StorageDALTestCase):
     def test_get_failed_downloads(self):
         """Test the get_failed_downloads() function."""
         # Create downloads
-        udf1 = self.user.make_udf(u"~/path/name")
+        udf1 = self.user.make_udf("~/path/name")
         d1 = downloadservices.make_download(
-            self.user.id, udf1.id, u"path/file", u"http://example.com")
+            self.user.id, udf1.id, "path/file", "http://example.com")
         downloadservices.download_error(
-            self.user.id, d1.id, u"download failed")
-        user2 = self.obj_factory.make_user(2, u"User 2", u"User 2", 10 * 23)
-        udf2 = user2.make_udf(u"~/path/name")
+            self.user.id, d1.id, "download failed")
+        user2 = self.obj_factory.make_user(2, "User 2", "User 2", 10 * 23)
+        udf2 = user2.make_udf("~/path/name")
         d2 = downloadservices.make_download(
-            user2.id, udf2.id, u"path/file", u"http://example.com")
-        downloadservices.download_error(user2.id, d2.id, u"download failed")
+            user2.id, udf2.id, "path/file", "http://example.com")
+        downloadservices.download_error(user2.id, d2.id, "download failed")
         # Finally, a failed download that will be outside the time window.
         d3 = downloadservices.make_download(
-            user2.id, udf2.id, u"path/file2", u"http://example.com")
-        downloadservices.download_error(user2.id, d3.id, u"download failed")
+            user2.id, udf2.id, "path/file2", "http://example.com")
+        downloadservices.download_error(user2.id, d3.id, "download failed")
         result = downloadservices.get_failed_downloads(
             start_date=d1.status_change_date,
             end_date=d3.status_change_date)
@@ -76,14 +78,14 @@ class DownloadServicesTestCase(StorageDALTestCase):
     def test_download_error(self):
         """Test download_error."""
         dl = self.get_or_make_it()
-        downloadservices.download_error(self.user.id, dl.id, u"Kaploey")
+        downloadservices.download_error(self.user.id, dl.id, "Kaploey")
         dl = downloadservices.get_download_by_id(self.user.id, dl.id)
         self.assertEquals(dl.status, model.DOWNLOAD_STATUS_ERROR)
-        self.assertEquals(dl.error_message, u"Kaploey")
+        self.assertEquals(dl.error_message, "Kaploey")
 
     def test_download_complete(self):
         """Test download_complete."""
-        mime = u'image/tif'
+        mime = 'image/tif'
         hash = get_fake_hash()
         storage_key = uuid.uuid4()
         crc = 12345
@@ -125,7 +127,7 @@ class DownloadServicesTestCase(StorageDALTestCase):
             self.user.id, self.volume_id, self.fpath, self.dl_url, self.dl_key)
         self.assertEquals(status, downloadservices.QUEUED)
         # go ahead and complete it and create a file
-        mime = u'image/tif'
+        mime = 'image/tif'
         hash = get_fake_hash()
         storage_key = uuid.uuid4()
         crc = 12345
@@ -152,7 +154,7 @@ class DownloadServicesTestCase(StorageDALTestCase):
         status = downloadservices.get_status_by_id(self.user.id, dl.id)
         self.assertEquals(status, downloadservices.QUEUED)
         # go ahead and complete it and create a file
-        mime = u'image/tif'
+        mime = 'image/tif'
         hash = get_fake_hash()
         storage_key = uuid.uuid4()
         crc = 12345

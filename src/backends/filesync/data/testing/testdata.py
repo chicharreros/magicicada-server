@@ -18,6 +18,8 @@
 
 """Tools used to initialize Test Data"""
 
+from __future__ import unicode_literals
+
 import hashlib
 import datetime
 import uuid
@@ -31,11 +33,13 @@ from backends.filesync.data import model
 
 def get_fake_hash(key=None):
     """Return a hashkey."""
-    return "sha1:" + hashlib.sha1(key or str(uuid.uuid4())).hexdigest()
+    return b'sha1:' + hashlib.sha1(key or str(uuid.uuid4())).hexdigest()
 
 
 def get_test_contentblob(content=None):
     """Get a content blob"""
+    if content:
+        content = content.encode('utf-8')
     cb = model.ContentBlob()
     cb.hash = get_fake_hash(content)
     cb.crc32 = 1023
@@ -49,15 +53,16 @@ def get_test_contentblob(content=None):
 
 def content_blob_args():
     """Returns example blob arguments."""
-    return dict(hash=get_fake_hash(), crc32=1023, size=1024,
-                storage_key=uuid.uuid4(), deflated_size=10000,
-                magic_hash="magic!", content="hola", status=model.STATUS_LIVE)
+    return dict(
+        hash=get_fake_hash(), crc32=1023, size=1024, storage_key=uuid.uuid4(),
+        deflated_size=10000, magic_hash=b'magic!', content=b'hola',
+        status=model.STATUS_LIVE)
 
 
-def uploadjob_args(key="hola"):
+def uploadjob_args(key='hola'):
     """Returns example upload job arguments."""
     return dict(crc32_hint=1024,
-                hash_hint="sha1:" + hashlib.sha1(key).hexdigest(),
+                hash_hint=b'sha1:' + hashlib.sha1(key).hexdigest(),
                 inflated_size_hint=200, deflated_size_hint=100,
                 when_started=datetime.datetime.now(),
                 when_last_active=datetime.datetime.now(),

@@ -18,6 +18,8 @@
 
 """Model code for the Transaction Log."""
 
+from __future__ import unicode_literals
+
 import calendar
 import json
 import os
@@ -47,13 +49,13 @@ class TransactionLog(object):
     """The log of an operation performed on a node."""
 
     # Constants; may want to move somewhere else.
-    OP_DELETE = u'delete'
-    OP_MOVE = u'move'
-    OP_PUT_CONTENT = u'put_content'
-    OP_SHARE_ACCEPTED = u'share_accepted'
-    OP_SHARE_DELETED = u'share_deleted'
-    OP_PUBLIC_ACCESS_CHANGED = u'public_access_changed'
-    OP_USER_CREATED = u'user_created'
+    OP_DELETE = 'delete'
+    OP_MOVE = 'move'
+    OP_PUT_CONTENT = 'put_content'
+    OP_SHARE_ACCEPTED = 'share_accepted'
+    OP_SHARE_DELETED = 'share_deleted'
+    OP_PUBLIC_ACCESS_CHANGED = 'public_access_changed'
+    OP_USER_CREATED = 'user_created'
     OP_UDF_CREATED = 'udf_created'
     OP_UDF_DELETED = 'udf_deleted'
     OPERATIONS_MAP = {

@@ -18,6 +18,8 @@
 
 """Some utility functions used by the DAL."""
 
+from __future__ import unicode_literals
+
 import base64
 import re
 import unicodedata
@@ -42,21 +44,34 @@ def encode_uuid(uuid_value):
     if uuid_value:
         if isinstance(uuid_value, uuid.UUID):
             uuid_value = uuid_value.bytes
-        return base64.urlsafe_b64encode(uuid_value).strip("=")
+        return base64.urlsafe_b64encode(uuid_value).strip('=')
 
 
-def decode_uuid(encoded):
+def decode_uuid(encoded, label=''):
     """Return a uuid from the encoded value.
 
     If the value isn't UUID, just return the decoded value
     """
-    if encoded:
-        value = base64.urlsafe_b64decode(
-            str(encoded) + '=' * (len(encoded) % 4))
+    encoded += '=' * (-len(encoded) % 4)
+
+    if isinstance(encoded, unicode):
         try:
-            return uuid.UUID(bytes=value)
-        except ValueError:
-            return value
+            encoded = encoded.encode('ascii')
+        except UnicodeEncodeError:
+            raise NodeKeyParseError('nodekey should be an ASCII string')
+
+    try:
+        value_bytes = base64.urlsafe_b64decode(encoded)
+    except TypeError:
+        raise NodeKeyParseError(
+            'Could not decode %r portion of node key' % label)
+    try:
+        value_id = uuid.UUID(bytes=value_bytes)
+    except ValueError:
+        raise NodeKeyParseError('%s portion of node key is not a uuid' % label)
+
+    return value_id
+
 
 NODEKEY_RE = r'[A-Za-z0-9_-]{22}(?::[A-Za-z0-9_-]{22})?'
 
@@ -68,21 +83,10 @@ def make_nodekey(share_id, node_id):
     determined via the share.
     """
     if share_id:
-        strkey = "%s:%s" % (encode_uuid(share_id), encode_uuid(node_id))
+        strkey = '%s:%s' % (encode_uuid(share_id), encode_uuid(node_id))
     else:
         strkey = str(encode_uuid(node_id))
     return strkey
-
-
-def split_nodekey(nodekey):
-    """Split a node key into a share_id, node_id."""
-    if nodekey is None:
-        return None, None
-    if ":" in nodekey:
-        parts = nodekey.split(":")
-        return decode_uuid(parts[0]), decode_uuid(parts[1])
-    else:
-        return None, decode_uuid(nodekey)
 
 
 class NodeKeyParseError(Exception):
@@ -91,40 +95,15 @@ class NodeKeyParseError(Exception):
 
 def parse_nodekey(nodekey):
     """Parse a string into a (volume_id, node_id) tuple."""
-    if isinstance(nodekey, unicode):
-        try:
-            nodekey = nodekey.encode('ASCII')
-        except UnicodeEncodeError:
-            raise NodeKeyParseError("nodekey should be an ASCII string")
-    if ":" in nodekey:
-        encoded_volume, nodekey = nodekey.split(":", 1)
+    if ':' in nodekey:
+        encoded_volume, nodekey = nodekey.split(':', 1)
     else:
         encoded_volume = ''
     if encoded_volume:
-        try:
-            volume_bytes = base64.urlsafe_b64decode(
-                encoded_volume + '=' * (-len(encoded_volume) % 4))
-        except TypeError:
-            raise NodeKeyParseError(
-                "Could not decode volume portion of node key")
-        try:
-            volume_id = uuid.UUID(bytes=volume_bytes)
-        except ValueError:
-            raise NodeKeyParseError(
-                "Volume portion of node key is not a uuid")
+        volume_id = decode_uuid(encoded_volume, label='volume')
     else:
         volume_id = None
-
-    try:
-        node_bytes = base64.urlsafe_b64decode(
-            nodekey + '=' * (-len(nodekey) % 4))
-    except TypeError:
-        raise NodeKeyParseError("Could not decode node portion of node key")
-    try:
-        node_id = uuid.UUID(bytes=node_bytes)
-    except ValueError:
-        raise NodeKeyParseError("Node portion of node key not a UUID")
-
+    node_id = decode_uuid(nodekey, label='node')
     return volume_id, node_id
 
 
@@ -132,9 +111,8 @@ class Base62Error(Exception):
     """Error encoding or decoding base-32 string."""
 
 
-_base62_digits = ("0123456789"
-                  "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-                  "abcdefghijklmnopqrstuvwxyz")
+_base62_digits = (
+    '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz')
 
 
 _base62_values = [-1] * 256
@@ -147,7 +125,7 @@ for _value, _char in enumerate(_base62_digits):
 def encode_base62(value, padded_to=0):
     """Encode a positive integer as a base-62 string."""
     if value <= 0:
-        raise Base62Error("Can only encode positive numbers")
+        raise Base62Error('Can only encode positive numbers')
     digits = []
     while value > 0:
         digits.append(_base62_digits[value % 62])
@@ -156,7 +134,7 @@ def encode_base62(value, padded_to=0):
     encoded_value = ''.join(digits)
     if padded_to:
         if len(digits) > padded_to:
-            raise Base62Error("Insufficent padding size.")
+            raise Base62Error('Insufficent padding size.')
         encoded_value = encoded_value.rjust(padded_to, '0')
     return encoded_value
 
@@ -167,19 +145,19 @@ def decode_base62(string, allow_padding=False):
         try:
             string = string.encode('ASCII')
         except UnicodeEncodeError:
-            raise Base62Error("base62 strings should be plain ASCII")
+            raise Base62Error('base62 strings should be plain ASCII')
     if not allow_padding and string.startswith(_base62_digits[0]):
-        raise Base62Error("base62 strings may not begin with zero")
+        raise Base62Error('base62 strings may not begin with zero')
     if len(string) == 0:
-        raise Base62Error("Can not decode an empty string")
+        raise Base62Error('Can not decode an empty string')
     value = 0
     for char in string:
         digit = _base62_values[ord(char)]
         if digit < 0:
-            raise Base62Error("Unknown base62 digit")
+            raise Base62Error('Unknown base62 digit')
         value = value * 62 + digit
     if not 0 <= value < 1 << 128L:
-        raise Base62Error("Value is out of range for uuid.")
+        raise Base62Error('Value is out of range for uuid.')
     return value
 
 
@@ -201,17 +179,17 @@ def get_node_public_key(node, from_uuid=False):
 def get_public_file_url(node):
     """Return the url to a public file."""
     if settings.UPDOWN_PUBLIC_URL_PREFIX_2 and node.public_uuid:
-        return "%s%s" % (settings.UPDOWN_PUBLIC_URL_PREFIX_2,
+        return '%s%s' % (settings.UPDOWN_PUBLIC_URL_PREFIX_2,
                          get_node_public_key(node, True))
     elif node.publicfile_id:
-        return "%s%s/" % (settings.UPDOWN_PUBLIC_URL_PREFIX,
+        return '%s%s/' % (settings.UPDOWN_PUBLIC_URL_PREFIX,
                           get_node_public_key(node, False))
 
 
 def get_keywords_from_path(volume_path):
     """Split keywords from a volume path."""
     # we do not index the root volume path
-    clean_path = volume_path.replace("~/Ubuntu One", '')
+    clean_path = volume_path.replace('~/Ubuntu One', '')
     clean_path = unicodedata.normalize('NFKD', clean_path)
     clean_path = clean_path.encode('ASCII', 'ignore').lower()
     keywords = re.findall(r'\w+', clean_path)

@@ -18,6 +18,8 @@
 
 """Retry utilities."""
 
+from __future__ import unicode_literals
+
 from twisted.internet import reactor, defer
 
 

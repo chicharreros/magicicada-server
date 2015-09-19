@@ -18,6 +18,8 @@
 
 """The DAL entry point as a service."""
 
+from __future__ import unicode_literals
+
 import uuid
 
 from backends.filesync.data import services, errors, model

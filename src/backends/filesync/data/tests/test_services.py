@@ -18,6 +18,8 @@
 
 """Test the Data services."""
 
+from __future__ import unicode_literals
+
 import uuid
 import datetime
 
@@ -56,14 +58,14 @@ class DataServicesTestCase(StorageDALTestCase):
     def test_make_storage_user(self):
         """Test the make_storage_user function."""
         storage_user = make_storage_user(
-            1, u"Cool UserName", u"Visible Name", MAX_STORAGE_BYTES)
+            1, "Cool UserName", "Visible Name", MAX_STORAGE_BYTES)
         self.assert_storage_user(
-            storage_user, 1, u"Visible Name", MAX_STORAGE_BYTES)
+            storage_user, 1, "Visible Name", MAX_STORAGE_BYTES)
 
     def test_get_storage_user(self):
         """Test the get_storage_user function."""
         user = make_storage_user(
-            1, u"Cool UserName", u"Visible Name", MAX_STORAGE_BYTES)
+            1, "Cool UserName", "Visible Name", MAX_STORAGE_BYTES)
         user = get_storage_user(1)
         self.assertTrue(isinstance(user, dao.StorageUser))
         user.update(subscription=False)
@@ -82,8 +84,8 @@ class DataServicesTestCase(StorageDALTestCase):
     def test_get_node(self):
         """Test the get_node function."""
         user1 = self.obj_factory.make_user(
-            1, u"User 1", u"User 1", MAX_STORAGE_BYTES)
-        node = user1.volume().root.make_file(u"test file")
+            1, "User 1", "User 1", MAX_STORAGE_BYTES)
+        node = user1.volume().root.make_file("test file")
         new_node = get_node(node.id)
         self.assertEquals(node.id, new_node.id)
         self.assertEquals(node.parent_id, new_node.parent_id)
@@ -93,7 +95,7 @@ class DataServicesTestCase(StorageDALTestCase):
     def test_get_user_info(self):
         """Test the get_user_info function."""
         user = self.obj_factory.make_user(
-            1, u"User 1", u"User 1", MAX_STORAGE_BYTES)
+            1, "User 1", "User 1", MAX_STORAGE_BYTES)
         user_info = get_user_info(user.id)
         quota = user.get_quota()
         self.assertEquals(quota.max_storage_bytes, user_info.max_storage_bytes)
@@ -113,9 +115,9 @@ class DataServicesTestCase(StorageDALTestCase):
         save_setting = utils.set_public_uuid
         utils.set_public_uuid = False
         user = self.obj_factory.make_user(
-            1, u"Cool UserName", u"Visible Name", 10)
+            1, "Cool UserName", "Visible Name", 10)
         a_file = user.volume().root.make_file_with_content(
-            u"file.txt", get_fake_hash(), 123, 1, 1, uuid.uuid4())
+            "file.txt", get_fake_hash(), 123, 1, 1, uuid.uuid4())
         a_file.change_public_access(True)
         public_key = a_file.public_key
         f1 = get_public_file(public_key)
@@ -128,10 +130,10 @@ class DataServicesTestCase(StorageDALTestCase):
     def test_get_public_directory(self):
         """Test the get_public_directory function."""
         user = self.obj_factory.make_user(
-            1, u"Cool UserName", u"Visible Name", 10)
-        a_dir = user.volume().root.make_subdirectory(u'test_dir')
+            1, "Cool UserName", "Visible Name", 10)
+        a_dir = user.volume().root.make_subdirectory('test_dir')
         a_dir.make_file_with_content(
-            u"file.txt", get_fake_hash(), 123, 1, 1, uuid.uuid4())
+            "file.txt", get_fake_hash(), 123, 1, 1, uuid.uuid4())
         a_dir.change_public_access(True, allow_directory=True)
         public_key = a_dir.public_key
         pub_dir = get_public_directory(public_key)
@@ -145,9 +147,9 @@ class DataServicesTestCase(StorageDALTestCase):
         save_setting = utils.set_public_uuid
         utils.set_public_uuid = True
         user = self.obj_factory.make_user(
-            1, u"Cool UserName", u"Visible Name", 10)
+            1, "Cool UserName", "Visible Name", 10)
         a_file = user.volume().root.make_file_with_content(
-            u"file.txt", get_fake_hash(), 123, 1, 1, uuid.uuid4())
+            "file.txt", get_fake_hash(), 123, 1, 1, uuid.uuid4())
         a_file.change_public_access(True)
         public_key = a_file.public_key
         # get the file using the public uuid

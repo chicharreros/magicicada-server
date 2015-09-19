@@ -18,6 +18,8 @@
 
 """Logging utilities."""
 
+from __future__ import unicode_literals
+
 
 def log_dal_function(logger):
     """Returns a function that logs dal operations in a consistent manner."""

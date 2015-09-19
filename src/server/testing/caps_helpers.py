@@ -21,6 +21,7 @@
 """helpers for capabilities related tests"""
 
 import functools
+
 from ubuntuone import syncdaemon
 from ubuntuone.storage.server import server
 

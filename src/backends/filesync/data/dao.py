@@ -27,6 +27,8 @@ They database access will be disabled if the underlying gateway is None or not
 initialized.
 """
 
+from __future__ import unicode_literals
+
 import datetime
 import os
 import posixpath as pypath
@@ -174,7 +176,7 @@ class StorageUser(DAOBase):
 
     def get_node_with_key(self, key):
         """Using a nodekey, get the node from the appropriate volume."""
-        vol_id, node_id = utils.split_nodekey(key)
+        vol_id, node_id = utils.parse_nodekey(key)
         return self.volume(vol_id).get_node(node_id)
 
     def get_node(self, id, **kwargs):
@@ -464,13 +466,13 @@ class StorageNode(VolumeObjectBase):
         if gateway and gateway.share:
             if object.id == gateway.root_id:
                 o.parent_id = None
-                o.path = u'/'
-                o.name = u''
-                o.full_path = u'/'
+                o.path = '/'
+                o.name = ''
+                o.full_path = '/'
             else:
                 # mask the root path
                 o.path = object.path[len(gateway.root_path_mask)::]
-                o.path = o.path if o.path else u'/'
+                o.path = o.path if o.path else '/'
                 o.full_path = pypath.join(o.path, o.name)
         o.volume_id = object.volume_id
         o.public_id = object.publicfile_id

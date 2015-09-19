@@ -18,6 +18,8 @@
 
 """Services for handling downloads."""
 
+from __future__ import unicode_literals
+
 from backends.filesync.data import model, errors
 from backends.filesync.data.gateway import SystemGateway
 from backends.filesync.data.dbmanager import (

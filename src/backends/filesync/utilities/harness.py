@@ -20,6 +20,8 @@
 
 """The Storage DAL test harness"""
 
+from __future__ import unicode_literals
+
 import os
 import readline
 
@@ -42,15 +44,15 @@ OH HAI HACKERS
 This sets up an environment making it easy to play with the data access layer.
 
 try this out:
-bob = services.make_storage_user(101, u'bob', u'Bob the Builder', 30*(2**30))
-tim = services.make_storage_user(102, u'tim', u'Tim the Enchanter', 30*(2**30))
+bob = services.make_storage_user(101, 'bob', 'Bob the Builder', 30*(2**30))
+tim = services.make_storage_user(102, 'tim', 'Tim the Enchanter', 30*(2**30))
 
-udf = bob.make_udf(u"~/Documents")
-dir = bob.volume(udf.id).root.make_subdirectory(u"Junk")
-share = dir.share(tim.id, u"MyJunk")
+udf = bob.make_udf("~/Documents")
+dir = bob.volume(udf.id).root.make_subdirectory("Junk")
+share = dir.share(tim.id, "MyJunk")
 tim.get_share(share.id).accept()
 
-file = tim.volume(share.id).root.make_file(u"file.txt")
+file = tim.volume(share.id).root.make_file("file.txt")
 
 #You also can see events queued for MQ:
 print nb.events

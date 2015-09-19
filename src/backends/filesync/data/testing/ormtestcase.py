@@ -18,6 +18,8 @@
 
 """This class supports older testcases which don't use the DAL"""
 
+from __future__ import unicode_literals
+
 import uuid
 
 from backends.filesync.data import model
@@ -102,7 +104,7 @@ class ORMObjectFactory(DAOObjectFactory):
         return content
 
     def make_file(self, user=None, parent=None, name=None,
-                  mimetype=u'text/plain', public=False):
+                  mimetype='text/plain', public=False):
         """Create a file node."""
         if user is None:
             user = self.make_user()

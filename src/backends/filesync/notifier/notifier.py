@@ -18,6 +18,8 @@
 
 """A Notifier that will bind to transaction."""
 
+from __future__ import unicode_literals
+
 import itertools
 import re
 import threading

@@ -18,6 +18,8 @@
 
 """Tests for the DAL entry point."""
 
+from __future__ import unicode_literals
+
 import uuid
 
 from twisted.trial.unittest import TestCase
@@ -581,15 +583,16 @@ class DALTestCase(TestCase):
         # user, with an exception when asking for the share, and
         # the udf deletion
         user = mocker.mock()
-        expect(user.get_share('volume_id')).throw(errors.DoesNotExist)
-        expect(user.delete_udf('volume_id')).throw(errors.DoesNotExist)
+        volume_id = 'volume_id'
+        expect(user.get_share(volume_id)).throw(errors.DoesNotExist)
+        expect(user.delete_udf(volume_id)).throw(errors.DoesNotExist)
         self.dal._get_user = lambda *a: user
 
         with mocker:
             err = self.assertRaises(errors.DoesNotExist,
                                     self.dal.delete_volume,
-                                    'user_id', 'volume_id', 'session_id')
-        self.assertEqual(str(err), "Volume 'volume_id' does not exist")
+                                    'user_id', volume_id, 'session_id')
+        self.assertEqual(str(err), "Volume %r does not exist" % volume_id)
 
     def test_get_user_quota(self):
         """Return the quota info for an user."""

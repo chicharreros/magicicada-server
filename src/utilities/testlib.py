@@ -18,6 +18,7 @@
 
 """Library of functions used in tests."""
 
+from __future__ import unicode_literals
 
 import os
 import re

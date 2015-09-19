@@ -18,6 +18,8 @@
 
 """Unit tests for the txutils.retry."""
 
+from __future__ import unicode_literals
+
 from ubuntuone import txutils
 from twisted.internet import defer
 from twisted.trial.unittest import TestCase as TwistedTestCase

@@ -18,6 +18,8 @@
 
 """TestCases for testing with backends."""
 
+from __future__ import unicode_literals
+
 from django.test import TestCase, utils
 from django.test.client import RequestFactory
 from testresources import ResourcedTestCase

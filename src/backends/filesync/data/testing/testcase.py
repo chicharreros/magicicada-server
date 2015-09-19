@@ -18,6 +18,8 @@
 
 """Base Test class for testing the data access layer"""
 
+from __future__ import unicode_literals
+
 import uuid
 
 from itertools import count
@@ -50,7 +52,7 @@ class StorageDALTestCase(DatabaseResourceTestCase):
         setattr(obj, attr_name, new_val)
         self.addCleanup(setattr, obj, attr_name, old_val)
 
-    def create_user(self, id=1, username=u"username", visible_name=u"vname",
+    def create_user(self, id=1, username="username", visible_name="vname",
                     max_storage_bytes=2 * (2 ** 30)):
         """Deprecated; This is only a compatibility shim for tests that
         haven't been updated to use the object factory directly."""
@@ -73,7 +75,7 @@ class DAOObjectFactory(object):
         return DAOObjectFactory._unique_int_counter.next()
 
     def get_unique_unicode(self):
-        return u'unique-string-%d' % self.get_unique_integer()
+        return 'unique-string-%d' % self.get_unique_integer()
 
     def make_user(self, user_id=None, username=None, visible_name=None,
                   max_storage_bytes=2 ** 20):
@@ -89,7 +91,7 @@ class DAOObjectFactory(object):
         return user
 
     def make_file(self, user=None, parent=None, name=None,
-                  mimetype=u'text/plain'):
+                  mimetype='text/plain'):
         if user is None:
             user = self.make_user()
         if name is None:
