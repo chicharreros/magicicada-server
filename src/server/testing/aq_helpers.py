@@ -41,7 +41,6 @@ from ubuntuone.storage.server.testing.testcase import (
     create_test_user,
 )
 
-from backends.filesync.data import model
 from backends.filesync.data.testing.testcase import StorageDALTestCase
 from magicicada import settings
 from ubuntuone.storage.server import ssl_proxy
@@ -63,7 +62,6 @@ SD_CONFIGS = [os.path.join(SD_CONFIG_DIR, 'syncdaemon.conf'),
 
 _marker = object()
 
-HASH_EMPTY = model.EMPTY_CONTENT_HASH
 NO_CONTENT_HASH = ""
 
 

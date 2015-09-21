@@ -36,6 +36,7 @@ from twisted.internet import defer
 from s3lib.s3lib import ProducerStopped
 from s3lib.producers import S3Producer
 from backends.filesync.data import errors as dataerrors
+from backends.filesync.data.model import Share
 from ubuntuone.storage.server import errors, upload
 from ubuntuone.storageprotocol import protocol_pb2
 
@@ -532,7 +533,7 @@ class MagicUploadJob(BaseUploadJob):
 
 
 class User(object):
-    """A proxy for model.User objects."""
+    """A proxy for User objects."""
 
     def __init__(self, manager, user_id,
                  root_volume_id, username, visible_name):
@@ -727,7 +728,7 @@ class User(object):
         @param name: the name of the share.
         @param access_level: the permissions on the share.
         """
-        readonly = access_level == "View"
+        readonly = access_level == Share.VIEW
         r = yield self.rpc_dal.call('create_share', user_id=self.id,
                                     node_id=node_id, share_name=name,
                                     to_username=shared_to_username,

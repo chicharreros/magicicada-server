@@ -22,8 +22,9 @@ from __future__ import unicode_literals
 
 import uuid
 
+from backends.filesync.data import downloadservices
+from backends.filesync.data.model import Download
 from backends.filesync.data.testing.testcase import StorageDALTestCase
-from backends.filesync.data import downloadservices, model
 from backends.filesync.data.testing.testdata import get_fake_hash
 
 
@@ -73,15 +74,15 @@ class DownloadServicesTestCase(StorageDALTestCase):
         dl = self.get_or_make_it()
         downloadservices.download_start(self.user.id, dl.id)
         dl = downloadservices.get_download_by_id(self.user.id, dl.id)
-        self.assertEquals(dl.status, model.DOWNLOAD_STATUS_DOWNLOADING)
+        self.assertEqual(dl.status, Download.STATUS_DOWNLOADING)
 
     def test_download_error(self):
         """Test download_error."""
         dl = self.get_or_make_it()
         downloadservices.download_error(self.user.id, dl.id, "Kaploey")
         dl = downloadservices.get_download_by_id(self.user.id, dl.id)
-        self.assertEquals(dl.status, model.DOWNLOAD_STATUS_ERROR)
-        self.assertEquals(dl.error_message, "Kaploey")
+        self.assertEqual(dl.status, Download.STATUS_ERROR)
+        self.assertEqual(dl.error_message, "Kaploey")
 
     def test_download_complete(self):
         """Test download_complete."""
@@ -95,37 +96,37 @@ class DownloadServicesTestCase(StorageDALTestCase):
             self.user.id, dl.id, hash, crc, size,
             deflated_size, mime, storage_key)
         dl = downloadservices.get_download_by_id(self.user.id, dl.id)
-        self.assertEquals(dl.status, model.DOWNLOAD_STATUS_COMPLETE)
+        self.assertEqual(dl.status, Download.STATUS_COMPLETE)
         f = self.user.volume().get_node_by_path(
             self.fpath, with_content=True)
-        self.assertEquals(f.full_path, self.fpath)
-        self.assertEquals(f.content_hash, hash)
-        self.assertEquals(f.content.storage_key, storage_key)
-        self.assertEquals(f.mimetype, mime)
+        self.assertEqual(f.full_path, self.fpath)
+        self.assertEqual(f.content_hash, hash)
+        self.assertEqual(f.content.storage_key, storage_key)
+        self.assertEqual(f.mimetype, mime)
 
     def test_get_or_make_download(self):
         """Test get_or_make_download."""
         dl = downloadservices.get_or_make_download(
             self.user.id, self.volume_id, self.fpath, self.dl_url, self.dl_key)
-        self.assertEquals(dl.owner_id, self.user.id)
-        self.assertEquals(dl.volume_id, self.volume_id)
-        self.assertEquals(dl.file_path, self.fpath)
-        self.assertEquals(dl.download_url, self.dl_url)
-        self.assertEquals(dl.download_key, unicode(repr(self.dl_key)))
+        self.assertEqual(dl.owner_id, self.user.id)
+        self.assertEqual(dl.volume_id, self.volume_id)
+        self.assertEqual(dl.file_path, self.fpath)
+        self.assertEqual(dl.download_url, self.dl_url)
+        self.assertEqual(dl.download_key, unicode(repr(self.dl_key)))
         # do it again, make sure we get the same one
         dl2 = downloadservices.get_or_make_download(
             self.user.id, self.volume_id, self.fpath, self.dl_url, self.dl_key)
-        self.assertEquals(dl.id, dl2.id)
+        self.assertEqual(dl.id, dl2.id)
 
     def test_get_status(self):
         """Test get_status."""
         status = downloadservices.get_status(
             self.user.id, self.volume_id, self.fpath, self.dl_url, self.dl_key)
-        self.assertEquals(status, downloadservices.UNKNOWN)
+        self.assertEqual(status, downloadservices.UNKNOWN)
         dl = self.get_or_make_it()
         status = downloadservices.get_status(
             self.user.id, self.volume_id, self.fpath, self.dl_url, self.dl_key)
-        self.assertEquals(status, downloadservices.QUEUED)
+        self.assertEqual(status, Download.STATUS_QUEUED)
         # go ahead and complete it and create a file
         mime = 'image/tif'
         hash = get_fake_hash()
@@ -138,21 +139,21 @@ class DownloadServicesTestCase(StorageDALTestCase):
             deflated_size, mime, storage_key)
         status = downloadservices.get_status(
             self.user.id, self.volume_id, self.fpath, self.dl_url, self.dl_key)
-        self.assertEquals(status, downloadservices.DOWNLOADED)
+        self.assertEqual(status, Download.STATUS_COMPLETE)
         # delete the file
         f = self.user.volume().get_node_by_path(self.fpath)
         f.delete()
         status = downloadservices.get_status(
             self.user.id, self.volume_id, self.fpath, self.dl_url, self.dl_key)
-        self.assertEquals(status, downloadservices.DOWNLOADED_NOT_PRESENT)
+        self.assertEqual(status, downloadservices.DOWNLOADED_NOT_PRESENT)
 
     def test_get_status_by_id(self):
         """Test get_status."""
         status = downloadservices.get_status_by_id(self.user.id, uuid.uuid4())
-        self.assertEquals(status, downloadservices.UNKNOWN)
+        self.assertEqual(status, downloadservices.UNKNOWN)
         dl = self.get_or_make_it()
         status = downloadservices.get_status_by_id(self.user.id, dl.id)
-        self.assertEquals(status, downloadservices.QUEUED)
+        self.assertEqual(status, Download.STATUS_QUEUED)
         # go ahead and complete it and create a file
         mime = 'image/tif'
         hash = get_fake_hash()
@@ -164,9 +165,9 @@ class DownloadServicesTestCase(StorageDALTestCase):
             self.user.id, dl.id, hash, crc, size,
             deflated_size, mime, storage_key)
         status = downloadservices.get_status_by_id(self.user.id, dl.id)
-        self.assertEquals(status, downloadservices.DOWNLOADED)
+        self.assertEqual(status, Download.STATUS_COMPLETE)
         # delete the file
         f = self.user.volume().get_node_by_path(self.fpath)
         f.delete()
         status = downloadservices.get_status_by_id(self.user.id, dl.id)
-        self.assertEquals(status, downloadservices.DOWNLOADED_NOT_PRESENT)
+        self.assertEqual(status, downloadservices.DOWNLOADED_NOT_PRESENT)

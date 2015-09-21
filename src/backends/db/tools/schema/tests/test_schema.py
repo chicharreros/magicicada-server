@@ -50,12 +50,12 @@ class SchemaTest(MakePackage, MakePath):
         self.assertRaises(StormError,
                           self.store.execute, "SELECT * FROM person")
         self.schema.create(self.store)
-        self.assertEquals(list(self.store.execute("SELECT * FROM person")), [])
+        self.assertEqual(list(self.store.execute("SELECT * FROM person")), [])
 
     def test_drop(self):
         """Drop a Schema"""
         self.schema.create(self.store)
-        self.assertEquals(list(self.store.execute("SELECT * FROM person")), [])
+        self.assertEqual(list(self.store.execute("SELECT * FROM person")), [])
         self.schema.drop(self.store)
         self.assertRaises(StormError,
                           self.store.execute, "SELECT * FROM person")
@@ -64,17 +64,17 @@ class SchemaTest(MakePackage, MakePath):
         """Delete a Schema"""
         self.schema.create(self.store)
         self.store.execute("INSERT INTO person (id, name) VALUES (1, 'Jane')")
-        self.assertEquals(list(self.store.execute("SELECT * FROM person")),
-                          [(1, u"Jane")])
+        self.assertEqual(
+            list(self.store.execute("SELECT * FROM person")), [(1, u"Jane")])
         self.schema.delete(self.store)
-        self.assertEquals(list(self.store.execute("SELECT * FROM person")), [])
+        self.assertEqual(list(self.store.execute("SELECT * FROM person")), [])
 
     def test_upgrade_creates_schema(self):
         """Upgrade a Schema, aka apply all patches"""
         self.assertRaises(StormError,
                           self.store.execute, "SELECT * FROM person")
         self.schema.upgrade(self.store)
-        self.assertEquals(list(self.store.execute("SELECT * FROM person")), [])
+        self.assertEqual(list(self.store.execute("SELECT * FROM person")), [])
 
     def test_upgrade_marks_patches_applied(self):
         """Test that an upgrade updates the patch table"""
@@ -86,7 +86,7 @@ def apply(store):
         self.assertRaises(StormError, self.store.execute,
                           "SELECT * FROM %s" % self.patch_table)
         self.schema.upgrade(self.store)
-        self.assertEquals(
+        self.assertEqual(
             list(self.store.execute("SELECT * FROM %s" % self.patch_table)),
             [(1,)])
 
@@ -101,5 +101,6 @@ def apply(store):
         self.schema.upgrade(self.store)
         self.store.execute(
             "INSERT INTO person (id, name, phone) VALUES (1, 'Jane', '123')")
-        self.assertEquals(list(self.store.execute("SELECT * FROM person")),
-                          [(1, u"Jane", u"123")])
+        self.assertEqual(
+            list(self.store.execute("SELECT * FROM person")),
+            [(1, u"Jane", u"123")])

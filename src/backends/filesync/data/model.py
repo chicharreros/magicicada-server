@@ -88,16 +88,6 @@ def lifecycle_status(**kwargs):
     return StormEnum(STATUS_LIVE, STATUS_DEAD, **kwargs)
 
 
-def object_kind(**kwargs):
-    """object kind field creator"""
-    return StormEnum('File', 'Directory', 'Symlink', **kwargs)
-
-
-def access_level(**kwargs):
-    """access level of the share"""
-    return StormEnum('View', 'Modify', **kwargs)
-
-
 def delete_user_main_data(store, id):
     """Delete all the main data for a user."""
     store.find(PublicNode, PublicNode.owner_id == id).remove()
@@ -138,7 +128,7 @@ def undelete_volume(store, owner_id, volume_id, restore_parent, limit=100):
         StorageObject.volume_id == root.volume_id,
         StorageObject.owner_id == root.owner_id,
         StorageObject.status == STATUS_DEAD,
-        StorageObject.kind == 'File').order_by(
+        StorageObject.kind == StorageObject.FILE).order_by(
             Desc(StorageObject.when_last_modified))
     if not deleted.is_empty():
         parent = restore_parent.build_tree_from_path(path)
@@ -216,7 +206,7 @@ class StorageUserInfo(object):
         old_root_size = store.find(
             Sum(ContentBlob.size),
             StorageObject.owner_id == self.id,
-            StorageObject.kind == 'File',
+            StorageObject.kind == StorageObject.FILE,
             StorageObject.status == STATUS_LIVE,
             StorageObject.volume_id == None, # flake8: NOQA
             StorageObject._content_hash == ContentBlob.hash).one()
@@ -225,7 +215,7 @@ class StorageUserInfo(object):
             UserVolume.owner_id == self.id,
             UserVolume.status == STATUS_LIVE,
             UserVolume.id == StorageObject.volume_id,
-            StorageObject.kind == 'File',
+            StorageObject.kind == StorageObject.FILE,
             StorageObject.status == STATUS_LIVE,
             StorageObject._content_hash == ContentBlob.hash).one()
         self.used_storage_bytes = (old_root_size or 0) + (vol_size or 0)
@@ -367,6 +357,12 @@ class StorageObject(Storm):
 
     Files or symbolic links refer to ContentBlob for their contents.
     """
+
+    # object kind constants
+    FILE = 'File'
+    DIRECTORY = 'Directory'
+    SYMLINK = 'Symlink'
+
     __storm_table__ = "Object"
 
     # A unique identifier for the file, corresponding roughly in
@@ -394,7 +390,7 @@ class StorageObject(Storm):
     _content = Reference(_content_hash, ContentBlob.hash)
 
     # The kind of object:  directory, file, or symbolic link.
-    kind = object_kind()
+    kind = StormEnum(FILE, DIRECTORY, SYMLINK)
 
     # Timestamp at which the object was first created.
     when_created = DateTime(allow_none=False, default=AutoReload)
@@ -527,7 +523,7 @@ class StorageObject(Storm):
                              StorageObject.path.startswith(path_sw))]
             if live_only:
                 conditions.append(StorageObject.status == STATUS_LIVE)
-            if kind in ('File', 'Directory'):
+            if kind in (StorageObject.FILE, StorageObject.DIRECTORY):
                 conditions.append(StorageObject.kind == kind)
             elif kind is not None:
                 # isn't one of File, Directory or None
@@ -557,13 +553,13 @@ class StorageObject(Storm):
     @property
     def content_hash(self):
         """Get the associated hash value."""
-        if self.kind == "Directory":
+        if self.kind == StorageObject.DIRECTORY:
             raise DirectoriesHaveNoContent("Directory has no content.")
         return self._content_hash
 
     def get_content(self):
         """Return this object ContentBlob"""
-        if self.kind == "Directory":
+        if self.kind == StorageObject.DIRECTORY:
             raise DirectoriesHaveNoContent("Directory has no content.")
         return self._content
 
@@ -571,7 +567,7 @@ class StorageObject(Storm):
         """Set this object ContentBlob and updates
         self.owner.used_storage_bytes
         """
-        if self.kind == "Directory":
+        if self.kind == StorageObject.DIRECTORY:
             raise DirectoriesHaveNoContent("Directory has no content.")
         curr_size = getattr(self.content, 'size', 0)
         self._update_used_bytes(new_content.size - curr_size)
@@ -619,7 +615,7 @@ class StorageObject(Storm):
 
         store = Store.of(self)
         new_parent = store.get(StorageObject, new_parent_id)
-        if new_parent.kind == 'File':
+        if new_parent.kind == StorageObject.FILE:
             raise NotADirectory("New parent (%r) isn't a directory"
                                 % new_parent_id)
         if new_parent.volume_id != self.volume_id:
@@ -629,7 +625,7 @@ class StorageObject(Storm):
         old_name = self.name
         new_parent_path = new_parent.path
         new_parent_name = new_parent.name
-        if self.kind == 'Directory':
+        if self.kind == StorageObject.DIRECTORY:
             if self.parent_id != new_parent_id:
                 # it was actually moved to other place, not just renamed
                 full_path_with_sep = self.full_path + '/'
@@ -663,7 +659,7 @@ class StorageObject(Storm):
         """Find a unique child name in this directory."""
         store = Store.of(self)
         if store:
-            if self.kind != 'Directory':
+            if self.kind != StorageObject.DIRECTORY:
                 raise NotADirectory("%s is not a directory." % self.full_path)
             basename, extension = os.path.splitext(name)
             idx = 0
@@ -681,7 +677,7 @@ class StorageObject(Storm):
         This will return the last directory created from the path.
         """
         store = Store.of(self)
-        if self.kind != 'Directory':
+        if self.kind != StorageObject.DIRECTORY:
             raise NotADirectory("%s is not a directory." % self.full_path)
 
         def getleaf(start, path_parts):
@@ -693,12 +689,12 @@ class StorageObject(Storm):
             head = path_parts[0]
             d = store.find(StorageObject,
                            StorageObject.parent_id == start.id,
-                           StorageObject.status == 'Live',
+                           StorageObject.status == STATUS_LIVE,
                            StorageObject.name == head).one()
             if d is None:
                 d = start.make_subdirectory(head)
             else:
-                if d.kind == 'File':
+                if d.kind == StorageObject.FILE:
                     #if a file with the same name exists, find a
                     #unique name for the directory
                     name = start.get_unique_childname(d.name)
@@ -716,11 +712,11 @@ class StorageObject(Storm):
         if self.status == STATUS_LIVE:
             return
         store = Store.of(self)
-        if new_parent and new_parent.kind != 'Directory':
+        if new_parent and new_parent.kind != StorageObject.DIRECTORY:
             raise NotADirectory("Must reparent to a Directory on Undelete.")
         parent = new_parent or self.parent
         self.name = parent.get_unique_childname(self.name)
-        if self.kind == 'File':
+        if self.kind == StorageObject.FILE:
             self._update_used_bytes(getattr(self.content, 'size', 0))
 
         self.parent = parent
@@ -756,7 +752,7 @@ class StorageObject(Storm):
         """Mark the node as Dead."""
         # we don't modify the 'path' when unlinking the file, to preserve
         # its location when unlinked
-        if self.kind == "Directory":
+        if self.kind == StorageObject.DIRECTORY:
             if self._has_children():
                 raise NotEmpty("Can't unlink a non empty directory.")
 
@@ -776,14 +772,14 @@ class StorageObject(Storm):
         from backends.txlog.model import TransactionLog
         TransactionLog.record_unlink(self)
 
-        if self.kind == "File":
+        if self.kind == StorageObject.FILE:
             self._update_used_bytes(0 - getattr(self.content, 'size', 0))
         if self.parent_id != ROOT_PARENTID:
             self.parent.when_last_modified = datetime.datetime.utcnow()
 
     def unlink_tree(self):
         """Unlink and entire directory and it's subdirectories"""
-        if self.kind != 'Directory':
+        if self.kind != StorageObject.DIRECTORY:
             raise NotADirectory("%s is not a directory." % self.id)
 
         if self.parent is None:
@@ -817,7 +813,7 @@ class StorageObject(Storm):
         store = Store.of(self)
         if store is None:
             return 0
-        if self.kind != 'Directory':
+        if self.kind != StorageObject.DIRECTORY:
             raise NotADirectory("%s is not a directory." % self.id)
         if self.status == STATUS_DEAD:
             return 0
@@ -825,7 +821,7 @@ class StorageObject(Storm):
 
         size = store.find(Sum(ContentBlob.size),
                           StorageObject.owner_id == self.owner_id,
-                          StorageObject.kind == 'File',
+                          StorageObject.kind == StorageObject.FILE,
                           StorageObject.status == STATUS_LIVE,
                           StorageObject.volume_id == self.volume_id,
                           StorageObject._content_hash == ContentBlob.hash,
@@ -850,10 +846,10 @@ class StorageObject(Storm):
             raise InvalidFilename("Invalid directory Name")
         store = Store.of(self)
         # parent must be directory
-        if self.kind != 'Directory':
+        if self.kind != StorageObject.DIRECTORY:
             raise NotADirectory("%s is not a directory." % self.id)
         node = self.__class__(user_id=self.owner_id, name=name,
-                              kind='Directory',
+                              kind=StorageObject.DIRECTORY,
                               parent=self)
         store.add(node)
         self.when_last_modified = datetime.datetime.utcnow()
@@ -869,11 +865,11 @@ class StorageObject(Storm):
         if not name:
             raise InvalidFilename("Invalid File Name")
         store = Store.of(self)
-        if self.kind != 'Directory':
+        if self.kind != StorageObject.DIRECTORY:
             raise NotADirectory("%s is not a directory." % self.id)
 
         node = self.__class__(user_id=self.owner_id, name=name,
-                              kind='File',
+                              kind=StorageObject.FILE,
                               parent=self)
         store.add(node)
         self.when_last_modified = datetime.datetime.utcnow()
@@ -969,7 +965,7 @@ class MoveFromShare(StorageObject):
         mnode.kind = node.kind
         mnode.when_created = node.when_created
         mnode.when_last_modified = node.when_last_modified
-        mnode.status = 'Dead'
+        mnode.status = STATUS_DEAD
         mnode.path = node.path
         mnode._publicfile_id = node.publicfile_id
         mnode.public_uuid = node.public_uuid
@@ -992,6 +988,11 @@ class Share(Storm):
 
     Shares are subtrees that a user shares to another.
     """
+
+    # share access constants
+    VIEW = 'View'
+    MODIFY = 'Modify'
+
     __storm_table__ = "Share"
     __storm_primary__ = "id"
 
@@ -1016,7 +1017,7 @@ class Share(Storm):
     accepted = Bool(allow_none=False, default=False)
 
     # access level of the share
-    access = access_level(allow_none=False)
+    access = StormEnum(VIEW, MODIFY, allow_none=False)
 
     # timestamp at which the share was first created.
     when_shared = DateTime(allow_none=False, default=AutoReload)
@@ -1250,7 +1251,7 @@ class UserVolume(Storm):
             return 0
         size = store.find(
             Sum(ContentBlob.size),
-            StorageObject.kind == 'File',
+            StorageObject.kind == StorageObject.FILE,
             StorageObject.owner_id == self.owner_id,
             StorageObject.status == STATUS_LIVE,
             StorageObject.volume_id == self.id,
@@ -1276,7 +1277,7 @@ class UserVolume(Storm):
     @classmethod
     def _create(cls, store, user_id, path):
         """Create a new UserVolume (with its root node) on the given path."""
-        node = StorageObject(user_id, name=ROOT_NAME, kind='Directory')
+        node = StorageObject(user_id, name=ROOT_NAME, kind=StorageObject.DIRECTORY)
         # Create the udf and fix the volume_id in the node
         vol = cls(user_id, node.id, path)
         node.volume_id = vol.id
@@ -1326,32 +1327,29 @@ class UserVolume(Storm):
         return vol.increment_generation()
 
 
-DOWNLOAD_STATUS_QUEUED = 'Queued'
-DOWNLOAD_STATUS_DOWNLOADING = 'Downloading'
-DOWNLOAD_STATUS_COMPLETE = 'Complete'
-DOWNLOAD_STATUS_ERROR = 'Error'
-
-
-def download_status(**kwargs):
-    """Current status of a download"""
-    return StormEnum(DOWNLOAD_STATUS_QUEUED,
-                     DOWNLOAD_STATUS_DOWNLOADING,
-                     DOWNLOAD_STATUS_COMPLETE,
-                     DOWNLOAD_STATUS_ERROR,
-                     **kwargs)
-
-
 class Download(object):
     """A download to be performed by the download daemon."""
 
+    # download status constants
+    STATUS_QUEUED = 'Queued'
+    STATUS_DOWNLOADING = 'Downloading'
+    STATUS_COMPLETE = 'Complete'
+    STATUS_ERROR = 'Error'
+
     __storm_table__ = "Download"
+
     id = StormUUID(primary=True)
     owner_id = Int(allow_none=False)
     volume_id = StormUUID()
     file_path = Unicode(allow_none=False)
     download_url = Unicode(allow_none=False)
     download_key = Unicode(allow_none=True)
-    _status = download_status(name="status", allow_none=False)
+    _status = StormEnum(
+        STATUS_QUEUED,
+        STATUS_DOWNLOADING,
+        STATUS_COMPLETE,
+        STATUS_ERROR,
+        name="status", allow_none=False)
     status_change_date = DateTime(allow_none=False, default=AutoReload)
     node_id = StormUUID()
     error_message = Unicode()
@@ -1367,7 +1365,7 @@ class Download(object):
         self.file_path = file_path
         self.download_url = download_url
         self.download_key = dl_key
-        self.status = DOWNLOAD_STATUS_QUEUED
+        self.status = Download.STATUS_QUEUED
         super(Download, self).__init__()
 
     def get_status(self):

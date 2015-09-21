@@ -28,7 +28,8 @@ from copy import copy
 from ubuntuone.platform.linux import tools
 from twisted.internet import defer
 
-from helpers import (
+from backends.filesync.data.model import Share
+from ubuntuone.storage.server.integration.helpers import (
     create_file_and_add_content,
     debug,
     walk_and_list_dir,
@@ -489,7 +490,7 @@ def test_sharing(udf_name, sd1, sd2, sd3, prefix):
     debug(prefix, "Offering share 1 from SD1")
     share_name_1 = "share_1_" + udf_name
     d_wait_share = sd3.wait_for_event('SV_SHARE_CHANGED')
-    sd1.sdt.offer_share(dir1, sd3.username, share_name_1, "View")
+    sd1.sdt.offer_share(dir1, sd3.username, share_name_1, Share.VIEW)
     yield d_wait_share
     debug(prefix, "Received share in SD3")
     shares = yield sd3.sdt.get_shares()
@@ -502,32 +503,36 @@ def test_sharing(udf_name, sd1, sd2, sd3, prefix):
     debug(prefix, "Offering share 2 from SD1")
     share_name_2 = "share_2_" + udf_name
     d_wait_share = sd3.wait_for_event('SV_SHARE_CHANGED')
-    sd1.sdt.offer_share(dir2, sd3.username, share_name_2, "Modify")
+    sd1.sdt.offer_share(dir2, sd3.username, share_name_2, Share.MODIFY)
     yield d_wait_share
     debug(prefix, "Received share in SD3")
 
     # check the shares of sd1
     shared = yield sd1.sdt.list_shared()
     share = [x for x in shared if x['name'] == share_name_1][0]
-    assert share['access_level'] == "View", "share 1 in sd1 should be View!"
+    assert share['access_level'] == Share.VIEW, (
+        "share 1 in sd1 should be View!")
     assert share['accepted'], "share 1 in sd1 should be accepted"
     share = [x for x in shared if x['name'] == share_name_2][0]
-    assert share['access_level'] == "Modify", "share 2 in sd1 should be Modif!"
+    assert share['access_level'] == Share.MODIFY, (
+        "share 2 in sd1 should be Modif!")
     assert not share['accepted'], "share 2 in sd1 should NOT be accepted"
 
     # check the shared of sd3
     shares = yield sd3.sdt.get_shares()
     share = [x for x in shares if x['name'] == share_name_1][0]
-    assert share['access_level'] == "View", "share 1 in sd2 should be View!"
+    assert share['access_level'] == Share.VIEW, (
+        "share 1 in sd2 should be View!")
     assert share['accepted'], "share 1 in sd2 should be accepted"
     share = [x for x in shares if x['name'] == share_name_2][0]
-    assert share['access_level'] == "Modify", "share 2 in sd2 should be Modif!"
+    assert share['access_level'] == Share.MODIFY, (
+        "share 2 in sd2 should be Modif!")
     assert not share['accepted'], "share 2 in sd2 should NOT be accepted"
 
 
 @defer.inlineCallbacks
 def test_disconnect_modify_connect(udf_name, sd1, sd2, sd3, prefix):
-    """Test 13: Create UDF, disconnect the SD, do stuff, and then reconnect."""
+    """Test 13: Create UDF, disconnect SD, do stuff, and then reconnect."""
     folder = yield create_udf(udf_name, sd1, prefix)
     folder_path = folder['path']
     other_dir = os.path.join(folder_path, 'other_dir')
@@ -755,7 +760,7 @@ def test_sharing_udfitself(udf_name, sd1, sd2, sd3, prefix):
     debug(prefix, "Offering share 1 from SD1")
     share_name = "share_" + udf_name
     d_wait_share = sd3.wait_for_event('SV_SHARE_CHANGED')
-    sd1.sdt.offer_share(folder["path"], sd3.username, share_name, "Modify")
+    sd1.sdt.offer_share(folder["path"], sd3.username, share_name, Share.MODIFY)
     yield d_wait_share
     debug(prefix, "Received share in SD3")
     shares = yield sd3.sdt.get_shares()
@@ -769,13 +774,15 @@ def test_sharing_udfitself(udf_name, sd1, sd2, sd3, prefix):
     # check the shares of sd1
     shared = yield sd1.sdt.list_shared()
     share = [x for x in shared if x['name'] == share_name][0]
-    assert share['access_level'] == "Modify", "share in sd1 should be Modify!"
+    assert share['access_level'] == Share.MODIFY, (
+        "share in sd1 should be Modify!")
     assert share['accepted'], "share in sd1 should be accepted"
 
     # check the shared of sd3
     shares = yield sd3.sdt.get_shares()
     share = [x for x in shares if x['name'] == share_name][0]
-    assert share['access_level'] == "Modify", "share in sd2 should be Modify!"
+    assert share['access_level'] == Share.MODIFY, (
+        "share in sd2 should be Modify!")
     assert share['accepted'], "share in sd2 should be accepted"
 
 

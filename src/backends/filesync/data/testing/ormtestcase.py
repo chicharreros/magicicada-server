@@ -22,7 +22,15 @@ from __future__ import unicode_literals
 
 import uuid
 
-from backends.filesync.data import model
+from backends.filesync.data.model import (
+    STATUS_LIVE,
+    ContentBlob,
+    PublicNode,
+    Share,
+    StorageObject,
+    StorageUser,
+    UserVolume,
+)
 from backends.filesync.data.dbmanager import get_filesync_store, filesync_tm
 from backends.filesync.data.testing.testcase import DAOObjectFactory
 from backends.filesync.data.testing.testdata import get_fake_hash
@@ -85,20 +93,20 @@ class ORMObjectFactory(DAOObjectFactory):
 
         user = super(ORMObjectFactory, self).make_user(
             user_id, username, visible_name, max_storage_bytes)
-        suser = self.store.get(model.StorageUser, user.id)
+        suser = self.store.get(StorageUser, user.id)
         self.users[user_id] = suser
         return suser
 
     def make_content(self, hash=None, crc32=None, size=None,
                      deflated_size=None, storage_key=None, magic_hash=None):
         """Create content for a file node."""
-        content = model.ContentBlob()
+        content = ContentBlob()
         content.hash = hash or get_fake_hash()
         content.magic_hash = magic_hash or get_fake_hash()
         content.crc32 = crc32 or self.get_unique_integer()
         content.size = size or self.get_unique_integer()
         content.deflated_size = deflated_size or self.get_unique_integer()
-        content.status = model.STATUS_LIVE
+        content.status = STATUS_LIVE
         content.storage_key = storage_key or uuid.uuid4()
         self.store.add(content)
         return content
@@ -111,12 +119,13 @@ class ORMObjectFactory(DAOObjectFactory):
         if name is None:
             name = self.get_unique_unicode()
         if parent is None:
-            parent = model.UserVolume.get_root(self.store, user.id).root_node
-        f = model.StorageObject(
-            user.id, name, 'File', provided_mimetype=mimetype, parent=parent)
+            parent = UserVolume.get_root(self.store, user.id).root_node
+        f = StorageObject(
+            user.id, name, StorageObject.FILE, provided_mimetype=mimetype,
+            parent=parent)
         f.content = self.make_content()
         if public:
-            publicfile = self.store.add(model.PublicNode(f.id, f.owner_id))
+            publicfile = self.store.add(PublicNode(f.id, f.owner_id))
             self.store.flush()
             f.publicfile_id = publicfile.id
         self.store.add(f)
@@ -144,27 +153,26 @@ class ORMObjectFactory(DAOObjectFactory):
         if name is None:
             name = self.get_unique_unicode()
         if parent is None:
-            parent = model.UserVolume.get_root(self.store, user.id).root_node
+            parent = UserVolume.get_root(self.store, user.id).root_node
         subdir = parent.make_subdirectory(name)
         if public:
-            publicfile = self.store.add(
-                model.PublicNode(subdir.id, subdir.owner_id))
+            publicfile = self.store.add(PublicNode(subdir.id, subdir.owner_id))
             self.store.flush()
             subdir.publicfile_id = publicfile.id
         return subdir
 
-    def make_udf(self, user=None, path=None, status=model.STATUS_LIVE):
+    def make_udf(self, user=None, path=None, status=STATUS_LIVE):
         """Create a UDF node."""
         if user is None:
             user = self.make_user()
         if path is None:
             path = '~/' + self.get_unique_unicode()
-        udf = model.UserVolume.create(self.store, user.id, path)
+        udf = UserVolume.create(self.store, user.id, path)
         udf.status = status
         return udf
 
     def make_share(self, node=None, name=None, recipient=None,
-                   access_level='View', accepted=True):
+                   access_level=Share.VIEW, accepted=True):
         """Create a share node."""
         if recipient is None:
             recipient = self.make_user()
@@ -172,8 +180,7 @@ class ORMObjectFactory(DAOObjectFactory):
             node = self.make_directory()
         if name is None:
             name = self.get_unique_unicode()
-        share = model.Share(
-            node.owner_id, node.id, recipient.id, name, access_level)
+        share = Share(node.owner_id, node.id, recipient.id, name, access_level)
         share.accepted = accepted
         self.store.add(share)
         return share

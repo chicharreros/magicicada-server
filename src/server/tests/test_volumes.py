@@ -22,11 +22,10 @@
 
 from twisted.internet import defer
 
+from backends.filesync.data.model import Share
 from backends.filesync.data.services import get_storage_user
-
-from ubuntuone.storageprotocol import request
 from ubuntuone.storage.server.testing.testcase import TestWithDatabase
-
+from ubuntuone.storageprotocol import request
 from ubuntuone.storageprotocol.volumes import (
     RootVolume, UDFVolume, ShareVolume)
 
@@ -86,7 +85,7 @@ class TestListVolumes(TestWithDatabase):
             d.addCallback(self.save_req, "root")
 
             d.addCallback(lambda r: client.create_share(r, self.usr1.username,
-                                                        u"n1", "View"))
+                                                        u"n1", Share.VIEW))
 
             d.addCallback(lambda _: client.list_volumes())
             d.addCallback(check)
@@ -163,7 +162,7 @@ class TestListVolumes(TestWithDatabase):
             self.assertEqual(share.share_name, "name")
             self.assertEqual(share.other_username, self.usr1.username)
             self.assertEqual(share.accepted, True)
-            self.assertEqual(share.access_level, "View")
+            self.assertEqual(share.access_level, Share.VIEW)
             self.assertEqual(share.free_bytes,
                              self.usr1.get_quota().free_bytes)
 
@@ -200,7 +199,7 @@ class TestListVolumes(TestWithDatabase):
             self.assertEqual(share.share_name, "name")
             self.assertEqual(share.other_username, self.usr1.username)
             self.assertEqual(share.accepted, True)
-            self.assertEqual(share.access_level, "View")
+            self.assertEqual(share.access_level, Share.VIEW)
             self.assertEqual(share.free_bytes,
                              self.usr1.get_quota().free_bytes)
             self.assertEqual(share.generation, 1)
@@ -321,7 +320,7 @@ class TestListVolumes(TestWithDatabase):
             self.assertEqual(share.share_name, "name")
             self.assertEqual(share.other_username, self.usr2.username)
             self.assertEqual(share.accepted, True)
-            self.assertEqual(share.access_level, "View")
+            self.assertEqual(share.access_level, Share.VIEW)
             self.assertEqual(share.free_bytes,
                              self.usr1.get_quota().free_bytes)
 

@@ -48,8 +48,8 @@ class NodeKeyTests(unittest.TestCase):
 
     def test_encode_decode(self):
         """Test encode and decode uuid."""
-        self.assertEquals(encode_uuid(VOLUME_UUID), VOLUME_KEY)
-        self.assertEquals(decode_uuid(VOLUME_KEY), VOLUME_UUID)
+        self.assertEqual(encode_uuid(VOLUME_UUID), VOLUME_KEY)
+        self.assertEqual(decode_uuid(VOLUME_KEY), VOLUME_UUID)
 
     def test_make_parse_nodekey(self):
         """Test make and parse_nodekey."""

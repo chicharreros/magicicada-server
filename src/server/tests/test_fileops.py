@@ -23,11 +23,12 @@ from StringIO import StringIO
 from twisted.internet import threads, defer
 
 from backends.filesync.data import errors
+from backends.filesync.data.dbmanager import fsync_readonly
+from backends.filesync.data.model import STATUS_LIVE, STATUS_DEAD
 from ubuntuone.storageprotocol import request
 from ubuntuone.storageprotocol import errors as protocol_errors
 from ubuntuone.storageprotocol.content_hash import content_hash_factory, crc32
 from ubuntuone.storage.server.testing.testcase import TestWithDatabase
-from backends.filesync.data.dbmanager import fsync_readonly
 
 
 class TestMove(TestWithDatabase):
@@ -163,7 +164,7 @@ class TestUnlink(TestWithDatabase):
                 try:
                     file = self.usr0.get_node(file_id)
                 except errors.DoesNotExist:
-                    return 'Dead'
+                    return STATUS_DEAD
                 return file.status
 
             d = client.dummy_authenticate("open sesame")
@@ -173,13 +174,13 @@ class TestUnlink(TestWithDatabase):
                 client.test_fail)
             d.addCallback(lambda req: self._save_state("file", req.new_id))
             d.addCallback(lambda _: threads.deferToThread(get_file_status))
-            d.addCallback(lambda status: self.assert_(status == 'Live'))
+            d.addCallback(lambda status: self.assert_(status == STATUS_LIVE))
             d.addCallbacks(
                 lambda mkfile_req: client.unlink(request.ROOT,
                                                  self._state.file),
                 client.test_fail)
             d.addCallback(lambda _: threads.deferToThread(get_file_status))
-            d.addCallback(lambda status: self.assert_(status == 'Dead'))
+            d.addCallback(lambda status: self.assert_(status == STATUS_DEAD))
             d.addCallbacks(client.test_done, client.test_fail)
         return self.callback_test(auth)
 
@@ -203,7 +204,7 @@ class TestUnlink(TestWithDatabase):
                 try:
                     file = self.usr0.get_node(file_id)
                 except errors.DoesNotExist:
-                    return 'Dead'
+                    return STATUS_DEAD
                 return file.status
 
             d = client.dummy_authenticate("open sesame")
@@ -211,13 +212,13 @@ class TestUnlink(TestWithDatabase):
             d.addCallbacks(lambda r: client.make_dir(request.ROOT, r, "hola"))
             d.addCallback(lambda req: self._save_state("file", req.new_id))
             d.addCallback(lambda _: threads.deferToThread(get_dir_status))
-            d.addCallback(lambda status: self.assert_(status == 'Live'))
+            d.addCallback(lambda status: self.assert_(status == STATUS_LIVE))
             d.addCallbacks(
                 lambda mkfile_req: client.unlink(request.ROOT,
                                                  self._state.file),
                 client.test_fail)
             d.addCallback(lambda _: threads.deferToThread(get_dir_status))
-            d.addCallback(lambda status: self.assert_(status == 'Dead'))
+            d.addCallback(lambda status: self.assert_(status == STATUS_DEAD))
             d.addCallbacks(client.test_done, client.test_fail)
         return self.callback_test(auth)
 

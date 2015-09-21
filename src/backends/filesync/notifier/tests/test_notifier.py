@@ -23,6 +23,7 @@ from __future__ import unicode_literals
 import unittest
 import uuid
 
+from backends.filesync.data.model import Share
 from backends.filesync.notifier import notifier
 from backends.filesync.notifier.notifier import (
     EventNotifier,
@@ -56,7 +57,7 @@ class FakeShare(object):
         self.root_id = uuid.uuid4()
         self.shared_by_id = 1
         self.shared_to_id = 2
-        self.access = 'View'
+        self.access = Share.VIEW
         self.accepted = True
 
     @property
@@ -214,37 +215,37 @@ class TestRecipientIds(unittest.TestCase):
     def test_udf_create(self):
         """Test that UDFCreate has the correct recipient_id list."""
         notif = UDFCreate(owner_id='user1')
-        self.assertEquals({'user1'}, notif.recipient_ids)
+        self.assertEqual({'user1'}, notif.recipient_ids)
 
     def test_udf_delete(self):
         """Test that UDFDelete has the correct recipient_id list."""
         notif = UDFDelete(owner_id='user1')
-        self.assertEquals({'user1'}, notif.recipient_ids)
+        self.assertEqual({'user1'}, notif.recipient_ids)
 
     def test_share_created(self):
         """Test that ShareCreated has the correct recipient_id list."""
         notif = ShareCreated(shared_to_id='user1')
-        self.assertEquals({'user1'}, notif.recipient_ids)
+        self.assertEqual({'user1'}, notif.recipient_ids)
 
     def test_share_deleted(self):
         """Test that ShareDeleted has the correct recipient_id list."""
         notif = ShareDeleted(shared_to_id='user1')
-        self.assertEquals({'user1'}, notif.recipient_ids)
+        self.assertEqual({'user1'}, notif.recipient_ids)
 
     def test_share_accepted(self):
         """Test that ShareAccepted has the correct recipient_id list."""
         notif = ShareAccepted(shared_to_id='user1', shared_by_id="user2")
-        self.assertEquals({'user1', 'user2'}, notif.recipient_ids)
+        self.assertEqual({'user1', 'user2'}, notif.recipient_ids)
 
     def test_share_declined(self):
         """Test that ShareDeclined has the correct recipient_id list."""
         notif = ShareDeclined(shared_by_id='user1')
-        self.assertEquals({'user1'}, notif.recipient_ids)
+        self.assertEqual({'user1'}, notif.recipient_ids)
 
     def test_volume_new_generation(self):
         """Test that VolumeNewGeneration has the correct recipient_id list."""
         notif = VolumeNewGeneration(user_id='user1')
-        self.assertEquals({'user1'}, notif.recipient_ids)
+        self.assertEqual({'user1'}, notif.recipient_ids)
 
 
 class TestPendingNotifications(unittest.TestCase):

@@ -29,6 +29,7 @@ import unittest
 import uuid
 from metrics.tests import FakeMetrics
 from backends.filesync.data import errors
+from backends.filesync.data.model import STATUS_LIVE, StorageObject
 from backends.filesync.data.testing.testcase import StorageDALTestCase
 from backends.filesync.data.testing.testdata import get_test_contentblob
 from backends.filesync.data.resthelper import (
@@ -68,7 +69,7 @@ class MockNode(object):
     """Fake Node for testing."""
     id = uuid.uuid4()
     nodekey = 'nodekey'
-    kind = 'File'
+    kind = StorageObject.FILE
     path = '/a/b/c/d'
     full_path = '/a/b/c/d/file.txt'
     name = 'file.txt'
@@ -82,7 +83,7 @@ class MockNode(object):
     public_url = "public url"
     is_public = False
     vol_type = 'root'
-    status = 'Live'
+    status = STATUS_LIVE
     vol_udf = MockVolume()
     vol_udf.is_root = True
     vol_udf.path = "~/Ubuntu One"
@@ -101,17 +102,17 @@ class ResourceMapperTestCase(unittest.TestCase):
 
     def test_mapping(self):
         """Test mapping."""
-        self.assertEquals(self.mapper.user(), '')
-        self.assertEquals(self.mapper.volume('~/1'), '/volumes/~/1')
-        self.assertEquals(self.mapper.node('~/1', '/x'), '/~/1/x')
+        self.assertEqual(self.mapper.user(), '')
+        self.assertEqual(self.mapper.volume('~/1'), '/volumes/~/1')
+        self.assertEqual(self.mapper.node('~/1', '/x'), '/~/1/x')
 
     def test_mapping_override(self):
         """Test mapping."""
         self.mapper.root = ''
         self.mapper.mapping['NODE_INFO'] = '/n/%(node_path)s'
-        self.assertEquals(self.mapper.user(), '')
-        self.assertEquals(self.mapper.volume(1), '/volumes/1')
-        self.assertEquals(self.mapper.node('a', 'b'), '/n/b')
+        self.assertEqual(self.mapper.user(), '')
+        self.assertEqual(self.mapper.volume(1), '/volumes/1')
+        self.assertEqual(self.mapper.node('a', 'b'), '/n/b')
 
     def test_user_repr(self):
         """Test Rest conversion of a user."""
@@ -119,26 +120,26 @@ class ResourceMapperTestCase(unittest.TestCase):
         quota = MockQuota()
         udf = MockVolume()
         info = self.mapper.user_repr(user, quota, [udf])
-        self.assertEquals(info['user_id'], user.id)
-        self.assertEquals(info['visible_name'], user.visible_name)
-        self.assertEquals(info['used_bytes'], quota.used_storage_bytes)
-        self.assertEquals(info['max_bytes'], quota.max_storage_bytes)
-        self.assertEquals(info['root_node_path'],
-                          self.mapper.node('~/Ubuntu One'))
-        self.assertEquals(info['user_node_paths'],
-                          [self.mapper.node(udf.path)])
+        self.assertEqual(info['user_id'], user.id)
+        self.assertEqual(info['visible_name'], user.visible_name)
+        self.assertEqual(info['used_bytes'], quota.used_storage_bytes)
+        self.assertEqual(info['max_bytes'], quota.max_storage_bytes)
+        self.assertEqual(
+            info['root_node_path'], self.mapper.node('~/Ubuntu One'))
+        self.assertEqual(
+            info['user_node_paths'], [self.mapper.node(udf.path)])
 
     def test_volume_repr(self):
         """Test Rest conversion of a volume."""
         udf = MockVolume()
         info = self.mapper.volume_repr(udf)
-        self.assertEquals(info['resource_path'], '/volumes/~/Documents')
-        self.assertEquals(info['type'], 'root' if udf.is_root else 'udf')
-        self.assertEquals(info['path'], udf.path)
-        self.assertEquals(info['generation'], udf.generation)
-        self.assertEquals(info['node_path'], self.mapper.node(udf.path))
-        self.assertEquals(info['when_created'],
-                          date_formatter(udf.when_created))
+        self.assertEqual(info['resource_path'], '/volumes/~/Documents')
+        self.assertEqual(info['type'], 'root' if udf.is_root else 'udf')
+        self.assertEqual(info['path'], udf.path)
+        self.assertEqual(info['generation'], udf.generation)
+        self.assertEqual(info['node_path'], self.mapper.node(udf.path))
+        self.assertEqual(
+            info['when_created'], date_formatter(udf.when_created))
 
     def test_volume_with_delta_repr0(self):
         """Test Rest conversion of a vol with delta information, no nodes."""
@@ -146,15 +147,15 @@ class ResourceMapperTestCase(unittest.TestCase):
         nodes = []
         info = self.mapper.volume_repr(
             volume=udf, from_generation=0, nodes=nodes)
-        self.assertEquals(info['resource_path'], '/volumes/~/Documents')
-        self.assertEquals(info['type'], 'root' if udf.is_root else 'udf')
-        self.assertEquals(info['path'], udf.path)
-        self.assertEquals(info['generation'], udf.generation)
-        self.assertEquals(info['node_path'], self.mapper.node(udf.path))
-        self.assertEquals(info['when_created'],
-                          date_formatter(udf.when_created))
-        self.assertEquals(info['delta']['from_generation'], 0)
-        self.assertEquals(info['delta']['nodes'], nodes)
+        self.assertEqual(info['resource_path'], '/volumes/~/Documents')
+        self.assertEqual(info['type'], 'root' if udf.is_root else 'udf')
+        self.assertEqual(info['path'], udf.path)
+        self.assertEqual(info['generation'], udf.generation)
+        self.assertEqual(info['node_path'], self.mapper.node(udf.path))
+        self.assertEqual(
+            info['when_created'], date_formatter(udf.when_created))
+        self.assertEqual(info['delta']['from_generation'], 0)
+        self.assertEqual(info['delta']['nodes'], nodes)
 
     def test_volume_with_delta_repr1(self):
         """Test Rest conversion of a volume with delta innformation,
@@ -163,9 +164,8 @@ class ResourceMapperTestCase(unittest.TestCase):
         nodes = [MockNode(), MockNode()]
         info = self.mapper.volume_repr(
             volume=udf, from_generation=0, nodes=nodes)
-        self.assertEquals(
-            info['delta']['from_generation'], 0)
-        self.assertEquals(
+        self.assertEqual(info['delta']['from_generation'], 0)
+        self.assertEqual(
             info['delta']['nodes'],
             [self.mapper.node_repr(node) for node in nodes])
 
@@ -173,83 +173,78 @@ class ResourceMapperTestCase(unittest.TestCase):
         """Test Rest conversion of a file node."""
         f1 = MockNode()
         info = self.mapper.node_repr(f1)
-        self.assertEquals(info['key'], f1.nodekey)
-        self.assertEquals(info['kind'], f1.kind.lower())
-        self.assertEquals(info['path'], f1.full_path)
-        self.assertEquals(info['hash'], f1.content_hash)
-        self.assertEquals(info['when_created'],
-                          date_formatter(f1.when_created))
-        self.assertEquals(info['when_changed'],
-                          date_formatter(f1.when_last_modified))
-        self.assertEquals(info['generation'], f1.generation)
-        self.assertEquals(info['generation_created'], f1.generation_created)
-        self.assertEquals(info['public_url'], f1.public_url)
-        self.assertEquals(info['is_public'], f1.is_public)
-        self.assertEquals(info['parent_path'],
-                          "/~/Ubuntu One/a/b/c/d")
-        self.assertEquals(info['volume_path'],
-                          "/volumes/~/Ubuntu One")
-        self.assertEquals(info['content_path'],
-                          '/content/~/Ubuntu One/a/b/c/d/file.txt')
+        self.assertEqual(info['key'], f1.nodekey)
+        self.assertEqual(info['kind'], f1.kind.lower())
+        self.assertEqual(info['path'], f1.full_path)
+        self.assertEqual(info['hash'], f1.content_hash)
+        self.assertEqual(
+            info['when_created'], date_formatter(f1.when_created))
+        self.assertEqual(
+            info['when_changed'], date_formatter(f1.when_last_modified))
+        self.assertEqual(info['generation'], f1.generation)
+        self.assertEqual(info['generation_created'], f1.generation_created)
+        self.assertEqual(info['public_url'], f1.public_url)
+        self.assertEqual(info['is_public'], f1.is_public)
+        self.assertEqual(
+            info['parent_path'], "/~/Ubuntu One/a/b/c/d")
+        self.assertEqual(
+            info['volume_path'], "/volumes/~/Ubuntu One")
+        self.assertEqual(
+            info['content_path'], '/content/~/Ubuntu One/a/b/c/d/file.txt')
         # make sure file specific rules apply
         self.assertTrue('has_children' not in info)
-        self.assertEquals(info['is_live'], True)
+        self.assertEqual(info['is_live'], True)
 
     def test_dir_node_repr(self):
         """Utility method to test Rest conversion of a directory node."""
         f1 = MockNode()
-        f1.kind = 'Directory'
+        f1.kind = StorageObject.DIRECTORY
         info = self.mapper.node_repr(f1)
-        self.assertEquals(info['key'], f1.nodekey)
-        self.assertEquals(info['kind'], f1.kind.lower())
-        self.assertEquals(info['path'], f1.full_path)
-        self.assertEquals(info['when_created'],
-                          date_formatter(f1.when_created))
-        self.assertEquals(info['when_changed'],
-                          date_formatter(f1.when_last_modified))
-        self.assertEquals(info['generation'], f1.generation)
-        self.assertEquals(info['generation_created'], f1.generation_created)
-        self.assertEquals(info['parent_path'],
-                          "/~/Ubuntu One/a/b/c/d")
-        self.assertEquals(info['volume_path'],
-                          "/volumes/~/Ubuntu One")
-        self.assertEquals(info['content_path'],
-                          '/content/~/Ubuntu One/a/b/c/d/file.txt')
+        self.assertEqual(info['key'], f1.nodekey)
+        self.assertEqual(info['kind'], f1.kind.lower())
+        self.assertEqual(info['path'], f1.full_path)
+        self.assertEqual(
+            info['when_created'], date_formatter(f1.when_created))
+        self.assertEqual(
+            info['when_changed'], date_formatter(f1.when_last_modified))
+        self.assertEqual(info['generation'], f1.generation)
+        self.assertEqual(info['generation_created'], f1.generation_created)
+        self.assertEqual(info['parent_path'], "/~/Ubuntu One/a/b/c/d")
+        self.assertEqual(info['volume_path'], "/volumes/~/Ubuntu One")
+        self.assertEqual(
+            info['content_path'], '/content/~/Ubuntu One/a/b/c/d/file.txt')
         # make sure directory specific rules apply
         self.assertTrue('hash' not in info)
         self.assertTrue('is_public' not in info)
         self.assertTrue('public_url' not in info)
         self.assertTrue('has_children' in info)
-        self.assertEquals(info['is_live'], True)
+        self.assertEqual(info['is_live'], True)
 
     def test_root_dir_node_repr(self):
         """Utility method to test Rest conversion of a root directory node."""
         f1 = MockNode()
-        f1.kind = 'Directory'
+        f1.kind = StorageObject.DIRECTORY
         f1.name = ""
         f1.path = '/'
         f1.full_path = "/"
         info = self.mapper.node_repr(f1)
-        self.assertEquals(info['key'], f1.nodekey)
-        self.assertEquals(info['kind'], f1.kind.lower())
-        self.assertEquals(info['path'], f1.full_path)
-        self.assertEquals(info['when_created'],
-                          date_formatter(f1.when_created))
-        self.assertEquals(info['when_changed'],
-                          date_formatter(f1.when_last_modified))
-        self.assertEquals(info['generation'], f1.generation)
-        self.assertEquals(info['generation_created'], f1.generation_created)
-        self.assertEquals(info['parent_path'], None)
-        self.assertEquals(info['volume_path'],
-                          "/volumes/~/Ubuntu One")
-        self.assertEquals(info['content_path'],
-                          '/content/~/Ubuntu One')
+        self.assertEqual(info['key'], f1.nodekey)
+        self.assertEqual(info['kind'], f1.kind.lower())
+        self.assertEqual(info['path'], f1.full_path)
+        self.assertEqual(info['when_created'], date_formatter(f1.when_created))
+        self.assertEqual(
+            info['when_changed'], date_formatter(f1.when_last_modified))
+        self.assertEqual(info['generation'], f1.generation)
+        self.assertEqual(info['generation_created'], f1.generation_created)
+        self.assertEqual(info['parent_path'], None)
+        self.assertEqual(info['volume_path'], "/volumes/~/Ubuntu One")
+        self.assertEqual(info['content_path'], '/content/~/Ubuntu One')
         # make sure directory specific rules apply
         self.assertTrue('hash' not in info)
         self.assertTrue('is_public' not in info)
         self.assertTrue('public_url' not in info)
         self.assertTrue('has_children' in info)
-        self.assertEquals(info['is_live'], True)
+        self.assertEqual(info['is_live'], True)
 
 
 class RestHelperTestCase(StorageDALTestCase):
@@ -270,9 +265,8 @@ class RestHelperTestCase(StorageDALTestCase):
     def test_GET_user(self):
         """Test for dao to REST conversion of user"""
         info = self.helper.get_user(self.user)
-        self.assertEqual(info,
-                         self.mapper.user_repr(self.user,
-                                               self.user.get_quota()))
+        self.assertEqual(
+            info, self.mapper.user_repr(self.user, self.user.get_quota()))
         user_id = repr(self.user.id)
         self.assertTrue(self.handler.check_info("get_quota", user_id))
         self.assertTrue(self.handler.check_info("get_udfs", user_id))
@@ -281,9 +275,9 @@ class RestHelperTestCase(StorageDALTestCase):
         """Test get_user with udf."""
         udf = self.user.make_udf("~/Documents")
         info = self.helper.get_user(self.user)
-        self.assertEqual(info, self.mapper.user_repr(self.user,
-                                                     self.user.get_quota(),
-                                                     [udf]))
+        self.assertEqual(
+            info,
+            self.mapper.user_repr(self.user, self.user.get_quota(), [udf]))
 
     def test_GET_volume(self):
         """Test get_volume."""
@@ -305,10 +299,7 @@ class RestHelperTestCase(StorageDALTestCase):
             from_generation=0)
         self.assertEqual(
             info,
-            self.mapper.volume_repr(
-                volume=udf,
-                from_generation=0,
-                nodes=[]))
+            self.mapper.volume_repr(volume=udf, from_generation=0, nodes=[]))
         ids = [repr(x) for x in [self.user.id, unicode(volume_path)]]
         self.assertTrue(self.handler.check_info("get_udf_by_path", *ids))
         ids = [repr(x) for x in [self.user.id, udf.id, 0]]
@@ -325,26 +316,21 @@ class RestHelperTestCase(StorageDALTestCase):
             volume_path=volume_path,
             from_generation=0)
         udf = self.user.get_udf_by_path('~/Documents')
-        self.assertEqual(
-            info,
-            self.mapper.volume_repr(
-                volume=udf,
-                from_generation=0,
-                nodes=[node0, node1]))
+        self.assertEqual(info, self.mapper.volume_repr(
+            volume=udf, from_generation=0, nodes=[node0, node1]))
         node0.delete()
         info = self.helper.get_volume(
             user=self.user,
             volume_path=volume_path,
             from_generation=0)
-        self.assertEqual(
-            info['delta']['nodes'][1]['is_live'], False)
+        self.assertEqual(info['delta']['nodes'][1]['is_live'], False)
 
     def test_PUT_volume(self):
         """Test put volume."""
         path = "~/Documents"
         info = self.helper.put_volume(user=self.user, path=path)
         udf = self.user.get_udf_by_path(path)
-        self.assertEquals(self.mapper.volume_repr(udf), info)
+        self.assertEqual(self.mapper.volume_repr(udf), info)
         ids = [repr(x) for x in [self.user.id, unicode(path)]]
         self.assertTrue(self.handler.check_info("make_udf", *ids))
 
@@ -354,7 +340,7 @@ class RestHelperTestCase(StorageDALTestCase):
         d1 = root.make_subdirectory("dir1")
         full_path = "~/Ubuntu One" + d1.full_path
         info = self.helper.get_node(user=self.user, node_path=full_path)
-        self.assertEquals(info, self.mapper.node_repr(d1))
+        self.assertEqual(info, self.mapper.node_repr(d1))
 
     def test_GET_node_file(self):
         """Test for  get_node conversion of a file node."""
@@ -363,7 +349,7 @@ class RestHelperTestCase(StorageDALTestCase):
         volume_path = "~/Ubuntu One"
         full_path = volume_path + f1.full_path
         info = self.helper.get_node(user=self.user, node_path=full_path)
-        self.assertEquals(info, self.mapper.node_repr(f1))
+        self.assertEqual(info, self.mapper.node_repr(f1))
         ids = [repr(x) for x in [self.user.id, full_path, True]]
         self.assertTrue(self.handler.check_info("get_node_by_path", *ids))
 
@@ -376,7 +362,7 @@ class RestHelperTestCase(StorageDALTestCase):
         expected_repr.extend([self.mapper.volume_repr(u) for u in udfs])
         info = info.sort(key=operator.itemgetter('path'))
         expected_repr = expected_repr.sort(key=operator.itemgetter('path'))
-        self.assertEquals(info, expected_repr)
+        self.assertEqual(info, expected_repr)
         self.assertTrue(self.handler.check_info("get_volume",
                                                 repr(self.user.id)))
         self.assertTrue(self.handler.check_info(
@@ -408,8 +394,8 @@ class RestHelperTestCase(StorageDALTestCase):
         f1 = d1.make_file("file.txt")
         full_path = "~/Ubuntu One" + os.path.join(d1.full_path, f1.name)
         info = self.helper.get_node(self.user, full_path)
-        self.assertEquals(info['key'], f1.nodekey)
-        self.assertEquals(info['path'], f1.full_path)
+        self.assertEqual(info['key'], f1.nodekey)
+        self.assertEqual(info['path'], f1.full_path)
 
     def test_GET_node2(self):
         """Test simple udf node info."""
@@ -418,8 +404,8 @@ class RestHelperTestCase(StorageDALTestCase):
         f1 = udf.make_file("file.txt")
         full_path = "~/Documents" + f1.full_path
         info = self.helper.get_node(self.user, full_path)
-        self.assertEquals(info['key'], f1.nodekey)
-        self.assertEquals(info['path'], f1.full_path)
+        self.assertEqual(info['key'], f1.nodekey)
+        self.assertEqual(info['path'], f1.full_path)
 
     def test_GET_node3(self):
         """Test child udf node info."""
@@ -454,7 +440,7 @@ class RestHelperTestCase(StorageDALTestCase):
         expected['children'] = [self.mapper.node_repr(n) for n in files]
         info = self.helper.get_node(
             self.user, full_path, include_children=True)
-        self.assertEquals(info, expected)
+        self.assertEqual(info, expected)
         ids = [repr(x) for x in [self.user.id, full_path, True]]
         self.assertTrue(self.handler.check_info("get_node", *ids))
         ids = [repr(x) for x in [self.user.id, root.id, True]]
@@ -613,7 +599,7 @@ class RestHelperTestCase(StorageDALTestCase):
             self.user, new_file_path,
             {'kind': 'file', 'hash': cb.hash, 'magic_hash': 'magic'})
         node = self.user.get_node_by_path(new_file_path)
-        self.assertEqual(node.kind, 'File')
+        self.assertEqual(node.kind, StorageObject.FILE)
         self.assertEqual(node.full_path, '/a/b/c/file.txt')
         self.assertEqual(info, self.mapper.node_repr(node))
 
@@ -635,7 +621,7 @@ class RestHelperTestCase(StorageDALTestCase):
             self.user, new_file_path,
             {'kind': 'file', 'hash': cb.hash, 'magic_hash': 'magic2'})
         node = self.user.get_node_by_path(new_file_path, with_content=True)
-        self.assertEqual(node.kind, 'File')
+        self.assertEqual(node.kind, StorageObject.FILE)
         self.assertEqual(node.full_path, '/a/b/c/file.txt')
         self.assertEqual(info, self.mapper.node_repr(node))
         self.assertEqual(node.content.magic_hash, 'magic2')
@@ -646,7 +632,7 @@ class RestHelperTestCase(StorageDALTestCase):
         info = self.helper.put_node(self.user, new_file_path,
                                     {'kind': 'file'})
         node = self.user.get_node_by_path(new_file_path)
-        self.assertEqual(node.kind, 'File')
+        self.assertEqual(node.kind, StorageObject.FILE)
         self.assertEqual(node.full_path, '/a/b/c/file.txt')
         self.assertEqual(info, self.mapper.node_repr(node))
 
@@ -656,7 +642,7 @@ class RestHelperTestCase(StorageDALTestCase):
         info = self.helper.put_node(self.user, new_file_path,
                                     {'kind': 'directory'})
         node = self.user.get_node_by_path(new_file_path)
-        self.assertEqual(node.kind, 'Directory')
+        self.assertEqual(node.kind, StorageObject.DIRECTORY)
         self.assertEqual(node.full_path, '/a/b/c/file.txt')
         self.assertEqual(info, self.mapper.node_repr(node))
 

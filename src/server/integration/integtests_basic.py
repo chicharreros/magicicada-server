@@ -26,7 +26,7 @@ import shutil
 
 from twisted.internet import defer
 
-from ubuntuone.storage.tests.integration.helpers import (
+from ubuntuone.storage.server.integration.helpers import (
     create_file_and_add_content,
     debug,
     walk_and_list_dir,

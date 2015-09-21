@@ -20,9 +20,8 @@
 
 from __future__ import unicode_literals
 
+from backends.filesync.data import adminservices as admin, dao, services
 from backends.filesync.data.testing.testcase import StorageDALTestCase
-from backends.filesync.data import dao, services
-from backends.filesync.data import adminservices as admin
 
 
 class AdminServicesTestCase(StorageDALTestCase):
@@ -37,26 +36,26 @@ class AdminServicesTestCase(StorageDALTestCase):
     def test_StorageUserFinder(self):
         """Test the StorageUserFinder."""
         users = admin.StorageUserFinder()
-        self.assertEquals(users.all(), [])
-        self.assertEquals(users.count(), 0)
-        self.assertEquals(users.is_empty(), True)
+        self.assertEqual(users.all(), [])
+        self.assertEqual(users.count(), 0)
+        self.assertEqual(users.is_empty(), True)
         self._make_users()
         # the returning object can be reused
-        self.assertEquals(len(users.all()), 5)
-        self.assertEquals(users.count(), 5)
-        self.assertEquals(users.is_empty(), False)
-        self.assertEquals(users[4].username, "tim")
+        self.assertEqual(len(users.all()), 5)
+        self.assertEqual(users.count(), 5)
+        self.assertEqual(users.is_empty(), False)
+        self.assertEqual(users[4].username, "tim")
         users.filter = "BOB"
-        self.assertEquals(len(users.all()), 2)
-        self.assertEquals(users[0].username, "bob")
-        self.assertEquals(users[1].username, "bobby")
+        self.assertEqual(len(users.all()), 2)
+        self.assertEqual(users[0].username, "bob")
+        self.assertEqual(users[1].username, "bobby")
         users.filter = "juan"
-        self.assertEquals(len(users.all()), 1)
+        self.assertEqual(len(users.all()), 1)
         self.assertTrue(isinstance(users[0], dao.StorageUser))
-        self.assertEquals(users[0].username, "juan")
+        self.assertEqual(users[0].username, "juan")
         # test slicing
         users.filter = None
         subset = users[2:4]
-        self.assertEquals(len(subset), 2)
-        self.assertEquals(subset[0].username, "inez")
-        self.assertEquals(subset[1].username, "juan")
+        self.assertEqual(len(subset), 2)
+        self.assertEqual(subset[0].username, "inez")
+        self.assertEqual(subset[1].username, "juan")

@@ -58,7 +58,7 @@ class RequiredCapsDecoratorTests(TestCase):
                 innerself.fail()
 
         FakeTest('test_method').run(result)
-        self.assertEquals(1, len(result.skips))
+        self.assertEqual(1, len(result.skips))
 
     def test_match(self):
         """Check that a test is executed when the caps match."""
@@ -74,8 +74,8 @@ class RequiredCapsDecoratorTests(TestCase):
                 innerself.assertTrue(True)
 
         FakeTest('test_method').run(result)
-        self.assertEquals(0, len(result.skips))
-        self.assertEquals(1, result.successes)
+        self.assertEqual(0, len(result.skips))
+        self.assertEqual(1, result.successes)
 
     def test_not_validate(self):
         """test that a test is executed when the supported_caps_set don't match
@@ -93,8 +93,8 @@ class RequiredCapsDecoratorTests(TestCase):
                 innerself.assertTrue(True)
 
         FakeTest('test_method').run(result)
-        self.assertEquals(0, len(result.skips))
-        self.assertEquals(1, result.successes)
+        self.assertEqual(0, len(result.skips))
+        self.assertEqual(1, result.successes)
 
     def test_validate(self):
         """test tha a test fails when the supported_caps_set don't match
@@ -111,9 +111,9 @@ class RequiredCapsDecoratorTests(TestCase):
 
         the_test = FakeTest('test_method')
         the_test.run(result)
-        self.assertEquals(0, len(result.skips))
-        self.assertEquals(1, len(result.failures))
-        self.assertEquals(the_test, result.failures[0][0])
+        self.assertEqual(0, len(result.skips))
+        self.assertEqual(1, len(result.failures))
+        self.assertEqual(the_test, result.failures[0][0])
 
 
 class TestClientCapabilities(TestWithDatabase):

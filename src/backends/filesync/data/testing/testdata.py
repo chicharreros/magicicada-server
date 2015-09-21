@@ -24,8 +24,11 @@ import hashlib
 import datetime
 import uuid
 
-from backends.filesync.data import model
-
+from backends.filesync.data.model import (
+    STATUS_DEAD,
+    STATUS_LIVE,
+    ContentBlob,
+)
 
 # XXX: salgado: The functionality here should be moved into methods of
 # ObjectFactory.
@@ -40,14 +43,14 @@ def get_test_contentblob(content=None):
     """Get a content blob"""
     if content:
         content = content.encode('utf-8')
-    cb = model.ContentBlob()
+    cb = ContentBlob()
     cb.hash = get_fake_hash(content)
     cb.crc32 = 1023
     cb.size = 1024
     cb.deflated_size = 10000
     cb.storage_key = uuid.uuid4()
     cb.content = content
-    cb.status = model.STATUS_LIVE
+    cb.status = STATUS_LIVE
     return cb
 
 
@@ -56,7 +59,7 @@ def content_blob_args():
     return dict(
         hash=get_fake_hash(), crc32=1023, size=1024, storage_key=uuid.uuid4(),
         deflated_size=10000, magic_hash=b'magic!', content=b'hola',
-        status=model.STATUS_LIVE)
+        status=STATUS_LIVE)
 
 
 def uploadjob_args(key='hola'):
@@ -66,4 +69,4 @@ def uploadjob_args(key='hola'):
                 inflated_size_hint=200, deflated_size_hint=100,
                 when_started=datetime.datetime.now(),
                 when_last_active=datetime.datetime.now(),
-                status=model.STATUS_DEAD)
+                status=STATUS_DEAD)

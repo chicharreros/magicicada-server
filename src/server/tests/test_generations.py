@@ -24,6 +24,7 @@ import calendar
 
 from twisted.internet import defer
 
+from backends.filesync.data.model import StorageObject
 from ubuntuone.storageprotocol import request, delta as protodelta
 from ubuntuone.storage.server.testing.testcase import TestWithDatabase
 from ubuntuone.storage.server import server
@@ -35,7 +36,7 @@ class GenerationsTestCase(TestWithDatabase):
     def assertEqualNode(self, delta_info, node):
         """Assert if a delta_info match with a node."""
         kind = protodelta.DIRECTORY
-        if node.kind == 'File':
+        if node.kind == StorageObject.FILE:
             kind = protodelta.FILE
         if node.parent_id is None:
             parent_id = None

@@ -32,6 +32,7 @@ from txstatsd.metrics.extendedmetrics import ExtendedMetrics
 
 import oops_timeline
 
+from backends.filesync.data.model import Share
 from backends.filesync.notifier.testing.testcase import FakeNotifier
 from backends.filesync.notifier.notifier import (
     ShareAccepted,
@@ -212,9 +213,9 @@ class TestDelivery(TwistedTestCase):
         # test
         self.mocker.replay()
         notif_to = ShareAccepted(share_id, u"name", root_id, from_user,
-                                 to_user, "View", True)
+                                 to_user, Share.VIEW, True)
         notif_from = ShareAccepted(share_id, u"name", root_id, from_user,
-                                   to_user, "View", True)
+                                   to_user, Share.VIEW, True)
         yield self.factory.deliver_share_accepted(notif_to,
                                                   recipient_id=to_user)
         yield self.factory.deliver_share_accepted(notif_from,
@@ -256,9 +257,9 @@ class TestDelivery(TwistedTestCase):
         # test
         self.mocker.replay()
         notif = ShareAccepted(share_id, u"name", root_id, from_user, to_user,
-                              "View", True)
+                              Share.VIEW, True)
         notif2 = ShareAccepted(share_id, u"name", root_id, from_user, to_user,
-                               "View", True)
+                               Share.VIEW, True)
         yield self.factory.deliver_share_accepted(notif,
                                                   recipient_id=from_user)
         yield self.factory.deliver_share_accepted(notif2, recipient_id=to_user)
@@ -411,22 +412,26 @@ class NotificationErrorsTestCase(testcase.TestWithDatabase):
 
     def test_share_created(self):
         """Test the share events."""
-        event_args = (uuid.uuid4(), u"name", uuid.uuid4(), 1, 2, "View", False)
+        event_args = (
+            uuid.uuid4(), u"name", uuid.uuid4(), 1, 2, Share.VIEW, False)
         self.check_event(ShareCreated(*event_args))
 
     def test_share_deleted(self):
         """Test the share events."""
-        event_args = (uuid.uuid4(), u"name", uuid.uuid4(), 1, 2, "View", False)
+        event_args = (
+            uuid.uuid4(), u"name", uuid.uuid4(), 1, 2, Share.VIEW, False)
         self.check_event(ShareDeleted(*event_args))
 
     def test_share_declined(self):
         """Test the share events."""
-        event_args = (uuid.uuid4(), u"name", uuid.uuid4(), 1, 2, "View", False)
+        event_args = (
+            uuid.uuid4(), u"name", uuid.uuid4(), 1, 2, Share.VIEW, False)
         self.check_event(ShareDeclined(*event_args))
 
     def test_share_accepted(self):
         """Test the share events."""
-        event_args = (uuid.uuid4(), u"name", uuid.uuid4(), 1, 2, "View", True)
+        event_args = (
+            uuid.uuid4(), u"name", uuid.uuid4(), 1, 2, Share.VIEW, True)
         self.check_event(ShareAccepted(*event_args), recipient_id=u'test')
 
     def test_udf_delete(self):

@@ -34,8 +34,8 @@ from backends.filesync.data.services import (
     get_storage_user,
     make_storage_user,
 )
-from backends.filesync.data import dao, errors, utils, model
-
+from backends.filesync.data import dao, errors, utils
+from backends.filesync.data.model import StorageUser
 
 MAX_STORAGE_BYTES = 10 * 23
 
@@ -73,7 +73,7 @@ class DataServicesTestCase(StorageDALTestCase):
         user = get_storage_user(1, active_only=False)
         user.update(subscription=True)
         # now check a locked user.
-        suser = self.store.get(model.StorageUser, user.id)
+        suser = self.store.get(StorageUser, user.id)
         suser.locked = True
         self.store.commit()
         self.assertRaises(errors.LockedUserError, get_storage_user, user.id)
@@ -87,10 +87,10 @@ class DataServicesTestCase(StorageDALTestCase):
             1, "User 1", "User 1", MAX_STORAGE_BYTES)
         node = user1.volume().root.make_file("test file")
         new_node = get_node(node.id)
-        self.assertEquals(node.id, new_node.id)
-        self.assertEquals(node.parent_id, new_node.parent_id)
-        self.assertEquals(node.name, new_node.name)
-        self.assertEquals(node.path, new_node.path)
+        self.assertEqual(node.id, new_node.id)
+        self.assertEqual(node.parent_id, new_node.parent_id)
+        self.assertEqual(node.name, new_node.name)
+        self.assertEqual(node.path, new_node.path)
 
     def test_get_user_info(self):
         """Test the get_user_info function."""
@@ -98,10 +98,10 @@ class DataServicesTestCase(StorageDALTestCase):
             1, "User 1", "User 1", MAX_STORAGE_BYTES)
         user_info = get_user_info(user.id)
         quota = user.get_quota()
-        self.assertEquals(quota.max_storage_bytes, user_info.max_storage_bytes)
-        self.assertEquals(quota.used_storage_bytes,
-                          user_info.used_storage_bytes)
-        self.assertEquals(quota.free_bytes, user_info.free_bytes)
+        self.assertEqual(quota.max_storage_bytes, user_info.max_storage_bytes)
+        self.assertEqual(
+            quota.used_storage_bytes, user_info.used_storage_bytes)
+        self.assertEqual(quota.free_bytes, user_info.free_bytes)
         self.assertRaises(errors.DoesNotExist, get_user_info, 41)
 
     def test_get_abandoned_uploadjobs(self):

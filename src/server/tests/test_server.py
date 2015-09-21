@@ -42,6 +42,7 @@ from txstatsd.metrics.metermetric import MeterMetric
 from s3lib import s3lib
 
 from backends.filesync.data import errors as dataerror
+from backends.filesync.data.model import Share
 from magicicada import settings
 from ubuntuone.devtools.handlers import MementoHandler
 from ubuntuone.storage.server import errors, server
@@ -637,7 +638,7 @@ class StorageServerRequestResponseTestCase(BaseStorageServerTestCase):
         self.assertEqual(3, len(self.last_error))
         if self.last_error[2] is not None:
             free_space_info = self.last_error[2]
-            self.assertEquals(dict, type(free_space_info))
+            self.assertEqual(dict, type(free_space_info))
 
         comment = self.last_error[1]
         self.assert_correct_comment(comment, msg)
@@ -825,32 +826,31 @@ class SimpleRequestResponseTestCase(StorageServerRequestResponseTestCase):
     def test_translation_does_not_exist(self):
         """DoesNotExist is properly translated."""
         e = self.response.protocol_errors[dataerror.DoesNotExist]
-        self.assertEquals(protocol_pb2.Error.DOES_NOT_EXIST, e)
+        self.assertEqual(protocol_pb2.Error.DOES_NOT_EXIST, e)
 
     def test_send_protocol_error_handles_retry_limit_reached(self):
         """_send_protocol_error handles the RetryLimitReached."""
         failure = Failure(dataerror.RetryLimitReached(self.msg))
         self.response._send_protocol_error(failure=failure)
         self.assertTrue(self.last_error is not None)
-        self.assertEquals(protocol_pb2.Error.TRY_AGAIN, self.last_error[0])
-        self.assertEquals("TryAgain (RetryLimitReached: %s)" % self.msg,
-                          self.last_error[1])
+        self.assertEqual(protocol_pb2.Error.TRY_AGAIN, self.last_error[0])
+        self.assertEqual(
+            "TryAgain (RetryLimitReached: %s)" % self.msg, self.last_error[1])
 
     def test_tcp_timeout_handled_as_try_again(self):
         """_send_protocol_error handles TCPTimedOutError as TRY_AGAIN."""
         failure = Failure(txerror.TCPTimedOutError())
         self.response._send_protocol_error(failure=failure)
         self.assertTrue(self.last_error is not None)
-        self.assertEquals(protocol_pb2.Error.TRY_AGAIN, self.last_error[0])
+        self.assertEqual(protocol_pb2.Error.TRY_AGAIN, self.last_error[0])
 
     def test_send_protocol_error_handles_does_not_exist(self):
         """_send_protocol_error handles the DoesNotExist."""
         failure = Failure(dataerror.DoesNotExist(self.msg))
         self.response._send_protocol_error(failure=failure)
         self.assertTrue(self.last_error is not None)
-        self.assertEquals(protocol_pb2.Error.DOES_NOT_EXIST,
-                          self.last_error[0])
-        self.assertEquals(self.msg, self.last_error[1])
+        self.assertEqual(protocol_pb2.Error.DOES_NOT_EXIST, self.last_error[0])
+        self.assertEqual(self.msg, self.last_error[1])
 
     def test_send_protocol_error_sends_comment(self):
         """_send_protocol_error sends the optional comment on errors."""
@@ -876,9 +876,8 @@ class SimpleRequestResponseTestCase(StorageServerRequestResponseTestCase):
         failure = Failure(ValueError(self.msg))
         self.response._send_protocol_error(failure=failure)
         self.assertTrue(self.last_error is not None)
-        self.assertEquals(protocol_pb2.Error.INTERNAL_ERROR,
-                          self.last_error[0])
-        self.assertEquals(self.msg, self.last_error[1])
+        self.assertEqual(protocol_pb2.Error.INTERNAL_ERROR, self.last_error[0])
+        self.assertEqual(self.msg, self.last_error[1])
         self.assertFalse(self.shutdown)
 
     def test_send_protocol_error_try_again_is_metered(self):
@@ -1081,7 +1080,7 @@ class SimpleRequestResponseTestCase(StorageServerRequestResponseTestCase):
         """Test the cancel_filter decorator."""
         self.response_class.fakefunction = \
             server.cancel_filter(lambda *a: 'hi')
-        self.assertEquals(self.response.fakefunction(self.response), "hi")
+        self.assertEqual(self.response.fakefunction(self.response), "hi")
         self.response.cancelled = True
         self.assertRaises(request.RequestCancelledError,
                           self.response.fakefunction, self.response)
@@ -1208,7 +1207,7 @@ class ListSharesTestCase(SimpleRequestResponseTestCase):
         share = dict(id=None, from_me=None, to_me=None, root_id=None,
                      name=u'name', shared_by_username=u'sby', accepted=False,
                      shared_to_username=u'sto', shared_by_visible_name=u'vby',
-                     shared_to_visible_name=u'vto', access='View')
+                     shared_to_visible_name=u'vto', access=Share.VIEW)
 
         # fake user
         user = mocker.mock()
@@ -1282,7 +1281,7 @@ class ListVolumesTestCase(SimpleRequestResponseTestCase):
         # fake share
         share = dict(id=None, root_id=None, name=u'name', path=u"somepath",
                      shared_by_username=u'sby', accepted=False,
-                     shared_by_visible_name=u'vby', access='View',
+                     shared_by_visible_name=u'vby', access=Share.VIEW,
                      generation=9, free_bytes=123)
 
         # fake user

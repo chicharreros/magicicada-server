@@ -20,9 +20,10 @@
 
 from __future__ import unicode_literals
 
-from backends.filesync.data import get_filesync_store, model, dao
-from backends.filesync.data.gateway import StorageUserGateway
+from backends.filesync.data import dao, get_filesync_store
 from backends.filesync.data.dbmanager import fsync_readonly
+from backends.filesync.data.gateway import StorageUserGateway
+from backends.filesync.data.model import StorageUser
 
 
 class StorageUserFinder(object):
@@ -42,9 +43,9 @@ class StorageUserFinder(object):
         if self.filter is not None:
             filter = unicode("%" + self.filter + "%")
             conditions.append(
-                model.StorageUser.username.like(filter, case_sensitive=False))
-        return store.find(model.StorageUser,
-                          *conditions).order_by(model.StorageUser.username)
+                StorageUser.username.like(filter, case_sensitive=False))
+        return store.find(StorageUser, *conditions).order_by(
+            StorageUser.username)
 
     def _get_dao_from_result(self, result):
         """Convert the result to a StorageUser DAO."""
@@ -75,6 +76,6 @@ class StorageUserFinder(object):
         """Get a StorageUser or list of StorageUsers."""
         result = self._find_users()[index]
         # if index is an integer, a tuple will be returned.
-        if isinstance(result, model.StorageUser):
+        if isinstance(result, StorageUser):
             return self._get_dao_from_result(result)
         return [self._get_dao_from_result(r) for r in result]

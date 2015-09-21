@@ -184,22 +184,22 @@ class PatchTest(MakePath):
         """Make sure a transaction commited"""
         self.another_store.rollback()
         result = self.another_store.execute("SELECT * FROM test").get_one()
-        self.assertEquals(result, (1,),
-                          "Transaction manager wasn't committed.")
+        self.assertEqual(
+            result, (1,), "Transaction manager wasn't committed.")
 
     def assert_transaction_aborted(self):
         """Make sure a transaction aborted"""
         self.another_store.commit()
         result = self.another_store.execute("SELECT * FROM test").get_one()
-        self.assertEquals(result, None,
-                          "Transaction manager wasn't aborted.")
+        self.assertEqual(
+            result, None, "Transaction manager wasn't aborted.")
 
     def test_apply(self):
         """Apply a patch"""
         self.patch_applier.apply(42)
 
         x = getattr(self.mypackage, "patch_42").x
-        self.assertEquals(x, 42)
+        self.assertEqual(x, 42)
         self.assertTrue(self.store.get(Patch, (42)))
         self.assertTrue("mypackage.patch_42" in sys.modules)
 
@@ -215,8 +215,8 @@ class PatchTest(MakePath):
         x = getattr(self.mypackage, "patch_42").x
         y = getattr(self.mypackage, "patch_380").y
 
-        self.assertEquals(x, 42)
-        self.assertEquals(y, 380)
+        self.assertEqual(x, 42)
+        self.assertEqual(y, 380)
 
         self.assert_transaction_committed()
 
@@ -238,11 +238,11 @@ class PatchTest(MakePath):
         """
         self.add_module("patch_666.py", patch_explosion)
         self.add_module("patch_667.py", patch_after_explosion)
-        self.assertEquals(list(self.patch_applier._get_unapplied_versions()),
-                          [42, 380, 666, 667])
+        self.assertEqual(list(self.patch_applier._get_unapplied_versions()),
+                         [42, 380, 666, 667])
         self.assertRaises(StormError, self.patch_applier.apply_all)
-        self.assertEquals(list(self.patch_applier._get_unapplied_versions()),
-                          [666, 667])
+        self.assertEqual(list(self.patch_applier._get_unapplied_versions()),
+                         [666, 667])
 
     def test_mark_applied(self):
         """Make sure a patch are put in the patch table"""
@@ -271,8 +271,8 @@ class PatchTest(MakePath):
     def test_application_order(self):
         """Make sure the patches are run in the right order not alpha"""
         self.patch_applier.apply_all()
-        self.assertEquals(self.mypackage.shared_data,
-                          [42, 380])
+        self.assertEqual(self.mypackage.shared_data,
+                         [42, 380])
 
     def test_has_pending_patches(self):
         """Make sure we can tell when patches are pending"""

@@ -20,21 +20,18 @@
 
 from __future__ import unicode_literals
 
-from backends.filesync.data import model, errors
+from backends.filesync.data import errors
 from backends.filesync.data.gateway import SystemGateway
 from backends.filesync.data.dbmanager import (
     retryable_transaction,
     fsync_commit,
     fsync_readonly,
 )
+from backends.filesync.data.model import Download
 
 # states
 UNKNOWN = "Unknown"
 DOWNLOADED_NOT_PRESENT = "Downloaded But Not Present"
-QUEUED = model.DOWNLOAD_STATUS_QUEUED
-DOWNLOADING = model.DOWNLOAD_STATUS_DOWNLOADING
-DOWNLOADED = model.DOWNLOAD_STATUS_COMPLETE
-ERROR = model.DOWNLOAD_STATUS_ERROR
 
 
 @retryable_transaction()
@@ -42,7 +39,7 @@ ERROR = model.DOWNLOAD_STATUS_ERROR
 def download_start(user_id, download_id):
     """Start the download."""
     SystemGateway().update_download(user_id, download_id,
-                                    status=model.DOWNLOAD_STATUS_DOWNLOADING)
+                                    status=Download.STATUS_DOWNLOADING)
 
 
 @retryable_transaction()
@@ -51,7 +48,7 @@ def download_error(user_id, download_id, message):
     """Mark the download as in error."""
     return SystemGateway().update_download(
         user_id, download_id,
-        status=model.DOWNLOAD_STATUS_ERROR, error_message=message)
+        status=Download.STATUS_ERROR, error_message=message)
 
 
 @retryable_transaction()
@@ -95,7 +92,7 @@ def download_update(user_id, download_id, status=None,
 def get_status_from_download(user_id, download):
     """Gets the status from a download object."""
     gw = SystemGateway()
-    if download.status == model.DOWNLOAD_STATUS_COMPLETE:
+    if download.status == Download.STATUS_COMPLETE:
         # check if the file is actually present
         gw.get_user(user_id)
         try:

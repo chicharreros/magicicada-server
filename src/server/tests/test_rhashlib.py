@@ -43,7 +43,7 @@ class TestRHashLib(unittest.TestCase):
 
         # set works
         ctx.set_context(old)
-        self.assertEquals(old, ctx.get_context())
+        self.assertEqual(old, ctx.get_context())
         self.assertEqual(ctx.h0, h0)
 
     def test_hashing(self):
@@ -138,7 +138,7 @@ class TestResumableMagicContentHash(unittest.TestCase):
 
         # set works
         ctx.set_context(old)
-        self.assertEquals(old, ctx.get_context())
+        self.assertEqual(old, ctx.get_context())
         self.assertEqual(ctx.hash_object.h0, h0)
 
     def test_hashing(self):

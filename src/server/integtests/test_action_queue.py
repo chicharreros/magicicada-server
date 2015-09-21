@@ -1035,7 +1035,7 @@ class SRVLookupTest(TestWithDatabase):
         def checkResult(result):
             """ Verify that we are correclty doing the lookup """
             host, port = result
-            self.assertEquals(host, self.aq.host)
+            self.assertEqual(host, self.aq.host)
 
         d = self.aq._lookup_srv()
         d.addCallback(checkResult)

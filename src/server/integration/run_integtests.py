@@ -46,7 +46,7 @@ from utilities import utils, dev_launcher
 from ubuntuone.platform.linux import tools
 from twisted.internet import reactor, defer
 
-from ubuntuone.storage.tests.integration.helpers import debug, retryable
+from ubuntuone.storage.server.integration.helpers import debug, retryable
 
 # to make dbus work
 dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)

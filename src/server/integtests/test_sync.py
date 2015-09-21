@@ -37,7 +37,11 @@ from twisted.python.failure import Failure
 
 import u1sync.client
 
-from backends.filesync.data import model
+from backends.filesync.data.model import (
+    STATUS_LIVE,
+    ContentBlob,
+    StorageObject,
+)
 from u1sync.main import do_diff, do_init, do_sync
 from ubuntuone.storage.server import server
 from ubuntuone.storageprotocol import client as protocol_client
@@ -283,17 +287,17 @@ class TestBrokenNode(TestSync):
         #   - set the content_hash to None
         #   - increase the generation
         user = self.storage_users['jack']
-        root = model.StorageObject.get_root(self.store, user.id)
+        root = StorageObject.get_root(self.store, user.id)
         afile = root.get_child_by_name(u"test_file")
         # create a "invalid" content blob
-        content = model.ContentBlob()
+        content = ContentBlob()
         content.hash = ""
         content.magic_hash = ""
         content.storage_key = uuid.uuid4()
         content.crc32 = 1
         content.size = 1
         content.deflated_size = 1
-        content.status = model.STATUS_LIVE
+        content.status = STATUS_LIVE
         self.store.add(content)
         self.store.flush()
         # change the node
@@ -1719,7 +1723,7 @@ class TestConflictOnServerSideDelete(TestServerBase):
     def unlink_dir_tree(self, _):
         """Remove the tree below foo/ directly on server."""
         u = self.storage_users['jack']
-        root = model.StorageObject.get_root(self.store, u.id)
+        root = StorageObject.get_root(self.store, u.id)
         dir_tree = root.get_child_by_name(self.dir_name)
 
         # foo/bar.txt exists on local FS

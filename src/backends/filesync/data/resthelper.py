@@ -25,6 +25,7 @@ import os
 from backends.filesync.data import errors
 from backends.filesync.data.dao import VolumeProxy
 from backends.filesync.data.logging import log_dal_function
+from backends.filesync.data.model import STATUS_LIVE, StorageObject
 
 
 def date_formatter(dt):
@@ -137,10 +138,10 @@ class ResourceMapper(object):
             when_changed=date_formatter(node.when_last_modified),
             generation=node.generation,
             generation_created=node.generation_created,
-            is_live=node.status == 'Live',
+            is_live=node.status == STATUS_LIVE,
             content_path=self.content(volume_path, node.full_path),
         )
-        if node.kind == 'File':
+        if node.kind == StorageObject.FILE:
             info.update(dict(
                 hash=node.content_hash,
                 public_url=node.public_url,
@@ -213,7 +214,7 @@ class RestHelper(object):
         node = user.get_node_by_path(node_path, with_content=True)
         node_info = self.map.node_repr(node)
         if include_children:
-            if node.kind == 'File':
+            if node.kind == StorageObject.FILE:
                 raise FileNodeHasNoChildren("Files have no Children")
             self.log_dal("get_children", user, node_id=node.id,
                          with_content=True)
@@ -258,7 +259,7 @@ class RestHelper(object):
             node = user.get_node_by_path(node_path)
         except errors.DoesNotExist:
             node = None
-        if node and node.kind == 'File' and hash and magic_hash:
+        if node and node.kind == StorageObject.FILE and hash and magic_hash:
             # if the file already exists and we have a hash and magic hash
             # update the file
             self.log_dal("make_file_by_path", user, node_path=node_path)
@@ -298,7 +299,7 @@ class RestHelper(object):
         # are we changing it's public status?
         is_public = node_repr.get('is_public')
         if is_public is not None:
-            if node.kind == 'Directory':
+            if node.kind == StorageObject.DIRECTORY:
                 raise CannotPublishDirectory("Directories cant be public.")
             self.log_dal("change_public_access", user, node_id=node.id,
                          is_public=is_public)

@@ -39,7 +39,7 @@ from ubuntuone.devtools.handlers import MementoHandler
 from ubuntuone.storageprotocol import request
 from ubuntuone.storage.server.testing.testcase import TestWithDatabase
 from ubuntuone.supervisor import utils as supervisor_utils
-from backends.filesync.data import model
+from backends.filesync.data.model import StorageUser
 
 
 class TestBasic(TestWithDatabase):
@@ -60,7 +60,7 @@ class TestBasic(TestWithDatabase):
     def test_disconnect_with_user_locked(self):
         """Create a simple client that just connects."""
         # lock the user:
-        usr = self.store.get(model.StorageUser, 0)
+        usr = self.store.get(StorageUser, 0)
         usr.locked = True
         self.store.commit()
         # add the log handler
@@ -111,7 +111,7 @@ class TestBasic(TestWithDatabase):
             yield client.dummy_authenticate("open sesame")
             root_id = yield client.get_root()
             # lock the user:
-            usr = self.store.get(model.StorageUser, 0)
+            usr = self.store.get(StorageUser, 0)
             usr.locked = True
             self.store.commit()
             client.make_dir(request.ROOT, root_id, u"open sesame")
@@ -299,7 +299,7 @@ class ServerPingTest(TestWithDatabase):
                 if self._state.ping_count == 5:
                     ping_cb.callback(self._state.ping_count)
             client.handle_PING = handle_PING
-            ping_cb.addCallbacks(lambda result: self.assertEquals(5, result),
+            ping_cb.addCallbacks(lambda result: self.assertEqual(5, result),
                                  client.test_fail)
             ping_cb.addCallbacks(client.test_done, client.test_fail)
             return ping_cb
@@ -320,7 +320,7 @@ class ServerPingTest(TestWithDatabase):
             def my_connection_lost(reason=None):
                 """ check if we received a ping and finish the test. """
                 client.__class__.connectionLost(client, reason)
-                self.assertEquals(getattr(self._state, 'pings', 0), 1)
+                self.assertEqual(getattr(self._state, 'pings', 0), 1)
                 client.test_done('ok')
 
             client.connectionLost = my_connection_lost
@@ -410,7 +410,7 @@ class ServerStatusTest(TestWithDatabase):
     def test_status_OK(self):
         """Test the OK status response."""
         response = yield client.getPage(self.url)
-        self.assertEquals(response, 'Status OK\n')
+        self.assertEqual(response, 'Status OK\n')
 
     @defer.inlineCallbacks
     def test_status_ERROR(self):
@@ -421,7 +421,7 @@ class ServerStatusTest(TestWithDatabase):
         try:
             yield client.getPage(self.url)
         except error.Error, e:
-            self.assertEquals('500', e.status)
+            self.assertEqual('500', e.status)
         else:
             self.fail('An error is expected.')
 
@@ -434,7 +434,7 @@ class ServerStatusTest(TestWithDatabase):
         try:
             yield client.getPage(self.url + "/foo")
         except error.Error, e:
-            self.assertEquals('404', e.status)
+            self.assertEqual('404', e.status)
         else:
             self.fail('An error is expected.')
 

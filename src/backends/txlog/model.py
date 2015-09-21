@@ -130,7 +130,7 @@ class TransactionLog(object):
         udf_join = Join(
             StorageObject,
             UserVolume, StorageObject.volume_id == UserVolume.id)
-        conditions = [StorageObject.kind == 'Directory',
+        conditions = [StorageObject.kind == StorageObject.DIRECTORY,
                       StorageObject.owner_id == user.id,
                       StorageObject.status == STATUS_LIVE,
                       StorageObject._publicfile_id != None,  # NOQA
@@ -304,7 +304,7 @@ class TransactionLog(object):
                  when_created=when_created,
                  last_modified=last_modified, kind=node.kind,
                  volume_path=volume_path)
-        if node.kind == 'File':
+        if node.kind == StorageObject.FILE:
             d['content_hash'] = node.content_hash
             d['size'] = getattr(node.content, 'size', None)
             storage_key = getattr(node.content, 'storage_key', None)
@@ -392,7 +392,7 @@ class TransactionLog(object):
             created by this method.
         @return: The number of created TransactionLog entries.
         """
-        assert directory.kind == 'Directory', (
+        assert directory.kind == StorageObject.DIRECTORY, (
             "The given node is not a directory.")
         cls._record_unlink(directory, generation)
         where_clause, extra_params = (
@@ -444,7 +444,7 @@ class TransactionLog(object):
         Store.of(node).add(txlog)
         rowcount += 1
 
-        if node.kind == 'Directory':
+        if node.kind == StorageObject.DIRECTORY:
             # Now we generate a TransactionLog for every interesting
             # descendant of the directory that is being moved.
             old_path_base = os.path.join(old_parent.full_path, old_name)

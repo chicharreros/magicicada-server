@@ -32,7 +32,8 @@ from twisted.internet import defer, reactor, threads, task, address
 from twisted.trial.unittest import TestCase
 from twisted.test.proto_helpers import StringTransport
 
-from backends.filesync.data import errors, model
+from backends.filesync.data import errors
+from backends.filesync.data.model import EMPTY_CONTENT_HASH, StorageObject
 from magicicada import settings
 from ubuntuone.devtools.handlers import MementoHandler
 from ubuntuone.storage.server import server, content, diskstorage
@@ -978,7 +979,7 @@ class TestPutContent(TestWithDatabase):
 
                 def _check_file():
                     quota = self.usr0.get_quota()
-                    self.assertEquals(size, quota.used_storage_bytes)
+                    self.assertEqual(size, quota.used_storage_bytes)
 
                 d = threads.deferToThread(_check_file)
                 return d
@@ -1006,8 +1007,8 @@ class TestPutContent(TestWithDatabase):
         try:
             yield self.test_putcontent()
         except protoerrors.QuotaExceededError as e:
-            self.assertEquals(e.free_bytes, 1)
-            self.assertEquals(e.share_id, request.ROOT)
+            self.assertEqual(e.free_bytes, 1)
+            self.assertEqual(e.share_id, request.ROOT)
         else:
             self.fail('Should fail with QuotaExceededError!')
 
@@ -1324,7 +1325,7 @@ class TestPutContent(TestWithDatabase):
         resp = yield upload_req.deferred
 
         # the response should have the new_generation
-        self.assertEquals(mkfile_req.new_generation + 1, resp.new_generation)
+        self.assertEqual(mkfile_req.new_generation + 1, resp.new_generation)
 
         # the BEGIN_CONTENT should be from the end
         message = [m for m in client.messages
@@ -2062,8 +2063,8 @@ class TestPutContentInternalError(TestWithDatabase):
         pc._processMessage(msg)
         # check the error
         error_type, comment = yield error_d
-        self.assertEquals(error_type, protocol_pb2.Error.INTERNAL_ERROR)
-        self.assertEquals(comment, "Fail!")
+        self.assertEqual(error_type, protocol_pb2.Error.INTERNAL_ERROR)
+        self.assertEqual(comment, "Fail!")
         # check that the put_content response is properly termintated
         # and the server is shuttdown.
         yield storage_server.wait_for_shutdown()
@@ -2251,7 +2252,7 @@ class UserTest(TestWithDatabase):
         new_gen, kind, name, _ = yield self.user.unlink_node(
             volume_id, node_id)
         self.assertEqual(new_gen, generation + 1)
-        self.assertEqual(kind, "Directory")
+        self.assertEqual(kind, StorageObject.DIRECTORY)
         self.assertEqual(name, u"name")
 
     @defer.inlineCallbacks
@@ -2387,7 +2388,7 @@ class TestUploadJob(TestWithDatabase):
             'make_file_with_content',
             user_id=c_user.id, volume_id=self.user.root_volume_id,
             parent_id=root, name=u"A new file",
-            node_hash=model.EMPTY_CONTENT_HASH, crc32=0,
+            node_hash=EMPTY_CONTENT_HASH, crc32=0,
             size=0, deflated_size=0, storage_key=None)
         node_id = r['node_id']
         node = yield c_user.get_node(self.user.root_volume_id, node_id, None)
@@ -2452,7 +2453,7 @@ class TestUploadJob(TestWithDatabase):
         try:
             yield upload_job.commit()
         except server.errors.ConflictError as e:
-            self.assertEquals(str(e), 'The File changed while uploading.')
+            self.assertEqual(str(e), 'The File changed while uploading.')
         else:
             self.fail("Should fail with ConflictError")
 
@@ -2467,7 +2468,7 @@ class TestUploadJob(TestWithDatabase):
         try:
             yield upload_job.commit()
         except server.errors.UploadCorrupt as e:
-            self.assertEquals(str(e), upload_job._deflated_size_hint_mismatch)
+            self.assertEqual(str(e), upload_job._deflated_size_hint_mismatch)
         else:
             self.fail("Should fail with UploadCorrupt")
 
@@ -2500,7 +2501,7 @@ class TestUploadJob(TestWithDatabase):
         try:
             yield upload_job.commit()
         except server.errors.UploadCorrupt as e:
-            self.assertEquals(str(e), upload_job._content_hash_hint_mismatch)
+            self.assertEqual(str(e), upload_job._content_hash_hint_mismatch)
         else:
             self.fail("Should fail with UploadCorrupt")
 
@@ -2516,7 +2517,7 @@ class TestUploadJob(TestWithDatabase):
         try:
             yield upload_job.commit()
         except server.errors.UploadCorrupt as e:
-            self.assertEquals(str(e), upload_job._magic_hash_hint_mismatch)
+            self.assertEqual(str(e), upload_job._magic_hash_hint_mismatch)
         else:
             self.fail("Should fail with UploadCorrupt")
 
@@ -2532,7 +2533,7 @@ class TestUploadJob(TestWithDatabase):
         try:
             yield upload_job.commit()
         except server.errors.UploadCorrupt as e:
-            self.assertEquals(str(e), upload_job._crc32_hint_mismatch)
+            self.assertEqual(str(e), upload_job._crc32_hint_mismatch)
         else:
             self.fail("Should fail with UploadCorrupt")
 
@@ -2722,7 +2723,7 @@ class TestNode(TestWithDatabase):
         r = yield rpcdal.call(
             'make_file_with_content', user_id=content_user.id,
             volume_id=self.user.root_volume_id, parent_id=root,
-            name=u"A new file", node_hash=model.EMPTY_CONTENT_HASH, crc32=0,
+            name=u"A new file", node_hash=EMPTY_CONTENT_HASH, crc32=0,
             size=0, deflated_size=0, storage_key=None)
         node_id = r['node_id']
         node = yield content_user.get_node(user.root_volume_id, node_id, None)
@@ -2797,16 +2798,16 @@ class TestGenerations(TestWithDatabase):
         """Test that User.get_delta works as expected."""
         delta = yield self.user.get_delta(None, 0)
         free_bytes = self.suser.get_quota().free_bytes
-        self.assertEquals(delta, ([], 0, free_bytes))
+        self.assertEqual(delta, ([], 0, free_bytes))
 
     @defer.inlineCallbacks
     def test_get_delta_from_0(self):
         """Test that User.get_delta works as expected."""
         nodes = [self.suser.root.make_file(u"name%s" % i) for i in range(5)]
         delta, end_gen, free_bytes = yield self.user.get_delta(None, 0)
-        self.assertEquals(len(delta), len(nodes))
-        self.assertEquals(end_gen, nodes[-1].generation)
-        self.assertEquals(free_bytes, self.suser.get_quota().free_bytes)
+        self.assertEqual(len(delta), len(nodes))
+        self.assertEqual(end_gen, nodes[-1].generation)
+        self.assertEqual(free_bytes, self.suser.get_quota().free_bytes)
 
     @defer.inlineCallbacks
     def test_get_delta_from_middle(self):
@@ -2818,9 +2819,9 @@ class TestGenerations(TestWithDatabase):
         from_generation = nodes[5].generation
         delta, end_gen, free_bytes = yield self.user.get_delta(None,
                                                                from_generation)
-        self.assertEquals(len(delta), len(nodes[6:]))
-        self.assertEquals(end_gen, nodes[-1].generation)
-        self.assertEquals(free_bytes, self.suser.get_quota().free_bytes)
+        self.assertEqual(len(delta), len(nodes[6:]))
+        self.assertEqual(end_gen, nodes[-1].generation)
+        self.assertEqual(free_bytes, self.suser.get_quota().free_bytes)
 
     @defer.inlineCallbacks
     def test_get_delta_from_last(self):
@@ -2832,9 +2833,9 @@ class TestGenerations(TestWithDatabase):
         from_generation = nodes[-1].generation
         delta, end_gen, free_bytes = yield self.user.get_delta(None,
                                                                from_generation)
-        self.assertEquals(len(delta), 0)
-        self.assertEquals(end_gen, nodes[-1].generation)
-        self.assertEquals(free_bytes, self.suser.get_quota().free_bytes)
+        self.assertEqual(len(delta), 0)
+        self.assertEqual(end_gen, nodes[-1].generation)
+        self.assertEqual(free_bytes, self.suser.get_quota().free_bytes)
 
     @defer.inlineCallbacks
     def test_get_delta_partial(self):

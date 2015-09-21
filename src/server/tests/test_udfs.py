@@ -66,7 +66,7 @@ class TestManageUDF(TestWithDatabase):
 
             def check_result(req):
                 """Check the request result."""
-                self.assertEquals(req.volume_id, str(udf.id))
+                self.assertEqual(req.volume_id, str(udf.id))
 
             d.addCallback(lambda _: client.create_udf(u"~", u"myudf"))
             d.addCallback(check_result)

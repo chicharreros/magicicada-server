@@ -22,7 +22,8 @@ from twisted.internet import defer
 
 from ubuntuone.storageprotocol import request
 from ubuntuone.storage.server.testing.testcase import TestWithDatabase
-from backends.filesync.data import model, services, dbmanager
+from backends.filesync.data import dbmanager, services
+from backends.filesync.data.model import StorageUserInfo
 
 
 class QuotaTest(TestWithDatabase):
@@ -57,7 +58,7 @@ class QuotaTest(TestWithDatabase):
         self.usr0.update(max_storage_bytes=2 ** 16)
         # need to do something that just can't happen normally
         store = dbmanager.get_filesync_store()
-        info = store.get(model.StorageUserInfo, 0)
+        info = store.get(StorageUserInfo, 0)
         info.used_storage_bytes = 2 ** 17
         store.commit()
 

@@ -129,7 +129,7 @@ class TestShutdown(TwistedTestCase, StorageDALTestCase):
         name = service.metrics.fully_qualify_name('services_active')
         self.assertTrue(isinstance(service.metrics._metrics[name],
                         CounterMetric))
-        self.assertEquals(service.metrics._metrics[name].count(), 1)
+        self.assertEqual(service.metrics._metrics[name].count(), 1)
 
         yield service.stopService()
 

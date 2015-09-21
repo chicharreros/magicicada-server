@@ -25,7 +25,13 @@ from mock import patch
 from backends.filesync.data.dbmanager import get_filesync_store
 from backends.filesync.data.gateway import SystemGateway
 from backends.filesync.data.model import (
-    PublicNode, STATUS_DEAD, StorageObject, StorageUser, UserVolume)
+    STATUS_LIVE,
+    STATUS_DEAD,
+    PublicNode,
+    StorageObject,
+    StorageUser,
+    UserVolume,
+)
 from backends.filesync.data.testing.ormtestcase import ORMTestCase
 from backends.filesync.data.utils import get_public_file_url
 
@@ -164,7 +170,7 @@ class TestTransactionLog(BaseTransactionLogTestCase):
         node.unlink()
         expected = self._get_dict_with_txlog_attrs_from(
             node, TransactionLog.OP_DELETE,
-            extra=dict(extra_data_dict={'kind': 'File',
+            extra=dict(extra_data_dict={'kind': StorageObject.FILE,
                                         'volume_path': '~/Ubuntu One'}))
         self.assertStoredTransactionLogsMatch({node.id: expected})
 
@@ -173,7 +179,7 @@ class TestTransactionLog(BaseTransactionLogTestCase):
         node.unlink()
         expected = self._get_dict_with_txlog_attrs_from(
             node, TransactionLog.OP_DELETE,
-            extra=dict(extra_data_dict={'kind': 'Directory',
+            extra=dict(extra_data_dict={'kind': StorageObject.DIRECTORY,
                                         'volume_path': '~/Ubuntu One'}))
         self.assertStoredTransactionLogsMatch({node.id: expected})
 
@@ -188,7 +194,7 @@ class TestTransactionLog(BaseTransactionLogTestCase):
         expected_rows = {
             directory.id: self._get_dict_with_txlog_attrs_from(
                 directory, TransactionLog.OP_DELETE,
-                extra=dict(extra_data_dict={'kind': 'Directory',
+                extra=dict(extra_data_dict={'kind': StorageObject.DIRECTORY,
                                             'volume_path': "~/Ubuntu One"}))}
 
         for i in range(0, 5):
@@ -465,7 +471,7 @@ class TestTransactionLog(BaseTransactionLogTestCase):
         photos = self._create_files_for_user(user, 'image/jpeg')
         # Even though all files in this second UDF are dead, the UDF itself is
         # alive so we will have a txlog for it.
-        self._create_files_for_user(user, 'image/jpeg', status='Dead')
+        self._create_files_for_user(user, 'image/jpeg', status=STATUS_DEAD)
 
         TransactionLog.bootstrap(user)
 
@@ -690,7 +696,7 @@ class TestTransactionLog(BaseTransactionLogTestCase):
         txlogs = self.store.find(TransactionLog)
         self.assertTransactionLogsMatch(txlogs, expected)
 
-    def _create_files_for_user(self, user, mimetype, status='Live'):
+    def _create_files_for_user(self, user, mimetype, status=STATUS_LIVE):
         """Create 5 files with the given mimetype for the given user."""
         files = []
         for i in range(0, 5):

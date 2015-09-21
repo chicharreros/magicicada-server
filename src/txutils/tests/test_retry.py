@@ -52,8 +52,8 @@ class TestNetworkRetry(TwistedTestCase):
         retrier = txutils.NetworkRetry(catch=TestNetworkRetry.TestException)
         f = TestNetworkRetry.MostlyFailingCallable(success_on_try=1)
         ret = yield retrier(f)
-        self.assertEquals(ret, "OK")
-        self.assertEquals(f.count, 1)
+        self.assertEqual(ret, "OK")
+        self.assertEqual(f.count, 1)
 
     @defer.inlineCallbacks
     def test_some_retries(self):
@@ -62,8 +62,8 @@ class TestNetworkRetry(TwistedTestCase):
             catch=TestNetworkRetry.TestException, retries=3, retry_wait=0.001)
         f = TestNetworkRetry.MostlyFailingCallable(success_on_try=3)
         ret = yield retrier(f)
-        self.assertEquals(ret, "OK")
-        self.assertEquals(f.count, 3)
+        self.assertEqual(ret, "OK")
+        self.assertEqual(f.count, 3)
 
     @defer.inlineCallbacks
     def test_too_many_retries(self):
@@ -72,7 +72,7 @@ class TestNetworkRetry(TwistedTestCase):
             catch=TestNetworkRetry.TestException, retries=3, retry_wait=0.001)
         f = TestNetworkRetry.MostlyFailingCallable(success_on_try=10)
         yield self.assertFailure(retrier(f), TestNetworkRetry.TestException)
-        self.assertEquals(f.count, 3)
+        self.assertEqual(f.count, 3)
 
     @defer.inlineCallbacks
     def test_other_exception(self):
@@ -80,4 +80,4 @@ class TestNetworkRetry(TwistedTestCase):
         retrier = txutils.NetworkRetry(catch=None, retries=3, retry_wait=0.001)
         f = TestNetworkRetry.MostlyFailingCallable(success_on_try=3)
         yield self.assertFailure(retrier(f), TestNetworkRetry.TestException)
-        self.assertEquals(f.count, 1)
+        self.assertEqual(f.count, 1)

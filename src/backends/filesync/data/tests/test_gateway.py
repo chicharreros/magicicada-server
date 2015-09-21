@@ -46,7 +46,23 @@ from backends.filesync.data.gateway import (
 )
 from backends.filesync.data.dbmanager import (
     get_filesync_store, filesync_tm as transaction)
-from backends.filesync.data import dao, errors, model, utils
+from backends.filesync.data import dao, errors, utils
+from backends.filesync.data.model import (
+    EMPTY_CONTENT_HASH,
+    ROOT_VOLUME,
+    STATUS_LIVE,
+    STATUS_DEAD,
+    ContentBlob,
+    Download,
+    MoveFromShare,
+    PublicNode,
+    Share,
+    StorageObject,
+    StorageUser,
+    StorageUserInfo,
+    UploadJob,
+    UserVolume,
+)
 from backends.filesync.data.testing.testdata import (
     get_fake_hash, get_test_contentblob)
 from backends.filesync.notifier.notifier import (
@@ -115,7 +131,7 @@ class GatewayBaseTestCase(StorageDALTestCase):
     def test_get_user_locked(self):
         """Test get_user with a locked user."""
         user = self.create_user()
-        suser = self.store.get(model.StorageUser, user.id)
+        suser = self.store.get(StorageUser, user.id)
         suser.locked = True
         self.store.commit()
         self.assertRaises(
@@ -125,7 +141,7 @@ class GatewayBaseTestCase(StorageDALTestCase):
     def test_get_user_locked_ignore_lock(self):
         """Test get_user with a locked user, but ignore the lock."""
         user = self.create_user()
-        suser = self.store.get(model.StorageUser, user.id)
+        suser = self.store.get(StorageUser, user.id)
         suser.locked = True
         self.store.commit()
         nuser = self.gw.get_user(
@@ -239,14 +255,14 @@ class EventNotificationTest(StorageDALTestCase):
         self.d1 = self.vgw.make_subdirectory(root.id, 'dir1')
         self.d2 = self.vgw.make_subdirectory(self.d1.id, 'dir1')
         self.d3 = self.vgw.make_subdirectory(self.d2.id, 'dir1')
-        self.share1 = self.store.add(model.Share(
-            self.user.id, root.id, self.user1.id, 'Share1', 'Modify'))
-        self.share2 = self.store.add(model.Share(
-            self.user.id, root.id, self.user2.id, 'Share2', 'Modify'))
-        self.share3 = self.store.add(model.Share(
-            self.user.id, self.d1.id, self.user3.id, 'Share3', 'View'))
-        self.share4 = self.store.add(model.Share(
-            self.user.id, self.d2.id, self.user4.id, 'Share4', 'Modify'))
+        self.share1 = self.store.add(Share(
+            self.user.id, root.id, self.user1.id, 'Share1', Share.MODIFY))
+        self.share2 = self.store.add(Share(
+            self.user.id, root.id, self.user2.id, 'Share2', Share.MODIFY))
+        self.share3 = self.store.add(Share(
+            self.user.id, self.d1.id, self.user3.id, 'Share3', Share.VIEW))
+        self.share4 = self.store.add(Share(
+            self.user.id, self.d2.id, self.user4.id, 'Share4', Share.MODIFY))
         # Note that only share1-3 are accepted
         self.share1.accept()
         self.share2.accept()
@@ -266,7 +282,7 @@ class EventNotificationTest(StorageDALTestCase):
     def test_handle_node_change_with_shares(self):
         """Test the handle_node_change."""
         self.setup_shares()
-        node = get_filesync_store().get(model.StorageObject, self.d3.id)
+        node = get_filesync_store().get(StorageObject, self.d3.id)
         self.vgw.handle_node_change(node)
         transaction.commit()
         self.assertIn(VolumeNewGeneration(self.user.id, None, node.
@@ -285,7 +301,7 @@ class EventNotificationTest(StorageDALTestCase):
     def test_handle_node_change_from_share(self):
         """Test the handle_node_change."""
         self.setup_shares()
-        node = get_filesync_store().get(model.StorageObject, self.d3.id)
+        node = get_filesync_store().get(StorageObject, self.d3.id)
         share = self.user1.get_share(self.share1.id)
         vgw = ReadWriteVolumeGateway(self.user1, share=share)
         vgw.handle_node_change(node)
@@ -550,11 +566,11 @@ class SystemGatewayTestCase(StorageDALTestCase):
             1, 'username', 'Visible Name', 1)
         self.assertEqual(user.username, 'username')
         self.assertEqual(user.visible_name, 'Visible Name')
-        self.assertEqual(user._subscription_status, model.STATUS_LIVE)
+        self.assertEqual(user._subscription_status, STATUS_LIVE)
         store = get_filesync_store()
-        info = store.get(model.StorageUserInfo, 1)
+        info = store.get(StorageUserInfo, 1)
         self.assertEqual(info.max_storage_bytes, 1)
-        root = model.StorageObject.get_root(store, user.id)
+        root = StorageObject.get_root(store, user.id)
         self.assertEqual(root.volume_id, user.root_volume_id)
         self.assertEqual(root.owner_id, user.id)
         self.assertTrue(isinstance(user, dao.StorageUser))
@@ -564,17 +580,17 @@ class SystemGatewayTestCase(StorageDALTestCase):
         self.gw.create_or_update_user(
             1, 'username', 'Visible Name', 1)
         # update the user info.
-        usr = get_filesync_store().get(model.StorageUser, 1)
-        usr.status = model.STATUS_DEAD
-        usr.subscription_status = model.STATUS_DEAD
+        usr = get_filesync_store().get(StorageUser, 1)
+        usr.status = STATUS_DEAD
+        usr.subscription_status = STATUS_DEAD
         transaction.commit()
         # creates for existing users
         user = self.gw.create_or_update_user(
             1, 'username2', 'Visible Name2', 2)
         quota = user._gateway.get_quota()
         # their quota and other infor should get updated
-        self.assertEqual(user._status, model.STATUS_LIVE)
-        self.assertEqual(user._subscription_status, model.STATUS_LIVE)
+        self.assertEqual(user._status, STATUS_LIVE)
+        self.assertEqual(user._subscription_status, STATUS_LIVE)
         self.assertEqual(user.username, 'username2')
         self.assertEqual(user.visible_name, 'Visible Name2')
         self.assertEqual(quota.max_storage_bytes, 2)
@@ -583,9 +599,10 @@ class SystemGatewayTestCase(StorageDALTestCase):
         """Test get_shareoffer."""
         user1 = self.create_user(id=1, username='sharer')
         store = get_filesync_store()
-        root = model.StorageObject.get_root(store, user1.id)
-        share = model.Share(
-            user1.id, root.id, None, 'Share', 'View', email='fake@example.com')
+        root = StorageObject.get_root(store, user1.id)
+        share = Share(
+            user1.id, root.id, None, 'Share', Share.VIEW,
+            email='fake@example.com')
         self.store.add(share)
         transaction.commit()
         share = self.gw.get_shareoffer(share.id)
@@ -599,10 +616,10 @@ class SystemGatewayTestCase(StorageDALTestCase):
         self.assertRaises(errors.DoesNotExist, self.gw.get_shareoffer,
                           uuid.uuid4())
         # test with Dead (rescinded) share_offer
-        share = model.Share(
-            user1.id, root.id, None, 'Share3', 'View',
+        share = Share(
+            user1.id, root.id, None, 'Share3', Share.VIEW,
             email='fake3@example.com')
-        share.status = model.STATUS_DEAD
+        share.status = STATUS_DEAD
         self.store.add(share)
         self.assertRaises(
             errors.DoesNotExist, self.gw.get_shareoffer, share.id)
@@ -619,9 +636,10 @@ class SystemGatewayTestCase(StorageDALTestCase):
         # setup the share_offer
         user1 = self.create_user(id=1, username='sharer')
         store = get_filesync_store()
-        root = model.StorageObject.get_root(store, user1.id)
-        share = model.Share(
-            user1.id, root.id, None, 'Share', 'View', email='fake@example.com')
+        root = StorageObject.get_root(store, user1.id)
+        share = Share(
+            user1.id, root.id, None, 'Share', Share.VIEW,
+            email='fake@example.com')
         self.store.add(share)
         transaction.commit()
         # user can't accept their own share offer
@@ -635,7 +653,7 @@ class SystemGatewayTestCase(StorageDALTestCase):
             user2.id, user2.username, user2.visible_name, share.id)
         user2 = self.gw.get_user(user2.id)
         self.assertEqual(user2.is_active, True)
-        share = self.store.get(model.Share, share.id)
+        share = self.store.get(Share, share.id)
         self.assertEqual(share.shared_to, user2.id)
         self.assertEqual(share.accepted, True)
         # Exception raised when accepted twice
@@ -643,8 +661,8 @@ class SystemGatewayTestCase(StorageDALTestCase):
             errors.ShareAlreadyAccepted, self.gw.claim_shareoffer, user2.id,
             user2.username, user2.visible_name, share.id)
         # test with new user
-        share = model.Share(
-            user1.id, root.id, None, 'Share2', 'View',
+        share = Share(
+            user1.id, root.id, None, 'Share2', Share.VIEW,
             email='fake2@example.com')
         self.store.add(share)
         self.gw.claim_shareoffer(3, 'user3', 'user 3', share.id)
@@ -657,7 +675,7 @@ class SystemGatewayTestCase(StorageDALTestCase):
         transaction.commit()
         user3 = self.gw.get_user(3)
         self.assertEqual(user3.is_active, True)
-        share = self.store.get(model.Share, share.id)
+        share = self.store.get(Share, share.id)
         self.assertEqual(share.shared_to, user3.id)
         self.assertEqual(share.accepted, True)
 
@@ -666,19 +684,20 @@ class SystemGatewayTestCase(StorageDALTestCase):
         # setup the share_offer
         user1 = self.create_user(id=1, username='sharer')
         store = get_filesync_store()
-        root = model.StorageObject.get_root(store, user1.id)
-        share = model.Share(
-            user1.id, root.id, None, 'Share', 'View', email='fake@example.com')
+        root = StorageObject.get_root(store, user1.id)
+        share = Share(
+            user1.id, root.id, None, 'Share', Share.VIEW,
+            email='fake@example.com')
         self.store.add(share)
         transaction.commit()
         # user 2 does not exist
         self.gw.claim_shareoffer(2, 'sharee', 'Sharee', share.id)
         user2 = self.gw.get_user(2)
         store = get_filesync_store()
-        root2 = model.StorageObject.get_root(store, user2.id)
+        root2 = StorageObject.get_root(store, user2.id)
         self.assertTrue(root2 is not None)
         self.assertEqual(user2.is_active, False)
-        share = self.store.get(model.Share, share.id)
+        share = self.store.get(Share, share.id)
         self.assertEqual(share.shared_to, user2.id)
         self.assertEqual(share.accepted, True)
 
@@ -686,7 +705,7 @@ class SystemGatewayTestCase(StorageDALTestCase):
         """The make_download() method creates a Download object."""
         user = self.gw.create_or_update_user(
             1, 'username', 'Visible Name', 1)
-        udf = model.UserVolume.create(
+        udf = UserVolume.create(
             get_filesync_store(), user.id, '~/path/name')
         dl_url = 'http://download/url'
         download = self.gw.make_download(
@@ -702,7 +721,7 @@ class SystemGatewayTestCase(StorageDALTestCase):
         """The make_download_with_key() makes a Download object with a key."""
         user = self.gw.create_or_update_user(
             1, 'username', 'Visible Name', 1)
-        udf = model.UserVolume.create(
+        udf = UserVolume.create(
             get_filesync_store(), user.id, '~/path/name')
         download = self.gw.make_download(
             user.id, udf.id, 'path', 'http://download/url', ['key'])
@@ -719,7 +738,7 @@ class SystemGatewayTestCase(StorageDALTestCase):
         """
         user = self.gw.create_or_update_user(
             1, 'username', 'Visible Name', 1)
-        udf = model.UserVolume.create(
+        udf = UserVolume.create(
             get_filesync_store(), user.id, '~/path/name')
         download = self.gw.make_download(
             user.id, udf.id, 'path', 'http://download/url')
@@ -732,7 +751,7 @@ class SystemGatewayTestCase(StorageDALTestCase):
         """Old Download records may have no download key."""
         user = self.gw.create_or_update_user(
             1, 'username', 'Visible Name', 1)
-        udf = model.UserVolume.create(
+        udf = UserVolume.create(
             get_filesync_store(), user.id, '~/path/name')
         download_url = 'http://download/url'
         file_path = 'path'
@@ -755,7 +774,7 @@ class SystemGatewayTestCase(StorageDALTestCase):
         """Old songs may have multiple download records. Get the last."""
         user = self.gw.create_or_update_user(
             1, 'username', 'Visible Name', 1)
-        udf = model.UserVolume.create(
+        udf = UserVolume.create(
             get_filesync_store(), user.id, '~/path/name')
 
         file_path = 'path'
@@ -779,7 +798,7 @@ class SystemGatewayTestCase(StorageDALTestCase):
         """
         user = self.gw.create_or_update_user(
             1, 'username', 'Visible Name', 1)
-        udf = model.UserVolume.create(
+        udf = UserVolume.create(
             get_filesync_store(), user.id, '~/path/name')
         key = ['some', 'key']
         download = self.gw.make_download(
@@ -795,7 +814,7 @@ class SystemGatewayTestCase(StorageDALTestCase):
         """
         user = self.gw.create_or_update_user(1, 'username', 'Visible Name',
                                              1)
-        udf = model.UserVolume.create(
+        udf = UserVolume.create(
             get_filesync_store(), user.id, '~/path/name')
         key = ['some', 'key']
         download = self.gw.make_download(
@@ -812,7 +831,7 @@ class SystemGatewayTestCase(StorageDALTestCase):
         """
         user = self.gw.create_or_update_user(1, 'username', 'Visible Name',
                                              1)
-        udf = model.UserVolume.create(
+        udf = UserVolume.create(
             get_filesync_store(), user.id, '~/path/name')
         download = self.gw.make_download(
             user.id, udf.id, 'path', 'http://download/url')
@@ -824,21 +843,21 @@ class SystemGatewayTestCase(StorageDALTestCase):
         """The update_download() method can update a download's status."""
         user = self.gw.create_or_update_user(1, 'username', 'Visible Name',
                                              1)
-        udf = model.UserVolume.create(
+        udf = UserVolume.create(
             get_filesync_store(), user.id, '~/spath/name')
         download = self.gw.make_download(
             user.id, udf.id, 'path', 'http://download/url')
         new_download = self.gw.update_download(
             download.owner_id, download.id,
-            status=model.DOWNLOAD_STATUS_DOWNLOADING)
+            status=Download.STATUS_DOWNLOADING)
         self.assertEqual(
-            new_download.status, model.DOWNLOAD_STATUS_DOWNLOADING)
+            new_download.status, Download.STATUS_DOWNLOADING)
 
     def test_update_download_node_id(self):
         """The update_download() method can update a download's node_id."""
         user = self.gw.create_or_update_user(1, 'username', 'Visible Name',
                                              1)
-        udf = model.UserVolume.create(
+        udf = UserVolume.create(
             get_filesync_store(), user.id, '~/path/name')
         download = self.gw.make_download(
             user.id, udf.id, 'path', 'http://download/url')
@@ -853,7 +872,7 @@ class SystemGatewayTestCase(StorageDALTestCase):
         message."""
         user = self.gw.create_or_update_user(1, 'username', 'Visible Name',
                                              1)
-        udf = model.UserVolume.create(
+        udf = UserVolume.create(
             get_filesync_store(), user.id, '~/path/name')
         download = self.gw.make_download(
             user.id, udf.id, 'path', 'http://download/url')
@@ -871,7 +890,7 @@ class SystemGatewayTestCase(StorageDALTestCase):
             user.id, user.root_volume_id, 'path2', 'http://download/url2')
         transaction.commit()
         download2 = self.gw.update_download(
-            user.id, download2.id, status=model.DOWNLOAD_STATUS_ERROR,
+            user.id, download2.id, status=Download.STATUS_ERROR,
             error_message='something died')
         failed_downloads = self.gw.get_failed_downloads(
             start_date=download1.status_change_date,
@@ -884,9 +903,9 @@ class SystemGatewayTestCase(StorageDALTestCase):
                                              1)
         sgw = SystemGateway()
         storage_store = get_filesync_store()
-        root = model.StorageObject.get_root(storage_store, user.id)
+        root = StorageObject.get_root(storage_store, user.id)
         node = root.make_file('TheName')
-        node._content_hash = model.EMPTY_CONTENT_HASH
+        node._content_hash = EMPTY_CONTENT_HASH
         node.mimetype = 'fakemime'
         new_node = sgw.get_node(node.id)
         self.assertEqual(node.id, new_node.id)
@@ -931,7 +950,7 @@ class SystemGatewayTestCase(StorageDALTestCase):
                                      multipart_key=uuid.uuid4())
             # change the when_started date for the test.
             store = get_filesync_store()
-            uploadjob = store.get(model.UploadJob, up1.id)
+            uploadjob = store.get(UploadJob, up1.id)
             uploadjob.when_last_active = (
                 datetime.datetime.now() - datetime.timedelta(uid))
         transaction.commit()
@@ -960,7 +979,7 @@ class SystemGatewayTestCase(StorageDALTestCase):
                                      multipart_key=uuid.uuid4())
             # change the when_started date for the test.
             store = get_filesync_store()
-            uploadjob = store.get(model.UploadJob, up1.id)
+            uploadjob = store.get(UploadJob, up1.id)
             uploadjob.when_last_active = (
                 datetime.datetime.now() - datetime.timedelta(10))
         transaction.commit()
@@ -1092,7 +1111,7 @@ class SystemGatewayPublicFileTestCase(StorageDALTestCase):
         self.assertEqual(file_dao.public_uuid, None)
         public_key = file_dao.public_key
         # lock the user
-        suser = self.store.get(model.StorageUser, self.user1.id)
+        suser = self.store.get(StorageUser, self.user1.id)
         suser.locked = True
         self.store.commit()
         # Once a file has been made public, it can be looked up by its ID.
@@ -1134,7 +1153,7 @@ class SystemGatewayPublicDirectoryTestCase(StorageDALTestCase):
         # If I don't do this, the test fails
         transaction.commit()
         # lock the user
-        suser = self.store.get(model.StorageUser, self.user1.id)
+        suser = self.store.get(StorageUser, self.user1.id)
         suser.locked = True
         self.store.commit()
         # Once a directory has been made public, it can be accessed
@@ -1196,19 +1215,19 @@ class StorageUserGatewayTestCase(StorageDALTestCase):
         user2 = self.gw.get_user(self.user.id)
         quota = self.gw.get_quota()
         self.assertEqual(quota.max_storage_bytes, 2)
-        self.assertEqual(user2._subscription_status, model.STATUS_LIVE)
+        self.assertEqual(user2._subscription_status, STATUS_LIVE)
         # make sure the StorageUserInfo is updated as well
         store = get_filesync_store()
-        info = store.get(model.StorageUserInfo, user2.id)
+        info = store.get(StorageUserInfo, user2.id)
         self.assertEqual(info.max_storage_bytes, 2)
 
         # subscription
         self.gw.update(subscription=False)
         user2 = self.gw.get_user(self.user.id)
-        self.assertEqual(user2._subscription_status, model.STATUS_DEAD)
+        self.assertEqual(user2._subscription_status, STATUS_DEAD)
         self.gw.update(subscription=True)
         user2 = self.gw.get_user(self.user.id)
-        self.assertEqual(user2._subscription_status, model.STATUS_LIVE)
+        self.assertEqual(user2._subscription_status, STATUS_LIVE)
 
     def test_get_udf_gateway_None(self):
         """Make sure method returns None and no Error."""
@@ -1224,16 +1243,16 @@ class StorageUserGatewayTestCase(StorageDALTestCase):
         """Test accepting a direct share."""
         user1 = self.create_user(id=2, username='sharer')
         store = get_filesync_store()
-        root = model.StorageObject.get_root(store, user1.id)
-        share = model.Share(user1.id, root.id, self.user.id, 'Share', 'View')
+        root = StorageObject.get_root(store, user1.id)
+        share = Share(user1.id, root.id, self.user.id, 'Share', Share.VIEW)
         self.store.add(share)
         transaction.commit()
         # if it's dead, it can't be accepted
-        share.status = model.STATUS_DEAD
+        share.status = STATUS_DEAD
         self.assertRaises(errors.DoesNotExist, self.gw.accept_share, share.id)
         # this should succeed
-        share.status = model.STATUS_LIVE
-        self.assertEqual(share.status, model.STATUS_LIVE)
+        share.status = STATUS_LIVE
+        self.assertEqual(share.status, STATUS_LIVE)
         self.assertEqual(share.accepted, False)
         self.gw.accept_share(share.id)
         self.assertEqual(share.accepted, True)
@@ -1244,21 +1263,21 @@ class StorageUserGatewayTestCase(StorageDALTestCase):
         """Test declinet a direct share."""
         user1 = self.create_user(id=2, username='sharer')
         store = get_filesync_store()
-        root = model.StorageObject.get_root(store, user1.id)
-        share = model.Share(user1.id, root.id, self.user.id, 'Share', 'View')
+        root = StorageObject.get_root(store, user1.id)
+        share = Share(user1.id, root.id, self.user.id, 'Share', Share.VIEW)
         self.store.add(share)
         transaction.commit()
         # if it's dead, it can't be accepted
-        share.status = model.STATUS_DEAD
+        share.status = STATUS_DEAD
         self.assertRaises(errors.DoesNotExist, self.gw.decline_share, share.id)
         # this should succeed
-        share.status = model.STATUS_LIVE
-        self.assertEqual(share.status, model.STATUS_LIVE)
+        share.status = STATUS_LIVE
+        self.assertEqual(share.status, STATUS_LIVE)
         self.assertEqual(share.accepted, False)
         self.gw.decline_share(share.id)
         self.assertEqual(share.accepted, False)
         # when a share is declined, it is also deleted
-        self.assertEqual(share.status, model.STATUS_DEAD)
+        self.assertEqual(share.status, STATUS_DEAD)
         # cant be accepted twice
         self.assertRaises(errors.DoesNotExist, self.gw.decline_share, share.id)
 
@@ -1266,20 +1285,20 @@ class StorageUserGatewayTestCase(StorageDALTestCase):
         """Test delete shares from share-er and share-ee"""
         user1 = self.create_user(id=2, username='sharer')
         store = get_filesync_store()
-        root = model.StorageObject.get_root(store, user1.id)
-        share = model.Share(
-            self.user.id, root.id, user1.id, 'Share', 'View')
+        root = StorageObject.get_root(store, user1.id)
+        share = Share(
+            self.user.id, root.id, user1.id, 'Share', Share.VIEW)
         self.store.add(share)
         transaction.commit()
         share = self.gw.get_share(share.id, accepted_only=False)
-        self.assertEqual(share.status, model.STATUS_LIVE)
+        self.assertEqual(share.status, STATUS_LIVE)
         self.gw.delete_share(share.id)
         # share is now inaccessible
         self.assertRaises(errors.DoesNotExist,
                           self.gw.get_share, share.id, accepted_only=False)
         # make it live again so we can test it with the share-ee
-        share = self.store.get(model.Share, share.id)
-        share.status = model.STATUS_LIVE
+        share = self.store.get(Share, share.id)
+        share.status = STATUS_LIVE
         # get user1's gateway and delete it
         user1._gateway.delete_share(share.id)
 
@@ -1445,9 +1464,9 @@ class StorageUserGatewayTestCase(StorageDALTestCase):
         userb._gateway.accept_share(shareb.id)
         for s in [sharea, sharea, shareb, sharec]:
             share = self.user._gateway.get_share(s.id, accepted_only=False)
-            self.assertEqual(share.status, 'Live')
+            self.assertEqual(share.status, STATUS_LIVE)
         transaction.commit()
-        dir1 = store.get(model.StorageObject, dir1.id)
+        dir1 = store.get(StorageObject, dir1.id)
         self.user._gateway.delete_related_shares(dir1)
         # the shares no longer exist
         for s in [sharez, sharea, shareb, sharec]:
@@ -1466,7 +1485,7 @@ class StorageUserGatewayTestCase(StorageDALTestCase):
         sharea = vgw.make_share(dir1.id, 'sharea', user_id=usera.id)
         usera._gateway.accept_share(sharea.id)
         store = get_filesync_store()
-        dir1 = store.get(model.StorageObject, dir1.id)
+        dir1 = store.get(StorageObject, dir1.id)
         self.user._gateway.delete_related_shares(dir1)
         self.assertRaises(
             errors.DoesNotExist,
@@ -1477,7 +1496,7 @@ class StorageUserGatewayTestCase(StorageDALTestCase):
         dls = self.gw.get_downloads()
         self.assertEqual(dls, [])
         sysgw = SystemGateway()
-        udf = model.UserVolume.create(
+        udf = UserVolume.create(
             get_filesync_store(),
             self.user.id, '~/path/name')
         dl_url = 'http://download/url'
@@ -1498,9 +1517,9 @@ class StorageUserGatewayTestCase(StorageDALTestCase):
         """Test get_public_files method."""
         vgw = self.gw.get_root_gateway()
         storage_store = get_filesync_store()
-        root = model.StorageObject.get_root(storage_store, self.user.id)
+        root = StorageObject.get_root(storage_store, self.user.id)
         node = root.make_file('TheName')
-        node._content_hash = model.EMPTY_CONTENT_HASH
+        node._content_hash = EMPTY_CONTENT_HASH
         node.mimetype = 'fakemime'
         vgw.change_public_access(node.id, True)
         nodes = list(self.gw.get_public_files())
@@ -1516,7 +1535,7 @@ class StorageUserGatewayTestCase(StorageDALTestCase):
                 d = root.make_subdirectory(dname)
                 for fname, j in [('file_%s' % j, j) for j in xrange(10)]:
                     f = d.make_file(fname)
-                    f._content_hash = model.EMPTY_CONTENT_HASH
+                    f._content_hash = EMPTY_CONTENT_HASH
                     f.mimetype = 'fakemime'
                     if j % 2:
                         continue
@@ -1529,7 +1548,7 @@ class StorageUserGatewayTestCase(StorageDALTestCase):
         self.assertEqual(file_cnt, len(nodes))
         # and test it with public files inside a UDF
         udf = self.gw.make_udf('~/path/name')
-        udf_root = storage_store.get(model.StorageObject, udf.root_id)
+        udf_root = storage_store.get(StorageObject, udf.root_id)
         create_files(udf_root)
         file_cnt = file_cnt + 5 * 5
         nodes = list(self.gw.get_public_files())
@@ -1539,7 +1558,7 @@ class StorageUserGatewayTestCase(StorageDALTestCase):
         """Test get_public_folders method."""
         vgw = self.gw.get_root_gateway()
         storage_store = get_filesync_store()
-        root = model.StorageObject.get_root(storage_store, self.user.id)
+        root = StorageObject.get_root(storage_store, self.user.id)
         node = root.make_subdirectory('test_dir')
         vgw.change_public_access(node.id, True, allow_directory=True)
         nodes = list(self.gw.get_public_folders())
@@ -1558,9 +1577,9 @@ class StorageUserGatewayTestCase(StorageDALTestCase):
         """Test the get_share_generation method."""
         user1 = self.create_user(id=2, username='sharer')
         store = get_filesync_store()
-        root = model.StorageObject.get_root(store, user1.id)
-        share = model.Share(
-            self.user.id, root.id, user1.id, 'Share', 'View')
+        root = StorageObject.get_root(store, user1.id)
+        share = Share(
+            self.user.id, root.id, user1.id, 'Share', Share.VIEW)
         self.store.add(share)
         transaction.commit()
         share = self.gw.get_share(share.id, accepted_only=False)
@@ -1574,15 +1593,15 @@ class StorageUserGatewayTestCase(StorageDALTestCase):
         """Test the get_share_generation method."""
         user1 = self.create_user(id=2, username='sharer')
         store = get_filesync_store()
-        root = model.StorageObject.get_root(store, user1.id)
-        share = model.Share(
-            self.user.id, root.id, user1.id, 'Share', 'View')
+        root = StorageObject.get_root(store, user1.id)
+        share = Share(
+            self.user.id, root.id, user1.id, 'Share', Share.VIEW)
         self.store.add(share)
         transaction.commit()
         vol = store.find(
-            model.UserVolume,
-            model.UserVolume.id == model.StorageObject.volume_id,
-            model.StorageObject.id == root.id).one()
+            UserVolume,
+            UserVolume.id == StorageObject.volume_id,
+            StorageObject.id == root.id).one()
         # force generation = None
         vol.generation = None
         share = self.gw.get_share(share.id, accepted_only=False)
@@ -1627,8 +1646,8 @@ class StorageUserGatewayTestCase(StorageDALTestCase):
         hash_value = get_fake_hash()
         node = self._make_file_with_content(hash_value)
         get_filesync_store().find(
-            model.ContentBlob,
-            model.ContentBlob.hash == node.content_hash
+            ContentBlob,
+            ContentBlob.hash == node.content_hash
         ).set(magic_hash=b'magic')
         blobexists, storage_key = self.gw.is_reusable_content(hash_value,
                                                               'magic')
@@ -1656,8 +1675,8 @@ class StorageUserGatewayTestCase(StorageDALTestCase):
         hash_value = get_fake_hash()
         node = self._make_file_with_content(hash_value, gw=user2._gateway)
         get_filesync_store().find(
-            model.ContentBlob,
-            model.ContentBlob.hash == node.content_hash
+            ContentBlob,
+            ContentBlob.hash == node.content_hash
         ).set(magic_hash=b'magic')
         self.assertTrue(self.gw.is_reusable_content(hash_value, 'magic'))
         blobexists, storage_key = self.gw.is_reusable_content(hash_value,
@@ -1685,8 +1704,8 @@ class StorageUserGatewayTestCase(StorageDALTestCase):
         hash_value = get_fake_hash()
         node = self._make_file_with_content(hash_value)
         get_filesync_store().find(
-            model.ContentBlob,
-            model.ContentBlob.hash == node.content_hash
+            ContentBlob,
+            ContentBlob.hash == node.content_hash
         ).set(magic_hash=b'magic')
         blobexists, blob = self.gw._get_reusable_content(hash_value, 'magic')
         self.assertTrue(blobexists)
@@ -1713,8 +1732,8 @@ class StorageUserGatewayTestCase(StorageDALTestCase):
         hash_value = get_fake_hash()
         node = self._make_file_with_content(hash_value, gw=user2._gateway)
         get_filesync_store().find(
-            model.ContentBlob,
-            model.ContentBlob.hash == node.content_hash
+            ContentBlob,
+            ContentBlob.hash == node.content_hash
         ).set(magic_hash=b'magic')
         self.assertTrue(self.gw._get_reusable_content(hash_value, 'magic'))
         blobexists, blob = self.gw._get_reusable_content(hash_value, 'magic')
@@ -1754,7 +1773,7 @@ class StorageUserGatewayTestCase(StorageDALTestCase):
             d3 = vgw.make_tree(root.id, '/a/path/with/pics4')
             vgw.make_file_with_content(
                 d3.id, 'picture.jpg',
-                model.EMPTY_CONTENT_HASH, 0, 0, 0, uuid.uuid4())
+                EMPTY_CONTENT_HASH, 0, 0, 0, uuid.uuid4())
         # this udf's results should not show up
         self.gw.delete_udf(udf3.id)
         dirs = list(self.gw.get_photo_directories())
@@ -1836,7 +1855,7 @@ class ReadWriteVolumeGatewayUtilityTests(StorageDALTestCase):
     def test_get_all_nodes_only_from_volume(self):
         """Test get_all_nodes."""
         # make some files on a UDF...
-        udf = model.UserVolume.create(
+        udf = UserVolume.create(
             self.storage_store, self.user.id, '~/thepath/thename')
         udf_dao = dao.UserVolume(udf, self.user)
         udf_vgw = ReadWriteVolumeGateway(self.user, udf=udf_dao)
@@ -1915,10 +1934,10 @@ class ReadWriteVolumeGatewayUtilityTests(StorageDALTestCase):
         # sort them in the right order
         files.sort(key=attrgetter('path', 'name'))
         dirs.sort(key=attrgetter('path', 'name'))
-        all_nodes = self.vgw.get_all_nodes(kind='File')
+        all_nodes = self.vgw.get_all_nodes(kind=StorageObject.FILE)
         self.assertEqual(len(all_nodes), 10)
         self.assertEqual(all_nodes, files)
-        all_nodes = self.vgw.get_all_nodes(kind='Directory')
+        all_nodes = self.vgw.get_all_nodes(kind=StorageObject.DIRECTORY)
         self.assertEqual(len(all_nodes), 11)
         self.assertEqual(all_nodes, dirs)
 
@@ -1960,7 +1979,8 @@ class ReadWriteVolumeGatewayUtilityTests(StorageDALTestCase):
             root_id, 'file%s.tif' % i, hash,
             1, 1, 1, key, mimetype=m)
         [mkfile(i, 'image/tif') for i in range(10)]
-        all_nodes = self.vgw.get_all_nodes(kind='File', with_content=True)
+        all_nodes = self.vgw.get_all_nodes(
+            kind=StorageObject.FILE, with_content=True)
         self.assertEqual(len(all_nodes), 10)
         for n in all_nodes:
             self.assertEqual(n.content.hash, hash)
@@ -2089,7 +2109,7 @@ class ReadWriteVolumeGatewayUtilityTests(StorageDALTestCase):
             self):
         """Test get_all_nodes wiht max_generation and limit for a UDF."""
         # make some files on a UDF...
-        udf = model.UserVolume.create(
+        udf = UserVolume.create(
             self.storage_store, self.user.id, '~/thepath/thename')
         udf_dao = dao.UserVolume(udf, self.user)
         udf_vgw = ReadWriteVolumeGateway(self.user, udf=udf_dao)
@@ -2264,7 +2284,7 @@ class ReadWriteVolumeGatewayUtilityTests(StorageDALTestCase):
 
     def test_get_all_nodes_chunked_only_root_in_volume(self):
         """Test chunked get_all_nodes with only one node, the root."""
-        udf = model.UserVolume.create(
+        udf = UserVolume.create(
             self.storage_store, self.user.id, '~/thepath/thename')
         udf_dao = dao.UserVolume(udf, self.user)
         udf_vgw = ReadWriteVolumeGateway(self.user, udf=udf_dao)
@@ -2332,9 +2352,9 @@ class ReadWriteVolumeGatewayUtilityTests(StorageDALTestCase):
         f1 = self.vgw.make_file(d.id, 'file.txt')
         self.vgw.move_node(f1.id, y.id, f1.name)
         mfs = self.storage_store.find(
-            model.MoveFromShare,
-            model.MoveFromShare.id == f1.id,
-            model.MoveFromShare.status == model.STATUS_DEAD)
+            MoveFromShare,
+            MoveFromShare.id == f1.id,
+            MoveFromShare.status == STATUS_DEAD)
         # should have 2 MoveFromShare
         shares = [n.share_id for n in mfs]
         self.assertEqual(len(shares), 2)
@@ -2353,7 +2373,7 @@ class ReadWriteVolumeGatewayUtilityTests(StorageDALTestCase):
         np = self.vgw.make_tree(d.id, '/q/w/e/r/t/y')
         self.assertTrue(np.full_path.startswith(f1.path))
         self.vgw.move_node(f1.id, np.id, f1.name)
-        mfs = self.storage_store.find(model.MoveFromShare)
+        mfs = self.storage_store.find(MoveFromShare)
         # should have no MoveFromShare
         self.assertEqual(mfs.count(), 0)
 
@@ -2366,7 +2386,7 @@ class ReadWriteVolumeGatewayUtilityTests(StorageDALTestCase):
         f1 = self.vgw.make_file(d.id, 'file.txt')
         np = self.vgw.get_node_by_path('/a/b/c/')
         self.vgw.move_node(f1.id, np.id, f1.name)
-        mfs = self.storage_store.find(model.MoveFromShare)
+        mfs = self.storage_store.find(MoveFromShare)
         # should have two shares listed with the node
         shares = [n.share_id for n in mfs]
         self.assertEqual(len(shares), 2)
@@ -2429,9 +2449,9 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
         self.owner_quota = self.owner.get_quota()
         self.vgw = self.user._gateway.get_root_gateway()
         self.root = self.storage_store.get(
-            model.StorageObject, self.vgw.get_root().id)
+            StorageObject, self.vgw.get_root().id)
         self.file = self.root.make_file('TheName')
-        self.file._content_hash = model.EMPTY_CONTENT_HASH
+        self.file._content_hash = EMPTY_CONTENT_HASH
         self.file.mimetype = 'fakemime'
 
     def tweak_users_quota(self, user_id, max_bytes, used_bytes=0):
@@ -2439,8 +2459,8 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
         self.gw.get_user(user_id)
         store = get_filesync_store()
         store.find(
-            model.StorageUserInfo,
-            model.StorageUserInfo.id == user_id
+            StorageUserInfo,
+            StorageUserInfo.id == user_id
         ).set(max_storage_bytes=max_bytes, used_storage_bytes=used_bytes)
         store.commit()
 
@@ -2448,7 +2468,7 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
         """Test _get_quota."""
         self.owner_quota.load()
         quota = self.vgw._get_quota()
-        self.assertTrue(isinstance(quota, model.StorageUserInfo))
+        self.assertTrue(isinstance(quota, StorageUserInfo))
         self.assertEqual(self.owner_quota.id, quota.id)
         self.assertEqual(self.owner_quota.free_bytes, quota.free_bytes)
 
@@ -2488,39 +2508,39 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
         # create a file to test with
         tables, origin = self.vgw._get_left_joins(
             with_content=False, with_parent=False)
-        self.assertEqual(tables, (model.StorageObject,))
-        self.assertEqual(origin, [model.StorageObject])
+        self.assertEqual(tables, (StorageObject,))
+        self.assertEqual(origin, [StorageObject])
         result = self.storage_store.using(*origin).find(
-            tables, model.StorageObject.id == self.file.id).one()
+            tables, StorageObject.id == self.file.id).one()
         object, content, parent = self.vgw._split_result(result)
-        self.assertTrue(isinstance(object, model.StorageObject))
+        self.assertTrue(isinstance(object, StorageObject))
         self.assertTrue(content is None)
         self.assertTrue(parent is None)
 
     def test__get_left_joins_with_content(self):
         tables, origin = self.vgw._get_left_joins(
             with_content=True, with_parent=False)
-        self.assertEqual(tables, (model.StorageObject, model.ContentBlob))
+        self.assertEqual(tables, (StorageObject, ContentBlob))
         # make sure it doesn't blow up..other tests will happen later
         result = self.storage_store.using(*origin).find(
-            tables, model.StorageObject.id == self.file.id).one()
+            tables, StorageObject.id == self.file.id).one()
         object, content, parent = self.vgw._split_result(result)
-        self.assertTrue(isinstance(object, model.StorageObject))
-        self.assertTrue(isinstance(content, model.ContentBlob))
+        self.assertTrue(isinstance(object, StorageObject))
+        self.assertTrue(isinstance(content, ContentBlob))
         self.assertTrue(parent is None)
 
     def test__get_left_joins_with_parent(self):
         tables, origin = self.vgw._get_left_joins(
             with_content=False, with_parent=True)
-        self.assertEqual(tables[0], model.StorageObject)
+        self.assertEqual(tables[0], StorageObject)
         # The second element in tables will be a ClassAlias, so we check
         # its base class here.
-        self.assertEqual(tables[1].__base__, model.StorageObject)
+        self.assertEqual(tables[1].__base__, StorageObject)
         # make sure it doesn't blow up..other tests will happen later
         result = self.storage_store.using(*origin).find(
-            tables, model.StorageObject.id == self.file.id).one()
+            tables, StorageObject.id == self.file.id).one()
         object, content, parent = self.vgw._split_result(result)
-        self.assertTrue(isinstance(object, model.StorageObject))
+        self.assertTrue(isinstance(object, StorageObject))
         self.assertTrue(content is None)
         self.assertTrue(parent.id, object.parent_id)
 
@@ -2530,16 +2550,16 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
                           self.vgw._get_kind_conditions, 'YYY')
         cond = self.vgw._get_kind_conditions(None)
         self.assertEqual(cond, [])
-        cond = self.vgw._get_kind_conditions('File')
-        self.assertEqual(cond, [model.StorageObject.kind == 'File'])
-        cond = self.vgw._get_kind_conditions('Directory')
-        self.assertEqual(cond, [model.StorageObject.kind == 'Directory'])
+        cond = self.vgw._get_kind_conditions(StorageObject.FILE)
+        self.assertEqual(cond, [StorageObject.kind == StorageObject.FILE])
+        cond = self.vgw._get_kind_conditions(StorageObject.DIRECTORY)
+        self.assertEqual(cond, [StorageObject.kind == StorageObject.DIRECTORY])
 
     def test__get_node_simple(self):
         """Test the _get_node_simple method."""
         node = self.vgw._get_node_simple(self.file.id)
         self.assertEqual(node, self.file)
-        self.file.status = 'Dead'
+        self.file.status = STATUS_DEAD
         node = self.vgw._get_node_simple(self.file.id, live_only=True)
         self.assertEqual(node, None)
         node = self.vgw._get_node_simple(self.file.id, live_only=False)
@@ -2564,7 +2584,7 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
         node = self.vgw._get_node_from_result(result)
         self.assertEqual(node.id, self.file.id)
         self.assertEqual(node.content.hash, self.file.content.hash)
-        self.file.status = model.STATUS_DEAD
+        self.file.status = STATUS_DEAD
         result = self.vgw._get_node(self.file.id, with_content=True)
         object, content, parent = self.vgw._split_result(result)
         self.assertEqual(object, None)
@@ -2584,7 +2604,8 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
         self.assertEqual(content.hash, self.file.content.hash)
         # test some conditions with none:
         # no Directories
-        result = self.vgw._get_children(self.file.parent_id, kind='Directory')
+        result = self.vgw._get_children(
+            self.file.parent_id, kind=StorageObject.DIRECTORY)
         self.assertEqual(result.count(), 0)
         # Filter by mimetypes
         result = self.vgw._get_children(
@@ -2594,22 +2615,28 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
             self.file.parent_id, mimetypes=['fakemime'])
         self.assertEqual(result.count(), 1)
         # only dead children
-        self.file.status = model.STATUS_DEAD
+        self.file.status = STATUS_DEAD
         result = self.vgw._get_children(self.file.parent_id)
         self.assertEqual(result.count(), 0)
 
     def test_check_has_children(self):
         """Test the check_has_children function."""
-        a_dir = self.vgw.make_subdirectory(self.root.id, 'Directory')
-        self.assertTrue(self.vgw.check_has_children(self.root.id, 'File'))
-        self.assertTrue(self.vgw.check_has_children(self.root.id, 'Directory'))
+        a_dir = self.vgw.make_subdirectory(
+            self.root.id, StorageObject.DIRECTORY)
+        self.assertTrue(
+            self.vgw.check_has_children(self.root.id, StorageObject.FILE))
+        self.assertTrue(
+            self.vgw.check_has_children(self.root.id, StorageObject.DIRECTORY))
         self.vgw.delete_node(self.file.id)
-        self.assertFalse(self.vgw.check_has_children(self.root.id, 'File'))
-        self.assertTrue(self.vgw.check_has_children(self.root.id, 'Directory'))
-        self.vgw.delete_node(a_dir.id)
-        self.assertFalse(self.vgw.check_has_children(self.root.id, 'File'))
         self.assertFalse(
-            self.vgw.check_has_children(self.root.id, 'Directory'))
+            self.vgw.check_has_children(self.root.id, StorageObject.FILE))
+        self.assertTrue(
+            self.vgw.check_has_children(self.root.id, StorageObject.DIRECTORY))
+        self.vgw.delete_node(a_dir.id)
+        self.assertFalse(
+            self.vgw.check_has_children(self.root.id, StorageObject.FILE))
+        self.assertFalse(
+            self.vgw.check_has_children(self.root.id, StorageObject.DIRECTORY))
 
     def test_get_child_by_name(self):
         """Test the get_child_by_name method."""
@@ -2628,7 +2655,7 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
             errors.DoesNotExist,
             self.vgw.get_child_by_name, self.file.parent_id, 'fake')
         # dead file
-        self.file.status = model.STATUS_DEAD
+        self.file.status = STATUS_DEAD
         self.assertRaises(
             errors.DoesNotExist,
             self.vgw.get_child_by_name, self.file.parent_id, self.file.name)
@@ -2792,7 +2819,7 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
         self.assertEqual(upload_job.crc32_hint, crc)
         self.assertEqual(upload_job.inflated_size_hint, size)
         self.assertEqual(upload_job.deflated_size_hint, def_size)
-        self.assertEqual(upload_job.status, model.STATUS_LIVE)
+        self.assertEqual(upload_job.status, STATUS_LIVE)
         self.assertEqual(upload_job.content_exists, False)
         self.assertEqual(upload_job.file.id, a_file.id)
         upload = self.vgw.get_uploadjob(upload_job.id)
@@ -3047,14 +3074,14 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
         self.assertEqual(content.crc32, crc)
         self.assertEqual(content.size, size)
         self.assertEqual(content.deflated_size, def_size)
-        self.assertEqual(content.status, model.STATUS_LIVE)
+        self.assertEqual(content.status, STATUS_LIVE)
         self.assertEqual(content.storage_key, key)
         self.assertEqual(content.magic_hash, magic_hash)
 
         # make it Dead
         self.storage_store.find(
-            model.ContentBlob,
-            model.ContentBlob.hash == hash).set(status=model.STATUS_DEAD)
+            ContentBlob,
+            ContentBlob.hash == hash).set(status=STATUS_DEAD)
 
         # dead content throws exception
         self.assertRaises(errors.DoesNotExist, self.vgw.get_content, hash)
@@ -3098,7 +3125,7 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
         a_file = self.vgw.get_node(node.id, with_content=True)
         self.assertEqual(a_file.name, 'filename')
         self.assertEqual(a_file.mimetype, 'image/tif')
-        self.assertEqual(a_file.status, model.STATUS_LIVE)
+        self.assertEqual(a_file.status, STATUS_LIVE)
         self.assertEqual(a_file.content.hash, hash)
         self.assertEqual(a_file.content.crc32, crc)
         self.assertEqual(a_file.content.size, size)
@@ -3280,7 +3307,8 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
         self.assertEqual(d2.id, dir2.id)
         f2 = self.vgw.get_node_by_path('/dir1/file2.mp3')
         self.assertEqual(f2.id, file2.id)
-        d3 = self.vgw.get_node_by_path('/dir1/dir2/dir3', kind='Directory')
+        d3 = self.vgw.get_node_by_path(
+            '/dir1/dir2/dir3', kind=StorageObject.DIRECTORY)
         self.assertEqual(d3.id, dir3.id)
         f3 = self.vgw.get_node_by_path('/dir1/dir2/file3.mp3')
         self.assertEqual(f3.id, file3.id)
@@ -3289,7 +3317,7 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
         # object accessable without inital / path
         d1 = self.vgw.get_node_by_path('dir1')
         self.assertEqual(d1.id, dir1.id)
-        f1 = self.vgw.get_node_by_path('file1.txt', kind='File')
+        f1 = self.vgw.get_node_by_path('file1.txt', kind=StorageObject.FILE)
         self.assertEqual(f1.id, file1.id)
         d2 = self.vgw.get_node_by_path('dir1/dir2')
         self.assertEqual(d2.id, dir2.id)
@@ -3308,10 +3336,10 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
             self.vgw.get_node_by_path, '/X..Y/')
         self.assertRaises(
             errors.DoesNotExist,
-            self.vgw.get_node_by_path, '/dir1', kind='File')
+            self.vgw.get_node_by_path, '/dir1', kind=StorageObject.FILE)
         self.assertRaises(
-            errors.DoesNotExist,
-            self.vgw.get_node_by_path, '/file1.txt', kind='Directory')
+            errors.DoesNotExist, self.vgw.get_node_by_path, '/file1.txt',
+            kind=StorageObject.DIRECTORY)
 
     def test_get_generation_delta(self):
         """Test get generation delta limiter."""
@@ -3422,14 +3450,14 @@ class UDFReadWriteVolumeGatewayApiTest(CommonReadWriteVolumeGatewayApiTest):
         self.owner_quota = self.user_quota
         self.storage_store = get_filesync_store()
         # make a test file using storm
-        udf = model.UserVolume.create(
+        udf = UserVolume.create(
             self.storage_store, self.user.id, '~/thepath/thename')
         udf_dao = dao.UserVolume(udf, self.user)
         self.vgw = ReadWriteVolumeGateway(self.user, udf=udf_dao)
         self.root = self.storage_store.get(
-            model.StorageObject, self.vgw.get_root().id)
+            StorageObject, self.vgw.get_root().id)
         self.file = self.root.make_file('TheName')
-        self.file._content_hash = model.EMPTY_CONTENT_HASH
+        self.file._content_hash = EMPTY_CONTENT_HASH
         self.file.mimetype = 'fakemime'
 
 
@@ -3447,12 +3475,12 @@ class ShareReadWriteVolumeGatewayApiTest(CommonReadWriteVolumeGatewayApiTest):
         self.owner = sharer
         self.owner_quota = sharer._gateway.get_quota()
         self.storage_store = get_filesync_store()
-        root = model.StorageObject.get_root(self.storage_store, sharer.id)
+        root = StorageObject.get_root(self.storage_store, sharer.id)
         rw_node = root.make_subdirectory('WriteMe')
         transaction.commit()
         # share a node with the user with modify access
-        rw_share = model.Share(
-            sharer.id, rw_node.id, self.user.id, 'WriteShare', 'Modify')
+        rw_share = Share(
+            sharer.id, rw_node.id, self.user.id, 'WriteShare', Share.MODIFY)
         self.store.add(rw_share)
         rw_share.accept()
         # self.store.add(self.wrong_share)
@@ -3460,9 +3488,9 @@ class ShareReadWriteVolumeGatewayApiTest(CommonReadWriteVolumeGatewayApiTest):
         share_dao = dao.SharedDirectory(rw_share, by_user=sharer)
         self.vgw = ReadWriteVolumeGateway(self.user, share=share_dao)
         self.root = self.storage_store.get(
-            model.StorageObject, self.vgw.get_root().id)
+            StorageObject, self.vgw.get_root().id)
         self.file = self.root.make_file('TheName')
-        self.file._content_hash = model.EMPTY_CONTENT_HASH
+        self.file._content_hash = EMPTY_CONTENT_HASH
         self.file.mimetype = 'fakemime'
 
 #
@@ -3485,9 +3513,9 @@ class RootReadWriteVolumeGatewayTestCase(StorageDALTestCase):
         self.storage_store = get_filesync_store()
         # make a test file
         vgw = self.user._gateway.get_root_gateway()
-        root = self.storage_store.get(model.StorageObject, vgw.get_root().id)
+        root = self.storage_store.get(StorageObject, vgw.get_root().id)
         self.file = root.make_file('TheName')
-        self.file._content_hash = model.EMPTY_CONTENT_HASH
+        self.file._content_hash = EMPTY_CONTENT_HASH
         self.file.mimetype = 'fakemime'
 
     def test_root_volume(self):
@@ -3500,7 +3528,7 @@ class RootReadWriteVolumeGatewayTestCase(StorageDALTestCase):
         self.assertEqual(vgw.udf, None)
         self.assertEqual(vgw.share, None)
         # make sure we have the correct root
-        node = model.StorageObject.get_root(self.storage_store, self.user.id)
+        node = StorageObject.get_root(self.storage_store, self.user.id)
         root = vgw.get_root()
         self.assertEqual(root.id, node.id)
         # this technically tests the DirectoryNode DAO properties
@@ -3517,7 +3545,7 @@ class RootReadWriteVolumeGatewayTestCase(StorageDALTestCase):
         self.assertEqual(vgw.session_id, 'QWERTY')
         # error conditions
         # the only error for a root is if the root doesn't exist or is Dead
-        node.status = model.STATUS_DEAD
+        node.status = STATUS_DEAD
         self.assertRaises(errors.DoesNotExist, vgw.get_root)
 
     def test_make_share(self):
@@ -3576,12 +3604,12 @@ class UDFReadWriteVolumeGatewayTestCase(StorageDALTestCase):
         self.user = self.gw.get_user(user.id, session_id='QWERTY')
         self.storage_store = get_filesync_store()
         # make a test file using storm
-        self.udf = model.UserVolume.create(
+        self.udf = UserVolume.create(
             self.storage_store, self.user.id, '~/thepath/thename')
         udf_dao = dao.UserVolume(self.udf, self.user)
         self.vgw = ReadWriteVolumeGateway(self.user, udf=udf_dao)
         self.root = self.storage_store.get(
-            model.StorageObject, self.vgw.get_root().id)
+            StorageObject, self.vgw.get_root().id)
 
     def test_udf_volume(self):
         """Test a ReadWriteVolumeGateway for a UDF."""
@@ -3594,11 +3622,11 @@ class UDFReadWriteVolumeGatewayTestCase(StorageDALTestCase):
         self.assertEqual(vgw.read_only, False)
         self.assertEqual(vgw.udf, udf_dao)
         self.assertEqual(vgw.share, None)
-        node = self.storage_store.get(model.StorageObject, udf.root_id)
+        node = self.storage_store.get(StorageObject, udf.root_id)
         root = vgw.get_root()
         self.assertEqual(root.id, node.id)
         self.assertEqual(root.volume_id, udf.id)
-        self.assertNotEqual(root.volume_id, model.ROOT_VOLUME)
+        self.assertNotEqual(root.volume_id, ROOT_VOLUME)
         self.assertEqual(root.owner, self.user)
         self.assertEqual(root.can_read, True)
         self.assertEqual(root.can_write, True)
@@ -3610,18 +3638,18 @@ class UDFReadWriteVolumeGatewayTestCase(StorageDALTestCase):
         self.assertEqual(vgw.owner, self.user)
         self.assertEqual(vgw.root_id, udf.root_id)
         # if the status is dead, the root is not acceptable
-        udf.status = model.STATUS_DEAD
+        udf.status = STATUS_DEAD
         udf_dao = dao.UserVolume(udf, self.user)
         self.assertRaises(errors.NoPermission,
                           ReadWriteVolumeGateway, self.user, udf=udf_dao)
-        udf.status = model.STATUS_LIVE
+        udf.status = STATUS_LIVE
         # the owners must match
         udf_dao.owner_id = 1000
         self.assertRaises(errors.NoPermission,
                           ReadWriteVolumeGateway, self.user, udf=udf_dao)
         udf_dao.owner_id = self.user.id
         # the node for the UDF must be live
-        node.status = model.STATUS_DEAD
+        node.status = STATUS_DEAD
         self.assertRaises(errors.DoesNotExist, vgw.get_root)
 
     def test_make_share(self):
@@ -3702,17 +3730,17 @@ class ShareGatewayTestCase(StorageDALTestCase):
         self.sharer = self.create_user(id=2, username='sharer')
         self.othersharee = self.create_user(id=3, username='sharee')
         store = get_filesync_store()
-        root = model.StorageObject.get_root(store, self.sharer.id)
+        root = StorageObject.get_root(store, self.sharer.id)
         self.r_node = root.make_subdirectory('NoWrite')
         self.file = self.r_node.make_file('A File for uploads')
         self.rw_node = root.make_subdirectory('WriteMe')
         transaction.commit()
-        self.r_share = model.Share(
+        self.r_share = Share(
             self.sharer.id, self.r_node.id, self.user.id, 'NoWriteShare',
-            'View')
-        self.rw_share = model.Share(
+            Share.VIEW)
+        self.rw_share = Share(
             self.sharer.id, self.rw_node.id, self.user.id, 'WriteShare',
-            'Modify')
+            Share.MODIFY)
         self.store.add(self.r_share)
         self.store.add(self.rw_share)
         self.r_share.accept()
@@ -3767,12 +3795,12 @@ class ShareGatewayTestCase(StorageDALTestCase):
 
     def test_user_gateway_get_share(self):
         """Test UserGateway get_share methods."""
-        wrong_share = model.Share(
+        wrong_share = Share(
             self.sharer.id, self.rw_node.id, self.othersharee.id, 'WriteShare',
-            'View')
+            Share.VIEW)
         # test with a share offer
-        shareoffer = model.Share(
-            self.sharer.id, self.r_node.id, None, 'offer', 'View',
+        shareoffer = Share(
+            self.sharer.id, self.r_node.id, None, 'offer', Share.VIEW,
             email='fake@example.com')
         self.store.add(shareoffer)
         so = self.sharer._gateway.get_share(shareoffer.id, accepted_only=False)
@@ -3809,9 +3837,9 @@ class ShareGatewayTestCase(StorageDALTestCase):
 
     def test_wrong_share(self):
         """Test when share is for another user."""
-        wrong_share = model.Share(
+        wrong_share = Share(
             self.sharer.id, self.rw_node.id, self.othersharee.id, 'WriteShare',
-            'View')
+            Share.VIEW)
         share_dao = dao.SharedDirectory(wrong_share, by_user=self.sharer)
         self.assertNotEqual(share_dao.shared_to_id, self.user.id)
         self.assertRaises(errors.NoPermission,
@@ -3827,7 +3855,7 @@ class ShareGatewayTestCase(StorageDALTestCase):
 
     def test_dead_share(self):
         """Dead shares share no files."""
-        self.r_share.status = model.STATUS_DEAD
+        self.r_share.status = STATUS_DEAD
         transaction.commit()
         share_dao = dao.SharedDirectory(self.r_share, by_user=self.sharer)
         self.assertRaises(errors.NoPermission, ReadWriteVolumeGateway,
@@ -4206,7 +4234,7 @@ class GenerationsTestCase(StorageDALTestCase):
         self.ugw = StorageUserGateway(self.user)
         self.vgw = self.ugw.get_root_gateway()
         self.volume = self.storage_store.get(
-            model.UserVolume, self.user.root_volume_id)
+            UserVolume, self.user.root_volume_id)
 
     def test_make_file(self):
         """Test make_file increments generation."""
@@ -4252,15 +4280,15 @@ class GenerationsTestCase(StorageDALTestCase):
         self.assertEqual(self.volume.generation, 3)
         self.vgw.move_node(file2.id, subdir.id, file2.name)
         self.assertEqual(self.volume.generation, 5)
-        d1 = self.storage_store.get(model.StorageObject, subdir.id)
-        f1 = self.storage_store.get(model.StorageObject, file1.id)
-        f2 = self.storage_store.get(model.StorageObject, file2.id)
+        d1 = self.storage_store.get(StorageObject, subdir.id)
+        f1 = self.storage_store.get(StorageObject, file1.id)
+        f2 = self.storage_store.get(StorageObject, file2.id)
         # the generation of original directory stays the same
         self.assertEqual(d1.generation, 1)
         # both the moved and overwritten files changed
         self.assertEqual(f1.generation, 4)
         self.assertEqual(f1.generation_created, 2)
-        self.assertEqual(f1.status, model.STATUS_DEAD)
+        self.assertEqual(f1.status, STATUS_DEAD)
         self.assertEqual(f2.generation, 5)
 
     def test_make_file_with_content(self):
@@ -4286,7 +4314,7 @@ class GenerationsTestCase(StorageDALTestCase):
         def_size = 10000
         self.vgw.make_content(filenode.id, filenode.content_hash, new_hash,
                               crc, size, def_size, uuid.uuid4())
-        f1 = self.storage_store.get(model.StorageObject, filenode.id)
+        f1 = self.storage_store.get(StorageObject, filenode.id)
         self.assertEqual(self.volume.generation, 2)
         self.assertEqual(f1.generation, 2)
         self.assertEqual(f1.generation_created, 1)
@@ -4297,7 +4325,7 @@ class GenerationsTestCase(StorageDALTestCase):
         utils.set_public_uuid = False
         a_file = self.vgw.make_file(self.vgw.get_root().id, 'the file name')
         a_file = self.vgw.change_public_access(a_file.id, True)
-        f1 = self.storage_store.get(model.StorageObject, a_file.id)
+        f1 = self.storage_store.get(StorageObject, a_file.id)
         self.assertEqual(f1.generation, 2)
         self.assertEqual(f1.generation_created, 1)
         self.assertEqual(f1.public_uuid, None)
@@ -4309,19 +4337,19 @@ class GenerationsTestCase(StorageDALTestCase):
         utils.set_public_uuid = True
         a_file = self.vgw.make_file(self.vgw.get_root().id, 'the file name')
         a_file = self.vgw.change_public_access(a_file.id, True)
-        f1 = self.storage_store.get(model.StorageObject, a_file.id)
+        f1 = self.storage_store.get(StorageObject, a_file.id)
         self.assertEqual(f1.generation, 2)
         self.assertEqual(f1.generation_created, 1)
         self.assertNotEqual(f1.public_uuid, None)
         public_uuid = a_file.public_uuid
-        pf = self.store.get(model.PublicNode, a_file.public_id)
+        pf = self.store.get(PublicNode, a_file.public_id)
         self.assertEqual(public_uuid, pf.public_uuid)
         # make sure the uuid is still saved despite other changes
         a_file = self.vgw.change_public_access(a_file.id, False)
-        f1 = self.storage_store.get(model.StorageObject, a_file.id)
+        f1 = self.storage_store.get(StorageObject, a_file.id)
         self.assertEqual(f1.public_uuid, public_uuid)
         a_file = self.vgw.change_public_access(a_file.id, True)
-        f1 = self.storage_store.get(model.StorageObject, a_file.id)
+        f1 = self.storage_store.get(StorageObject, a_file.id)
         self.assertEqual(f1.public_uuid, public_uuid)
         utils.set_public_uuid = saved_flag
 
@@ -4393,7 +4421,7 @@ class GenerationsTestCase(StorageDALTestCase):
         self.assertTrue(sh_subdir in sh_delta)
         self.assertTrue(sh_file1 in sh_delta)
         self.assertTrue(sh_delta[1].id, sh_file1.id)
-        self.assertTrue(sh_delta[1].status, model.STATUS_DEAD)
+        self.assertTrue(sh_delta[1].status, STATUS_DEAD)
         # moving it back into the share in a different folder.
         # the file will be in the delta Live
         r_subdir2 = self.vgw.make_subdirectory(r_dir.id, 'subdir2')
@@ -4405,7 +4433,7 @@ class GenerationsTestCase(StorageDALTestCase):
         self.assertTrue(sh_subdir2 in sh_delta)
         self.assertTrue(sh_file1 in sh_delta)
         self.assertTrue(sh_delta[2].id, sh_file1.id)
-        self.assertTrue(sh_delta[2].status, model.STATUS_LIVE)
+        self.assertTrue(sh_delta[2].status, STATUS_LIVE)
         # moving it within the share to the root.
         # the file will be in the delta Live
         self.vgw.move_node(r_file1.id, r_subdir.id, r_file1.name)
@@ -4415,7 +4443,7 @@ class GenerationsTestCase(StorageDALTestCase):
         self.assertTrue(sh_subdir2 in sh_delta)
         self.assertTrue(sh_file1 in sh_delta)
         self.assertTrue(sh_delta[2].id, sh_file1.id)
-        self.assertTrue(sh_delta[2].status, model.STATUS_LIVE)
+        self.assertTrue(sh_delta[2].status, STATUS_LIVE)
 
     def test_delta_order(self):
         """Test delta is always in order."""
@@ -4617,7 +4645,7 @@ class TestVolumeGenerationUniqueKeyViolation(ORMTestCase):
         fix_all_udfs_with_generation_out_of_sync(logging)
         store = Store.of(obj)
         self.assertEqual(expected_generation,
-                         store.get(model.UserVolume, vol_id).generation)
+                         store.get(UserVolume, vol_id).generation)
 
     def test_fix_all_udfs_with_gen_out_of_sync_dry_run(self):
         user = self.obj_factory.make_user()

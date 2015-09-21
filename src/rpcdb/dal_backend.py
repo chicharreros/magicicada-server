@@ -22,7 +22,8 @@ from __future__ import unicode_literals
 
 import uuid
 
-from backends.filesync.data import services, errors, model
+from backends.filesync.data import services, errors
+from backends.filesync.data.model import STATUS_LIVE, StorageObject
 
 
 class DAL(object):
@@ -271,8 +272,8 @@ class DAL(object):
 
     def _process_node(self, node):
         """Get info from a node."""
-        is_live = node.status == model.STATUS_LIVE
-        is_file = node.kind == 'File'
+        is_live = node.status == STATUS_LIVE
+        is_file = node.kind == StorageObject.FILE
         content = node.content
         if content is not None:
             crc32 = content.crc32

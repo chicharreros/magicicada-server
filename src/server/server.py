@@ -56,6 +56,7 @@ from twisted.python.failure import Failure
 from metrics import get_meter
 from metrics.metricsconnector import MetricsConnector
 from backends.filesync.data import errors as dataerror
+from backends.filesync.data.model import Share, StorageObject
 from backends.filesync.notifier import notifier
 from magicicada import settings
 from ubuntuone.storage.server.logger import configure_logger, TRACE
@@ -1202,8 +1203,8 @@ class CreateShare(SimpleRequestResponse):
     # these are the valid access levels and their translation from the
     # protocol message
     _valid_access_levels = {
-        protocol_pb2.CreateShare.VIEW: 'View',
-        protocol_pb2.CreateShare.MODIFY: 'Modify',
+        protocol_pb2.CreateShare.VIEW: Share.VIEW,
+        protocol_pb2.CreateShare.MODIFY: Share.MODIFY,
     }
 
     user_activity = 'create_share'
@@ -2194,11 +2195,11 @@ class MakeResponse(SimpleRequestResponse):
         if self.source_message.type == protocol_pb2.Message.MAKE_DIR:
             response_type = protocol_pb2.Message.NEW_DIR
             create_method_name = 'make_dir'
-            node_type = 'Directory'
+            node_type = StorageObject.DIRECTORY
         elif self.source_message.type == protocol_pb2.Message.MAKE_FILE:
             response_type = protocol_pb2.Message.NEW_FILE
             create_method_name = 'make_file'
-            node_type = 'File'
+            node_type = StorageObject.FILE
         else:
             raise request.StorageProtocolError(
                 'Can not create from message '

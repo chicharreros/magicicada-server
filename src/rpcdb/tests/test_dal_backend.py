@@ -26,7 +26,12 @@ from twisted.trial.unittest import TestCase
 from twisted.internet import defer
 from mocker import Mocker, expect, KWARGS
 
-from backends.filesync.data import errors, model
+from backends.filesync.data import errors
+from backends.filesync.data.model import (
+    STATUS_LIVE,
+    STATUS_DEAD,
+    StorageObject,
+)
 from ubuntuone.storage.rpcdb import dal_backend
 
 
@@ -46,7 +51,7 @@ class DALTestCase(TestCase):
         # node, with a generation attribute
         node = mocker.mock()
         expect(node.generation).result(123)
-        expect(node.kind).result('File')
+        expect(node.kind).result(StorageObject.FILE)
         expect(node.name).result('foo')
         expect(node.mimetype).result('mime')
 
@@ -60,7 +65,8 @@ class DALTestCase(TestCase):
                           node_id='node_id', session_id='session_id')
             result = self.dal.unlink_node(**kwargs)
 
-        d = dict(generation=123, kind='File', name='foo', mimetype='mime')
+        d = dict(generation=123, kind=StorageObject.FILE, name='foo',
+                 mimetype='mime')
         self.assertEqual(result, d)
 
     def test_list_volumes_root_and_quota(self):
@@ -671,11 +677,11 @@ class DALTestCase(TestCase):
         expect(node.name).result('name')
         expect(node.vol_id).result('volume_id')
         expect(node.parent_id).result('parent_id')
-        expect(node.status).result(model.STATUS_LIVE)
+        expect(node.status).result(STATUS_LIVE)
         expect(node.generation).result('generation')
         expect(node.is_public).result(False)
         expect(node.content_hash).result('content_hash')
-        expect(node.kind).result('File')
+        expect(node.kind).result(StorageObject.FILE)
         expect(node.when_last_modified).result('last_modified')
         content = mocker.mock()
         expect(content.size).result('size')
@@ -713,11 +719,11 @@ class DALTestCase(TestCase):
         expect(node.name).result('name')
         expect(node.vol_id).result('volume_id')
         expect(node.parent_id).result('parent_id')
-        expect(node.status).result(model.STATUS_LIVE)
+        expect(node.status).result(STATUS_LIVE)
         expect(node.generation).result('generation')
         expect(node.is_public).result(False)
         expect(node.content_hash).result('content_hash')
-        expect(node.kind).result('File')
+        expect(node.kind).result(StorageObject.FILE)
         expect(node.when_last_modified).result('last_modified')
         expect(node.content).result(None)
 
@@ -750,11 +756,11 @@ class DALTestCase(TestCase):
         expect(node.name).result('name')
         expect(node.vol_id).result('volume_id')
         expect(node.parent_id).result('parent_id')
-        expect(node.status).result(model.STATUS_LIVE)
+        expect(node.status).result(STATUS_LIVE)
         expect(node.generation).result('generation')
         expect(node.is_public).result(False)
         expect(node.content_hash).result('content_hash')
-        expect(node.kind).result('File')
+        expect(node.kind).result(StorageObject.FILE)
         expect(node.when_last_modified).result('last_modified')
         expect(node.content).count(1).result(None)
 
@@ -792,9 +798,9 @@ class DALTestCase(TestCase):
         expect(node1.generation).count(2).result('generation1')
         expect(node1.is_public).count(2).result(True)
         expect(node1.parent_id).count(2).result('parent_id1')
-        expect(node1.status).count(2).result(model.STATUS_LIVE)
+        expect(node1.status).count(2).result(STATUS_LIVE)
         expect(node1.content_hash).count(2).result('content_hash1')
-        expect(node1.kind).count(2).result('File')
+        expect(node1.kind).count(2).result(StorageObject.FILE)
         expect(node1.when_last_modified).count(2).result('last_modified1')
         content1 = mocker.mock()
         expect(content1.size).count(2).result('size1')
@@ -812,9 +818,9 @@ class DALTestCase(TestCase):
         expect(node2.generation).count(2).result('generation2')
         expect(node2.is_public).count(2).result(False)
         expect(node2.parent_id).count(2).result('parent_id2')
-        expect(node2.status).count(2).result(model.STATUS_DEAD)
+        expect(node2.status).count(2).result(STATUS_DEAD)
         expect(node2.content_hash).count(2).result('content_hash2')
-        expect(node2.kind).count(2).result('Directory')
+        expect(node2.kind).count(2).result(StorageObject.DIRECTORY)
         expect(node2.when_last_modified).count(2).result('last_modified2')
         content2 = mocker.mock()
         expect(content2.size).count(2).result('size2')

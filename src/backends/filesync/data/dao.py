@@ -35,7 +35,13 @@ import posixpath as pypath
 
 from weakref import WeakValueDictionary
 
-from backends.filesync.data import errors, utils, model
+from backends.filesync.data import errors, utils
+from backends.filesync.data.model import (
+    ROOT_USERVOLUME_PATH,
+    STATUS_LIVE,
+    StorageObject,
+    Share,
+)
 from backends.filesync.data.dbmanager import (
     fsync_readonly,
     fsync_readonly_slave,
@@ -122,7 +128,8 @@ class StorageUser(DAOBase):
     @property
     def is_active(self):
         """True if the user is active."""
-        return self._status == 'Live' and self._subscription_status == 'Live'
+        return (self._status == STATUS_LIVE and
+                self._subscription_status == STATUS_LIVE)
 
     def _load(self):
         """Load this storage user from the database."""
@@ -286,8 +293,8 @@ class StorageUser(DAOBase):
 
     def _path_helper(self, vol_full_path):
         """Using the path, return the remaining path and the udf."""
-        if (vol_full_path == model.ROOT_USERVOLUME_PATH or
-                vol_full_path.startswith(model.ROOT_USERVOLUME_PATH + "/")):
+        if (vol_full_path == ROOT_USERVOLUME_PATH or
+                vol_full_path.startswith(ROOT_USERVOLUME_PATH + "/")):
             udf = self._gateway.get_udf(self.root_volume_id)
         else:
             udf = self._gateway.get_udf_by_path(vol_full_path,
@@ -450,9 +457,9 @@ class StorageNode(VolumeObjectBase):
     def factory(gateway, object, permissions=None, content=None, udf=None,
                 owner=None):
         """Create the appropriate DAO from storm model."""
-        if object.kind == 'File':
+        if object.kind == StorageObject.FILE:
             klass = FileNode
-        elif object.kind == 'Directory':
+        elif object.kind == StorageObject.DIRECTORY:
             klass = DirectoryNode
         o = klass(object.id, gateway=gateway)
         o.kind = object.kind
@@ -485,7 +492,7 @@ class StorageNode(VolumeObjectBase):
         o._owner = owner
         o._udf = udf
         o.mimetype = object.mimetype
-        if object.kind == 'File':
+        if object.kind == StorageObject.FILE:
             # only files have content
             o.content_hash = object.content_hash
             o._content = content
@@ -505,7 +512,7 @@ class StorageNode(VolumeObjectBase):
     def publicfile_id(self):
         """An alias to .public_id.
 
-        This is to keep compatibility with model.StorageObject so that we can
+        This is to keep compatibility with StorageObject so that we can
         pass instances of either class to functions like get_public_file_url().
         """
         return self.public_id
@@ -513,7 +520,7 @@ class StorageNode(VolumeObjectBase):
     @property
     def public_url(self):
         """Return the public URL of the file."""
-        if self.public_id is not None and self.kind == 'File':
+        if self.public_id is not None and self.kind == StorageObject.FILE:
             return utils.get_public_file_url(self)
 
     @property
@@ -588,7 +595,7 @@ class StorageNode(VolumeObjectBase):
         Optionally kind can be provided and only children matching the kind
         will be checked.
         """
-        if self.kind == 'Directory':
+        if self.kind == StorageObject.DIRECTORY:
             f = fsync_readonly(self._gateway.check_has_children)
             return f(self.id, kind=kind)
         return False
@@ -673,7 +680,7 @@ class DirectoryNode(StorageNode):
 
 
 class FileNode(StorageNode):
-    """DAO for an StorageObject kind='File'."""
+    """DAO for an FILE StorageObject."""
 
     @retryable_transaction()
     @fsync_commit
@@ -826,7 +833,7 @@ class SharedDirectory(DAOBase):
         self.root_id = share.subtree
         self.accepted = share.accepted
         self.access = share.access
-        self.read_only = share.access == 'View'
+        self.read_only = share.access == Share.VIEW
         self.when_shared = share.when_shared
         self.when_last_changed = share.when_last_changed
         self.status = share.status
