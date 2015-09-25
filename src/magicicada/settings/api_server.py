@@ -62,3 +62,4 @@ STORAGE_CHUNK_SIZE = 5242880
 TCP_PORT = 21100
 TRACE_USERS = ['test', 'etc']
 UPLOAD_BUFFER_MAX_SIZE = 10485761
+STORAGE_BASEDIR = os.path.join(settings.BASE_DIR, 'tmp', 'filestorage')

@@ -115,10 +115,10 @@ class DiskStorage(object):
 
     def _get_treepath(self, node_id):
         """Build the tree path."""
-        if '/' in node_id or len(node_id) < DIRS_LEVELS:
+        if os.path.sep in node_id or len(node_id) < DIRS_LEVELS:
             raise ValueError("Invalid node id.")
 
-        return os.path.join(self.basedir, "/".join(node_id[:DIRS_LEVELS]))
+        return os.path.join(self.basedir, os.path.join(*node_id[:DIRS_LEVELS]))
 
     def get(self, node_id):
         """Get a producer that will retrieve bytes from disk."""

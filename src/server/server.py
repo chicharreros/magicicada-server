@@ -2414,8 +2414,7 @@ class StorageServerFactory(Factory):
         self.s3_secret = s3_secret
         self.s3_proxy_host = s3_proxy_host
         self.s3_proxy_port = s3_proxy_port
-        # NOTE: put this in a real configured place
-        self.diskstorage = DiskStorage('/tmp/testfs')
+        self.diskstorage = DiskStorage(settings.api_server.STORAGE_BASEDIR)
         self.logger = logging.getLogger('storage.server')
 
         self.metrics = MetricsConnector.get_metrics('root')
