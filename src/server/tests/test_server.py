@@ -41,8 +41,8 @@ from txstatsd.metrics.metermetric import MeterMetric
 
 from s3lib import s3lib
 
-from backends.filesync.data import errors as dataerror
-from backends.filesync.data.model import Share
+from backends.filesync import errors as dataerror
+from backends.filesync.models import Share
 from magicicada import settings
 from ubuntuone.devtools.handlers import MementoHandler
 from ubuntuone.storage.server import errors, server

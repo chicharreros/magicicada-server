@@ -16,14 +16,14 @@
 #
 # For further info, check  http://launchpad.net/magicicada-server
 
-"""Tests for backends.filesync.data.utils."""
+"""Tests for backends.filesync.utils."""
 
 from __future__ import unicode_literals
 
 import unittest
 import uuid
 
-from backends.filesync.data.utils import (
+from backends.filesync.utils import (
     decode_base62,
     decode_uuid,
     encode_base62,

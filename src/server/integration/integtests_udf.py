@@ -28,7 +28,7 @@ from copy import copy
 from ubuntuone.platform.linux import tools
 from twisted.internet import defer
 
-from backends.filesync.data.model import Share
+from backends.filesync.models import Share
 from ubuntuone.storage.server.integration.helpers import (
     create_file_and_add_content,
     debug,

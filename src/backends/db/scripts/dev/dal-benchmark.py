@@ -25,7 +25,7 @@ from ubuntuone.storageprotocol import content_hash
 
 from backends.filesync.notifier.notifier import register_notifier_for_bus
 from backends.filesync.notifier.testing.testcase import AccumulatingNotifyBus
-from backends.filesync.data.services import make_storage_user
+from backends.filesync.services import make_storage_user
 
 MIME_TYPES = [
     u'audio/mp3',

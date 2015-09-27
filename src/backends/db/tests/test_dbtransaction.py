@@ -56,8 +56,8 @@ from backends.db.dbtransaction import (
     on_timeout,
     filesync_zstorm,
 )
-from backends.filesync.data.model import StorageObject
-from backends.filesync.data.services import make_storage_user
+from backends.filesync.models import StorageObject
+from backends.filesync.services import make_storage_user
 from backends.testing import testcase
 
 storm_commit = get_storm_commit(transaction)

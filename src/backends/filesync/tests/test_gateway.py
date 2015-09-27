@@ -33,9 +33,9 @@ from mock import patch
 from psycopg2 import IntegrityError
 from storm.locals import Store
 
-from backends.filesync.data.testing.ormtestcase import ORMTestCase
-from backends.filesync.data.testing.testcase import StorageDALTestCase
-from backends.filesync.data.gateway import (
+from backends.filesync.dbmanager import (
+    get_filesync_store, filesync_tm as transaction)
+from backends.filesync.gateway import (
     GatewayBase,
     ReadWriteVolumeGateway,
     StorageUserGateway,
@@ -44,10 +44,8 @@ from backends.filesync.data.gateway import (
     fix_udfs_with_generation_out_of_sync,
     timing_metric,
 )
-from backends.filesync.data.dbmanager import (
-    get_filesync_store, filesync_tm as transaction)
-from backends.filesync.data import dao, errors, utils
-from backends.filesync.data.model import (
+from backends.filesync import dao, errors, utils
+from backends.filesync.models import (
     EMPTY_CONTENT_HASH,
     ROOT_VOLUME,
     STATUS_LIVE,
@@ -63,8 +61,6 @@ from backends.filesync.data.model import (
     UploadJob,
     UserVolume,
 )
-from backends.filesync.data.testing.testdata import (
-    get_fake_hash, get_test_contentblob)
 from backends.filesync.notifier.notifier import (
     ShareAccepted,
     ShareCreated,
@@ -74,6 +70,7 @@ from backends.filesync.notifier.notifier import (
     UDFDelete,
     VolumeNewGeneration,
 )
+from backends.filesync.tests.testcase import ORMTestCase, StorageDALTestCase
 
 
 class FakeShare(object):
@@ -332,7 +329,7 @@ class EventNotificationTest(StorageDALTestCase):
 
     def test_make_file_with_magic_content(self):
         """Make sure make_file with magic content sends a notification."""
-        cb = get_test_contentblob('FakeContent')
+        cb = self.factory.get_test_contentblob('FakeContent')
         cb.magic_hash = b'magic'
         get_filesync_store().add(cb)
         f = self.vgw.make_file(self.root.id, 'filename', hash=cb.hash,
@@ -358,7 +355,7 @@ class EventNotificationTest(StorageDALTestCase):
     def test_delete_file_notifications(self):
         """Make sure delete_file sends notifications."""
         name = 'filename'
-        hash = get_fake_hash()
+        hash = self.factory.get_fake_hash()
         storage_key = uuid.uuid4()
         crc = 12345
         size = 100
@@ -377,7 +374,7 @@ class EventNotificationTest(StorageDALTestCase):
     def test_restore_file_notifications(self):
         """Make sure restore_file sends notifications."""
         name = 'filename'
-        hash = get_fake_hash()
+        hash = self.factory.get_fake_hash()
         storage_key = uuid.uuid4()
         crc = 12345
         size = 100
@@ -444,7 +441,7 @@ class EventNotificationTest(StorageDALTestCase):
         """Make sure moves send the corrent notifications."""
         root_id = self.vgw.get_root().id
         name = 'filename'
-        hash = get_fake_hash()
+        hash = self.factory.get_fake_hash()
         storage_key = uuid.uuid4()
         crc = 12345
         size = 111111111
@@ -482,7 +479,7 @@ class EventNotificationTest(StorageDALTestCase):
     def test_make_file_with_content(self):
         """Ensure file creation with content sends corrent notifications."""
         name = 'filename'
-        hash = get_fake_hash()
+        hash = self.factory.get_fake_hash()
         storage_key = uuid.uuid4()
         crc = 12345
         size = 111111111
@@ -500,7 +497,7 @@ class EventNotificationTest(StorageDALTestCase):
     def test_make_file_with_content_overwrite(self):
         """Make file with contentblob and overwite its existing content."""
         name = 'filename.tif'
-        hash = get_fake_hash()
+        hash = self.factory.get_fake_hash()
         storage_key = uuid.uuid4()
         crc = 12345
         size = 100
@@ -511,7 +508,7 @@ class EventNotificationTest(StorageDALTestCase):
         transaction.commit()
         self.notifications = []
         size = 101
-        newhash = get_fake_hash('CXXYYY')
+        newhash = self.factory.get_fake_hash('CXXYYY')
         newstorage_key = uuid.uuid4()
         n = f(self.root.id, name, newhash, crc, size, deflated_size,
               newstorage_key)
@@ -526,7 +523,7 @@ class EventNotificationTest(StorageDALTestCase):
         filenode = self.vgw.make_file(self.root.id, 'the file name')
         transaction.commit()
         self.notifications = []
-        new_hash = get_fake_hash()
+        new_hash = self.factory.get_fake_hash()
         new_storage_key = uuid.uuid4()
         crc = 12345
         size = 11111
@@ -942,7 +939,7 @@ class SystemGatewayTestCase(StorageDALTestCase):
             user = self.gw.get_user(suser.id)
             vgw = user._gateway.get_root_gateway()
             root = vgw.get_root()
-            new_hash = get_fake_hash(os.urandom(100))
+            new_hash = self.factory.get_fake_hash(os.urandom(100))
             file1 = vgw.make_file(root.id, 'file1-%d' % uid)
             up1 = vgw.make_uploadjob(file1.id, file1.content_hash, new_hash,
                                      crc, size, def_size,
@@ -971,7 +968,7 @@ class SystemGatewayTestCase(StorageDALTestCase):
             user = self.gw.get_user(suser.id)
             vgw = user._gateway.get_root_gateway()
             root = vgw.get_root()
-            new_hash = get_fake_hash(os.urandom(100))
+            new_hash = self.factory.get_fake_hash(os.urandom(100))
             file1 = vgw.make_file(root.id, 'file1-%d' % uid)
             up1 = vgw.make_uploadjob(file1.id, file1.content_hash, new_hash,
                                      crc, size, def_size,
@@ -1001,7 +998,7 @@ class SystemGatewayPublicFileTestCase(StorageDALTestCase):
         self.user1 = self.create_user(id=1, username='sharer')
         self.vgw = ReadWriteVolumeGateway(self.user1)
         name = 'filename'
-        hash = get_fake_hash()
+        hash = self.factory.get_fake_hash()
         storage_key = uuid.uuid4()
         crc = 12345
         size = deflated_size = 10
@@ -1635,7 +1632,7 @@ class StorageUserGatewayTestCase(StorageDALTestCase):
 
     def test_reusable_content_same_owner_no_magic(self):
         """Test update_content will reuse owned content, even with no magic."""
-        hash_value = get_fake_hash()
+        hash_value = self.factory.get_fake_hash()
         node = self._make_file_with_content(hash_value)
         blobexists, storage_key = self.gw.is_reusable_content(hash_value, None)
         self.assertTrue(blobexists)
@@ -1643,7 +1640,7 @@ class StorageUserGatewayTestCase(StorageDALTestCase):
 
     def test_reusable_content_same_owner_with_magic(self):
         """Test update_content will reuse owned content."""
-        hash_value = get_fake_hash()
+        hash_value = self.factory.get_fake_hash()
         node = self._make_file_with_content(hash_value)
         get_filesync_store().find(
             ContentBlob,
@@ -1660,7 +1657,7 @@ class StorageUserGatewayTestCase(StorageDALTestCase):
                                  max_storage_bytes=2 ** 32)
         assert user2.id != self.user.id
 
-        hash_value = get_fake_hash()
+        hash_value = self.factory.get_fake_hash()
         self._make_file_with_content(hash_value, gw=user2._gateway)
         blobexists, storage_key = self.gw.is_reusable_content(hash_value, None)
         self.assertTrue(blobexists)
@@ -1672,7 +1669,7 @@ class StorageUserGatewayTestCase(StorageDALTestCase):
                                  max_storage_bytes=2 ** 32)
         assert user2.id != self.user.id
 
-        hash_value = get_fake_hash()
+        hash_value = self.factory.get_fake_hash()
         node = self._make_file_with_content(hash_value, gw=user2._gateway)
         get_filesync_store().find(
             ContentBlob,
@@ -1693,7 +1690,7 @@ class StorageUserGatewayTestCase(StorageDALTestCase):
 
     def test__get_reusable_content_same_owner_no_magic(self):
         """Test update_content will reuse owned content, even with no magic."""
-        hash_value = get_fake_hash()
+        hash_value = self.factory.get_fake_hash()
         node = self._make_file_with_content(hash_value)
         blobexists, blob = self.gw._get_reusable_content(hash_value, None)
         self.assertTrue(blobexists)
@@ -1701,7 +1698,7 @@ class StorageUserGatewayTestCase(StorageDALTestCase):
 
     def test__get_reusable_content_same_owner_with_magic(self):
         """Test update_content will reuse owned content."""
-        hash_value = get_fake_hash()
+        hash_value = self.factory.get_fake_hash()
         node = self._make_file_with_content(hash_value)
         get_filesync_store().find(
             ContentBlob,
@@ -1717,7 +1714,7 @@ class StorageUserGatewayTestCase(StorageDALTestCase):
                                  max_storage_bytes=2 ** 32)
         assert user2.id != self.user.id
 
-        hash_value = get_fake_hash()
+        hash_value = self.factory.get_fake_hash()
         self._make_file_with_content(hash_value, gw=user2._gateway)
         blobexists, blob = self.gw._get_reusable_content(hash_value, None)
         self.assertTrue(blobexists)
@@ -1729,7 +1726,7 @@ class StorageUserGatewayTestCase(StorageDALTestCase):
                                  max_storage_bytes=2 ** 32)
         assert user2.id != self.user.id
 
-        hash_value = get_fake_hash()
+        hash_value = self.factory.get_fake_hash()
         node = self._make_file_with_content(hash_value, gw=user2._gateway)
         get_filesync_store().find(
             ContentBlob,
@@ -1749,7 +1746,7 @@ class StorageUserGatewayTestCase(StorageDALTestCase):
         vgw2 = self.gw.get_udf_gateway(udf1.id)
         vgw3 = self.gw.get_udf_gateway(udf2.id)
         vgw4 = self.gw.get_udf_gateway(udf3.id)
-        hash_value = get_fake_hash()
+        hash_value = self.factory.get_fake_hash()
         expected_dirs = []
         for vgw in [vgw1, vgw2, vgw3, vgw4]:
             root = vgw.get_root()
@@ -1943,7 +1940,7 @@ class ReadWriteVolumeGatewayUtilityTests(StorageDALTestCase):
 
     def test_get_all_with_mimetype(self):
         """Test get_all_nodes with mimetype filter."""
-        hash = get_fake_hash()
+        hash = self.factory.get_fake_hash()
         key = uuid.uuid4()
         root_id = self.vgw.get_root().id
         # make a bunch of files with content
@@ -1971,7 +1968,7 @@ class ReadWriteVolumeGatewayUtilityTests(StorageDALTestCase):
 
     def test_get_all_with_content(self):
         """Test get_all_nodes with mimetype filter."""
-        hash = get_fake_hash()
+        hash = self.factory.get_fake_hash()
         key = uuid.uuid4()
         root_id = self.vgw.get_root().id
         # make a bunch of files with content
@@ -1987,7 +1984,7 @@ class ReadWriteVolumeGatewayUtilityTests(StorageDALTestCase):
 
     def test_get_all_with_content_and_mimetype(self):
         """Test get_all_nodes with mimetype filter."""
-        hash = get_fake_hash()
+        hash = self.factory.get_fake_hash()
         key = uuid.uuid4()
         root_id = self.vgw.get_root().id
         # make a bunch of files with content
@@ -2700,7 +2697,7 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
 
     def test_make_file_with_magic(self):
         """Test make_file method."""
-        cb = get_test_contentblob('FakeContent')
+        cb = self.factory.get_test_contentblob('FakeContent')
         cb.magic_hash = b'magic'
         get_filesync_store().add(cb)
         # make enough room
@@ -2712,7 +2709,7 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
     def test_make_file_with_magic_bad_hashes(self):
         """Test make_file method with a bad hash raises an exception."""
         # make a content blob with a magic hash
-        cb = get_test_contentblob('FakeContent')
+        cb = self.factory.get_test_contentblob('FakeContent')
         cb.magic_hash = b'magic'
         get_filesync_store().add(cb)
         self.assertRaises(errors.HashMismatch,
@@ -2797,7 +2794,7 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
     def test_get_uploadjob(self):
         """Test get_uploadjob."""
         a_file = self.vgw.make_file(self.root.id, 'the file name')
-        new_hash = get_fake_hash()
+        new_hash = self.factory.get_fake_hash()
         crc = 12345
         size = 100
         def_size = 10000
@@ -2832,7 +2829,7 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
     def test_make_uploadjob_enforces_quota(self):
         """Test make_uploadjob enforces quota check (or not)."""
         a_file = self.vgw.make_file(self.root.id, 'the file name')
-        new_hash = get_fake_hash()
+        new_hash = self.factory.get_fake_hash()
         crc = 12345
         size = def_size = 300
         f = self.vgw.make_uploadjob
@@ -2850,7 +2847,7 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
         file1 = self.vgw.make_file(self.root.id, 'the file1 name')
         file2 = self.vgw.make_file(self.root.id, 'the file2 name')
         file3 = self.vgw.make_file(self.root.id, 'the file3 name')
-        new_hash = get_fake_hash()
+        new_hash = self.factory.get_fake_hash()
         crc = 12345
         size = 100
         def_size = 10000
@@ -2872,7 +2869,7 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
         file1 = self.vgw.make_file(self.root.id, 'the file1 name')
         file2 = self.vgw.make_file(self.root.id, 'the file2 name')
         file3 = self.vgw.make_file(self.root.id, 'the file3 name')
-        new_hash = get_fake_hash()
+        new_hash = self.factory.get_fake_hash()
         crc = 12345
         size = 100
         def_size = 10000
@@ -2912,7 +2909,7 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
     def test_add_uploadjob_part(self):
         """Test add_uploadjob_part."""
         file1 = self.vgw.make_file(self.root.id, 'the file1 name')
-        new_hash = get_fake_hash()
+        new_hash = self.factory.get_fake_hash()
         crc = 12345
         size = 100
         def_size = 10000
@@ -2943,7 +2940,7 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
     def test_set_uploadjob_multipart_id(self):
         """Test set_uploadjob_multpart_id."""
         file1 = self.vgw.make_file(self.root.id, 'the file1 name')
-        new_hash = get_fake_hash()
+        new_hash = self.factory.get_fake_hash()
         crc = 12345
         size = 100
         def_size = 10000
@@ -2960,7 +2957,7 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
     def test_set_uploadjob_when_last_active(self):
         """Test set_uploadjob_when_last_active."""
         file1 = self.vgw.make_file(self.root.id, 'the file1 name')
-        new_hash = get_fake_hash()
+        new_hash = self.factory.get_fake_hash()
         crc = 12345
         size = 100
         def_size = 10000
@@ -2978,7 +2975,7 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
         file_node = self.vgw.make_file(self.root.id, 'the file name')
         old_hash = file_node.content_hash
         file_id = file_node.id
-        new_hash = get_fake_hash()
+        new_hash = self.factory.get_fake_hash()
         new_storage_key = uuid.uuid4()
         crc = 12345
         size = 100
@@ -3026,7 +3023,7 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
     def test_make_content_updates_contentblob(self):
         """Contentblob is updated if needed when making content."""
         filenode = self.vgw.make_file(self.root.id, 'the file name')
-        new_hash = get_fake_hash()
+        new_hash = self.factory.get_fake_hash()
         new_storage_key = uuid.uuid4()
         crc = 12345
         size = 100
@@ -3050,7 +3047,7 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
     def test_make_content_enforeces_quota(self):
         """Test make_content enforces quota check (or not)."""
         filenode = self.vgw.make_file(self.root.id, 'the file name')
-        new_hash = get_fake_hash()
+        new_hash = self.factory.get_fake_hash()
         new_storage_key = uuid.uuid4()
         crc = 12345
         size = def_size = 100
@@ -3061,7 +3058,7 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
 
     def test_make_get_content(self):
         """Test the make and get content."""
-        hash = get_fake_hash()
+        hash = self.factory.get_fake_hash()
         key = uuid.uuid4()
         crc = 12345
         size = 100
@@ -3099,7 +3096,7 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
         all handled in one function after the upload.
         """
         name = 'filename'
-        hash = get_fake_hash()
+        hash = self.factory.get_fake_hash()
         storage_key = uuid.uuid4()
         crc = 12345
         self.assertRaises(
@@ -3113,7 +3110,7 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
         all handled in one function after the upload.
         """
         name = 'filename'
-        hash = get_fake_hash()
+        hash = self.factory.get_fake_hash()
         storage_key = uuid.uuid4()
         crc = 12345
         size = 100
@@ -3136,7 +3133,7 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
     def test_make_file_with_content_public(self):
         """Make file with contentblob and make public."""
         name = 'filename'
-        hash = get_fake_hash()
+        hash = self.factory.get_fake_hash()
         storage_key = uuid.uuid4()
         crc = 12345
         size = 100
@@ -3150,7 +3147,7 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
     def test_make_file_with_content_overwrite(self):
         """Make file with contentblob and overwite its existing content."""
         name = 'filename.tif'
-        hash = get_fake_hash()
+        hash = self.factory.get_fake_hash()
         storage_key = uuid.uuid4()
         crc = 12345
         size = 100
@@ -3159,7 +3156,7 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
         f = self.vgw.make_file_with_content
         node1 = f(self.root.id, name, hash, crc, size, deflated_size,
                   storage_key, mimetype='image/tif')
-        newhash = get_fake_hash('ZZZYYY')
+        newhash = self.factory.get_fake_hash('ZZZYYY')
         newstorage_key = uuid.uuid4()
         self.assertNotEqual(newhash, hash)
         self.assertNotEqual(newstorage_key, storage_key)
@@ -3174,12 +3171,13 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
         # test hashcheck when trying to overwrite with a wrong hash
         self.assertRaises(
             errors.HashMismatch, f, self.root.id, name, newhash, crc, size,
-            deflated_size, newstorage_key, previous_hash=get_fake_hash('ABC'))
+            deflated_size, newstorage_key,
+            previous_hash=self.factory.get_fake_hash('ABC'))
 
     def test_make_file_with_same_content_updates_contentblob(self):
         """Make file for the same content update the contentblob if needed."""
         name = 'filename.tif'
-        hash = get_fake_hash()
+        hash = self.factory.get_fake_hash()
         storage_key = uuid.uuid4()
         crc = 12345
         size = 100
@@ -3204,7 +3202,7 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
     def test_make_file_with_content_enforces_quota(self):
         """Make file with contentblob enforces quota check (or not)."""
         name = 'filename'
-        hash = get_fake_hash()
+        hash = self.factory.get_fake_hash()
         storage_key = uuid.uuid4()
         crc = 12345
         size = deflated_size = 10000
@@ -3288,7 +3286,7 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
         dir3 = self.vgw.make_subdirectory(dir2.id, 'dir3')
         file3 = self.vgw.make_file(dir2.id, 'file3.mp3')
         # make sure content and mimetype still work correctly
-        hash = get_fake_hash()
+        hash = self.factory.get_fake_hash()
         key = uuid.uuid4()
         self.vgw.make_file_with_content(
             dir3.id, 'file4.tif', hash, 123, 100, 1000, key,
@@ -3395,7 +3393,7 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
     def test_get_directories_with_mimetypes(self):
         """Test get_directories_with_mimetype."""
         root_id = self.root.id
-        hash = get_fake_hash()
+        hash = self.factory.get_fake_hash()
         key = uuid.uuid4()
         # only files with content are returned.
         make_file = lambda id, name: self.vgw.make_file_with_content(
@@ -3695,8 +3693,8 @@ class UDFReadWriteVolumeGatewayTestCase(StorageDALTestCase):
         self.assertRaises(errors.DoesNotExist,
                           self.vgw.make_subdirectory, a_dir.id, 'filename')
         self.assertRaises(errors.DoesNotExist, self.vgw.make_uploadjob,
-                          a_file.id, a_file.content_hash, get_fake_hash(),
-                          1, 1, 1)
+                          a_file.id, a_file.content_hash,
+                          self.factory.get_fake_hash(), 1, 1, 1)
 
     def test_undelete_volume(self):
         """Test Undelete Volume from a UDF."""
@@ -3958,7 +3956,8 @@ class ShareGatewayTestCase(StorageDALTestCase):
         sgw = ReadWriteVolumeGateway(self.user, share=share_dao)
         self.assertRaises(
             errors.NoPermission, sgw.make_uploadjob,
-            self.file.id, self.file.content_hash, get_fake_hash(), 1, 1, 1)
+            self.file.id, self.file.content_hash, self.factory.get_fake_hash(),
+            1, 1, 1)
 
     def test_get_all_nodes_with_max_generation(self):
         """Test get_all_nodes with max_generation."""
@@ -4294,7 +4293,7 @@ class GenerationsTestCase(StorageDALTestCase):
     def test_make_file_with_content(self):
         """Test make_file_with_content increments generation."""
         name = 'filename'
-        a_hash = get_fake_hash()
+        a_hash = self.factory.get_fake_hash()
         storage_key = uuid.uuid4()
         crc = 12345
         size = 100
@@ -4308,7 +4307,7 @@ class GenerationsTestCase(StorageDALTestCase):
     def test_make_file_from_uploadjob(self):
         """Test make_file_from_uploadjob increments generation."""
         filenode = self.vgw.make_file(self.vgw.get_root().id, 'the file name')
-        new_hash = get_fake_hash()
+        new_hash = self.factory.get_fake_hash()
         crc = 12345
         size = 11111
         def_size = 10000
@@ -4372,8 +4371,8 @@ class GenerationsTestCase(StorageDALTestCase):
         share = self.ugw.accept_share(share.id)
         sh_gw = self.ugw.get_volume_gateway(share=share)
         sh_file1 = sh_gw.make_file_with_content(
-            sh_gw.get_root().id, 'file.txt', get_fake_hash(), 1234, 100, 10,
-            uuid.uuid4(), 'text/lame')
+            sh_gw.get_root().id, 'file.txt', self.factory.get_fake_hash(),
+            1234, 100, 10, uuid.uuid4(), 'text/lame')
         sh_dir = sh_gw.make_subdirectory(sh_gw.get_root().id, 'directory')
         # get the deltas
         r_delta = list(self.vgw.get_generation_delta(0))
@@ -4607,11 +4606,11 @@ class MetricsTestCase(StorageDALTestCase):
 class TestVolumeGenerationUniqueKeyViolation(ORMTestCase):
 
     def test_fix_udfs_with_gen_out_of_sync(self):
-        obj = self.obj_factory.make_file()
+        obj = self.factory.make_file()
         obj.generation = obj.volume.generation + 1
-        user2 = self.obj_factory.make_user(user_id=2)
-        obj2 = self.obj_factory.make_file(user=user2)
-        obj3 = self.obj_factory.make_file(user=user2)
+        user2 = self.factory.make_user(user_id=2)
+        obj2 = self.factory.make_file(user=user2)
+        obj3 = self.factory.make_file(user=user2)
         obj2.generation = obj2.volume.generation + 2
         obj3.generation = obj3.volume.generation + 1
         store = Store.of(obj)
@@ -4621,10 +4620,10 @@ class TestVolumeGenerationUniqueKeyViolation(ORMTestCase):
         self.assertEqual(obj2.generation, obj2.volume.generation)
 
     def test_limits_to_given_user_ids(self):
-        obj = self.obj_factory.make_file()
+        obj = self.factory.make_file()
         obj.generation = obj.volume.generation + 1
-        user2 = self.obj_factory.make_user(user_id=2)
-        obj2 = self.obj_factory.make_file(user=user2)
+        user2 = self.factory.make_user(user_id=2)
+        obj2 = self.factory.make_file(user=user2)
         obj2.generation = obj.volume.generation + 1
         store = Store.of(obj)
         user_ids = [obj.owner_id]
@@ -4637,8 +4636,8 @@ class TestVolumeGenerationUniqueKeyViolation(ORMTestCase):
         self.assertEqual(obj2.generation - 1, obj2.volume.generation)
 
     def test_fix_all_udfs_with_gen_out_of_sync(self):
-        user = self.obj_factory.make_user()
-        obj = self.obj_factory.make_file(user=user)
+        user = self.factory.make_user()
+        obj = self.factory.make_file(user=user)
         obj.generation = obj.volume.generation + 1
         expected_generation = obj.generation
         vol_id = obj.volume.id
@@ -4648,8 +4647,8 @@ class TestVolumeGenerationUniqueKeyViolation(ORMTestCase):
                          store.get(UserVolume, vol_id).generation)
 
     def test_fix_all_udfs_with_gen_out_of_sync_dry_run(self):
-        user = self.obj_factory.make_user()
-        obj = self.obj_factory.make_file(user=user)
+        user = self.factory.make_user()
+        obj = self.factory.make_file(user=user)
         obj.generation = obj.volume.generation + 1
 
         with patch.object(Store, 'commit') as mock_commit:

@@ -20,14 +20,14 @@
 
 from __future__ import unicode_literals
 
-from backends.filesync.data import errors
-from backends.filesync.data.gateway import SystemGateway
-from backends.filesync.data.dbmanager import (
+from backends.filesync import errors
+from backends.filesync.gateway import SystemGateway
+from backends.filesync.dbmanager import (
     retryable_transaction,
     fsync_commit,
     fsync_readonly,
 )
-from backends.filesync.data.model import Download
+from backends.filesync.models import Download
 
 # states
 UNKNOWN = "Unknown"

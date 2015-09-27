@@ -34,7 +34,7 @@ if startup:
 
 from backends.filesync.notifier.notifier import register_notifier_for_bus
 from backends.filesync.notifier.testing.testcase import AccumulatingNotifyBus
-from backends.filesync.data import services  # NOQA
+from backends.filesync import services  # NOQA
 
 nb = AccumulatingNotifyBus()
 register_notifier_for_bus(nb)

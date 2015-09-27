@@ -32,12 +32,9 @@ from storm.tracer import install_tracer, remove_tracer_type
 
 from mocker import Mocker, expect
 
-from backends.filesync.data.testing.testcase import StorageDALTestCase
-from backends.filesync.data.testing.testdata import (
-    get_test_contentblob, get_fake_hash)
-from backends.filesync.data import dao, errors, services, utils
-from backends.filesync.data.dbmanager import get_filesync_store
-from backends.filesync.data.model import (
+from backends.filesync import dao, errors, services, utils
+from backends.filesync.dbmanager import get_filesync_store
+from backends.filesync.models import (
     ROOT_USERVOLUME_PATH,
     STATUS_LIVE,
     STATUS_DEAD,
@@ -49,9 +46,10 @@ from backends.filesync.data.model import (
     UploadJob,
     UserVolume,
 )
+from backends.filesync.tests.testcase import StorageDALTestCase
 
 
-class DAOInitTestCase(TestCase):
+class DAOInitTestCase(StorageDALTestCase):
     """Test to make sure DAOs are properly initialized from the storm models.
 
     These tests have no database access.
@@ -89,7 +87,7 @@ class DAOInitTestCase(TestCase):
         u = StorageUser(1, 'theusername', 'visible name')
         owner = dao.StorageUser(u)
         # the FileNodeContent of the node
-        cb = get_test_contentblob()
+        cb = self.factory.get_test_contentblob()
         content = dao.FileNodeContent(cb)
         # the node
         node = StorageObject(1, 'Name', StorageObject.FILE)
@@ -150,7 +148,7 @@ class DAOInitTestCase(TestCase):
 
     def test_FileNodeContent(self):
         """Test ContentBlob init."""
-        cb = get_test_contentblob()
+        cb = self.factory.get_test_contentblob()
         cb_dao = dao.FileNodeContent(cb)
         self._compare_props(cb, cb_dao, ['hash', 'size', 'deflated_size',
                                          'storage_key', 'crc32', 'status',
@@ -231,7 +229,7 @@ class VolumeProxyTestCase(StorageDALTestCase):
         """Make content on this volume to get it with the proxy."""
         name = 'filename'
         mime = 'image/tif'
-        hash = get_fake_hash()
+        hash = self.factory.get_fake_hash()
         storage_key = uuid.uuid4()
         crc = 12345
         size = 100
@@ -342,7 +340,7 @@ class VolumeProxyTestCase(StorageDALTestCase):
         """Test get_all_nodes."""
         user = self.create_user(max_storage_bytes=2 * (2 ** 30))
         mime = 'image/tif'
-        hash = get_fake_hash()
+        hash = self.factory.get_fake_hash()
         storage_key = uuid.uuid4()
         crc = 12345
         size = 100
@@ -394,7 +392,7 @@ class DAOTestCase(StorageDALTestCase):
         if storage_key is None:
             storage_key = uuid.uuid4()
         if hash is None:
-            hash = get_fake_hash()
+            hash = self.factory.get_fake_hash()
         if deflated_size is None:
             deflated_size = size
         if udf is None:
@@ -764,7 +762,7 @@ class DAOTestCase(StorageDALTestCase):
         user = self.create_user(max_storage_bytes=200)
         path = '~/Ubuntu One/a/b/c/filename.txt'
         mime = 'image/tif'
-        hash = get_fake_hash()
+        hash = self.factory.get_fake_hash()
         storage_key = uuid.uuid4()
         crc = 12345
         size = 100
@@ -793,7 +791,7 @@ class DAOTestCase(StorageDALTestCase):
         user = self.create_user(max_storage_bytes=200)
         name = 'filename'
         mime = 'image/tif'
-        hash = get_fake_hash()
+        hash = self.factory.get_fake_hash()
         storage_key = uuid.uuid4()
         crc = 12345
         size = 100
@@ -829,7 +827,7 @@ class DAOTestCase(StorageDALTestCase):
         self.assertEqual(quota.used_storage_bytes, 100)
         # a call later to the same function will create a new content blob and
         # update the file
-        new_hash = get_fake_hash()
+        new_hash = self.factory.get_fake_hash()
         new_storage_key = uuid.uuid4()
         new_crc = 54321
         new_size = 99
@@ -849,7 +847,7 @@ class DAOTestCase(StorageDALTestCase):
         quota.load()
         self.assertEqual(quota.used_storage_bytes, 99)
         # uhoh this file grew to big!!
-        new_hash = get_fake_hash()
+        new_hash = self.factory.get_fake_hash()
         new_size = 10000
         self.assertRaises(errors.QuotaExceeded, f, name, new_hash, new_crc,
                           new_size, new_deflated_size, storage_key)
@@ -858,7 +856,7 @@ class DAOTestCase(StorageDALTestCase):
         """Make file with contentblob."""
         user = self.create_user(max_storage_bytes=200)
         name = 'filename'
-        a_hash = get_fake_hash()
+        a_hash = self.factory.get_fake_hash()
         storage_key = uuid.uuid4()
         crc = 12345
         size = 100
@@ -873,7 +871,7 @@ class DAOTestCase(StorageDALTestCase):
         user = self.create_user(max_storage_bytes=200)
         name = 'filename'
         mime = 'image/tif'
-        hash = get_fake_hash()
+        hash = self.factory.get_fake_hash()
         storage_key = uuid.uuid4()
         crc = 12345
         size = deflated_size = 300
@@ -889,7 +887,7 @@ class DAOTestCase(StorageDALTestCase):
         user = self.create_user(max_storage_bytes=200)
         name = 'filename'
         mime = 'image/tif'
-        a_hash = get_fake_hash()
+        a_hash = self.factory.get_fake_hash()
         storage_key = uuid.uuid4()
         crc = 12345
         size = deflated_size = 300
@@ -901,13 +899,13 @@ class DAOTestCase(StorageDALTestCase):
         self.assertRaises(
             errors.HashMismatch,
             f, name, a_hash, crc, size, deflated_size, storage_key,
-            previous_hash=get_fake_hash('ABC'))
+            previous_hash=self.factory.get_fake_hash('ABC'))
 
     def test_UploadJob(self):
         """Test the UploadJob."""
         user = self.create_user(max_storage_bytes=200)
         file = user.root.make_file('A new file')
-        new_hash = get_fake_hash()
+        new_hash = self.factory.get_fake_hash()
         crc = 12345
         size = 100
         deflated_size = 10000
@@ -1294,7 +1292,7 @@ class DAOTestCase(StorageDALTestCase):
     def test_get_photo_directories(self):
         """Make file with contentblob."""
         user = self.create_user(max_storage_bytes=200000)
-        hash = get_fake_hash()
+        hash = self.factory.get_fake_hash()
         key = uuid.uuid4()
         crc = 12345
         size = 100
@@ -1331,7 +1329,7 @@ class DAOTestCase(StorageDALTestCase):
         user = self.create_user(max_storage_bytes=200000)
         dirs = user.volume().get_directories_with_mimetypes(['image/jpeg'])
         self.assertEqual(len(dirs), 0)
-        hash = get_fake_hash()
+        hash = self.factory.get_fake_hash()
         key = uuid.uuid4()
         crc = 12345
         size = 100
@@ -1388,7 +1386,7 @@ class GenerationsDAOTestCase(StorageDALTestCase):
     def test_delta_info(self):
         """A basic test of free_bytes and generation from deltas."""
         user = self.create_user(max_storage_bytes=1000)
-        test_file = self.obj_factory.make_file(user, user.root, 'file.txt')
+        test_file = self.factory.make_file(user, user.root, 'file.txt')
         file_size = test_file.content.size
         generation, free_bytes, delta = user.volume().get_delta(1)
         self.assertEqual(len(delta), 1)
@@ -1399,7 +1397,7 @@ class GenerationsDAOTestCase(StorageDALTestCase):
     def test_delta_info_multi(self):
         """Test of free_bytes and generation from deltas with many changes."""
         user = self.create_user(max_storage_bytes=1000)
-        mfc = lambda u, i: self.obj_factory.make_file(u, u.root, 'f%s' % i)
+        mfc = lambda u, i: self.factory.make_file(u, u.root, 'f%s' % i)
         files = [mfc(user, i) for i in range(10)]
         file_size = files[0].content.size
         new_gen = user.volume().get_volume().generation
@@ -1419,7 +1417,7 @@ class GenerationsDAOTestCase(StorageDALTestCase):
         """Test get_from_scratch."""
         user = self.create_user(max_storage_bytes=1000)
         root = user.root.load()
-        mfc = lambda u, i: self.obj_factory.make_file(u, root, 'f%s' % i)
+        mfc = lambda u, i: self.factory.make_file(u, root, 'f%s' % i)
         files = [mfc(user, i) for i in range(10)]
         file_size = files[0].content.size
         new_gen = user.volume().get_volume().generation
@@ -1479,10 +1477,10 @@ class TestSQLStatementCount(StorageDALTestCase):
 
     def _create_directory_with_five_files(self):
         """Creates a DirectoryNode with 5 files inside it."""
-        user = self.obj_factory.make_user()
+        user = self.factory.make_user()
         directory = user.root.make_subdirectory('test')
         for i in range(0, 5):
-            self.obj_factory.make_file(
+            self.factory.make_file(
                 parent=directory, mimetype=self.mimetype)
         self._flush_store()
         return directory
@@ -1506,7 +1504,7 @@ class TestSQLStatementCount(StorageDALTestCase):
 
     def test_delete_file(self):
         """Delete a file."""
-        f = self.obj_factory.make_file(mimetype=self.mimetype)
+        f = self.factory.make_file(mimetype=self.mimetype)
         self._flush_store()
         with StormStatementRecorder() as recorder:
             f.delete()
@@ -1518,13 +1516,13 @@ class TestSQLStatementCount(StorageDALTestCase):
     # number of queries it issues.
     def test_make_file_with_content(self):
         """Create a file with content."""
-        user = self.obj_factory.make_user()
+        user = self.factory.make_user()
         directory = user.root.make_subdirectory('test')
         self._flush_store()
-        hash_ = get_fake_hash()
-        name = self.obj_factory.get_unique_unicode()
-        size = self.obj_factory.get_unique_integer()
-        crc32 = self.obj_factory.get_unique_integer()
+        hash_ = self.factory.get_fake_hash()
+        name = self.factory.get_unique_unicode()
+        size = self.factory.get_unique_integer()
+        crc32 = self.factory.get_unique_integer()
         storage_key = uuid.uuid4()
         with StormStatementRecorder() as recorder:
             directory.make_file_with_content(
@@ -1608,7 +1606,7 @@ class UserDAOTest(StorageDALTestCase):
         """Tests if the DAO retrieves a random ID."""
         user_dao = dao.UserDAO()
 
-        user = self.obj_factory.make_user()
+        user = self.factory.make_user()
 
         expected_id = user.id
         actual_id = user_dao.get_random_user_id()
@@ -1623,8 +1621,8 @@ class UserDAOTest(StorageDALTestCase):
         """
         user_dao = dao.UserDAO()
 
-        user1 = self.obj_factory.make_user()
-        user2 = self.obj_factory.make_user()
+        user1 = self.factory.make_user()
+        user2 = self.factory.make_user()
 
         searches = 100
         expected_user_ids = sorted(set((user1.id, user2.id)))

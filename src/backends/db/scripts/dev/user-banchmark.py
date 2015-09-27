@@ -30,7 +30,7 @@ from optparse import OptionParser
 
 from backends.filesync.notifier.notifier import register_notifier_for_bus
 from backends.filesync.notifier.testing.testcase import AccumulatingNotifyBus
-from backends.filesync.data.services import (
+from backends.filesync.services import (
     get_storage_user, make_storage_user)
 
 

@@ -24,7 +24,7 @@ import calendar
 
 from twisted.internet import defer
 
-from backends.filesync.data.model import StorageObject
+from backends.filesync.models import StorageObject
 from ubuntuone.storageprotocol import request, delta as protodelta
 from ubuntuone.storage.server.testing.testcase import TestWithDatabase
 from ubuntuone.storage.server import server

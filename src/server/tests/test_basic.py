@@ -39,7 +39,7 @@ from ubuntuone.devtools.handlers import MementoHandler
 from ubuntuone.storageprotocol import request
 from ubuntuone.storage.server.testing.testcase import TestWithDatabase
 from ubuntuone.supervisor import utils as supervisor_utils
-from backends.filesync.data.model import StorageUser
+from backends.filesync.models import StorageUser
 
 
 class TestBasic(TestWithDatabase):

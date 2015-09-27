@@ -39,7 +39,7 @@ from twisted.trial.unittest import TestCase as TwistedTestCase
 
 from metrics import METER_UTILITY
 from s4 import s4
-from backends.filesync.data.testing.testcase import StorageDALTestCase
+from backends.filesync.tests.testcase import StorageDALTestCase
 from backends.utils import create_test_user
 from magicicada import settings
 from ubuntuone.storage.server.auth import DummyAuthProvider

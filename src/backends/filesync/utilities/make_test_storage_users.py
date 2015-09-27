@@ -38,7 +38,7 @@ if __name__ == "__main__":
 
     from utilities import userutils
     import uuid
-    from backends.filesync.data.services import make_storage_user
+    from backends.filesync.services import make_storage_user
 
     token_data = {}
     for i in range(int(options.count)):

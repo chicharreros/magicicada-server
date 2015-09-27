@@ -35,8 +35,8 @@ from twisted.internet import defer
 
 from s3lib.s3lib import ProducerStopped
 from s3lib.producers import S3Producer
-from backends.filesync.data import errors as dataerrors
-from backends.filesync.data.model import Share
+from backends.filesync import errors as dataerrors
+from backends.filesync.models import Share
 from ubuntuone.storage.server import errors, upload
 from ubuntuone.storageprotocol import protocol_pb2
 

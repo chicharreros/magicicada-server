@@ -22,8 +22,8 @@ from __future__ import unicode_literals
 
 import uuid
 
-from backends.filesync.data import services, errors
-from backends.filesync.data.model import STATUS_LIVE, StorageObject
+from backends.filesync import services, errors
+from backends.filesync.models import STATUS_LIVE, StorageObject
 
 
 class DAL(object):

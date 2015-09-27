@@ -24,10 +24,10 @@ import datetime
 
 from mock import patch
 
-from backends.filesync.data import dbmanager
+from backends.filesync import dbmanager
 from backends.txlog import utils
-from backends.txlog.model import TransactionLog
-from backends.txlog.tests.test_model import BaseTransactionLogTestCase
+from backends.txlog.models import TransactionLog
+from backends.txlog.tests.test_models import BaseTransactionLogTestCase
 
 
 class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
@@ -36,14 +36,14 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
     def _create_db_worker_last_row_entry(self, worker_name, txlog):
         """Create a new entry on the txlog_db_worker_last_row table."""
         worker_name = unicode(worker_name)
-        self.obj_factory.store.execute(
+        self.factory.store.execute(
             """INSERT INTO txlog_db_worker_last_row
             (worker_id, row_id, timestamp) VALUES (?, ?, ?)""",
             params=(worker_name, txlog.id, txlog.timestamp))
 
     def _find_last_row_worker_names(self):
         """Find all worker names from the db_worker_last_row table."""
-        result = self.obj_factory.store.execute(
+        result = self.factory.store.execute(
             """SELECT worker_id
             FROM txlog_db_worker_last_row""")
         return [row[0] for row in result]
@@ -51,7 +51,7 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
     def test_get_last_row_with_no_data(self):
         """Test the get_last_row function when no data is present."""
         # First, check the db directly to ensure it is empty.
-        result = self.obj_factory.store.execute(
+        result = self.factory.store.execute(
             """SELECT row_id
             FROM txlog_db_worker_last_row""")
         self.assertEqual(0, result.rowcount)
@@ -61,16 +61,16 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
     def test_get_last_row_with_other_data_returns_the_oldest_one(self):
         """get_last_row returns the row for the oldest txlog ID in the
         table, if the worker name is not found for that."""
-        txlog1 = self.obj_factory.make_transaction_log()
-        txlog2 = self.obj_factory.make_transaction_log()
-        txlog3 = self.obj_factory.make_transaction_log()
+        txlog1 = self.factory.make_transaction_log()
+        txlog2 = self.factory.make_transaction_log()
+        txlog3 = self.factory.make_transaction_log()
 
         self._create_db_worker_last_row_entry(
-            self.obj_factory.get_unique_unicode(), txlog3)
+            self.factory.get_unique_unicode(), txlog3)
         self._create_db_worker_last_row_entry(
-            self.obj_factory.get_unique_unicode(), txlog1)
+            self.factory.get_unique_unicode(), txlog1)
         self._create_db_worker_last_row_entry(
-            self.obj_factory.get_unique_unicode(), txlog2)
+            self.factory.get_unique_unicode(), txlog2)
 
         self.assertEqual(
             (txlog1.id, txlog1.timestamp), utils.get_last_row('some worker'))
@@ -78,28 +78,28 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
     def test_get_last_row_with_same_data_returns_the_exact_one(self):
         """Test that get_last_row returns the row for the exact txlog ID in the
         table, if the worker name is found for that."""
-        txlog1 = self.obj_factory.make_transaction_log()
-        txlog2 = self.obj_factory.make_transaction_log()
-        txlog3 = self.obj_factory.make_transaction_log()
+        txlog1 = self.factory.make_transaction_log()
+        txlog2 = self.factory.make_transaction_log()
+        txlog3 = self.factory.make_transaction_log()
 
-        worker_name = self.obj_factory.get_unique_unicode()
+        worker_name = self.factory.get_unique_unicode()
         self._create_db_worker_last_row_entry(worker_name, txlog3)
         self._create_db_worker_last_row_entry(
-            self.obj_factory.get_unique_unicode(), txlog1)
+            self.factory.get_unique_unicode(), txlog1)
         self._create_db_worker_last_row_entry(
-            self.obj_factory.get_unique_unicode(), txlog2)
+            self.factory.get_unique_unicode(), txlog2)
 
         self.assertEqual(
             (txlog3.id, txlog3.timestamp), utils.get_last_row(worker_name))
 
     def test_update_last_row_with_no_data(self):
         """Test the update_last_row function when no data is present."""
-        txlog = self.obj_factory.make_transaction_log()
-        worker_name = self.obj_factory.get_unique_unicode()
+        txlog = self.factory.make_transaction_log()
+        worker_name = self.factory.get_unique_unicode()
         utils.update_last_row(
             worker_name=worker_name, row_id=txlog.id,
             timestamp=txlog.timestamp)
-        result = self.obj_factory.store.execute(
+        result = self.factory.store.execute(
             """SELECT row_id, timestamp
             FROM txlog_db_worker_last_row
             WHERE worker_id=?""", (worker_name,)).get_one()
@@ -109,14 +109,14 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         """Test the update_last_row function when data for this worker is
         present.
         """
-        txlog = self.obj_factory.make_transaction_log()
-        txlog2 = self.obj_factory.make_transaction_log()
-        worker_name = self.obj_factory.get_unique_unicode()
+        txlog = self.factory.make_transaction_log()
+        txlog2 = self.factory.make_transaction_log()
+        worker_name = self.factory.get_unique_unicode()
         self._create_db_worker_last_row_entry(worker_name, txlog)
         utils.update_last_row(
             worker_name=worker_name, row_id=txlog2.id,
             timestamp=txlog2.timestamp)
-        result = self.obj_factory.store.execute(
+        result = self.factory.store.execute(
             """SELECT row_id, timestamp
             FROM txlog_db_worker_last_row
             WHERE worker_id=?""", (worker_name,)).get_one()
@@ -173,8 +173,8 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         processed any rows and the number of rows in the transaction_log table
         is smaller than the number requested.
         """
-        txlogs = [self.obj_factory.make_transaction_log(),
-                  self.obj_factory.make_transaction_log()]
+        txlogs = [self.factory.make_transaction_log(),
+                  self.factory.make_transaction_log()]
         txlist = utils.get_txn_recs(num_recs=5, last_id=0)
         self.assertEqual(self._convert_txlogs_to_dicts(txlogs), txlist)
 
@@ -183,8 +183,8 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         processed any rows and the number of rows in the transaction_log table
         is exactly the number requested.
         """
-        txlogs = [self.obj_factory.make_transaction_log(),
-                  self.obj_factory.make_transaction_log()]
+        txlogs = [self.factory.make_transaction_log(),
+                  self.factory.make_transaction_log()]
         txlist = utils.get_txn_recs(num_recs=2, last_id=0)
         self.assertEqual(self._convert_txlogs_to_dicts(txlogs), txlist)
 
@@ -193,8 +193,8 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         processed any rows and the number of rows in the transaction_log table
         is larger than the number requested.
         """
-        txlogs = [self.obj_factory.make_transaction_log(),
-                  self.obj_factory.make_transaction_log()]
+        txlogs = [self.factory.make_transaction_log(),
+                  self.factory.make_transaction_log()]
         txlist = utils.get_txn_recs(num_recs=1, last_id=0)
         self.assertEqual(self._convert_txlogs_to_dicts(txlogs[:1]), txlist)
 
@@ -203,8 +203,8 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         processed rows and there are no newer rows in the transaction_log
         table.
         """
-        self.obj_factory.make_transaction_log()
-        log = self.obj_factory.make_transaction_log()
+        self.factory.make_transaction_log()
+        log = self.factory.make_transaction_log()
         txlist = utils.get_txn_recs(num_recs=1, last_id=log.id)
         self.assertEqual([], txlist)
 
@@ -213,8 +213,8 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         processed rows and there are fewer newer rows in the transaction_log
         table than we requested.
         """
-        txlogs = [self.obj_factory.make_transaction_log(),
-                  self.obj_factory.make_transaction_log()]
+        txlogs = [self.factory.make_transaction_log(),
+                  self.factory.make_transaction_log()]
         txlist = utils.get_txn_recs(num_recs=5, last_id=txlogs[0].id)
         self.assertEqual(self._convert_txlogs_to_dicts(txlogs[1:]), txlist)
 
@@ -223,8 +223,8 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         processed rows and there are the exact number of newer rows in the
         transaction_log table that we requested.
         """
-        txlogs = [self.obj_factory.make_transaction_log(),
-                  self.obj_factory.make_transaction_log()]
+        txlogs = [self.factory.make_transaction_log(),
+                  self.factory.make_transaction_log()]
         txlist = utils.get_txn_recs(num_recs=1, last_id=txlogs[0].id)
         self.assertEqual(self._convert_txlogs_to_dicts(txlogs[1:]), txlist)
 
@@ -233,17 +233,17 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         processed rows and there are the more newer rows in the
         transaction_log table than we requested.
         """
-        txlogs = [self.obj_factory.make_transaction_log(),
-                  self.obj_factory.make_transaction_log(),
-                  self.obj_factory.make_transaction_log()]
+        txlogs = [self.factory.make_transaction_log(),
+                  self.factory.make_transaction_log(),
+                  self.factory.make_transaction_log()]
         txlist = utils.get_txn_recs(num_recs=1, last_id=txlogs[0].id)
         self.assertEqual(self._convert_txlogs_to_dicts(txlogs[1:2]), txlist)
 
     def test_get_txn_recs_respects_order(self):
         """Test that transaction log entries are returned in order."""
-        txlogs = [self.obj_factory.make_transaction_log(tx_id=3),
-                  self.obj_factory.make_transaction_log(tx_id=2),
-                  self.obj_factory.make_transaction_log(tx_id=1)]
+        txlogs = [self.factory.make_transaction_log(tx_id=3),
+                  self.factory.make_transaction_log(tx_id=2),
+                  self.factory.make_transaction_log(tx_id=1)]
         txlist = utils.get_txn_recs(num_recs=3, last_id=0)
         txlogs.sort(key=lambda x: x.id)
         self.assertEqual(self._convert_txlogs_to_dicts(txlogs), txlist)
@@ -253,14 +253,14 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         records those as unseen. Querying again returns unseen transactions if
         they are now present.
         """
-        txlogs = [self.obj_factory.make_transaction_log(tx_id=1),
-                  self.obj_factory.make_transaction_log(tx_id=3)]
-        worker_id = self.obj_factory.get_unique_unicode()
+        txlogs = [self.factory.make_transaction_log(tx_id=1),
+                  self.factory.make_transaction_log(tx_id=3)]
+        worker_id = self.factory.get_unique_unicode()
         txlist = utils.get_txn_recs(num_recs=3, worker_id=worker_id)
 
         expected = self._convert_txlogs_to_dicts([txlogs[0], txlogs[1]])
         self.assertEqual(expected, txlist)
-        unseen = self.obj_factory.make_transaction_log(tx_id=2)
+        unseen = self.factory.make_transaction_log(tx_id=2)
         txlist = utils.get_txn_recs(
             num_recs=3, last_id=txlogs[1].id, worker_id=worker_id)
         self.assertEqual(
@@ -271,9 +271,9 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         records those as unseen. Querying again when unseen isn't available yet
         returns nothing.
         """
-        txlogs = [self.obj_factory.make_transaction_log(tx_id=1),
-                  self.obj_factory.make_transaction_log(tx_id=3)]
-        worker_id = self.obj_factory.get_unique_unicode()
+        txlogs = [self.factory.make_transaction_log(tx_id=1),
+                  self.factory.make_transaction_log(tx_id=3)]
+        worker_id = self.factory.get_unique_unicode()
         txlist = utils.get_txn_recs(num_recs=3, worker_id=worker_id)
         self.assertEqual(
             self._convert_txlogs_to_dicts([txlogs[0], txlogs[1]]), txlist)
@@ -294,13 +294,13 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         partition_id = owner_id % num_partitions
 
         txlogs = [
-            self.obj_factory.make_transaction_log(),
-            self.obj_factory.make_transaction_log(owner_id=2),  # Different one
-            self.obj_factory.make_transaction_log(),
+            self.factory.make_transaction_log(),
+            self.factory.make_transaction_log(owner_id=2),  # Different one
+            self.factory.make_transaction_log(),
             # Share txlogs, but with a different owner, are also returned.
-            self.obj_factory.make_transaction_log(
+            self.factory.make_transaction_log(
                 owner_id=2, op_type=TransactionLog.OP_SHARE_ACCEPTED),
-            self.obj_factory.make_transaction_log(
+            self.factory.make_transaction_log(
                 owner_id=2, op_type=TransactionLog.OP_SHARE_DELETED),
         ]
         expected_txlogs = [txlogs[0], txlogs[2], txlogs[3], txlogs[4]]
@@ -320,10 +320,10 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         # Not so old
         old_datetime = limit_datetime + datetime.timedelta(seconds=1)
 
-        self.obj_factory.make_transaction_log(tx_id=1)
-        self.obj_factory.make_transaction_log(tx_id=2, timestamp=old_datetime)
-        self.obj_factory.make_transaction_log(tx_id=3)
-        self.obj_factory.make_transaction_log(tx_id=4, timestamp=old_datetime)
+        self.factory.make_transaction_log(tx_id=1)
+        self.factory.make_transaction_log(tx_id=2, timestamp=old_datetime)
+        self.factory.make_transaction_log(tx_id=3)
+        self.factory.make_transaction_log(tx_id=4, timestamp=old_datetime)
         self.store.commit()
 
         removed = utils.delete_old_txlogs(timestamp_limit=limit_datetime)
@@ -345,11 +345,11 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         old_datetime = timestamp_limit
 
         txlogs = [
-            self.obj_factory.make_transaction_log(tx_id=1),
-            self.obj_factory.make_transaction_log(
+            self.factory.make_transaction_log(tx_id=1),
+            self.factory.make_transaction_log(
                 tx_id=2, timestamp=old_datetime),
-            self.obj_factory.make_transaction_log(tx_id=3),
-            self.obj_factory.make_transaction_log(
+            self.factory.make_transaction_log(tx_id=3),
+            self.factory.make_transaction_log(
                 tx_id=4, timestamp=old_datetime),
         ]
         self.store.commit()
@@ -375,13 +375,13 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         quantity_limit = 2
 
         txlogs = [
-            self.obj_factory.make_transaction_log(tx_id=1),
-            self.obj_factory.make_transaction_log(
+            self.factory.make_transaction_log(tx_id=1),
+            self.factory.make_transaction_log(
                 tx_id=2, timestamp=old_datetime),
-            self.obj_factory.make_transaction_log(tx_id=3),
-            self.obj_factory.make_transaction_log(
+            self.factory.make_transaction_log(tx_id=3),
+            self.factory.make_transaction_log(
                 tx_id=4, timestamp=old_datetime),
-            self.obj_factory.make_transaction_log(
+            self.factory.make_transaction_log(
                 tx_id=5, timestamp=old_datetime),
         ]
         self.store.commit()
@@ -407,11 +407,11 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         quantity_limit = 2
 
         txlogs = [
-            self.obj_factory.make_transaction_log(tx_id=1),
-            self.obj_factory.make_transaction_log(tx_id=2, timestamp=old_dt),
-            self.obj_factory.make_transaction_log(tx_id=3),
-            self.obj_factory.make_transaction_log(tx_id=4, timestamp=old_dt),
-            self.obj_factory.make_transaction_log(tx_id=5),
+            self.factory.make_transaction_log(tx_id=1),
+            self.factory.make_transaction_log(tx_id=2, timestamp=old_dt),
+            self.factory.make_transaction_log(tx_id=3),
+            self.factory.make_transaction_log(tx_id=4, timestamp=old_dt),
+            self.factory.make_transaction_log(tx_id=5),
         ]
         self.store.commit()
 
@@ -436,7 +436,7 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         """Test get_row_by_time function when data is present."""
         ts = datetime.datetime.utcnow()
         txlogs = [
-            self.obj_factory.make_transaction_log(
+            self.factory.make_transaction_log(
                 timestamp=ts + datetime.timedelta(i, 0)) for i in range(5)]
         tstamp = txlogs[2].timestamp
         txid, newtstamp = utils.get_row_by_time(tstamp)
@@ -447,7 +447,7 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         """Test get_row_by_time having two lines with same timestamp."""
         ts = datetime.datetime.utcnow()
         txlogs = [
-            self.obj_factory.make_transaction_log(
+            self.factory.make_transaction_log(
                 timestamp=ts + datetime.timedelta(i, 0)) for i in range(5)]
         # put the timestamp of [3] into [1], the function should return the
         # id of [1]
@@ -461,7 +461,7 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         """Test get_row_by_time not giving an exact timestamp."""
         ts = datetime.datetime.utcnow()
         txlogs = [
-            self.obj_factory.make_transaction_log(
+            self.factory.make_transaction_log(
                 timestamp=ts + datetime.timedelta(i, 0)) for i in range(5)]
 
         # get a timestamp in the middle of [2] and [3], the function should
@@ -476,7 +476,7 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
 
     def test_get_row_by_time_nothing_found(self):
         """Test get_row_by_time with a big enough timestamp."""
-        txlogs = [self.obj_factory.make_transaction_log() for i in range(2)]
+        txlogs = [self.factory.make_transaction_log() for i in range(2)]
         tstamp = txlogs[-1].timestamp + datetime.timedelta(seconds=1)
         txid, newtstamp = utils.get_row_by_time(tstamp)
         self.assertEqual(txid, None)
@@ -497,7 +497,7 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
             'worker4',
         ]
         for worker_name in initial_workers:
-            txlog = self.obj_factory.make_transaction_log()
+            txlog = self.factory.make_transaction_log()
             self._create_db_worker_last_row_entry(worker_name, txlog)
 
         utils.keep_last_rows_for_worker_names(kept_workers)
@@ -520,7 +520,7 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
             'worker4',
         ]
         for worker_name in initial_workers:
-            txlog = self.obj_factory.make_transaction_log()
+            txlog = self.factory.make_transaction_log()
             self._create_db_worker_last_row_entry(worker_name, txlog)
 
         utils.keep_last_rows_for_worker_names(kept_workers)

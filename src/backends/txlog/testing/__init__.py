@@ -21,7 +21,7 @@
 import datetime
 import uuid
 
-from backends.txlog.model import TransactionLog
+from backends.txlog.models import TransactionLog
 
 
 def txn_log_as_dict(txn_id=1, node_id=None, owner_id=1, volume_id=None,

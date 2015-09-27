@@ -28,11 +28,10 @@ import unittest
 
 import uuid
 from metrics.tests import FakeMetrics
-from backends.filesync.data import errors
-from backends.filesync.data.model import STATUS_LIVE, StorageObject
-from backends.filesync.data.testing.testcase import StorageDALTestCase
-from backends.filesync.data.testing.testdata import get_test_contentblob
-from backends.filesync.data.resthelper import (
+from backends.filesync import errors
+from backends.filesync.models import STATUS_LIVE, StorageObject
+from backends.filesync.tests.testcase import StorageDALTestCase
+from backends.filesync.resthelper import (
     CannotPublishDirectory,
     FileNodeHasNoChildren,
     InvalidKind,
@@ -253,7 +252,7 @@ class RestHelperTestCase(StorageDALTestCase):
     def setUp(self):
         super(RestHelperTestCase, self).setUp()
         self.handler = MementoHandler()
-        self.user = self.obj_factory.make_user(
+        self.user = self.factory.make_user(
             1, "bob", "bobby boo", 2 * (2 ** 30))
         self.mapper = ResourceMapper()
         logger = logging.getLogger("test")
@@ -590,7 +589,7 @@ class RestHelperTestCase(StorageDALTestCase):
 
     def test_PUT_node_new_file_magic(self):
         """Test put_node to make a new file with content."""
-        cb = get_test_contentblob("FakeContent")
+        cb = self.factory.get_test_contentblob("FakeContent")
         cb.magic_hash = b'magic'
         self.store.add(cb)
         self.store.commit()
@@ -605,7 +604,7 @@ class RestHelperTestCase(StorageDALTestCase):
 
     def test_PUT_node_update_file_magic(self):
         """Test put_node to make a new file with content."""
-        cb = get_test_contentblob("FakeContent")
+        cb = self.factory.get_test_contentblob("FakeContent")
         cb.magic_hash = b'magic'
         self.store.add(cb)
         self.store.commit()
@@ -613,7 +612,7 @@ class RestHelperTestCase(StorageDALTestCase):
         info = self.helper.put_node(
             self.user, new_file_path,
             {'kind': 'file', 'hash': cb.hash, 'magic_hash': 'magic'})
-        cb = get_test_contentblob("NewFakeContent")
+        cb = self.factory.get_test_contentblob("NewFakeContent")
         cb.magic_hash = b'magic2'
         self.store.add(cb)
         self.store.commit()

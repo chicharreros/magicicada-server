@@ -32,8 +32,8 @@ from twisted.internet import defer, reactor, threads, task, address
 from twisted.trial.unittest import TestCase
 from twisted.test.proto_helpers import StringTransport
 
-from backends.filesync.data import errors
-from backends.filesync.data.model import EMPTY_CONTENT_HASH, StorageObject
+from backends.filesync import errors
+from backends.filesync.models import StorageObject
 from magicicada import settings
 from ubuntuone.devtools.handlers import MementoHandler
 from ubuntuone.storage.server import server, content, diskstorage
@@ -1145,7 +1145,7 @@ class TestPutContent(TestWithDatabase):
 
     def _get_users(self, max_storage_bytes):
         """Get both storage and content users."""
-        s_user = self.obj_factory.make_user(
+        s_user = self.factory.make_user(
             max_storage_bytes=max_storage_bytes)
         c_user = content.User(self.service.factory.content, s_user.id,
                               s_user.root_volume_id, s_user.username,
@@ -1520,7 +1520,7 @@ class TestPutContent(TestWithDatabase):
         deflated_size = len(deflated_data)
         # create the content blob without a magic hash in a different
         # user.
-        self.obj_factory.make_user(100, u'my_user', u'', 2 ** 20)
+        self.factory.make_user(100, u'my_user', u'', 2 ** 20)
         self.usr3.make_filepath_with_content(
             u"~/Ubuntu One/file.txt", hash_value, crc32_value, size,
             deflated_size, uuid.uuid4())
@@ -1930,7 +1930,7 @@ class TestMultipartPutContent(TestWithDatabase):
         size = len(data)
         deflated_size = len(deflated_data)
         # create the content blob without a magic hash in a different user.
-        self.obj_factory.make_user(100, u'my_user', u'', 2 ** 20)
+        self.factory.make_user(100, u'my_user', u'', 2 ** 20)
         self.usr3.make_filepath_with_content(
             u"~/Ubuntu One/file.txt",
             hash_value, crc32_value, size, deflated_size, uuid.uuid4())
@@ -2388,7 +2388,7 @@ class TestUploadJob(TestWithDatabase):
             'make_file_with_content',
             user_id=c_user.id, volume_id=self.user.root_volume_id,
             parent_id=root, name=u"A new file",
-            node_hash=EMPTY_CONTENT_HASH, crc32=0,
+            node_hash=EMPTY_HASH, crc32=0,
             size=0, deflated_size=0, storage_key=None)
         node_id = r['node_id']
         node = yield c_user.get_node(self.user.root_volume_id, node_id, None)
@@ -2723,7 +2723,7 @@ class TestNode(TestWithDatabase):
         r = yield rpcdal.call(
             'make_file_with_content', user_id=content_user.id,
             volume_id=self.user.root_volume_id, parent_id=root,
-            name=u"A new file", node_hash=EMPTY_CONTENT_HASH, crc32=0,
+            name=u"A new file", node_hash=EMPTY_HASH, crc32=0,
             size=0, deflated_size=0, storage_key=None)
         node_id = r['node_id']
         node = yield content_user.get_node(user.root_volume_id, node_id, None)

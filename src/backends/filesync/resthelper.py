@@ -22,10 +22,10 @@ from __future__ import unicode_literals
 
 import os
 
-from backends.filesync.data import errors
-from backends.filesync.data.dao import VolumeProxy
-from backends.filesync.data.logging import log_dal_function
-from backends.filesync.data.model import STATUS_LIVE, StorageObject
+from backends.filesync import errors
+from backends.filesync.dao import VolumeProxy
+from backends.filesync.logging import log_dal_function
+from backends.filesync.models import STATUS_LIVE, StorageObject
 
 
 def date_formatter(dt):

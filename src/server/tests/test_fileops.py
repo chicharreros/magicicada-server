@@ -22,9 +22,9 @@ from StringIO import StringIO
 
 from twisted.internet import threads, defer
 
-from backends.filesync.data import errors
-from backends.filesync.data.dbmanager import fsync_readonly
-from backends.filesync.data.model import STATUS_LIVE, STATUS_DEAD
+from backends.filesync import errors
+from backends.filesync.dbmanager import fsync_readonly
+from backends.filesync.models import STATUS_LIVE, STATUS_DEAD
 from ubuntuone.storageprotocol import request
 from ubuntuone.storageprotocol import errors as protocol_errors
 from ubuntuone.storageprotocol.content_hash import content_hash_factory, crc32

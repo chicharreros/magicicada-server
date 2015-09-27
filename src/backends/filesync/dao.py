@@ -35,14 +35,14 @@ import posixpath as pypath
 
 from weakref import WeakValueDictionary
 
-from backends.filesync.data import errors, utils
-from backends.filesync.data.model import (
+from backends.filesync import errors, utils
+from backends.filesync.models import (
     ROOT_USERVOLUME_PATH,
     STATUS_LIVE,
     StorageObject,
     Share,
 )
-from backends.filesync.data.dbmanager import (
+from backends.filesync.dbmanager import (
     fsync_readonly,
     fsync_readonly_slave,
     fsync_commit,
@@ -1103,7 +1103,7 @@ class UserDAO(object):
     """DAO to retrieve data not associated to a specific user in context."""
 
     def __init__(self):
-        from backends.filesync.data.gateway import SystemGateway
+        from backends.filesync.gateway import SystemGateway
         self._gateway = SystemGateway()
 
     def get_random_user_id(self):

@@ -22,8 +22,8 @@ from twisted.internet import defer
 
 from ubuntuone.storageprotocol import request
 from ubuntuone.storage.server.testing.testcase import TestWithDatabase
-from backends.filesync.data import dbmanager, services
-from backends.filesync.data.model import StorageUserInfo
+from backends.filesync import dbmanager, services
+from backends.filesync.models import StorageUserInfo
 
 
 class QuotaTest(TestWithDatabase):

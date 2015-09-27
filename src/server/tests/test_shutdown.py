@@ -25,8 +25,8 @@ from txstatsd.metrics.countermetric import CounterMetric
 from txstatsd.metrics.metermetric import MeterMetric
 
 from s4 import s4
-from backends.filesync.data.services import make_storage_user
-from backends.filesync.data.testing.testcase import StorageDALTestCase
+from backends.filesync.services import make_storage_user
+from backends.filesync.tests.testcase import StorageDALTestCase
 from ubuntuone.storage.server.auth import DummyAuthProvider
 from ubuntuone.storage.server.testing.testcase import StorageServerService
 from ubuntuone.storageprotocol import request

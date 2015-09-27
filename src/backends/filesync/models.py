@@ -35,8 +35,8 @@ from storm.store import AutoReload, EmptyResultSet
 import posixpath as pypath
 
 from backends.db.store import implicit_flushes_blocked_on
-from backends.filesync.data import EMPTY_CONTENT_HASH
-from backends.filesync.data.errors import (
+from backends.filesync import EMPTY_CONTENT_HASH
+from backends.filesync.errors import (
     DirectoriesHaveNoContent,
     InvalidFilename,
     InvalidVolumePath,
@@ -44,7 +44,7 @@ from backends.filesync.data.errors import (
     NotADirectory,
     NotEmpty,
 )
-from backends.filesync.data.utils import encode_base62
+from backends.filesync.utils import encode_base62
 from backends.tools.properties import StormEnum, StormUUID
 
 
@@ -262,7 +262,7 @@ class StorageUser(object):
         This is the preferred way of creating new StorageUsers.
         """
         user = store.add(cls(user_id, username, visible_name))
-        from backends.txlog.model import TransactionLog
+        from backends.txlog.models import TransactionLog
         TransactionLog.record_user_created(user)
         return user
 
@@ -545,7 +545,7 @@ class StorageObject(Storm):
         """Setter for publicfile_id."""
         self.update_generation()
         self._publicfile_id = value
-        from backends.txlog.model import TransactionLog
+        from backends.txlog.models import TransactionLog
         TransactionLog.record_public_access_change(self)
 
     publicfile_id = property(get_publicfile_id, set_publicfile_id)
@@ -575,7 +575,7 @@ class StorageObject(Storm):
         self.when_last_modified = datetime.datetime.utcnow()
         self.update_generation()
 
-        from backends.txlog.model import TransactionLog
+        from backends.txlog.models import TransactionLog
         TransactionLog.record_put_content(self)
 
     content = property(get_content, set_content)
@@ -652,7 +652,7 @@ class StorageObject(Storm):
             old_parent.when_last_modified = now
         new_parent.when_last_modified = now
 
-        from backends.txlog.model import TransactionLog
+        from backends.txlog.models import TransactionLog
         TransactionLog.record_move(self, old_name, old_parent)
 
     def get_unique_childname(self, name):
@@ -769,7 +769,7 @@ class StorageObject(Storm):
             self.when_last_modified = datetime.datetime.utcnow()
             self.update_generation()
 
-        from backends.txlog.model import TransactionLog
+        from backends.txlog.models import TransactionLog
         TransactionLog.record_unlink(self)
 
         if self.kind == StorageObject.FILE:
@@ -795,7 +795,7 @@ class StorageObject(Storm):
             size_to_remove = self.tree_size
             self._update_used_bytes(0 - size_to_remove)
 
-            from backends.txlog.model import TransactionLog
+            from backends.txlog.models import TransactionLog
             TransactionLog.record_unlink_tree(self)
 
             self.descendants.set(status=STATUS_DEAD,
@@ -1043,7 +1043,7 @@ class Share(Storm):
     def delete(self):
         """Marks itself as dead."""
         self.status = STATUS_DEAD
-        from backends.txlog.model import TransactionLog
+        from backends.txlog.models import TransactionLog
         TransactionLog.record_share_deleted(self)
 
     def accept(self):
@@ -1055,7 +1055,7 @@ class Share(Storm):
         assert self.status == STATUS_LIVE
         assert self.shared_to is not None
         self.accepted = True
-        from backends.txlog.model import TransactionLog
+        from backends.txlog.models import TransactionLog
         TransactionLog.record_share_accepted(self)
 
     @staticmethod
@@ -1241,7 +1241,7 @@ class UserVolume(Storm):
         self.root_node._update_used_bytes(0 - size_to_remove)
         self.status = STATUS_DEAD
         self.increment_generation()
-        from backends.txlog.model import TransactionLog
+        from backends.txlog.models import TransactionLog
         TransactionLog.record_udf_deleted(self)
 
     def volume_size(self):
@@ -1284,7 +1284,7 @@ class UserVolume(Storm):
         # Add both records to DB (node first, because of foreign key)
         store.add(node)
         store.add(vol)
-        from backends.txlog.model import TransactionLog
+        from backends.txlog.models import TransactionLog
         TransactionLog.record_udf_created(vol)
         return vol
 

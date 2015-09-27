@@ -29,9 +29,9 @@ import datetime
 from mock import patch
 from storm.expr import Or, Max
 
-from backends.filesync.data import errors
-from backends.filesync.data.dbmanager import filesync_tm
-from backends.filesync.data.model import (
+from backends.filesync import errors
+from backends.filesync.dbmanager import filesync_tm
+from backends.filesync.models import (
     ROOT_USERVOLUME_PATH,
     STATUS_LIVE,
     STATUS_DEAD,
@@ -53,10 +53,8 @@ from backends.filesync.data.model import (
     validate_name,
     undelete_volume,
 )
-from backends.filesync.data.testing.ormtestcase import ORMTestCase
-from backends.filesync.data.testing.testdata import (
-    content_blob_args, uploadjob_args)
-from backends.txlog.model import TransactionLog
+from backends.filesync.tests.testcase import ORMTestCase
+from backends.txlog.models import TransactionLog
 
 
 class TestStorageUser(ORMTestCase):
@@ -64,7 +62,7 @@ class TestStorageUser(ORMTestCase):
 
     def test_create(self):
         """Tests creation of a StorageUser."""
-        u = self.obj_factory.make_user()
+        u = self.factory.make_user()
         self.assertFalse(u.locked)
 
     def test_lock_for_update(self):
@@ -210,7 +208,7 @@ class TestContentBlob(ORMTestCase):
 
     def test_create(self):
         """Tests the creation of a ContentBlob."""
-        cb = self.create(ContentBlob, **content_blob_args())
+        cb = self.create(ContentBlob, **self.factory.content_blob_args())
         self.assertNotEqual(cb.when_created, None)
 
     def test_make_empty(self):
@@ -226,15 +224,15 @@ class TestStorageObjectBase(ORMTestCase):
 
     def createStorageObject(self, fname='file.ext'):
         """Helper function to create an StorageObject."""
-        self.create(ContentBlob, ** content_blob_args())
-        u = self.obj_factory.make_user()
+        self.create(ContentBlob, **self.factory.content_blob_args())
+        u = self.factory.make_user()
         root = StorageObject.get_root(self.store, u.id)
         obj = root.make_file(fname)
         return u, root, obj
 
     def createUDF(self):
         """Helper function to create an UDF's root."""
-        user = self.obj_factory.make_user()
+        user = self.factory.make_user()
         udf = UserVolume.create(
             self.store, user.id, path='~/Documents/Stuff/DirToUDF')
         root = self.store.get(StorageObject, udf.root_id)
@@ -253,7 +251,7 @@ class TestStorageObject(TestStorageObjectBase):
 
     def test_create_root(self):
         """Create a standard root."""
-        user = self.obj_factory.make_user()
+        user = self.factory.make_user()
         node = StorageObject.get_root(self.store, user.id)
 
         # check node properties
@@ -268,7 +266,7 @@ class TestStorageObject(TestStorageObjectBase):
 
     def test_make_with_no_name(self):
         """Test make_file and make_directory with no name."""
-        user = self.obj_factory.make_user()
+        user = self.factory.make_user()
         root_node = StorageObject.get_root(self.store, user.id)
         self.assertRaises(errors.StorageError, root_node.make_file, '')
         self.assertRaises(errors.StorageError, root_node.make_file, None)
@@ -279,7 +277,7 @@ class TestStorageObject(TestStorageObjectBase):
 
     def test_create_a_node_in_a_root(self):
         """Create a regular node inside a standard root."""
-        user = self.obj_factory.make_user()
+        user = self.factory.make_user()
         root_node = StorageObject.get_root(self.store, user.id)
         # change the generaiton of the volume
         root_node.volume.generation = 12
@@ -489,7 +487,7 @@ class TestStorageObject(TestStorageObjectBase):
         sub = root.make_subdirectory('My Subfolder')
         used = info.used_storage_bytes
         self.assertEqual(used, 0)
-        content = self.create(ContentBlob, ** content_blob_args())
+        content = self.create(ContentBlob, **self.factory.content_blob_args())
         self.store.add(content)
         for i in range(100):
             file = sub.make_file('File%s' % i)
@@ -511,7 +509,7 @@ class TestStorageObject(TestStorageObjectBase):
         self.assertEqual(info.used_storage_bytes, 0)
 
         # create some nodes
-        content = self.create(ContentBlob, ** content_blob_args())
+        content = self.create(ContentBlob, **self.factory.content_blob_args())
         self.store.add(content)
         for i in range(10):
             file = sub.make_file('File%s' % i)
@@ -567,7 +565,7 @@ class TestStorageObject(TestStorageObjectBase):
 
     def test_udf_trailing_slashes(self):
         """Tests that the path for an udf doesn't have trailing slashes."""
-        user = self.obj_factory.make_user()
+        user = self.factory.make_user()
         udf = UserVolume.create(
             self.store, user.id, path='~/Documents/Stuff/DirToUDF/')
         filesync_tm.commit()
@@ -772,8 +770,8 @@ class TestStorageObject(TestStorageObjectBase):
         subdir = root.make_subdirectory('subdir')
         self.assertEqual(0, info.used_storage_bytes)
         self.assertEqual(0, subdir.tree_size)
-        file_size = content_blob_args()['size']
-        content = self.create(ContentBlob, ** content_blob_args())
+        file_size = self.factory.content_blob_args()['size']
+        content = self.create(ContentBlob, **self.factory.content_blob_args())
 
         def add_tree_and_files(dir, name):
             """Add a subtree and 100 files"""
@@ -823,7 +821,7 @@ class TestStorageObject(TestStorageObjectBase):
         u_sub3 = u_sub2.make_subdirectory('sub3')
 
         # create a content of 100
-        args = content_blob_args()
+        args = self.factory.content_blob_args()
         args['size'] = 100
         content = self.create(ContentBlob, ** args)
 
@@ -935,8 +933,8 @@ class TestStorageObject(TestStorageObjectBase):
         self.assertEqual(subdirxxx1.status, STATUS_LIVE)
 
     def test_unlink_tree_calls_transaction_log_recording_method(self):
-        directory = self.obj_factory.make_directory()
-        self.obj_factory.make_file(parent=directory)
+        directory = self.factory.make_directory()
+        self.factory.make_file(parent=directory)
 
         with patch.object(TransactionLog, 'record_unlink_tree') as mock_unlink:
             directory.unlink_tree()
@@ -988,7 +986,7 @@ class TestStorageObject(TestStorageObjectBase):
         self.assertEqual(obj.status, STATUS_DEAD)
 
     def test_unlink_calls_transaction_log_recording_method(self):
-        f = self.obj_factory.make_file()
+        f = self.factory.make_file()
 
         with patch.object(TransactionLog, 'record_unlink') as mock_unlink:
             f.unlink()
@@ -1208,7 +1206,7 @@ class TestStorageObject(TestStorageObjectBase):
         root = StorageObject.get_root(self.store, user.id)
         subdir = root.make_subdirectory('subdir')
         self.assertEqual(0, info.used_storage_bytes)
-        content = self.create(ContentBlob, ** content_blob_args())
+        content = self.create(ContentBlob, **self.factory.content_blob_args())
         self.store.add(content)
 
         def add_file(name):
@@ -1223,7 +1221,7 @@ class TestStorageObject(TestStorageObjectBase):
 
         filesync_tm.commit()
         self.assertEqual(info.used_storage_bytes,
-                         content_blob_args()['size'] * 100)
+                         self.factory.content_blob_args()['size'] * 100)
 
     def test_update_used_bytes_udf(self):
         """Test the tracking of storage bytes used by a user in an UDF."""
@@ -1234,7 +1232,7 @@ class TestStorageObject(TestStorageObjectBase):
         filesync_tm.commit()
 
         self.assertEqual(0, info.used_storage_bytes)
-        content = self.create(ContentBlob, ** content_blob_args())
+        content = self.create(ContentBlob, **self.factory.content_blob_args())
         self.store.add(content)
 
         def add_file(name):
@@ -1249,7 +1247,7 @@ class TestStorageObject(TestStorageObjectBase):
 
         filesync_tm.commit()
         self.assertEqual(info.used_storage_bytes,
-                         content_blob_args()['size'] * 10)
+                         self.factory.content_blob_args()['size'] * 10)
 
     def test_recalculate_used_bytes(self):
         """Test the recalculating used bytes."""
@@ -1261,9 +1259,9 @@ class TestStorageObject(TestStorageObjectBase):
         vol2 = UserVolume.create(self.store, user.id, '~/v2')
         filesync_tm.commit()
         self.assertEqual(0, info.used_storage_bytes)
-        content = self.create(ContentBlob, ** content_blob_args())
+        content = self.create(ContentBlob, **self.factory.content_blob_args())
         self.store.add(content)
-        expected_used = content_blob_args()['size'] * 30
+        expected_used = self.factory.content_blob_args()['size'] * 30
 
         def add_file(subdir, name):
             """Adds a file to the user storage."""
@@ -1301,7 +1299,7 @@ class TestStorageObject(TestStorageObjectBase):
         root = StorageObject.get_root(self.store, user.id)
         subdir = root.make_subdirectory('subdir')
         self.assertEqual(0, info.used_storage_bytes)
-        content = self.create(ContentBlob, ** content_blob_args())
+        content = self.create(ContentBlob, **self.factory.content_blob_args())
         self.store.add(content)
         for i in range(100):
             file = subdir.make_file('File%s' % i)
@@ -1311,7 +1309,7 @@ class TestStorageObject(TestStorageObjectBase):
                 file.unlink()
         filesync_tm.commit()
         self.assertEqual(info.used_storage_bytes,
-                         content_blob_args()['size'] * 50)
+                         self.factory.content_blob_args()['size'] * 50)
 
         file = subdir.make_file('Blah')
         file.content = content
@@ -1326,7 +1324,7 @@ class TestStorageObject(TestStorageObjectBase):
         info.max_storage_bytes = 2 ** 18
         subdir = udf_root.make_subdirectory('subdir')
         self.assertEqual(0, info.used_storage_bytes)
-        content = self.create(ContentBlob, ** content_blob_args())
+        content = self.create(ContentBlob, **self.factory.content_blob_args())
         self.store.add(content)
         for i in range(10):
             file = subdir.make_file('File%s' % i)
@@ -1336,7 +1334,7 @@ class TestStorageObject(TestStorageObjectBase):
                 file.unlink()
         filesync_tm.commit()
         self.assertEqual(info.used_storage_bytes,
-                         content_blob_args()['size'] * 5)
+                         self.factory.content_blob_args()['size'] * 5)
 
         file = subdir.make_file('Blah')
         file.content = content
@@ -1355,7 +1353,7 @@ class TestStorageObject(TestStorageObjectBase):
         subdir = root.make_subdirectory('subdir')
         subdir2 = root.make_subdirectory('subdir2')
         self.assertEqual(0, info.used_storage_bytes)
-        content = self.create(ContentBlob, ** content_blob_args())
+        content = self.create(ContentBlob, **self.factory.content_blob_args())
         self.store.add(content)
         for i in range(100):
             file = subdir.make_file('File%s' % i)
@@ -1365,12 +1363,12 @@ class TestStorageObject(TestStorageObjectBase):
                 file.move(subdir2.id, file.name)
         filesync_tm.commit()
         self.assertEqual(info.used_storage_bytes,
-                         content_blob_args()['size'] * 100)
+                         self.factory.content_blob_args()['size'] * 100)
 
     def test_update_last_modified_on_content(self):
         """Tests that when_last_modified is updated when the content changes"""
         user = self.make_user(1, 'a_test_user')
-        content = self.create(ContentBlob, ** content_blob_args())
+        content = self.create(ContentBlob, **self.factory.content_blob_args())
         self.store.add(content)
         root = StorageObject.get_root(self.store, user.id)
         file = root.make_file('a_File')
@@ -1406,13 +1404,13 @@ class TestStorageObject(TestStorageObjectBase):
 
     def test_move_directory_into_itself(self):
         """Tests that a directory can't be moved into itself."""
-        subdir = self.obj_factory.make_directory()
+        subdir = self.factory.make_directory()
         self.assertRaises(
             errors.NoPermission, subdir.move, subdir.id, subdir.name)
 
     def test_move_file_into_itself(self):
         """Tests that a file can't be moved into itself."""
-        a_file = self.obj_factory.make_file()
+        a_file = self.factory.make_file()
         self.assertRaises(
             errors.NoPermission, a_file.move, a_file.id, a_file.name)
 
@@ -1422,7 +1420,7 @@ class TestStorageObject(TestStorageObjectBase):
         If move() is called with the existing parent and name as arguments, it
         does nothing.
         """
-        f = self.obj_factory.make_file()
+        f = self.factory.make_file()
         old_generation = f.generation
 
         f.move(f.parent_id, f.name)
@@ -1431,7 +1429,7 @@ class TestStorageObject(TestStorageObjectBase):
 
     def test_move_requires_uuid_for_new_parent_id(self):
         """move() will raise a TypeError if parent_id is a str."""
-        f = self.obj_factory.make_file()
+        f = self.factory.make_file()
 
         self.assertRaises(TypeError, f.move, str(uuid.uuid4()), f.name)
 
@@ -1590,7 +1588,7 @@ class TestStorageObjectGenerations(TestStorageObjectBase):
 
     def setUp(self):
         super(TestStorageObjectGenerations, self).setUp()
-        self.usr = self.obj_factory.make_user()
+        self.usr = self.factory.make_user()
         self.volume = UserVolume.make_root(self.store, self.usr.id)
         self.root = self.volume.root_node
 
@@ -1614,7 +1612,7 @@ class TestStorageObjectGenerations(TestStorageObjectBase):
 
     def test_content_property(self):
         """Generation is incremented when content is updated."""
-        cb = self.create(ContentBlob, ** content_blob_args())
+        cb = self.create(ContentBlob, **self.factory.content_blob_args())
         node = self.root.make_file('file.txt')
         start_gen = self.volume.generation
         node.content = cb
@@ -1684,7 +1682,7 @@ class TestMoveFromShare(ORMTestCase):
 
     def test_create_mfs(self):
         """Basic create test."""
-        u = self.obj_factory.make_user()
+        u = self.factory.make_user()
         node = StorageObject(u.id, 'TheFile.txt', StorageObject.FILE)
         self.store.add(node)
         share_id = uuid.uuid4()
@@ -1706,7 +1704,7 @@ class TestMoveFromShare(ORMTestCase):
 
     def test_ShareVolumeDelta(self):
         """Test the ShareVolumeDelta view."""
-        u = self.obj_factory.make_user()
+        u = self.factory.make_user()
         # create 10 StorageObjects and MoveFromShare.
         share_id = uuid.uuid4()
         for i in range(10):
@@ -1746,9 +1744,9 @@ class TestShare(ORMTestCase):
     def test_create_share(self):
         """Creates a Share."""
         # create all the needed objects
-        usr1 = self.obj_factory.make_user(0, 'user0')
-        usr2 = self.obj_factory.make_user(1, 'user1')
-        usr3 = self.obj_factory.make_user(2, 'user2')
+        usr1 = self.factory.make_user(0, 'user0')
+        usr2 = self.factory.make_user(1, 'user1')
+        usr3 = self.factory.make_user(2, 'user2')
         root = StorageObject.get_root(self.store, usr1.id)
 
         # see if creation goes ok
@@ -1767,9 +1765,9 @@ class TestShare(ORMTestCase):
     def test_create_share_udf(self):
         """Creates a Share in an UDF."""
         # create all the needed objects
-        usr1 = self.obj_factory.make_user(0, 'user0')
-        usr2 = self.obj_factory.make_user(1, 'user1')
-        usr3 = self.obj_factory.make_user(2, 'user2')
+        usr1 = self.factory.make_user(0, 'user0')
+        usr2 = self.factory.make_user(1, 'user1')
+        usr3 = self.factory.make_user(2, 'user2')
         udf = UserVolume.create(
             self.store, usr1.id, path='~/Documents/Stuff/DirToUDF')
         root = self.store.get(StorageObject, udf.root_id)
@@ -1790,8 +1788,8 @@ class TestShare(ORMTestCase):
     def test_create_share_same_name(self):
         """Creates a Share from usr1 to usr2, different nodes, but same name"""
         # create all the needed objects
-        usr1 = self.obj_factory.make_user(0, 'user0')
-        usr2 = self.obj_factory.make_user(1, 'user1')
+        usr1 = self.factory.make_user(0, 'user0')
+        usr2 = self.factory.make_user(1, 'user1')
         root = StorageObject.get_root(self.store, usr1.id)
         node = root.make_subdirectory('newdir')
 
@@ -1803,8 +1801,8 @@ class TestShare(ORMTestCase):
     def test_create_same_share_after_delete(self):
         """ (re)creates a share after deleting it """
         # create all the needed objects
-        usr1 = self.obj_factory.make_user(0, 'user0')
-        usr2 = self.obj_factory.make_user(1, 'user1')
+        usr1 = self.factory.make_user(0, 'user0')
+        usr2 = self.factory.make_user(1, 'user1')
         root = StorageObject.get_root(self.store, usr1.id)
         root.make_subdirectory('newdir')
 
@@ -1825,8 +1823,8 @@ class TestShare(ORMTestCase):
     def test_multiple_shares_same_subtree(self):
         """ checks db constraints that enforce only one share per subtree """
         # create all the needed objects
-        usr1 = self.obj_factory.make_user(0, 'user0')
-        usr2 = self.obj_factory.make_user(1, 'user1')
+        usr1 = self.factory.make_user(0, 'user0')
+        usr2 = self.factory.make_user(1, 'user1')
         root = StorageObject.get_root(self.store, usr1.id)
         node = root.make_subdirectory('newdir')
 
@@ -1876,7 +1874,7 @@ class TestUserVolume(ORMTestCase):
     def test_create_volume(self):
         """Create an UDF."""
         # create all the needed objects
-        usr = self.obj_factory.make_user()
+        usr = self.factory.make_user()
         node = StorageObject.make_root(self.store, usr.id)
 
         # see if creation goes ok
@@ -1888,7 +1886,7 @@ class TestUserVolume(ORMTestCase):
 
     def test_increment_generation(self):
         """Test increment_generation."""
-        usr = self.obj_factory.make_user()
+        usr = self.factory.make_user()
         volume = UserVolume.make_root(self.store, usr.id)
         self.assertEqual(volume.generation, 0)
         volume.increment_generation()
@@ -1898,21 +1896,21 @@ class TestUserVolume(ORMTestCase):
 
     def test_create_volume_baduser(self):
         """Create an UDF with a wrong user."""
-        usr = self.obj_factory.make_user()
+        usr = self.factory.make_user()
         node = StorageObject.get_root(self.store, usr.id)
         self.assertRaises(psycopg2.IntegrityError,
                           self.create_volume, 999, node.id, '~/somepath')
 
     def test_create_volume_badnode(self):
         """Create an UDF with a wrong node."""
-        usr = self.obj_factory.make_user()
+        usr = self.factory.make_user()
         self.assertRaises(
             psycopg2.IntegrityError,
             self.create_volume, usr.id, uuid.uuid4(), '~/somepath')
 
     def test_create_volume_badpath(self):
         """Create an UDF with a wrong node."""
-        usr = self.obj_factory.make_user()
+        usr = self.factory.make_user()
         node = StorageObject.get_root(self.store, usr.id)
         self.assertRaises(
             errors.InvalidVolumePath,
@@ -1921,7 +1919,7 @@ class TestUserVolume(ORMTestCase):
     def test_delete_volume(self):
         """Delete an UDF."""
         # create all the needed objects
-        usr = self.obj_factory.make_user()
+        usr = self.factory.make_user()
         node = StorageObject.get_root(self.store, usr.id)
         volume = self.create_volume(usr.id, node.id, '~/somepath')
         generation = volume.generation
@@ -1933,7 +1931,7 @@ class TestUserVolume(ORMTestCase):
 
     def test_create_volume_using_the_classmethod(self):
         """Create an UserVolume."""
-        user = self.obj_factory.make_user()
+        user = self.factory.make_user()
         self.assertRaises(
             errors.NoPermission, UserVolume.create,
             self.store, user.id, '~/Ubuntu One')
@@ -1958,7 +1956,7 @@ class TestUserVolume(ORMTestCase):
 
     def test_make_root(self):
         """Create the root UserVolume."""
-        user = self.obj_factory.make_user()
+        user = self.factory.make_user()
         volume = UserVolume.make_root(self.store, user.id)
         node = self.store.get(StorageObject, volume.root_id)
 
@@ -1979,7 +1977,7 @@ class TestUserVolume(ORMTestCase):
 
     def test_get_root_volume(self):
         """Test the get_root method."""
-        user = self.obj_factory.make_user()
+        user = self.factory.make_user()
         volume1 = UserVolume.make_root(self.store, user.id)
         volume2 = UserVolume.get_root(self.store, user.id)
         self.assertEqual(volume1.id, volume2.id)
@@ -1987,8 +1985,8 @@ class TestUserVolume(ORMTestCase):
     def add_tree_and_files(self, volume):
         """Add a subtree and 100 files to the volume"""
         sub = volume.root_node.make_subdirectory('SubDir')
-        file_size = content_blob_args()['size']
-        content = self.create(ContentBlob, ** content_blob_args())
+        file_size = self.factory.content_blob_args()['size']
+        content = self.create(ContentBlob, **self.factory.content_blob_args())
         for i in range(100):
             file = sub.make_file('%s-%s' % (sub.name, i))
             file.content = content
@@ -2024,14 +2022,14 @@ class TestUploadJob(ORMTestCase):
 
     def create_uploadjob(self):
         """Create a UploadJob instance."""
-        u = self.obj_factory.make_user()
+        u = self.factory.make_user()
         root = StorageObject.make_root(self.store, u.id)
         obj = root.make_file(name='file.ext')
 
         def _UploadJob():
             """ wrapper for the UploadJob __init__ method """
             return UploadJob(obj.id)
-        job = self.create(_UploadJob, ** uploadjob_args())
+        job = self.create(_UploadJob, **self.factory.uploadjob_args())
         filesync_tm.commit()
         return job
 
@@ -2043,7 +2041,7 @@ class TestUploadJob(ORMTestCase):
 
     def test_uploadjob_create_udf(self):
         """Test upload job creation in an UDF."""
-        user = self.obj_factory.make_user()
+        user = self.factory.make_user()
         udf = UserVolume.create(
             self.store, user.id, path='~/Documents/Stuff/DirToUDF')
         root = self.store.get(StorageObject, udf.root_id)
@@ -2053,13 +2051,13 @@ class TestUploadJob(ORMTestCase):
             """Wrapper for the UploadJob __init__ method."""
             return UploadJob(obj.id)
 
-        job = self.create(_UploadJob, ** uploadjob_args())
+        job = self.create(_UploadJob, **self.factory.uploadjob_args())
         self.failIf(job.uploadjob_id is None)
         self.failUnless(job.uploadjob_id > 0)
 
     def test_uploadjob_new_uploadjob(self):
         """Test creation of a new uploadjob."""
-        u = self.obj_factory.make_user()
+        u = self.factory.make_user()
         root = StorageObject.make_root(self.store, u.id)
         obj = root.make_file(name='file.ext')
         job = UploadJob.new_uploadjob(self.store, obj.id)
@@ -2069,7 +2067,7 @@ class TestUploadJob(ORMTestCase):
 
     def test_uploadjob_new_uploadjob_udf(self):
         """Test creation of a new uploadjob in an UDF."""
-        user = self.obj_factory.make_user()
+        user = self.factory.make_user()
         udf = UserVolume.create(
             self.store, user.id, path='~/Documents/Stuff/DirToUDF')
         root = self.store.get(StorageObject, udf.root_id)
@@ -2081,7 +2079,7 @@ class TestUploadJob(ORMTestCase):
 
     def test_uploadjob_new_multipart_uploadjob(self):
         """Test creation of a new multipart uploadjob."""
-        u = self.obj_factory.make_user()
+        u = self.factory.make_user()
         root = StorageObject.make_root(self.store, u.id)
         obj = root.make_file(name='file.ext')
         job = UploadJob.new_multipart_uploadjob(
@@ -2097,7 +2095,7 @@ class TestUploadJob(ORMTestCase):
 
     def test_uploadjob_add_part(self):
         """Test add_part method."""
-        u = self.obj_factory.make_user()
+        u = self.factory.make_user()
         root = StorageObject.make_root(self.store, u.id)
         obj = root.make_file(name='file.ext')
         job = UploadJob.new_multipart_uploadjob(
@@ -2129,7 +2127,7 @@ class TestUploadJob(ORMTestCase):
 
     def test_uploadjob_find(self):
         """Test add_part method."""
-        u = self.obj_factory.make_user()
+        u = self.factory.make_user()
         root = StorageObject.make_root(self.store, u.id)
         obj = root.make_file(name='file.ext')
         job = UploadJob.new_multipart_uploadjob(

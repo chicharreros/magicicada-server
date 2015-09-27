@@ -40,8 +40,8 @@ from storm.info import ClassAlias
 
 from metrics.metricsconnector import MetricsConnector
 from backends.db.dbtransaction import db_timeout, TRANSACTION_MAX_TIME
-from backends.filesync.data import errors, dao, utils
-from backends.filesync.data.model import (
+from backends.filesync import errors, dao, utils
+from backends.filesync.models import (
     EMPTY_CONTENT_HASH,
     ROOT_PARENTID,
     ROOT_USERVOLUME_PATH,
@@ -62,7 +62,7 @@ from backends.filesync.data.model import (
     undelete_volume,
 )
 from backends.filesync.notifier.notifier import get_notifier
-from backends.filesync.data.dbmanager import get_filesync_store
+from backends.filesync.dbmanager import get_filesync_store
 
 
 class TimingMetrics(object):
@@ -2196,7 +2196,7 @@ def fix_udfs_with_generation_out_of_sync(store, user_ids, logger):
 
 def fix_all_udfs_with_generation_out_of_sync(
         logger, sleep=0, dry_run=False, batch_size=500):
-    from backends.filesync.data.dbmanager import get_filesync_store
+    from backends.filesync.dbmanager import get_filesync_store
     if dry_run:
         logger.info("Dry-run enabled; not committing any changes.")
     store = get_filesync_store()

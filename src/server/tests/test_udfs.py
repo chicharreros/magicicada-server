@@ -27,7 +27,7 @@ from StringIO import StringIO
 
 from twisted.internet import reactor, defer
 
-from backends.filesync.data.errors import DoesNotExist
+from backends.filesync.errors import DoesNotExist
 from ubuntuone.storageprotocol import request
 from ubuntuone.storage.server.testing.testcase import (
     TestWithDatabase, FactoryHelper)

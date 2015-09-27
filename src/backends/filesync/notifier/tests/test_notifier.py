@@ -23,7 +23,7 @@ from __future__ import unicode_literals
 import unittest
 import uuid
 
-from backends.filesync.data.model import Share
+from backends.filesync.models import Share
 from backends.filesync.notifier import notifier
 from backends.filesync.notifier.notifier import (
     EventNotifier,

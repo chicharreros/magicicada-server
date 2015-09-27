@@ -24,7 +24,7 @@ from twisted.internet import defer
 
 from ubuntuone.devtools.handlers import MementoHandler
 
-from backends.filesync.data.errors import DoesNotExist
+from backends.filesync.errors import DoesNotExist
 from ubuntuone.storage.server.auth import (
     AuthenticationProvider,
     DummyAuthProvider,

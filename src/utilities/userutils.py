@@ -23,7 +23,7 @@ from __future__ import unicode_literals
 import json
 import os
 
-from backends.filesync.data.dbmanager import fsync_commit
+from backends.filesync.dbmanager import fsync_commit
 from backends.db.store import get_filesync_store
 from backends.db.schemas.storage import create_schema as storage
 

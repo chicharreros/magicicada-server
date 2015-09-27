@@ -32,7 +32,7 @@ from txstatsd.metrics.extendedmetrics import ExtendedMetrics
 
 import oops_timeline
 
-from backends.filesync.data.model import Share
+from backends.filesync.models import Share
 from backends.filesync.notifier.testing.testcase import FakeNotifier
 from backends.filesync.notifier.notifier import (
     ShareAccepted,

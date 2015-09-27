@@ -25,8 +25,8 @@ from StringIO import StringIO
 
 from twisted.internet import reactor, defer
 
-from backends.filesync.data import errors, dbmanager
-from backends.filesync.data.model import (
+from backends.filesync import errors, dbmanager
+from backends.filesync.models import (
     STATUS_LIVE,
     StorageObject,
     Share,

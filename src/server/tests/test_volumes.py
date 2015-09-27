@@ -22,8 +22,8 @@
 
 from twisted.internet import defer
 
-from backends.filesync.data.model import Share
-from backends.filesync.data.services import get_storage_user
+from backends.filesync.models import Share
+from backends.filesync.services import get_storage_user
 from ubuntuone.storage.server.testing.testcase import TestWithDatabase
 from ubuntuone.storageprotocol import request
 from ubuntuone.storageprotocol.volumes import (

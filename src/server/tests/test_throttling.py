@@ -27,8 +27,8 @@ from twisted.internet import threads, defer
 from twisted.internet.protocol import connectionDone
 
 
-from backends.filesync.data import get_filesync_store, filesync_tm
-from backends.filesync.data.model import ContentBlob
+from backends.filesync.dbmanager import get_filesync_store, filesync_tm
+from backends.filesync.models import ContentBlob
 from ubuntuone.storageprotocol import request, client
 from ubuntuone.storageprotocol.content_hash import content_hash_factory, crc32
 from ubuntuone.storage.server.testing.testcase import (

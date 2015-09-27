@@ -33,7 +33,7 @@ from backends.db.schemas import account as account_schema
 from backends.db.schemas import storage as storage_schema
 from backends.db.dbwatcher import DatabaseWatcher
 from backends.db.store import get_filesync_store
-from backends.filesync.data.dbmanager import filesync_tm
+from backends.filesync.dbmanager import filesync_tm
 
 DEBUG_RESOURCES = bool(os.environ.get("DEBUG_RESOURCES"))
 

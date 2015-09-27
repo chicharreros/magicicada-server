@@ -28,8 +28,8 @@ from storm.expr import Join, LeftJoin
 from storm.locals import Int, DateTime, Enum, Store, Unicode
 from storm.store import AutoReload
 
-from backends.filesync.data.dbmanager import get_filesync_store
-from backends.filesync.data.model import (
+from backends.filesync.dbmanager import get_filesync_store
+from backends.filesync.models import (
     STATUS_LIVE,
     Share,
     StorageObject,

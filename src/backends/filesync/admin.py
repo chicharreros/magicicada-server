@@ -20,10 +20,10 @@
 
 from __future__ import unicode_literals
 
-from backends.filesync.data import dao, get_filesync_store
-from backends.filesync.data.dbmanager import fsync_readonly
-from backends.filesync.data.gateway import StorageUserGateway
-from backends.filesync.data.model import StorageUser
+from backends.filesync import dao
+from backends.filesync.dbmanager import fsync_readonly, get_filesync_store
+from backends.filesync.gateway import StorageUserGateway
+from backends.filesync.models import StorageUser
 
 
 class StorageUserFinder(object):

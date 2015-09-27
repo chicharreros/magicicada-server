@@ -55,8 +55,8 @@ from twisted.python.failure import Failure
 
 from metrics import get_meter
 from metrics.metricsconnector import MetricsConnector
-from backends.filesync.data import errors as dataerror
-from backends.filesync.data.model import Share, StorageObject
+from backends.filesync import errors as dataerror
+from backends.filesync.models import Share, StorageObject
 from backends.filesync.notifier import notifier
 from magicicada import settings
 from ubuntuone.storage.server.logger import configure_logger, TRACE

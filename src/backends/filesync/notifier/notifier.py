@@ -28,7 +28,7 @@ from weakref import WeakKeyDictionary
 
 from twisted.internet import reactor
 
-from backends.filesync.data import filesync_tm
+from backends.filesync.dbmanager import filesync_tm
 
 
 class EventTypeDescriptor(object):

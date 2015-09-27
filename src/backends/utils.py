@@ -22,7 +22,7 @@ from datetime import datetime
 
 from django.contrib.auth.models import User
 
-from backends.filesync.data import services
+from backends.filesync import services
 
 
 def create_test_user(username=u"fred", email=u"fred@bedrock.com",

@@ -24,12 +24,13 @@ from __future__ import unicode_literals
 
 import sys
 import random
+import uuid
 
 import _pythonpath  # NOQA
 
 from twisted.python.util import makeStatBar
-from backends.filesync.data.testing.testdata import get_fake_hash, uuid
-from backends.filesync.data.services import get_storage_user
+from backends.filesync.services import get_storage_user
+from backends.filesync.tests.testcase import Factory
 
 utf2unicode = lambda s: unicode(s, 'utf-8', 'replace')
 
@@ -119,7 +120,7 @@ def main(username, sharer, wlist, num):
         name = sample.pop()
         random.choice(folders).make_file(name)
 
-    fake_hash = get_fake_hash()
+    fake_hash = Factory().get_fake_hash()
     while sample:
         progress(sample)
         name = sample.pop()

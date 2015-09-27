@@ -22,9 +22,9 @@ from __future__ import unicode_literals
 
 from itertools import imap
 
-from backends.filesync.data import dbmanager
+from backends.filesync import dbmanager
 
-from backends.txlog.model import TransactionLog
+from backends.txlog.models import TransactionLog
 
 
 NEW_WORKER_LAST_ROW = (0, None)

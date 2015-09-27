@@ -25,7 +25,7 @@ import logging
 
 from twisted.internet import defer
 
-from backends.filesync.data.errors import DoesNotExist
+from backends.filesync.errors import DoesNotExist
 from ubuntuone.storage.rpcdb import auth_backend
 
 

@@ -26,8 +26,8 @@ from twisted.trial.unittest import TestCase
 from twisted.internet import defer
 from mocker import Mocker, expect, KWARGS
 
-from backends.filesync.data import errors
-from backends.filesync.data.model import (
+from backends.filesync import errors
+from backends.filesync.models import (
     STATUS_LIVE,
     STATUS_DEAD,
     StorageObject,

@@ -37,7 +37,7 @@ from twisted.python.failure import Failure
 
 import u1sync.client
 
-from backends.filesync.data.model import (
+from backends.filesync.models import (
     STATUS_LIVE,
     ContentBlob,
     StorageObject,

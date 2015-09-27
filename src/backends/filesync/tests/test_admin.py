@@ -16,16 +16,16 @@
 #
 # For further info, check  http://launchpad.net/magicicada-server
 
-"""Tests for the adminservices features."""
+"""Tests for the admin features."""
 
 from __future__ import unicode_literals
 
-from backends.filesync.data import adminservices as admin, dao, services
-from backends.filesync.data.testing.testcase import StorageDALTestCase
+from backends.filesync import admin, dao, services
+from backends.filesync.tests.testcase import StorageDALTestCase
 
 
 class AdminServicesTestCase(StorageDALTestCase):
-    """Tests the adminservices module features."""
+    """Tests the admin module features."""
 
     def _make_users(self):
         """Create users for tests."""

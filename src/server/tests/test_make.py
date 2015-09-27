@@ -27,7 +27,7 @@ from StringIO import StringIO
 
 from twisted.internet import threads, defer
 
-from backends.filesync.data import errors
+from backends.filesync import errors
 from ubuntuone.storageprotocol import request, volumes
 from ubuntuone.storage.server.testing.testcase import TestWithDatabase
 from ubuntuone.storageprotocol.content_hash import content_hash_factory, crc32

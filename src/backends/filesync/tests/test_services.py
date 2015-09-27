@@ -23,9 +23,9 @@ from __future__ import unicode_literals
 import uuid
 import datetime
 
-from backends.filesync.data.testing.testdata import get_fake_hash
-from backends.filesync.data.testing.testcase import StorageDALTestCase
-from backends.filesync.data.services import (
+from backends.filesync import dao, errors, utils
+from backends.filesync.models import StorageUser
+from backends.filesync.services import (
     get_abandoned_uploadjobs,
     get_node,
     get_user_info,
@@ -34,8 +34,7 @@ from backends.filesync.data.services import (
     get_storage_user,
     make_storage_user,
 )
-from backends.filesync.data import dao, errors, utils
-from backends.filesync.data.model import StorageUser
+from backends.filesync.tests.testcase import StorageDALTestCase
 
 MAX_STORAGE_BYTES = 10 * 23
 
@@ -83,7 +82,7 @@ class DataServicesTestCase(StorageDALTestCase):
 
     def test_get_node(self):
         """Test the get_node function."""
-        user1 = self.obj_factory.make_user(
+        user1 = self.factory.make_user(
             1, "User 1", "User 1", MAX_STORAGE_BYTES)
         node = user1.volume().root.make_file("test file")
         new_node = get_node(node.id)
@@ -94,7 +93,7 @@ class DataServicesTestCase(StorageDALTestCase):
 
     def test_get_user_info(self):
         """Test the get_user_info function."""
-        user = self.obj_factory.make_user(
+        user = self.factory.make_user(
             1, "User 1", "User 1", MAX_STORAGE_BYTES)
         user_info = get_user_info(user.id)
         quota = user.get_quota()
@@ -114,10 +113,10 @@ class DataServicesTestCase(StorageDALTestCase):
         """Test the get_public_file function."""
         save_setting = utils.set_public_uuid
         utils.set_public_uuid = False
-        user = self.obj_factory.make_user(
+        user = self.factory.make_user(
             1, "Cool UserName", "Visible Name", 10)
         a_file = user.volume().root.make_file_with_content(
-            "file.txt", get_fake_hash(), 123, 1, 1, uuid.uuid4())
+            "file.txt", self.factory.get_fake_hash(), 123, 1, 1, uuid.uuid4())
         a_file.change_public_access(True)
         public_key = a_file.public_key
         f1 = get_public_file(public_key)
@@ -129,11 +128,11 @@ class DataServicesTestCase(StorageDALTestCase):
 
     def test_get_public_directory(self):
         """Test the get_public_directory function."""
-        user = self.obj_factory.make_user(
+        user = self.factory.make_user(
             1, "Cool UserName", "Visible Name", 10)
         a_dir = user.volume().root.make_subdirectory('test_dir')
         a_dir.make_file_with_content(
-            "file.txt", get_fake_hash(), 123, 1, 1, uuid.uuid4())
+            "file.txt", self.factory.get_fake_hash(), 123, 1, 1, uuid.uuid4())
         a_dir.change_public_access(True, allow_directory=True)
         public_key = a_dir.public_key
         pub_dir = get_public_directory(public_key)
@@ -146,10 +145,10 @@ class DataServicesTestCase(StorageDALTestCase):
         """Test the get_public_file function."""
         save_setting = utils.set_public_uuid
         utils.set_public_uuid = True
-        user = self.obj_factory.make_user(
+        user = self.factory.make_user(
             1, "Cool UserName", "Visible Name", 10)
         a_file = user.volume().root.make_file_with_content(
-            "file.txt", get_fake_hash(), 123, 1, 1, uuid.uuid4())
+            "file.txt", self.factory.get_fake_hash(), 123, 1, 1, uuid.uuid4())
         a_file.change_public_access(True)
         public_key = a_file.public_key
         # get the file using the public uuid

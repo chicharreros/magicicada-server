@@ -20,7 +20,7 @@
 
 from __future__ import unicode_literals
 
-from backends.filesync.data.testing.testcase import StorageDALTestCase
+from backends.filesync.tests.testcase import StorageDALTestCase
 from ubuntuone.storage.rpcdb import auth_backend
 from ubuntuone.storage.server.testing.testcase import create_test_user
 
