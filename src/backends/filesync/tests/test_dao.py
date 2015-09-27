@@ -25,7 +25,6 @@ import uuid
 
 from datetime import datetime
 from operator import attrgetter
-from unittest import TestCase
 
 from storm.database import Connection
 from storm.tracer import install_tracer, remove_tracer_type
