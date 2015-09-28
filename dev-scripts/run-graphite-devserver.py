@@ -27,6 +27,9 @@ import commands
 import signal
 import subprocess
 
+import django
+django.setup()
+
 from django.conf import settings
 import utilities.localendpoints as local
 from utilities.utils import kill_group, get_tmpdir
@@ -68,11 +71,12 @@ if status > 0:
     sys.exit(1)
 
 # Create the user
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 # delete if exists
-User.objects.filter(username=ADMIN_USER).delete()
+get_user_model().objects.filter(username=ADMIN_USER).delete()
 # Create user with correct credentials
-user = User.objects.create_user(ADMIN_USER, "noreply@somemail.com", ADMIN_PASS)
+user = get_user_model().objects.create_user(
+    ADMIN_USER, "noreply@somemail.com", ADMIN_PASS)
 user.is_staff = True
 user.save()
 
