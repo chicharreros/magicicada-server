@@ -294,7 +294,7 @@ class FakeNetworkManager(dbus.service.Object):
 
 
 class TestWithDatabase(BaseProtocolTestCase, StorageDALTestCase):
-    """Hook up Trial, ORMTestCase, and our very own s4 and storage servers.
+    """Hook up Trial, ORMTestCase, and our very own storage servers.
 
     Large chunks have been copy-pasted from
     server.testing.testcase.TestWithDatabase, hence the name.
@@ -335,9 +335,6 @@ class TestWithDatabase(BaseProtocolTestCase, StorageDALTestCase):
                    self.ssl_proxy_heartbeat_interval)
         yield self.ssl_service.startService()
 
-        # these tests require a "test" bucket to be avaialble,
-        # but don't create it using the s3 api...
-        self.s4_site.resource._add_bucket("test")
         if os.path.exists(self.tmpdir):
             self.rmtree(self.tmpdir)
 

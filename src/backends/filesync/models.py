@@ -291,12 +291,7 @@ class PublicNode(object):
 
 
 class ContentBlob(object):
-    """ Associates a hash with a specific storage key in S3
-    or in the case of symlinks and sufficiently small files,
-    the file contents directly.
-    In S3, file contents are deflated, but this is not reflected
-    anywhere except in ContentBlob.deflated_size.
-    """
+    """Associates a hash with a specific storage key."""
     __storm_table__ = "ContentBlob"
 
     # The hash for the raw file content represented by this record.
@@ -308,14 +303,11 @@ class ContentBlob(object):
     # The size of the raw file content represented by this record, in bytes.
     size = Int(allow_none=False)
 
-    # The S3 content key which references the deflated file contents,
-    # or NULL if the content is stored locally in the table or if it
-    # has been garbage collected.  This column is set after inserting
-    # an object into S3, and NULLed just before deleting an object from S3.
+    # The content key which references the deflated file contents,
+    # or NULL if it has been garbage collected.
     storage_key = StormUUID()
 
-    # The deflated size of the file content as stored in S3,
-    # or NULL if inapplicable.
+    # The deflated size of the file content as stored or NULL if inapplicable.
     deflated_size = Int()
 
     # The file content as a raw byte string, or else NULL.
@@ -1398,7 +1390,7 @@ class ResumableUpload(object):
     status = lifecycle_status(allow_none=False)
     # the multipart upload id
     multipart_id = RawStr(allow_none=False)
-    # the s3 key for this multipart upload
+    # the key for this multipart upload
     storage_key = StormUUID(allow_none=False)
     # the number of parts currently created
     part_count = Int(allow_none=False)

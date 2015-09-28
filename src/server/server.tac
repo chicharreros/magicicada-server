@@ -33,26 +33,7 @@ oops_config = server.configure_oops()
 oops_timeline.install_hooks(oops_config)
 
 
-s3_host = settings.aws.S3_HOST
-s3_ssl = settings.aws.S3_USE_SSL
-
-# if neither env nor config has it, we try the port file
-if s3_ssl:
-    s3_port = os.getenv('S4SSLPORT', settings.aws.S3_PORT)
-    if s3_port:
-        s3_port = int(s3_port)
-else:
-    s3_port = os.getenv('S4PORT', settings.aws.S3_PORT)
-    if s3_port:
-        s3_port = int(s3_port)
-
-s3_key = os.environ.get('S3_KEY', settings.aws.ACCESS_KEY_ID)
-s3_secret = os.environ.get('S3_SECRET', settings.aws.SECRET_ACCESS_KEY)
-
 application = service.Application('StorageServer')
-storage = server.create_service(s3_host, s3_port, s3_ssl, s3_key, s3_secret,
-                                s3_proxy_host=settings.aws.S3_PROXY_HOST,
-                                s3_proxy_port=settings.aws.S3_PROXY_PORT,
-                                auth_provider_class=auth.SimpleAuthProvider,
+storage = server.create_service(auth_provider_class=auth.SimpleAuthProvider,
                                 oops_config=oops_config)
 storage.setServiceParent(service.IServiceCollection(application))

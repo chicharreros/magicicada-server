@@ -18,13 +18,9 @@
 
 """Tests for the stats helpers."""
 
-import mocker
-
 from twisted.internet import defer, task
 
 from metrics.metricsconnector import MetricsConnector
-from s3lib import producers
-from s3lib.contrib import http_client
 from ubuntuone.storage.server.stats import StatsWorker
 from ubuntuone.storage.server.testing.testcase import TestWithDatabase
 
@@ -90,23 +86,3 @@ class TestStats(TestWithDatabase):
                        len(reactor.getReaders())), self.metrics.calls)
         self.assertIn(('gauge', 'reactor.writers',
                        len(reactor.getWriters())), self.metrics.calls)
-
-    def test_buffers_runtime_info(self):
-        """Make sure we send the buffers size info."""
-        stats_worker = StatsWorker(self.service, 10)
-        # add some info the all the buffers we know
-        mock = mocker.Mocker()
-        client = mock.mock()
-        http_client.HTTPProducer.buffers_size = 0
-        http_prod = http_client.HTTPProducer(client)
-        self.addCleanup(http_prod.timeout_call.cancel)
-        http_prod.dataReceived('a' * 20)
-        producers.S3Producer.buffers_size = 0
-        s3_prod = producers.S3Producer(1024)
-        s3_prod.dataReceived('a' * 30)
-
-        stats_worker.runtime_info()
-        self.assertIn(('gauge', 'buffers_size.HTTPProducer', 20),
-                      self.metrics.calls)
-        self.assertIn(('gauge', 'buffers_size.S3Producer', 30),
-                      self.metrics.calls)

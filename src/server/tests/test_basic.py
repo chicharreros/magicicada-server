@@ -523,12 +523,6 @@ class DumpTest(TestWithDatabase):
         self.assertIn("1 garbage items written", page)
 
 
-class TestS3SSL(TestBasic):
-    """Test the basic stuff using ssl with s3."""
-
-    s4_use_ssl = True
-
-
 class TestServerHeartbeat(TestWithDatabase):
     """Server Heartbeat tests."""
     heartbeat_interval = 0.1

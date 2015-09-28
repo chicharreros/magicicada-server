@@ -45,7 +45,6 @@ import oops_datedir_repo
 import metrics.services
 import timeline
 
-from s3lib.s3lib import S3, ProducerStopped
 from twisted.application.service import MultiService, Service
 from twisted.application.internet import TCPServer
 from twisted.internet.defer import maybeDeferred, inlineCallbacks
@@ -1000,19 +999,6 @@ class SimpleRequestResponse(StorageServerRequestResponse):
     def _process(self):
         """Process the request."""
 
-    def _meter_s3_timeout(self, failure):
-        """Send metrics on S3 timeouts."""
-        if failure.check(errors.S3Error):
-            factory = self.protocol.factory
-            last_responsive = factory.reactor_inspector.last_responsive_ts
-            last_good = self.last_good_state_ts
-            # Unresponsive server or client not reading/writing fast enough?
-            reason = 'server' if last_responsive <= last_good else 'client'
-
-            class_name = self.__class__.__name__
-            metric_name = '%s.request_error.s3_timeout.%s'
-            factory.metrics.meter(metric_name % (class_name, reason), 1)
-
     def _send_protocol_error(self, failure):
         """Convert the failure to a protocol error.
 
@@ -1022,9 +1008,6 @@ class SimpleRequestResponse(StorageServerRequestResponse):
         # Convert try_again_errors that weren't converted at lower levels
         if failure.check(*self.try_again_errors):
             failure = Failure(errors.TryAgain(failure.value))
-
-        # Send metrics if we have an S3 error
-        self._meter_s3_timeout(failure)
 
         foreign_errors = (self.generic_foreign_errors +
                           self.expected_foreign_errors)
@@ -1519,9 +1502,7 @@ class GetContentResponse(SimpleRequestResponse):
         Send it if possible; otherwise, continue propagating it.
 
         """
-        is_cancelled = (failure.check(ProducerStopped) and self.cancelled)
-
-        if failure.check(request.RequestCancelledError) or is_cancelled:
+        if failure.check(request.RequestCancelledError) or self.cancelled:
             # the normal sequence was interrupted by a cancel
             if self.cancel_message is not None:
                 response = protocol_pb2.Message()
@@ -1535,7 +1516,7 @@ class GetContentResponse(SimpleRequestResponse):
 
         else:
             # handle all the TRY_AGAIN cases
-            if failure.check(ProducerStopped, error.ConnectionLost):
+            if failure.check(error.ConnectionLost):
                 failure = Failure(errors.TryAgain(failure.value))
             return SimpleRequestResponse._send_protocol_error(self, failure)
 
@@ -1561,16 +1542,6 @@ class GetContentResponse(SimpleRequestResponse):
 
         def stop_if_cancelled(producer):
             """Stop the producer if cancelled."""
-            # let's forget ProducerStopped if we're cancelled
-            def ignore_producer_stopped(failure):
-                """Like failure trap with extras."""
-                if failure.check(ProducerStopped) and self.cancelled:
-                    # I know, I know, I cancelled you!
-                    return
-                return failure
-
-            producer.deferred.addErrback(ignore_producer_stopped)
-
             if self.cancelled:
                 producer.stopProducing()
             return producer
@@ -1662,13 +1633,6 @@ class PutContentResponse(SimpleRequestResponse):
     states = 'INIT UPLOADING COMMITING CANCELING ERROR DONE'
     states = collections.namedtuple('States', states.lower())(*states.split())
 
-    # will send TRY_AGAIN on all these errors
-    _try_again_errors = (
-        ProducerStopped,
-        dataerror.RetryLimitReached,
-        errors.BufferLimit,
-    )
-
     def __init__(self, protocol, message):
         super(PutContentResponse, self).__init__(protocol, message)
         self.cancel_message = None
@@ -1751,8 +1715,8 @@ class PutContentResponse(SimpleRequestResponse):
             self.log.debug('Stoping the upload job after an error')
             yield self.upload_job.stop()
 
-        # handle all the TRY_AGAIN cases
-        if failure.check(*self._try_again_errors):
+        # send TryAgain if too may retries on DB
+        if failure.check(dataerror.RetryLimitReached):
             exc = errors.TryAgain(exc)
             failure = Failure(exc)
 
@@ -2397,23 +2361,13 @@ class StorageServerFactory(Factory):
     protocol = StorageServer
     graceful_shutdown = settings.api_server.GRACEFUL_SHUTDOWN
 
-    def __init__(self, s3_host, s3_port, s3_ssl, s3_key, s3_secret,
-                 s3_proxy_host=None, s3_proxy_port=None,
-                 auth_provider_class=auth.DummyAuthProvider,
-                 s3_class=S3, content_class=content.ContentManager,
+    def __init__(self, auth_provider_class=auth.DummyAuthProvider,
+                 content_class=content.ContentManager,
                  reactor=reactor, oops_config=None,
                  servername=None, reactor_inspector=None):
         """Create a StorageServerFactory."""
         self.auth_provider = auth_provider_class(self)
         self.content = content_class(self)
-        self.s3_class = s3_class
-        self.s3_host = s3_host
-        self.s3_port = s3_port
-        self.s3_ssl = s3_ssl
-        self.s3_key = s3_key
-        self.s3_secret = s3_secret
-        self.s3_proxy_host = s3_proxy_host
-        self.s3_proxy_port = s3_proxy_port
         self.diskstorage = DiskStorage(settings.api_server.STORAGE_BASEDIR)
         self.logger = logging.getLogger('storage.server')
 
@@ -2510,13 +2464,6 @@ class StorageServerFactory(Factory):
             d.addErrback(notification_error_handler)
             return d
         return wrapper
-
-    def s3(self):
-        """Get an s3lib instance to do s3 operations."""
-        return self.s3_class(self.s3_host, self.s3_port, self.s3_key,
-                             self.s3_secret, use_ssl=self.s3_ssl,
-                             proxy_host=self.s3_proxy_host,
-                             proxy_port=self.s3_proxy_port)
 
     @inlineCallbacks
     def deliver_udf_create(self, udf_create):
@@ -2723,17 +2670,11 @@ def get_service_port(service):
 class StorageServerService(OrderedMultiService):
     """Wrap the whole TCP StorageServer mess as a single twisted serv."""
 
-    def __init__(self, port, s3_host, s3_port, s3_ssl, s3_key, s3_secret,
-                 s3_proxy_host=None, s3_proxy_port=None,
-                 auth_provider_class=None,
+    def __init__(self, port, auth_provider_class=None,
                  oops_config=None, status_port=0, heartbeat_interval=None):
         """Create a StorageServerService.
 
         @param port: the port to listen on without ssl.
-        @param s3_host: the S3 server hostname.
-        @param s3_port: the S3 server port to connect to.
-        @param s3_key: the S3 key.
-        @param s3_secret: the S3 secret.
         @param auth_provider_class: the authentication provider.
         """
         OrderedMultiService.__init__(self)
@@ -2772,8 +2713,6 @@ class StorageServerService(OrderedMultiService):
                                                    reactor.callFromThread)
 
         self.factory = StorageServerFactory(
-            s3_host, s3_port, s3_ssl, s3_key, s3_secret,
-            s3_proxy_host=s3_proxy_host, s3_proxy_port=s3_proxy_port,
             auth_provider_class=auth_provider_class,
             oops_config=oops_config, servername=self.servername,
             reactor_inspector=self._reactor_inspector)
@@ -2853,9 +2792,7 @@ class StorageServerService(OrderedMultiService):
         self.logger.info('- - - - - SERVER STOPPED')
 
 
-def create_service(s3_host, s3_port, s3_ssl, s3_key, s3_secret,
-                   s3_proxy_host=None, s3_proxy_port=None,
-                   status_port=None,
+def create_service(status_port=None,
                    auth_provider_class=auth.DummyAuthProvider,
                    oops_config=None):
     """Start the StorageServer service."""
@@ -2866,18 +2803,11 @@ def create_service(s3_host, s3_port, s3_ssl, s3_key, s3_secret,
                                filename=settings.api_server.LOG_FILENAME,
                                start_observer=True)
 
-    # set up s3
-    s3_logger = logging.getLogger('s3lib')
-    s3_logger.setLevel(settings.LOG_LEVEL)
-    s3_logger.addHandler(handler)
-
     # set up the hacker's logger always in TRACE
     h_logger = logging.getLogger(settings.api_server.LOGGER_NAME + '.hackers')
     h_logger.setLevel(TRACE)
     h_logger.propagate = False
     h_logger.addHandler(handler)
-
-    logger.debug('S3 host:%s port:%s', s3_host, s3_port)
 
     # turn on heapy if must to
     if os.getenv('USE_HEAPY'):
@@ -2902,7 +2832,6 @@ def create_service(s3_host, s3_port, s3_ssl, s3_key, s3_secret,
 
     # create the service
     service = StorageServerService(
-        settings.api_server.TCP_PORT, s3_host, s3_port, s3_ssl, s3_key,
-        s3_secret, s3_proxy_host, s3_proxy_port, auth_provider_class,
+        settings.api_server.TCP_PORT, auth_provider_class,
         oops_config, status_port)
     return service

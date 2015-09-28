@@ -39,8 +39,6 @@ from txstatsd.metrics.extendedmetrics import ExtendedMetrics
 from txstatsd.metrics.gaugemetric import GaugeMetric
 from txstatsd.metrics.metermetric import MeterMetric
 
-from s3lib import s3lib
-
 from backends.filesync import errors as dataerror
 from backends.filesync.models import Share
 from magicicada import settings
@@ -901,16 +899,6 @@ class SimpleRequestResponseTestCase(StorageServerRequestResponseTestCase):
             failure = Failure(error(self.msg))
             self.response._send_protocol_error(failure=failure)
 
-    def test_send_protocol_error_not_s3_error(self):
-        """No metrics are sent for s3 timeout if the error is different."""
-        mocker = Mocker()
-        mock_metrics = mocker.mock(ExtendedMetrics)
-        self.response.protocol.factory.metrics = mock_metrics
-        expect(mock_metrics.meter(ANY)).count(0)
-        with mocker:
-            failure = Failure(NameError())
-            self.response._send_protocol_error(failure=failure)
-
     def test_send_protocol_error_locked_user(self):
         """_send_protocol_error handles the LockedUserError"""
         called = []
@@ -929,40 +917,6 @@ class SimpleRequestResponseTestCase(StorageServerRequestResponseTestCase):
                 """Pass in the fake last_responsive_ts value."""
                 self.last_responsive_ts = last_responsive_ts
         return FakeReactorInspector(last_responsive_ts)
-
-    def test_send_protocol_error_s3_client_timeout(self):
-        """Sends metrics for a S3 client timeout."""
-        mocker = Mocker()
-        mock_metrics = mocker.mock(ExtendedMetrics)
-        self.response.protocol.factory.metrics = mock_metrics
-        # Reactor was responsive since last operation, so blame the client
-        self.response.last_good_state_ts = 12345
-        ri = self.fake_reactor_inspector(12399)
-        self.response.protocol.factory.reactor_inspector = ri
-        operation = self.response.__class__.__name__
-        msg = "%s.request_error.s3_timeout.client" % operation
-        mock_metrics.meter(msg, 1)
-        expect(mock_metrics.meter(ANY, 1)).count(0, None)
-        with mocker:
-            failure = Failure(errors.S3Error(ValueError("help")))
-            self.response._send_protocol_error(failure=failure)
-
-    def test_send_protocol_error_s3_server_timeout(self):
-        """Sends metrics for a S3 server timeout."""
-        mocker = Mocker()
-        mock_metrics = mocker.mock(ExtendedMetrics)
-        self.response.protocol.factory.metrics = mock_metrics
-        # Reactor was not responsive since last operation, blame the server
-        self.response.last_good_state_ts = 12345
-        ri = self.fake_reactor_inspector(12300)
-        self.response.protocol.factory.reactor_inspector = ri
-        operation = self.response.__class__.__name__
-        msg = "%s.request_error.s3_timeout.server" % operation
-        mock_metrics.meter(msg, 1)
-        expect(mock_metrics.meter(ANY, 1)).count(0, None)
-        with mocker:
-            failure = Failure(errors.S3Error(ValueError("help")))
-            self.response._send_protocol_error(failure=failure)
 
     def test_start_sends_comment_on_error(self):
         """_start sends the optional comment on errors."""
@@ -1380,50 +1334,6 @@ class GetContentResponseTestCase(SimpleRequestResponseTestCase):
         self.assertTrue(self.handler.check_warning(
                         str(failure), 'cancel_message is None'))
 
-    def test_on_producerstopped_and_cancelled_with_cancel_message(self):
-        """_send_protocol_error handles ProducerStopped when cancelled.
-
-        self.response.cancel_message is not None.
-
-        """
-        self.response.cancel_message = protocol_pb2.Message()
-        self.response.cancel_message.id = 1
-        self.response.cancel()
-        assert self.response.cancelled
-
-        failure = Failure(s3lib.ProducerStopped(self.msg))
-        self.response._send_protocol_error(failure=failure)
-        self.assertTrue(self.last_error is None)
-        self.assertTrue(self.last_msg is not None)
-        self.assertEqual(protocol_pb2.Message.CANCELLED, self.last_msg.type)
-
-    def test_on_producerstopped_and_cancelled_without_cancel_message(self):
-        """_send_protocol_error handles ProducerStopped when cancelled.
-
-        self.response.cancel_message is None.
-
-        """
-        self.response.cancel_message = None
-        self.response.cancel()
-        assert self.response.cancelled
-
-        failure = Failure(s3lib.ProducerStopped(self.msg))
-        self.response._send_protocol_error(failure=failure)
-        self.assertTrue(self.last_error is None)
-        self.assertTrue(self.last_msg is None)
-        self.assertTrue(self.handler.check_warning(
-                        str(failure), 'cancel_message is None'))
-
-    def test_on_producerstopped_and_not_cancelled(self):
-        """_send_protocol_error handles ProducerStopped when not cancelled."""
-        assert not self.response.cancelled
-
-        failure = Failure(s3lib.ProducerStopped(self.msg))
-        self.response._send_protocol_error(failure=failure)
-        self.assert_comment_present(self.msg)
-        self.assertEqual(protocol_pb2.Error.TRY_AGAIN, self.last_error[0])
-        self.assertTrue(self.handler.check_warning(str(failure), 'TRY_AGAIN'))
-
     def test__init__(self):
         """Test __init__."""
         message = protocol_pb2.Message()
@@ -1479,7 +1389,6 @@ class GetContentResponseTestCase(SimpleRequestResponseTestCase):
 
         # fake producer
         producer = mocker.mock()
-        expect(producer.deferred).result(defer.Deferred())
 
         # some node
         node = mocker.mock()
@@ -1889,70 +1798,6 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
         self.assertTrue(self.handler.check_debug(
                         "Stoping the upload job after an error"))
 
-    def test_genericerror_try_again_ok(self):
-        """Test how a TRY_AGAIN error is handled."""
-        # several patches
-        self.response.upload_job = self.FakeUploadJob()
-        called = []
-        self.response._log_exception = lambda *a: called.extend(a)
-        self.response.done = lambda: called.append('done')
-        self.patch(PutContentResponse, '_try_again_errors', (NameError,))
-
-        # call and test
-        exc = NameError('foo')
-        self.response._generic_error(exc)
-        e, done = called
-        self.assertEqual(e.__class__, errors.TryAgain)
-        self.assertEqual(e.orig_error, exc)
-        self.assertEqual(done, 'done')
-
-        self.assert_oopsless()
-
-    def test_genericerror_try_again_handling_error(self):
-        """Test how a TRY_AGAIN error is handled."""
-        # several patches
-        self.response.upload_job = self.FakeUploadJob()
-        called = []
-        exc = ValueError("test error")
-
-        def fake(*a):
-            """Fake function to raise an error."""
-            raise exc
-
-        self.response._log_exception = fake
-        self.response.done = lambda: called.append('done')
-        self.response.internal_error = lambda f: called.append(('error', f))
-        self.patch(PutContentResponse, '_try_again_errors', (NameError,))
-
-        # call and test
-        self.response._generic_error(NameError('foo'))
-        called, = called
-        self.assertEqual(called[0], 'error')
-        self.assertEqual(called[1].value, exc)
-
-    def test_genericerror_try_again_done_error(self):
-        """Test how a TRY_AGAIN error is handled."""
-        # several patches
-        self.response.upload_job = self.FakeUploadJob()
-        called = []
-        exc = ValueError("test error")
-
-        def fake_done(*a):
-            """Fake function to raise an error."""
-            raise Exception("Unexpected done call")
-
-        self.response._log_exception = lambda *args: called.append('handle')
-        self.response.done = fake_done
-        self.response.internal_error = lambda f: called.append(('error', f))
-        self.patch(PutContentResponse, '_try_again_errors', (NameError,))
-
-        # call and test
-        self.response._generic_error(exc)
-        handle, done = called
-        self.assertEqual(handle, 'handle')
-        self.assertEqual(done[0], 'error')
-        self.assertEqual(done[1].value, exc)
-
     def test_try_again_handling(self):
         """Test how a TRY_AGAIN error is handled."""
         # several patches
@@ -1968,14 +1813,6 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
             self.response._log_exception(errors.TryAgain(NameError('foo')))
         self.assertTrue(self.handler.check_debug("TryAgain", "NameError",
                                                  str(size_hint)))
-
-    def test_try_again_on_what(self):
-        """Assure the list of retryable errors is ok."""
-        tryagain = PutContentResponse._try_again_errors
-        expected_try_again = (s3lib.ProducerStopped,
-                              dataerror.RetryLimitReached,
-                              errors.BufferLimit)
-        self.assertEqual(tryagain, expected_try_again)
 
     def test_genericerror_requestcancelled_canceling(self):
         """Test how a RequestCancelledError error is handled when canceling."""
@@ -2835,7 +2672,7 @@ class StorageServerFactoryTests(TwistedTestCase):
         MetricsConnector.register_metrics("root", instance=ExtendedMetrics())
         MetricsConnector.register_metrics("user", instance=ExtendedMetrics())
         MetricsConnector.register_metrics("sli", instance=ExtendedMetrics())
-        self.factory = StorageServerFactory(None, None, None, None, None)
+        self.factory = StorageServerFactory()
         self.handler = MementoHandler()
         self.handler.setLevel(logging.DEBUG)
         self.factory.logger.addHandler(self.handler)
@@ -2874,7 +2711,7 @@ class StorageServerFactoryTests(TwistedTestCase):
         """Check trace users are correctly set."""
         # set a specific config to test
         self.patch(settings.api_server, 'TRACE_USERS', ['foo', 'bar', 'baz'])
-        factory = StorageServerFactory(None, None, None, None, None)
+        factory = StorageServerFactory()
         self.assertEqual(factory.trace_users, set(['foo', 'bar', 'baz']))
 
 

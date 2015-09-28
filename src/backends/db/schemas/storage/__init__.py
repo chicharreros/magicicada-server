@@ -250,9 +250,7 @@ CREATE = [
     """,
     """
     COMMENT ON TABLE ContentBlob IS 'Associates a hash with a specific \
-    storage key in S3, or in the case of symlinks and sufficiently small \
-    files, the file contents directly.  In S3, file contents are deflated, \
-    but this is not reflected anywhere except in ContentBlob.deflated_size.';
+    storage key.';
     """,
     """
     COMMENT ON COLUMN ContentBlob.hash IS 'The hash for the raw file content \
@@ -269,15 +267,13 @@ CREATE = [
     represented by this record, in bytes.';
     """,
     """
-    COMMENT ON COLUMN ContentBlob.storage_key IS 'The S3 content key which \
-    references the deflated file contents, or NULL if the content is stored \
-    locally in the table or if it has been garbage collected.  This column is \
-    set after inserting an object into S3, and NULLed just before deleting an \
-    object from S3.';
+    COMMENT ON COLUMN ContentBlob.storage_key IS 'The unique content key \
+    which references the deflated file contents, or NULL if the it has been \
+    garbage collected.';
     """,
     """
     COMMENT ON COLUMN ContentBlob.deflated_size IS 'The deflated size of the \
-    file content as stored in S3, or NULL if inapplicable.';
+    file content as stored.';
     """,
     """
     COMMENT ON COLUMN ContentBlob.content IS 'The file content as a raw byte \

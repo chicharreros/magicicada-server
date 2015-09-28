@@ -756,52 +756,6 @@ class TestCancel(TestContentBase):
         yield self.aq.download(request.ROOT, file_id, hash_v, mdid)
         yield self.wait_for_nirvana()
 
-#
-# This test is commented out because of a problem in s3 uploading cancel, so
-# I'm just pushing this to be able in other branch to fix that.
-#
-#    def test_upload(self):
-#        fobj, data, hash_value, crc32_value, size = self._get_data(150000)
-#        d = self._mkfile('hola', 'file_id')
-#        outer_self = self
-#
-#        class MyTempFile(object):
-#            """
-#            A proxy around tempfile.TemporaryFile that, in the second read,
-#            it cancels the upload.
-#            """
-#            def __init__(self):
-#                self.tempfile = tempfile.TemporaryFile()
-#                self.how_many_reads = 0
-#
-#            def read(self, size=None):
-#                "do the check, proxy the read"
-#                self.how_many_reads += 1
-#                if self.how_many_reads == 2:
-#                    outer_self.aq.cancel_upload(
-#                                            request.ROOT, outer_self.file_id)
-#                elif self.how_many_reads > 2:
-#                    raise Exception("should never get here")
-#                return self.tempfile.read(size)
-#
-#            def __getattr__(self, attr):
-#                "proxy all the rest"
-#                return getattr(self.tempfile, attr)
-#
-#        d.addCallback(lambda _: self.failIf(self.aq.uploading))
-#        d.addCallback(
-#            lambda _: self.aq.upload(request.ROOT, self.file_id,
-#                                     HASH_EMPTY, hash_value, crc32_value,
-#                                     size, 'path', fobj,
-#                                     tempfile_factory=MyTempFile))
-#        d.addCallback(lambda _: self.failIf(self.aq.uploading))
-#
-#        # let's wait!
-#        d2 = defer.Deferred()
-#        d1 = defer.DeferredList([d, d2])
-#        reactor.callLater(1, d2.callback, None)
-#        return d1
-
 
 class TestFSM(TestWithDatabase):
     """Test the AQ follows its FSM."""

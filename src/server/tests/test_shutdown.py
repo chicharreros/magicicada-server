@@ -24,7 +24,6 @@ from twisted.internet import reactor, defer, error
 from txstatsd.metrics.countermetric import CounterMetric
 from txstatsd.metrics.metermetric import MeterMetric
 
-from s4 import s4
 from backends.filesync.services import make_storage_user
 from backends.filesync.tests.testcase import StorageDALTestCase
 from ubuntuone.storage.server.auth import DummyAuthProvider
@@ -57,27 +56,15 @@ class TestShutdown(TwistedTestCase, StorageDALTestCase):
         """Setup for testing."""
         # make sure we start with clean state
         yield super(TestShutdown, self).setUp()
-        self.s4_site = site = s4.server.Site(s4.Root())
-        self.s4_conn = reactor.listenTCP(0, site)
         # since storageusers are not automatically created, we need to create
         self.usr0 = make_storage_user(0, u"dummy", u"", 2 ** 20)
-
-    @defer.inlineCallbacks
-    def tearDown(self):
-        """Tear down after testing."""
-        yield self.s4_conn.stopListening()
-        yield super(TestShutdown, self).tearDown()
 
     @defer.inlineCallbacks
     def test_shutdown_upload(self):
         """Stop and restart the server."""
         # create a server
         service = StorageServerService(
-            0, "localhost", self.s4_conn.getHost().port, False,
-            s4.AWS_DEFAULT_ACCESS_KEY_ID,
-            s4.AWS_DEFAULT_SECRET_ACCESS_KEY,
-            auth_provider_class=DummyAuthProvider,
-            heartbeat_interval=0)
+            0, auth_provider_class=DummyAuthProvider, heartbeat_interval=0)
         yield service.startService()
 
         # create a user, connect a client
@@ -114,11 +101,7 @@ class TestShutdown(TwistedTestCase, StorageDALTestCase):
         """Stop and restart the server."""
         # create a server
         service = StorageServerService(
-            0, "localhost", self.s4_conn.getHost().port, False,
-            s4.AWS_DEFAULT_ACCESS_KEY_ID,
-            s4.AWS_DEFAULT_SECRET_ACCESS_KEY,
-            auth_provider_class=DummyAuthProvider,
-            heartbeat_interval=0)
+            0, auth_provider_class=DummyAuthProvider, heartbeat_interval=0)
 
         yield service.startService()
 
@@ -138,9 +121,6 @@ class TestShutdown(TwistedTestCase, StorageDALTestCase):
         """Test that the server waits for pending requests."""
         # create a server
         self.service = StorageServerService(
-            0, "localhost", self.s4_conn.getHost().port, False,
-            s4.AWS_DEFAULT_ACCESS_KEY_ID,
-            s4.AWS_DEFAULT_SECRET_ACCESS_KEY,
             auth_provider_class=DummyAuthProvider,
             heartbeat_interval=0)
         # start it

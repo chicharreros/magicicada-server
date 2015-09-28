@@ -72,21 +72,9 @@ class TryAgain(StorageServerError):
         self.orig_error = orig_error
 
 
-class S3Error(TryAgain):
-    """There was an error accessing the s3 external service."""
-
-
-class S3UploadError(S3Error):
-    """S3 error while sending data."""
-
-
 class NotAvailable(StorageServerError):
     errno = protocol_pb2.Error.NOT_AVAILABLE
 
 
 class ProtocolReferenceError(ReferenceError):
-    pass
-
-
-class BufferLimit(Exception):
     pass

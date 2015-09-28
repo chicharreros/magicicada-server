@@ -27,7 +27,6 @@ from StringIO import StringIO
 
 from mocker import Mocker, expect, ARGS, KWARGS, ANY
 from oops_datedir_repo import serializer
-from twisted.python.failure import Failure
 from twisted.internet import defer, reactor, threads, task, address
 from twisted.trial.unittest import TestCase
 from twisted.test.proto_helpers import StringTransport
@@ -438,7 +437,7 @@ class TestGetContent(TestWithDatabase):
         mocker = Mocker()
 
         producer = mocker.mock()
-        expect(producer.deferred).count(2).result(defer.Deferred())
+        expect(producer.deferred).count(1).result(defer.Deferred())
         expect(producer.startProducing(ANY))
 
         node = mocker.mock()
@@ -692,27 +691,16 @@ class TestPutContent(TestWithDatabase):
         self.assertFails(d, 'DOES_NOT_EXIST')
         return d
 
+    @defer.inlineCallbacks
     def test_putcontent_duplicated(self):
         """Test putting the same content twice"""
-        d = self.test_putcontent(num_files=2)
-
-        def callback(a):
-            "check that only one object has been stored"
-            objects = self.s4_site.resource.buckets['test'].bucket_children
-
-            def non_chunks(objects):
-                """iterator of stored objects with meta = {}"""
-                for obj in objects:
-                    d = dict(obj.iter_meta())
-                    if d == {}:
-                        yield obj
-            objects = list(non_chunks(objects.itervalues()))
-            if len(objects) > 1:
-                return Failure(AssertionError('too many objects stored'))
-            else:
-                return a
-        d.addCallback(callback)
-        return d
+        # check that only one object will be stored
+        called = []
+        ds = self.service.factory.diskstorage
+        orig_put = ds.put
+        ds.put = lambda *a: called.append(True) or orig_put(*a)
+        yield self.test_putcontent(num_files=2)
+        self.assertEqual(len(called), 1)
 
     def test_putcontent_twice_simple(self):
         """Test putting content twice."""
@@ -1525,8 +1513,8 @@ class TestPutContent(TestWithDatabase):
             u"~/Ubuntu One/file.txt", hash_value, crc32_value, size,
             deflated_size, uuid.uuid4())
 
-        # overwrite UploadJob method to detect if it connected and
-        # uploaded stuff to S3 (it shouldn't)
+        # overwrite UploadJob method to detect if it
+        # uploaded stuff (it shouldn't)
         self.patch(content.BaseUploadJob, '_start_receiving',
                    lambda s: defer.fail(Exception("This shouldn't be called")))
 
@@ -2703,7 +2691,7 @@ class TestNode(TestWithDatabase):
 
     @defer.inlineCallbacks
     def _upload_a_file(self, user, content_user):
-        """Upload a file to s3.
+        """Upload a file.
 
         @param user: the storage user
         @param content: the content.User
@@ -2921,10 +2909,8 @@ class TestContentManagerTests(TestWithDatabase):
         self.assertIdentical(u1, self.cm.users[self.suser.id])
 
 
-class TestContentWithSSL(TestWithDatabase):
-    """Test the upload and download using ssl with s3."""
-
-    s4_use_ssl = True
+class TestContent(TestWithDatabase):
+    """Test the upload and download."""
 
     def test_getcontent(self):
         """Get the content from a file."""

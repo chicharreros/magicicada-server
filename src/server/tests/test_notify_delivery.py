@@ -86,8 +86,7 @@ class TestDelivery(TwistedTestCase):
         MetricsConnector.register_metrics("root", instance=ExtendedMetrics())
         MetricsConnector.register_metrics("user", instance=ExtendedMetrics())
         self.factory = StorageServerFactory(
-            s3_host=None, s3_port=None, s3_key=None, s3_ssl=False,
-            s3_secret=None, content_class=content_class,
+            content_class=content_class,
             reactor=self.fake_reactor)
 
     @inlineCallbacks
@@ -373,11 +372,6 @@ class NotificationErrorsTestCase(testcase.TestWithDatabase):
         oops_config.publishers = [publish]
 
         self.ssfactory = StorageServerFactory(
-            s3_host=None,
-            s3_port=None,
-            s3_key=None,
-            s3_ssl=False,
-            s3_secret=None,
             oops_config=oops_config,
             reactor=self.fake_reactor)
 

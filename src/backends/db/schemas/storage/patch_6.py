@@ -75,7 +75,7 @@ SQL = [
     """,
     """
     COMMENT ON COLUMN resumable_upload.storage_key IS
-        'The S3 objectName which will be created by this upload';
+        'The objectName which will be created by this upload';
     """,
     """
     COMMENT ON COLUMN resumable_upload.part_count IS

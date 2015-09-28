@@ -33,8 +33,6 @@ import twisted.web.error
 
 from twisted.internet import defer
 
-from s3lib.s3lib import ProducerStopped
-from s3lib.producers import S3Producer
 from backends.filesync import errors as dataerrors
 from backends.filesync.models import Share
 from ubuntuone.storage.server import errors, upload
@@ -254,7 +252,6 @@ class BaseUploadJob(object):
         self.ops = defer.succeed(None)
         self.deferred = defer.Deferred()
         self.deferred.addErrback(self._handle_errors)
-        self.s3 = None
         self._initial_data = True
         self._storage_key = None
         self.canceling = False
@@ -338,12 +335,7 @@ class BaseUploadJob(object):
         self.canceling = True
         if self.producer is not None:
             # upload already started
-            try:
-                self.producer.stopProducing()
-            except ProducerStopped:
-                # dont't care if stopped it in the middle, we're
-                # canceling!
-                pass
+            self.producer.stopProducing()
         if self.consumer is not None:
             self.consumer.unregisterProducer()
         if not self.deferred.called:
@@ -476,7 +468,6 @@ class UploadJob(BaseUploadJob):
                                         inflated_size_hint, deflated_size_hint,
                                         session_id, blob_exists,
                                         magic_hash)
-        self.producer = S3Producer(self.deflated_size_hint)
         self.uploadjob = upload
 
     @property

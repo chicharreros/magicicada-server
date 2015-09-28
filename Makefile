@@ -144,8 +144,7 @@ start-oauth-heapy:
 
 start-base:
 	$(MAKE) start-db && $(MAKE) start-supervisor && $(MAKE) start-dbus && \
-	$(MAKE) start-statsd && $(MAKE) start-s4 && $(MAKE) start-storage-proxy || \
-	( $(MAKE) stop ; exit 1 )
+	$(MAKE) start-statsd || ( $(MAKE) stop ; exit 1 )
 
 stop:  stop-filesync-dummy-group stop-supervisor stop-db stop-statsd stop-dbus
 

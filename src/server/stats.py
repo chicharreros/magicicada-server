@@ -26,17 +26,11 @@ from twisted.internet import defer, reactor
 from twisted.web import server, resource
 
 from metrics.metricsconnector import MetricsConnector
-from s3lib import producers
-from s3lib.contrib import http_client
 from txstatsd.process import report_reactor_stats
 from ubuntuone.monitoring import dump
 
 logger = logging.getLogger("storage.server.stat")
 status_log = logging.getLogger("storage.server.status")
-
-# list of buffers to watch, we will use
-BUFFERS = (http_client.HTTPProducer,
-           producers.S3Producer)
 
 
 class MeliaeResource(resource.Resource):
@@ -109,12 +103,6 @@ class StatsWorker(object):
 
         self.log("reactor readers: %(reactor.readers)s "
                  "writers: %(reactor.writers)s", reactor_report)
-
-        # send a metric for current buffers size
-        for clazz in BUFFERS:
-            size = clazz.buffers_size
-            name = clazz.__name__
-            self.metrics.gauge("buffers_size.%s" % (name,), size)
 
 
 class _Status(resource.Resource):

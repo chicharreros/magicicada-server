@@ -52,18 +52,6 @@ stdout_capture_maxbytes=16384
 autostart=false
 stopsignal=INT
 
-[program:s4]
-command=/usr/bin/twistd --pidfile %(tmp_dir)s/s4.pid -n -y %(basepath)s/lib/s4/S4.tac -l %(tmp_dir)s/s4_stdout.log
-environment=PYTHONPATH="%(basepath)s/lib",DJANGO_SETTINGS_MODULE="magicicada.settings"
-autostart=false
-stopsignal=INT
-
-[program:storage-proxy]
-command=python %(basepath)s/dev-scripts/squid.py storage-proxy %(basepath)s/dev-scripts/storage-proxy.conf.tmpl
-environment=PYTHONPATH="%(basepath)s/lib",DJANGO_SETTINGS_MODULE="magicicada.settings"
-autostart=false
-stopsignal=INT
-
 [program:stats_worker]
 command=python %(basepath)s/lib/ubuntuone/monitoring/stats_worker.py --log_file=%(tmp_dir)s/stats_worker.log
 environment=PYTHONPATH="%(basepath)s/lib",DJANGO_SETTINGS_MODULE="magicicada.settings"

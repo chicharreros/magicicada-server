@@ -192,7 +192,6 @@ UPDOWN_PUBLIC_URL_PREFIX_2 = 'http://some_url/'
 
 
 from . import api_server  # noqa
-from . import aws  # noqa
 from . import ssl_proxy  # noqa
 
 

@@ -24,9 +24,6 @@ import zlib
 
 from twisted.internet import defer, reactor, task
 
-from s3lib import s3lib
-from s4 import s4
-
 from ubuntuone.storage.server import upload, diskstorage
 from ubuntuone.storage.server.auth import DummyAuthProvider
 from ubuntuone.storage.server.testing import testcase
@@ -49,11 +46,6 @@ class UploadTestCase(testcase.BaseProtocolTestCase):
         self.tmpdir = os.getcwd() + "/tmp/diskstorage_tests"
         os.makedirs(self.tmpdir)
         self.addCleanup(shutil.rmtree, self.tmpdir)
-
-        self.s4_site.resource._add_bucket("test")
-        self.s3 = s3lib.S3("localhost", self.s4_port,
-                           s4.AWS_DEFAULT_ACCESS_KEY_ID,
-                           s4.AWS_DEFAULT_SECRET_ACCESS_KEY)
 
         def slowScheduler(x):
             """A slower scheduler for our cooperator."""
