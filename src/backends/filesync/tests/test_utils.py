@@ -23,6 +23,8 @@ from __future__ import unicode_literals
 import unittest
 import uuid
 
+from django.conf import settings
+
 from backends.filesync.utils import (
     decode_base62,
     decode_uuid,
@@ -192,7 +194,8 @@ class KeywordsTests(unittest.TestCase):
 
     def test_basic_path(self):
         kw = get_keywords_from_path(
-            '~/Ubuntu One/is/the path/path! for/my%$files/here.txt')
+            settings.ROOT_USERVOLUME_PATH +
+            '/is/the path/path! for/my%$files/here.txt')
         # result should not include base directory and should be sorted
         self.assertEqual(
             list(sorted(kw)),

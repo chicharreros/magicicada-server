@@ -1510,8 +1510,8 @@ class TestPutContent(TestWithDatabase):
         # user.
         self.factory.make_user(100, u'my_user', u'', 2 ** 20)
         self.usr3.make_filepath_with_content(
-            u"~/Ubuntu One/file.txt", hash_value, crc32_value, size,
-            deflated_size, uuid.uuid4())
+            settings.ROOT_USERVOLUME_PATH + u"/file.txt", hash_value,
+            crc32_value, size, deflated_size, uuid.uuid4())
 
         # overwrite UploadJob method to detect if it
         # uploaded stuff (it shouldn't)
@@ -1920,7 +1920,7 @@ class TestMultipartPutContent(TestWithDatabase):
         # create the content blob without a magic hash in a different user.
         self.factory.make_user(100, u'my_user', u'', 2 ** 20)
         self.usr3.make_filepath_with_content(
-            u"~/Ubuntu One/file.txt",
+            settings.ROOT_USERVOLUME_PATH + u"/file.txt",
             hash_value, crc32_value, size, deflated_size, uuid.uuid4())
 
         def auth(client):

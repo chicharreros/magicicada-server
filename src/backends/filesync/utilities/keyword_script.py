@@ -30,11 +30,13 @@ import psycopg2
 
 psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
 
+from django.conf import settings
+
 
 def get_keywords_from_path(volume_path):
     """Split keywords from a volume path."""
     # we do not index the root volume path
-    clean_path = volume_path.replace("~/Ubuntu One", '')
+    clean_path = volume_path.replace(settings.ROOT_USERVOLUME_PATH, '')
     clean_path = unicodedata.normalize('NFKD', clean_path)
     clean_path = clean_path.encode('ASCII', 'ignore').lower()
     keywords = re.findall(r'\w+', clean_path)

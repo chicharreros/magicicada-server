@@ -20,13 +20,16 @@
 
 from __future__ import unicode_literals
 
-from datetime import datetime
 import logging
 import operator
-import os.path
+import os
 import unittest
-
 import uuid
+
+from datetime import datetime
+
+from django.conf import settings
+
 from metrics.tests import FakeMetrics
 from backends.filesync import errors
 from backends.filesync.models import STATUS_LIVE, StorageObject
@@ -85,7 +88,7 @@ class MockNode(object):
     status = STATUS_LIVE
     vol_udf = MockVolume()
     vol_udf.is_root = True
-    vol_udf.path = "~/Ubuntu One"
+    vol_udf.path = settings.ROOT_USERVOLUME_PATH
 
     class _content(object):
         """Fake content within a Node."""
@@ -124,7 +127,8 @@ class ResourceMapperTestCase(unittest.TestCase):
         self.assertEqual(info['used_bytes'], quota.used_storage_bytes)
         self.assertEqual(info['max_bytes'], quota.max_storage_bytes)
         self.assertEqual(
-            info['root_node_path'], self.mapper.node('~/Ubuntu One'))
+            info['root_node_path'],
+            self.mapper.node(settings.ROOT_USERVOLUME_PATH))
         self.assertEqual(
             info['user_node_paths'], [self.mapper.node(udf.path)])
 
@@ -185,11 +189,12 @@ class ResourceMapperTestCase(unittest.TestCase):
         self.assertEqual(info['public_url'], f1.public_url)
         self.assertEqual(info['is_public'], f1.is_public)
         self.assertEqual(
-            info['parent_path'], "/~/Ubuntu One/a/b/c/d")
+            info['parent_path'], "/%s/a/b/c/d" % settings.ROOT_USERVOLUME_PATH)
         self.assertEqual(
-            info['volume_path'], "/volumes/~/Ubuntu One")
+            info['volume_path'], "/volumes/%s" % settings.ROOT_USERVOLUME_PATH)
         self.assertEqual(
-            info['content_path'], '/content/~/Ubuntu One/a/b/c/d/file.txt')
+            info['content_path'],
+            '/content/%s/a/b/c/d/file.txt' % settings.ROOT_USERVOLUME_PATH)
         # make sure file specific rules apply
         self.assertTrue('has_children' not in info)
         self.assertEqual(info['is_live'], True)
@@ -208,10 +213,14 @@ class ResourceMapperTestCase(unittest.TestCase):
             info['when_changed'], date_formatter(f1.when_last_modified))
         self.assertEqual(info['generation'], f1.generation)
         self.assertEqual(info['generation_created'], f1.generation_created)
-        self.assertEqual(info['parent_path'], "/~/Ubuntu One/a/b/c/d")
-        self.assertEqual(info['volume_path'], "/volumes/~/Ubuntu One")
         self.assertEqual(
-            info['content_path'], '/content/~/Ubuntu One/a/b/c/d/file.txt')
+            info['parent_path'],
+            "/%s/a/b/c/d" % settings.ROOT_USERVOLUME_PATH)
+        self.assertEqual(
+            info['volume_path'], "/volumes/%s" % settings.ROOT_USERVOLUME_PATH)
+        self.assertEqual(
+            info['content_path'],
+            '/content/%s/a/b/c/d/file.txt' % settings.ROOT_USERVOLUME_PATH)
         # make sure directory specific rules apply
         self.assertTrue('hash' not in info)
         self.assertTrue('is_public' not in info)
@@ -236,8 +245,11 @@ class ResourceMapperTestCase(unittest.TestCase):
         self.assertEqual(info['generation'], f1.generation)
         self.assertEqual(info['generation_created'], f1.generation_created)
         self.assertEqual(info['parent_path'], None)
-        self.assertEqual(info['volume_path'], "/volumes/~/Ubuntu One")
-        self.assertEqual(info['content_path'], '/content/~/Ubuntu One')
+        self.assertEqual(
+            info['volume_path'], "/volumes/%s" % settings.ROOT_USERVOLUME_PATH)
+        self.assertEqual(
+            info['content_path'],
+            '/content/%s' % settings.ROOT_USERVOLUME_PATH)
         # make sure directory specific rules apply
         self.assertTrue('hash' not in info)
         self.assertTrue('is_public' not in info)
@@ -337,7 +349,7 @@ class RestHelperTestCase(StorageDALTestCase):
         """Test for get_node a directory node."""
         root = self.user.volume().get_root()
         d1 = root.make_subdirectory("dir1")
-        full_path = "~/Ubuntu One" + d1.full_path
+        full_path = settings.ROOT_USERVOLUME_PATH + d1.full_path
         info = self.helper.get_node(user=self.user, node_path=full_path)
         self.assertEqual(info, self.mapper.node_repr(d1))
 
@@ -345,7 +357,7 @@ class RestHelperTestCase(StorageDALTestCase):
         """Test for  get_node conversion of a file node."""
         root = self.user.volume().get_root()
         f1 = root.make_file("file.txt")
-        volume_path = "~/Ubuntu One"
+        volume_path = settings.ROOT_USERVOLUME_PATH
         full_path = volume_path + f1.full_path
         info = self.helper.get_node(user=self.user, node_path=full_path)
         self.assertEqual(info, self.mapper.node_repr(f1))
@@ -382,7 +394,7 @@ class RestHelperTestCase(StorageDALTestCase):
         """Test simple node info."""
         root = self.user.volume().get_root()
         f1 = root.make_file("file.txt")
-        full_path = "~/Ubuntu One" + f1.full_path
+        full_path = settings.ROOT_USERVOLUME_PATH + f1.full_path
         info = self.helper.get_node(self.user, full_path)
         self.assertEqual(info, self.mapper.node_repr(f1))
 
@@ -391,7 +403,8 @@ class RestHelperTestCase(StorageDALTestCase):
         root = self.user.volume().get_root()
         d1 = root.make_subdirectory("Documents")
         f1 = d1.make_file("file.txt")
-        full_path = "~/Ubuntu One" + os.path.join(d1.full_path, f1.name)
+        full_path = settings.ROOT_USERVOLUME_PATH + os.path.join(
+            d1.full_path, f1.name)
         info = self.helper.get_node(self.user, full_path)
         self.assertEqual(info['key'], f1.nodekey)
         self.assertEqual(info['path'], f1.full_path)
@@ -420,7 +433,7 @@ class RestHelperTestCase(StorageDALTestCase):
         """Test delete_volume."""
         root = self.user.volume().get_root()
         f1 = root.make_file("file.txt")
-        full_path = "~/Ubuntu One" + f1.full_path
+        full_path = settings.ROOT_USERVOLUME_PATH + f1.full_path
         self.helper.delete_node(self.user, full_path)
         self.assertRaises(errors.DoesNotExist,
                           self.user.volume().get_node, f1.id)
@@ -433,7 +446,7 @@ class RestHelperTestCase(StorageDALTestCase):
         """Test get_node_children."""
         root = self.user.volume().get_root()
         files = [root.make_file("file%s.txt" % i) for i in range(10)]
-        full_path = "~/Ubuntu One"
+        full_path = settings.ROOT_USERVOLUME_PATH
         root.load()
         expected = self.mapper.node_repr(root)
         expected['children'] = [self.mapper.node_repr(n) for n in files]
@@ -448,15 +461,15 @@ class RestHelperTestCase(StorageDALTestCase):
     def test_GET_file_node_children(self):
         """Test get_node_children."""
         self.user.volume().root.make_file("file.txt")
-        self.assertRaises(FileNodeHasNoChildren,
-                          self.helper.get_node, self.user,
-                          "~/Ubuntu One/file.txt", include_children=True)
+        self.assertRaises(
+            FileNodeHasNoChildren, self.helper.get_node, self.user,
+            settings.ROOT_USERVOLUME_PATH + "/file.txt", include_children=True)
 
     def test_PUT_node_is_public(self):
         """Test put node to make existing file public."""
         original_metrics = self.helper.metrics
         self.helper.metrics = FakeMetrics()
-        new_file_path = "~/Ubuntu One/a/b/c/file.txt"
+        new_file_path = settings.ROOT_USERVOLUME_PATH + "/a/b/c/file.txt"
         node = self.user.make_file_by_path(new_file_path)
         self.assertEqual(node.is_public, False)
         node_rep = self.mapper.node_repr(node)
@@ -483,7 +496,7 @@ class RestHelperTestCase(StorageDALTestCase):
     def test_GET_public_files(self):
         """Test public_files returns the list of public files."""
         self.assertEqual(self.helper.get_public_files(self.user), [])
-        new_file_path = "~/Ubuntu One/a/b/c/file.txt"
+        new_file_path = settings.ROOT_USERVOLUME_PATH + "/a/b/c/file.txt"
         node = self.user.make_file_by_path(new_file_path)
         self.assertEqual(node.is_public, False)
         node_rep = self.mapper.node_repr(node)
@@ -495,7 +508,7 @@ class RestHelperTestCase(StorageDALTestCase):
 
     def test_PUT_node_is_public_directory(self):
         """Test put node to make existing file public."""
-        dir_path = "~/Ubuntu One/a/b/c"
+        dir_path = settings.ROOT_USERVOLUME_PATH + "/a/b/c"
         node = self.user.make_tree_by_path(dir_path)
         self.assertEqual(node.is_public, False)
         node_rep = self.mapper.node_repr(node)
@@ -505,7 +518,7 @@ class RestHelperTestCase(StorageDALTestCase):
 
     def test_PUT_node_path(self):
         """Test put node with a new path."""
-        new_file_path = "~/Ubuntu One/a/b/c/file.txt"
+        new_file_path = settings.ROOT_USERVOLUME_PATH + "/a/b/c/file.txt"
         node = self.user.make_file_by_path(new_file_path)
         self.assertEqual(node.full_path, "/a/b/c/file.txt")
         node_rep = self.mapper.node_repr(node)
@@ -525,7 +538,7 @@ class RestHelperTestCase(StorageDALTestCase):
 
     def test_PUT_node_path_is_public(self):
         """Test put node with a new path and make it public."""
-        new_file_path = "~/Ubuntu One/a/b/c/file.txt"
+        new_file_path = settings.ROOT_USERVOLUME_PATH + "/a/b/c/file.txt"
         node = self.user.make_file_by_path(new_file_path)
         self.assertEqual(node.full_path, "/a/b/c/file.txt")
         node_rep = self.mapper.node_repr(node)
@@ -539,7 +552,7 @@ class RestHelperTestCase(StorageDALTestCase):
 
     def test_PUT_node_is_public_partial(self):
         """Test put node."""
-        new_file_path = "~/Ubuntu One/a/b/c/file.txt"
+        new_file_path = settings.ROOT_USERVOLUME_PATH + "/a/b/c/file.txt"
         node = self.user.make_file_by_path(new_file_path)
         self.assertEqual(node.is_public, False)
         info = self.helper.put_node(self.user, new_file_path,
@@ -555,7 +568,7 @@ class RestHelperTestCase(StorageDALTestCase):
 
     def test_PUT_node_path_partial(self):
         """Test put node with a new path with partial info."""
-        new_file_path = "~/Ubuntu One/a/b/c/file.txt"
+        new_file_path = settings.ROOT_USERVOLUME_PATH + "/a/b/c/file.txt"
         node = self.user.make_file_by_path(new_file_path)
         info = self.helper.put_node(self.user, new_file_path,
                                     {'path': "/a/newfile.txt"})
@@ -565,7 +578,7 @@ class RestHelperTestCase(StorageDALTestCase):
 
     def test_PUT_node_path_is_pulic_partial(self):
         """Test put node with a new path and make it public."""
-        new_file_path = "~/Ubuntu One/a/b/c/file.txt"
+        new_file_path = settings.ROOT_USERVOLUME_PATH + "/a/b/c/file.txt"
         node = self.user.make_file_by_path(new_file_path)
         info = self.helper.put_node(
             self.user, new_file_path,
@@ -576,7 +589,7 @@ class RestHelperTestCase(StorageDALTestCase):
 
     def test_PUT_node_do_nothing(self):
         """Test put_node with nothing to do."""
-        new_file_path = "~/Ubuntu One/a/b/c/file.txt"
+        new_file_path = settings.ROOT_USERVOLUME_PATH + "/a/b/c/file.txt"
         node = self.user.make_file_by_path(new_file_path)
         node_repr = self.mapper.node_repr(node)
         info = self.helper.put_node(self.user, new_file_path,
@@ -593,7 +606,7 @@ class RestHelperTestCase(StorageDALTestCase):
         cb.magic_hash = b'magic'
         self.store.add(cb)
         self.store.commit()
-        new_file_path = "~/Ubuntu One/a/b/c/file.txt"
+        new_file_path = settings.ROOT_USERVOLUME_PATH + "/a/b/c/file.txt"
         info = self.helper.put_node(
             self.user, new_file_path,
             {'kind': 'file', 'hash': cb.hash, 'magic_hash': 'magic'})
@@ -608,7 +621,7 @@ class RestHelperTestCase(StorageDALTestCase):
         cb.magic_hash = b'magic'
         self.store.add(cb)
         self.store.commit()
-        new_file_path = "~/Ubuntu One/a/b/c/file.txt"
+        new_file_path = settings.ROOT_USERVOLUME_PATH + "/a/b/c/file.txt"
         info = self.helper.put_node(
             self.user, new_file_path,
             {'kind': 'file', 'hash': cb.hash, 'magic_hash': 'magic'})
@@ -627,7 +640,7 @@ class RestHelperTestCase(StorageDALTestCase):
 
     def test_PUT_node_new_file(self):
         """Test put_node to make a new file."""
-        new_file_path = "~/Ubuntu One/a/b/c/file.txt"
+        new_file_path = settings.ROOT_USERVOLUME_PATH + "/a/b/c/file.txt"
         info = self.helper.put_node(self.user, new_file_path,
                                     {'kind': 'file'})
         node = self.user.get_node_by_path(new_file_path)
@@ -637,7 +650,7 @@ class RestHelperTestCase(StorageDALTestCase):
 
     def test_PUT_node_new_directory(self):
         """Test put_node to make a new directory."""
-        new_file_path = "~/Ubuntu One/a/b/c/file.txt"
+        new_file_path = settings.ROOT_USERVOLUME_PATH + "/a/b/c/file.txt"
         info = self.helper.put_node(self.user, new_file_path,
                                     {'kind': 'directory'})
         node = self.user.get_node_by_path(new_file_path)
@@ -647,9 +660,9 @@ class RestHelperTestCase(StorageDALTestCase):
 
     def test_PUT_node_exceptions(self):
         """Test put_node exceptions."""
-        self.assertRaises(InvalidKind,
-                          self.helper.put_node,
-                          self.user, "~/Ubuntu one/x", {"kind": "ABC"})
+        self.assertRaises(
+            InvalidKind, self.helper.put_node, self.user,
+            settings.ROOT_USERVOLUME_PATH + "/x", {"kind": "ABC"})
         # PUT to a non existent node.
         self.assertRaises(errors.DoesNotExist,
                           self.helper.put_node,
@@ -657,4 +670,4 @@ class RestHelperTestCase(StorageDALTestCase):
         # PUT to a non existent node.
         self.assertRaises(errors.DoesNotExist,
                           self.helper.put_node,
-                          self.user, "~/Ubuntu One/x", {})
+                          self.user, settings.ROOT_USERVOLUME_PATH + "/x", {})

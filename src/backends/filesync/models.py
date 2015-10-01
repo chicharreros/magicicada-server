@@ -34,6 +34,7 @@ from storm.store import AutoReload, EmptyResultSet
 
 import posixpath as pypath
 
+from django.conf import settings
 from backends.db.store import implicit_flushes_blocked_on
 from backends.filesync import EMPTY_CONTENT_HASH
 from backends.filesync.errors import (
@@ -64,7 +65,6 @@ ROOT_NAME = ''
 ROOT_PATH = '/'
 ROOT_PARENTID = None
 ROOT_VOLUME = None
-ROOT_USERVOLUME_PATH = "~/Ubuntu One"
 
 # info for the name validation
 ILLEGAL_FILENAMES = [".", ".."]
@@ -1253,7 +1253,7 @@ class UserVolume(Storm):
     @property
     def is_root(self):
         """Return true if this is the root volume."""
-        return self.path == ROOT_USERVOLUME_PATH
+        return self.path == settings.ROOT_USERVOLUME_PATH
 
     @staticmethod
     def lock_volume(store, id):
@@ -1283,7 +1283,7 @@ class UserVolume(Storm):
     @classmethod
     def create(cls, store, user_id, path):
         """Create the UserVolume and its root node."""
-        if path == ROOT_USERVOLUME_PATH:
+        if path == settings.ROOT_USERVOLUME_PATH:
             raise NoPermission("Invalid Path Volume.")
         return cls._create(store, user_id, path)
 
@@ -1295,7 +1295,7 @@ class UserVolume(Storm):
         # create the node
         vol = UserVolume.get_root(store, user_id)
         if vol is None:
-            vol = UserVolume._create(store, user_id, ROOT_USERVOLUME_PATH)
+            vol = UserVolume._create(store, user_id, settings.ROOT_USERVOLUME_PATH)
         return vol
 
     @staticmethod
@@ -1303,7 +1303,7 @@ class UserVolume(Storm):
         """Get the root UserVolume."""
         return store.find(UserVolume,
                           UserVolume.owner_id == user_id,
-                          UserVolume.path == ROOT_USERVOLUME_PATH,
+                          UserVolume.path == settings.ROOT_USERVOLUME_PATH,
                           UserVolume.status == STATUS_LIVE).one()
 
     def increment_generation(self):

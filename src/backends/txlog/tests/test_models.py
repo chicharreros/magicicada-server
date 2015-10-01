@@ -20,6 +20,7 @@
 
 from __future__ import unicode_literals
 
+from django.conf import settings
 from mock import patch
 
 from backends.filesync.dbmanager import get_filesync_store
@@ -170,8 +171,9 @@ class TestTransactionLog(BaseTransactionLogTestCase):
         node.unlink()
         expected = self._get_dict_with_txlog_attrs_from(
             node, TransactionLog.OP_DELETE,
-            extra=dict(extra_data_dict={'kind': StorageObject.FILE,
-                                        'volume_path': '~/Ubuntu One'}))
+            extra=dict(extra_data_dict={
+                'kind': StorageObject.FILE,
+                'volume_path': settings.ROOT_USERVOLUME_PATH}))
         self.assertStoredTransactionLogsMatch({node.id: expected})
 
     def test_txlog_when_unlinking_empty_directory(self):
@@ -179,8 +181,9 @@ class TestTransactionLog(BaseTransactionLogTestCase):
         node.unlink()
         expected = self._get_dict_with_txlog_attrs_from(
             node, TransactionLog.OP_DELETE,
-            extra=dict(extra_data_dict={'kind': StorageObject.DIRECTORY,
-                                        'volume_path': '~/Ubuntu One'}))
+            extra=dict(extra_data_dict={
+                'kind': StorageObject.DIRECTORY,
+                'volume_path': settings.ROOT_USERVOLUME_PATH}))
         self.assertStoredTransactionLogsMatch({node.id: expected})
 
     def test_txlogs_when_unlinking_tree(self):
@@ -194,15 +197,17 @@ class TestTransactionLog(BaseTransactionLogTestCase):
         expected_rows = {
             directory.id: self._get_dict_with_txlog_attrs_from(
                 directory, TransactionLog.OP_DELETE,
-                extra=dict(extra_data_dict={'kind': StorageObject.DIRECTORY,
-                                            'volume_path': "~/Ubuntu One"}))}
+                extra=dict(extra_data_dict={
+                    'kind': StorageObject.DIRECTORY,
+                    'volume_path': settings.ROOT_USERVOLUME_PATH}))}
 
         for i in range(0, 5):
             f = self._make_file(parent=directory, mimetype=self.mimetype)
             expected_rows[f.id] = self._get_dict_with_txlog_attrs_from(
                 f, TransactionLog.OP_DELETE,
-                extra=dict(extra_data_dict={'kind': f.kind,
-                                            'volume_path': "~/Ubuntu One"}))
+                extra=dict(extra_data_dict={
+                    'kind': f.kind,
+                    'volume_path': settings.ROOT_USERVOLUME_PATH}))
 
         directory.unlink_tree()
 

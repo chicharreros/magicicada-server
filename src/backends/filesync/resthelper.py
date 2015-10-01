@@ -22,6 +22,8 @@ from __future__ import unicode_literals
 
 import os
 
+from django.conf import settings
+
 from backends.filesync import errors
 from backends.filesync.dao import VolumeProxy
 from backends.filesync.logging import log_dal_function
@@ -96,7 +98,7 @@ class ResourceMapper(object):
             visible_name=user.visible_name,
             used_bytes=quota.used_storage_bytes,
             max_bytes=quota.max_storage_bytes,
-            root_node_path=self.node('~/Ubuntu One', ''),
+            root_node_path=self.node(settings.ROOT_USERVOLUME_PATH, ''),
             user_node_paths=[self.node(u.path) for u in udfs])
 
     def volume_repr(self, volume,
@@ -120,7 +122,7 @@ class ResourceMapper(object):
     def node_repr(self, node):
         """Return a serializable representation of a node."""
         if node.vol_type == 'root':
-            volume_path = "~/Ubuntu One"
+            volume_path = settings.ROOT_USERVOLUME_PATH
         else:
             volume_path = node.vol_udf.path
         if node.full_path == '/':

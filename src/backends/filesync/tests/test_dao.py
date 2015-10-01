@@ -26,15 +26,14 @@ import uuid
 from datetime import datetime
 from operator import attrgetter
 
+from django.conf import settings
+from mocker import Mocker, expect
 from storm.database import Connection
 from storm.tracer import install_tracer, remove_tracer_type
-
-from mocker import Mocker, expect
 
 from backends.filesync import dao, errors, services, utils
 from backends.filesync.dbmanager import get_filesync_store
 from backends.filesync.models import (
-    ROOT_USERVOLUME_PATH,
     STATUS_LIVE,
     STATUS_DEAD,
     Download,
@@ -451,7 +450,7 @@ class DAOTestCase(StorageDALTestCase):
         """Test get_node_by_path from root."""
         user = self.create_user()
         udf = user.volume().get_volume()
-        d1 = user.get_node_by_path(ROOT_USERVOLUME_PATH)
+        d1 = user.get_node_by_path(settings.ROOT_USERVOLUME_PATH)
         self.assertEqual(d1.id, udf.root_id)
         trick_path = udf.path + ' Tricky'
         udf2 = user.make_udf(trick_path)
@@ -484,21 +483,22 @@ class DAOTestCase(StorageDALTestCase):
     def test_user_make_tree_by_path(self):
         """Test user.make_tree_by_path."""
         user = self.create_user()
-        d = user.make_tree_by_path('~/Ubuntu One/a/b')
+        d = user.make_tree_by_path(settings.ROOT_USERVOLUME_PATH + '/a/b')
         self.assertEqual(d.full_path, '/a/b')
-        d1 = user.get_node_by_path('~/Ubuntu One/a/b')
+        d1 = user.get_node_by_path(settings.ROOT_USERVOLUME_PATH + '/a/b')
         self.assertEqual(d.id, d1.id)
 
     def test_user_make_file_by_path1(self):
         """Test user.make_tree_by_path."""
         user = self.create_user()
-        f = user.make_file_by_path('~/Ubuntu One/file.txt')
+        f = user.make_file_by_path(settings.ROOT_USERVOLUME_PATH + '/file.txt')
         self.assertEqual(f.full_path, '/file.txt')
 
     def test_user_make_file_by_path2(self):
         """Test user.make_tree_by_path."""
         user = self.create_user()
-        f = user.make_file_by_path('~/Ubuntu One/a/b/file.txt')
+        f = user.make_file_by_path(
+            settings.ROOT_USERVOLUME_PATH + '/a/b/file.txt')
         self.assertEqual(f.full_path, '/a/b/file.txt')
 
     def test_SharedDirectories(self):
@@ -759,7 +759,7 @@ class DAOTestCase(StorageDALTestCase):
     def test_make_filepath_with_content(self):
         """Make file with content using paths."""
         user = self.create_user(max_storage_bytes=200)
-        path = '~/Ubuntu One/a/b/c/filename.txt'
+        path = settings.ROOT_USERVOLUME_PATH + '/a/b/c/filename.txt'
         mime = 'image/tif'
         hash = self.factory.get_fake_hash()
         storage_key = uuid.uuid4()

@@ -27,6 +27,8 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/1.8/ref/settings/
 """
 
+from __future__ import unicode_literals
+
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 import os
 import urllib
@@ -181,6 +183,8 @@ LOG_FORMAT = '%(asctime)s %(levelname)-8s %(name)s[%(process)d]: %(message)s'
 LOG_LEVEL = 5
 LOG_TO_SYSLOG = False
 OOPS_PATH = os.path.join(BASE_DIR, 'tmp', 'oops')
+ROOT_USERVOLUME_NAME = 'Magicicada'
+ROOT_USERVOLUME_PATH = '~/' + ROOT_USERVOLUME_NAME
 SERVICE_GROUP = 'filesync'
 SERVICE_NAME = 'server'
 STATSD_SERVERS = 'localhost:8125'

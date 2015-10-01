@@ -22,6 +22,8 @@ from __future__ import unicode_literals
 
 import os
 
+from django.conf import settings
+
 from utilities import utils
 
 
@@ -71,7 +73,7 @@ def launch(progname, username, params=None, environ=None, verbose=False,
             home = homedir
 
         data = os.path.join(home, '.local/share/ubuntuone/syncdaemon')
-        root = os.path.join(home, 'Ubuntu One')
+        root = os.path.join(home, settings.ROOT_USERVOLUME_NAME)
         shares = os.path.join(home, '.local/share/ubuntuone/shares')
         env['HOME'] = home
         env['XDG_DATA_HOME'] = os.path.join(home, '.local/share')

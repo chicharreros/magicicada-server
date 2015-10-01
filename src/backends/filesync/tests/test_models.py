@@ -29,10 +29,10 @@ import datetime
 from mock import patch
 from storm.expr import Or, Max
 
+from django.conf import settings
 from backends.filesync import errors
 from backends.filesync.dbmanager import filesync_tm
 from backends.filesync.models import (
-    ROOT_USERVOLUME_PATH,
     STATUS_LIVE,
     STATUS_DEAD,
     ContentBlob,
@@ -1934,7 +1934,7 @@ class TestUserVolume(ORMTestCase):
         user = self.factory.make_user()
         self.assertRaises(
             errors.NoPermission, UserVolume.create,
-            self.store, user.id, '~/Ubuntu One')
+            self.store, user.id, settings.ROOT_USERVOLUME_PATH)
         volume = UserVolume.create(
             self.store, user.id, path='~/Documents/Stuff/DirToUDF')
         node = self.store.get(StorageObject, volume.root_id)
@@ -1972,7 +1972,7 @@ class TestUserVolume(ORMTestCase):
         # check volume is ok
         self.assertEqual(volume.root_id, node.id)
         self.assertEqual(volume.owner_id, user.id)
-        self.assertEqual(volume.path, ROOT_USERVOLUME_PATH)
+        self.assertEqual(volume.path, settings.ROOT_USERVOLUME_PATH)
         self.assertEqual(volume.status, STATUS_LIVE)
 
     def test_get_root_volume(self):

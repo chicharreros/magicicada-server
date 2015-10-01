@@ -41,12 +41,13 @@ sys.path.insert(0, LIB_DIR)
 from twisted.internet import glib2reactor
 glib2reactor.install()  # before any reactor import
 
-from ubuntuone.storage.server.testing.testcase import create_test_user
+from django.conf import settings
 from utilities import utils, dev_launcher
-from ubuntuone.platform.linux import tools
 from twisted.internet import reactor, defer
 
+from ubuntuone.platform.linux import tools
 from ubuntuone.storage.server.integration.helpers import debug, retryable
+from ubuntuone.storage.server.testing.testcase import create_test_user
 
 # to make dbus work
 dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
@@ -163,7 +164,8 @@ class SyncDaemon(object):
         self.prefix = 'SyncDaemon %d:' % procnum
         sd_home = 'syncdaemon-home-%d-%s' % (procnum, timestamp)
         self.homedir = os.path.join(TMP_DIR, sd_home, username)
-        self.rootdir = os.path.join(self.homedir, 'Ubuntu One')
+        self.rootdir = os.path.join(
+            self.homedir, settings.ROOT_USERVOLUME_NAME)
         self.pidfile = PID_FILENAME % procnum
         self.events = []
         self.sdt = None
@@ -363,7 +365,8 @@ def execute_tests(all_tests, sd1, sd2, sd3):
             debug(testprefix, 'Removing old data in home.')
             for sd in sd1, sd2, sd3:
                 for something in os.listdir(sd.homedir):
-                    if something not in ('Ubuntu One', '.local', '.config'):
+                    dirs = (settings.ROOT_USERVOLUME_NAME, '.local', '.config')
+                    if something not in dirs:
                         fullpath = os.path.join(sd.homedir, something)
                         if os.path.isdir(fullpath):
                             shutil.rmtree(fullpath)

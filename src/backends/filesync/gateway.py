@@ -44,7 +44,6 @@ from backends.filesync import errors, dao, utils
 from backends.filesync.models import (
     EMPTY_CONTENT_HASH,
     ROOT_PARENTID,
-    ROOT_USERVOLUME_PATH,
     STATUS_LIVE,
     STATUS_DEAD,
     ContentBlob,
@@ -837,7 +836,7 @@ class StorageUserGateway(GatewayBase):
         store = get_filesync_store()
         udfs = store.find(
             UserVolume, UserVolume.owner_id == self.user.id,
-            UserVolume.path != ROOT_USERVOLUME_PATH,
+            UserVolume.path != settings.ROOT_USERVOLUME_PATH,
             UserVolume.status == STATUS_LIVE)
         for udf in udfs:
             udf_dao = dao.UserVolume(udf, self.user)

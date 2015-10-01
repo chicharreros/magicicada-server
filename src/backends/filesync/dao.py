@@ -35,9 +35,10 @@ import posixpath as pypath
 
 from weakref import WeakValueDictionary
 
+from django.conf import settings
+
 from backends.filesync import errors, utils
 from backends.filesync.models import (
-    ROOT_USERVOLUME_PATH,
     STATUS_LIVE,
     StorageObject,
     Share,
@@ -293,8 +294,8 @@ class StorageUser(DAOBase):
 
     def _path_helper(self, vol_full_path):
         """Using the path, return the remaining path and the udf."""
-        if (vol_full_path == ROOT_USERVOLUME_PATH or
-                vol_full_path.startswith(ROOT_USERVOLUME_PATH + "/")):
+        if (vol_full_path == settings.ROOT_USERVOLUME_PATH or
+                vol_full_path.startswith(settings.ROOT_USERVOLUME_PATH + "/")):
             udf = self._gateway.get_udf(self.root_volume_id)
         else:
             udf = self._gateway.get_udf_by_path(vol_full_path,
