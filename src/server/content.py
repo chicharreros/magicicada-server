@@ -308,16 +308,20 @@ class BaseUploadJob(object):
 
     @defer.inlineCallbacks
     def add_data(self, data):
-        """Add data to this upload."""
-        # add data is called by the server with the bytes that arrive in a
-        # packet. This is at most MAX_MESSAGE_SIZE bytes (2**16, 65k at the
-        # moment).
-        # zlib has a theoretical limit of compression of 1032:1, so this
-        # means that at most we will get a 1032*2**16 ~= 64MB, meaning that
-        # the memory usage for this has a maximum.
-        # """the theoretical limit for the zlib format (as opposed to its
-        # implementation in the currently available sources) is 1032:1."""
-        # http://zlib.net/zlib_tech.html
+        """Add data to this upload.
+
+        This is called by the server with the bytes that arrive in a packet.
+        This is at most MAX_MESSAGE_SIZE bytes (2**16, 65k at the moment).
+
+        zlib has a theoretical limit of compression of 1032:1, so this means
+        that at most we will get a 1032*2**16 ~= 64MB, meaning that the memory
+        usage for this has a maximum.
+
+        http://zlib.net/zlib_tech.html
+        """
+        if self.canceling:
+            return
+
         try:
             self.producer.dataReceived(data)
         except Exception as err:

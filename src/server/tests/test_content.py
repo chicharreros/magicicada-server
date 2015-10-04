@@ -2660,6 +2660,17 @@ class TestUploadJob(TestWithDatabase):
         yield upload_job.ops
         self.assertEqual(called, ['operation', 'error: crash'])
 
+    @defer.inlineCallbacks
+    def test_add_data_after_cancel(self):
+        """Data after cancellation should be just ignored."""
+        deflated_data, _, upload_job = yield self.make_upload(self.half_size)
+        middle = self.half_size // 2
+        data1, data2 = deflated_data[:middle], deflated_data[middle:]
+        yield upload_job.connect()
+        yield upload_job.add_data(data1)
+        yield upload_job.cancel()
+        yield upload_job.add_data(data2)
+
 
 class TestNode(TestWithDatabase):
     """Tests for Node class."""
