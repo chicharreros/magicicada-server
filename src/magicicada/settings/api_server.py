@@ -48,7 +48,6 @@ LOG_FILENAME = 'filesync-server.log'
 MAGIC_UPLOAD_ACTIVE = True
 MAX_DELTA_INFO = 20
 METRICS_NAMESPACE = 'development.filesync.server'
-MULTIPART_THRESHOLD = 10485760
 PROTOCOL_WEAKREF = False
 SERVERNAME = 'filesyncserver-development'
 SLI_METRIC_NAMESPACE = None

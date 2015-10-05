@@ -421,7 +421,6 @@ class TestWithDatabase(ProtocolTestCase, StorageDALTestCase):
             user.password = password
 
         # tune the config for this tests
-        self.patch(settings.api_server, 'MULTIPART_THRESHOLD', 1024 * 1024 * 5)
         self.patch(settings.api_server, 'STORAGE_CHUNK_SIZE', 1024 * 64)
 
         self.addCleanup(setattr, METER_UTILITY, 'service_meter', None)

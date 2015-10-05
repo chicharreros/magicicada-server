@@ -1601,7 +1601,6 @@ class TestMultipartPutContent(TestWithDatabase):
         self._logger.addHandler(self.handler)
         yield super(TestMultipartPutContent, self).setUp()
         # override defaults set by TestWithDatabase.setUp.
-        self.patch(settings.api_server, 'MULTIPART_THRESHOLD', 1024 * 10)
         self.patch(settings.api_server, 'STORAGE_CHUNK_SIZE', 1024)
 
     @defer.inlineCallbacks
@@ -1660,19 +1659,10 @@ class TestMultipartPutContent(TestWithDatabase):
                                  add_default_callbacks=True)
 
     @defer.inlineCallbacks
-    def test_putcontent_multipart(self):
-        """Test putcontent with multipart upload job."""
-        # tune the config for this tests
-        size = int(settings.api_server.MULTIPART_THRESHOLD * 1.5)
-        self.usr0.update(max_storage_bytes=size * 2)
-        yield self._test_putcontent(size=size)
-
-    @defer.inlineCallbacks
     def test_resume_putcontent(self):
         """Test that the client can resume a putcontent request."""
-        self.patch(settings.api_server, 'MULTIPART_THRESHOLD', 1024 * 512)
         self.patch(settings.api_server, 'STORAGE_CHUNK_SIZE', 1024 * 64)
-        size = settings.api_server.MULTIPART_THRESHOLD * 2
+        size = 2 * 1024 * 512
         self.usr0.update(max_storage_bytes=size * 2)
         data = os.urandom(size)
         deflated_data = zlib.compress(data)
@@ -1797,9 +1787,8 @@ class TestMultipartPutContent(TestWithDatabase):
 
         It receives a new upload_id.
         """
-        self.patch(settings.api_server, 'MULTIPART_THRESHOLD', 1024 * 128)
         self.patch(settings.api_server, 'STORAGE_CHUNK_SIZE', 1024 * 32)
-        size = settings.api_server.MULTIPART_THRESHOLD * 2
+        size = 2 * 1024 * 128
         self.usr0.update(max_storage_bytes=size * 2)
         data = os.urandom(size)
         deflated_data = zlib.compress(data)
@@ -1867,9 +1856,8 @@ class TestMultipartPutContent(TestWithDatabase):
 
     def test_putcontent_corrupt(self):
         """Put content on a file with corrupt data."""
-        self.patch(settings.api_server, 'MULTIPART_THRESHOLD', 1024 * 512)
         self.patch(settings.api_server, 'STORAGE_CHUNK_SIZE', 1024 * 64)
-        size = settings.api_server.MULTIPART_THRESHOLD * 2
+        size = 2 * 1024 * 512
         self.usr0.update(max_storage_bytes=size * 2)
         data = os.urandom(size)
         deflated_data = zlib.compress(data)
@@ -2108,7 +2096,6 @@ class TestChunkedContent(TestWithDatabase):
         """Setup the test."""
         yield super(TestChunkedContent, self).setUp()
         # tune the config for this tests
-        self.patch(settings.api_server, 'MULTIPART_THRESHOLD', 1024 * 1024 * 5)
         self.patch(settings.api_server, 'STORAGE_CHUNK_SIZE', 1024 * 1024)
 
     @defer.inlineCallbacks
@@ -2210,7 +2197,6 @@ class UserTest(TestWithDatabase):
         u = self.suser = self.create_user(max_storage_bytes=64 ** 2)
         self.user = content.User(self.service.factory.content, u.id,
                                  u.root_volume_id, u.username, u.visible_name)
-        self.patch(settings.api_server, 'MULTIPART_THRESHOLD', 32 ** 2)
 
     @defer.inlineCallbacks
     def test_make_file_node_with_gen(self):
@@ -2262,28 +2248,11 @@ class UserTest(TestWithDatabase):
         volume_id = yield self.user.get_volume_id(root_id)
         node_id, _, _ = yield self.user.make_file(volume_id, root_id,
                                                   u"name", True)
-        size = settings.api_server.MULTIPART_THRESHOLD
+        size = 1024
         # this will create a new uploadjob
         upload_job = yield self.user.get_upload_job(
             None, node_id, NO_CONTENT_HASH, 'foo', 10, size / 2, size / 4,
             True)
-        self.assertTrue(isinstance(upload_job, content.UploadJob),
-                        upload_job.__class__)
-
-    @defer.inlineCallbacks
-    def test_resumable_upload_disabled(self):
-        """Test that we can disable resumable uploads."""
-        # disable multipart/resumable uploads
-        self.patch(settings.api_server, 'MULTIPART_THRESHOLD', 0)
-        root_id, _ = yield self.user.get_root()
-        volume_id = yield self.user.get_volume_id(root_id)
-        node_id, _, _ = yield self.user.make_file(volume_id, root_id,
-                                                  u"name", True)
-        size = 1024 * 512
-        self.suser.update(max_storage_bytes=size * 5)
-        # this will create a new uploadjob
-        upload_job = yield self.user.get_upload_job(
-            None, node_id, NO_CONTENT_HASH, 'foo', 10, size * 4, size, True)
         self.assertTrue(isinstance(upload_job, content.UploadJob),
                         upload_job.__class__)
 
