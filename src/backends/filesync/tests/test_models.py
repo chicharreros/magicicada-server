@@ -2083,7 +2083,7 @@ class TestUploadJob(ORMTestCase):
         root = StorageObject.make_root(self.store, u.id)
         obj = root.make_file(name='file.ext')
         job = UploadJob.new_multipart_uploadjob(
-            self.store, obj.id, b'foo', uuid.uuid4())
+            self.store, obj.id, uuid.uuid4())
         job.hash_hint = b'bar'
         job.crc32_hint = 0
         job.inflated_size_hint = 10
@@ -2091,7 +2091,6 @@ class TestUploadJob(ORMTestCase):
         self.store.flush()
         self.failIf(job.uploadjob_id is None)
         self.failUnless(job.uploadjob_id > 0)
-        self.assertEqual(job.multipart_id, 'foo')
 
     def test_uploadjob_add_part(self):
         """Test add_part method."""
@@ -2099,7 +2098,7 @@ class TestUploadJob(ORMTestCase):
         root = StorageObject.make_root(self.store, u.id)
         obj = root.make_file(name='file.ext')
         job = UploadJob.new_multipart_uploadjob(
-            self.store, obj.id, b'foo', uuid.uuid4())
+            self.store, obj.id, uuid.uuid4())
         job.hash_hint = b'bar'
         job.crc32_hint = 0
         job.inflated_size_hint = 10
@@ -2131,7 +2130,7 @@ class TestUploadJob(ORMTestCase):
         root = StorageObject.make_root(self.store, u.id)
         obj = root.make_file(name='file.ext')
         job = UploadJob.new_multipart_uploadjob(
-            self.store, obj.id, b'foo', uuid.uuid4())
+            self.store, obj.id, uuid.uuid4())
         job.hash_hint = b'bar'
         job.crc32_hint = 0
         job.inflated_size_hint = 10
@@ -2238,17 +2237,14 @@ class ResumableUploadTest(TestStorageObjectBase):
     def test_constructor(self):
         user = self.make_user(1, 'username')
         vol_path = '~/MyVolume/and/file/path.txt'
-        multipart_id = b'multipart_id'
         size = 1000 * (2 ** 30)
         storage_key = uuid.uuid4()
-        upload = ResumableUpload(
-            user.id, vol_path, size, multipart_id, storage_key)
+        upload = ResumableUpload(user.id, vol_path, size, storage_key)
         self.store.add(upload)
         self.store.commit()
         u = self.store.get(ResumableUpload, upload.upload_id)
         self.assertEqual(u.owner_id, user.id)
         self.assertEqual(u.volume_path, vol_path)
-        self.assertEqual(u.multipart_id, multipart_id)
         self.assertEqual(u.storage_key, storage_key)
         self.assertEqual(u.uploaded_bytes, 0)
         self.assertEqual(u.part_count, 0)
@@ -2256,11 +2252,9 @@ class ResumableUploadTest(TestStorageObjectBase):
     def test_add_part(self):
         user = self.make_user(1, 'username')
         vol_path = '~/MyVolume/and/file/path.txt'
-        multipart_id = b'multipart_id'
         size = 1000 * (2 ** 30)
         storage_key = uuid.uuid4()
-        upload = ResumableUpload(
-            user.id, vol_path, size, multipart_id, storage_key)
+        upload = ResumableUpload(user.id, vol_path, size, storage_key)
         self.store.add(upload)
         upload.add_part(
             10 * (2 ** 20), b'hash context', b'magic hash context', 55)

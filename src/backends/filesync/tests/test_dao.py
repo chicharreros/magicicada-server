@@ -203,7 +203,7 @@ class DAOInitTestCase(StorageDALTestCase):
                             ['storage_object_id', 'chunk_count',
                              'hash_hint', 'crc32_hint', 'deflated_size_hint',
                              'inflated_size_hint', 'when_started',
-                             'when_last_active', 'multipart_id',
+                             'when_last_active',
                              'multipart_key', 'uploaded_bytes', 'hash_context',
                              'decompress_context'])
 
@@ -930,8 +930,7 @@ class DAOTestCase(StorageDALTestCase):
 
         # now play a bit with multipart support
         job = file.make_uploadjob(file.content_hash, new_hash, crc, size,
-                                  deflated_size, multipart_id=b'foo',
-                                  multipart_key=uuid.uuid4())
+                                  deflated_size, multipart_key=uuid.uuid4())
         old = job.when_last_active
         job.add_part(
             10, 15, 1, b'hash context', b'magic hash context', b'zlib context')
@@ -958,17 +957,9 @@ class DAOTestCase(StorageDALTestCase):
         self.assertEqual(job.file, file)
         job.delete()
 
-        # set the multipart id
-        job = file.make_uploadjob(file.content_hash, new_hash, crc, size,
-                                  deflated_size, multipart_key=uuid.uuid4())
-        self.assertEqual(job.multipart_id, None)
-        job.set_multipart_id(b'foo')
-        self.assertEqual(job.multipart_id, b'foo')
-
         # update the last active time
         job = file.make_uploadjob(file.content_hash, new_hash, crc, size,
                                   deflated_size, multipart_key=uuid.uuid4())
-        self.assertEqual(job.multipart_id, None)
         old = job.when_last_active
         job.touch()
         self.assertTrue(job.when_last_active > old)

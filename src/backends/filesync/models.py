@@ -1122,8 +1122,6 @@ class UploadJob(object):
     # Whether this is a live upload or a done-with one
     status = lifecycle_status(allow_none=False)
 
-    # the multipart upload id
-    multipart_id = RawStr(allow_none=True)
     # the key name for this multipart upload
     multipart_key = StormUUID(allow_none=True)
     # the number of the uploaded bytes so far.
@@ -1139,13 +1137,11 @@ class UploadJob(object):
     # the decompressobj context of this resumable upload
     decompress_context = RawStr(allow_none=True)
 
-    def __init__(self, storage_object_id, multipart_id=None,
-                 multipart_key=None):
+    def __init__(self, storage_object_id, multipart_key=None):
         """ Create a blob upload """
         self.storage_object_id = storage_object_id
         self.chunk_count = 0
         self.uploaded_bytes = 0
-        self.multipart_id = multipart_id
         self.multipart_key = multipart_key
         self.hash_context = None
         self.magic_hash_context = None
@@ -1161,10 +1157,9 @@ class UploadJob(object):
         return obj
 
     @classmethod
-    def new_multipart_uploadjob(cls, store, storage_object_id,
-                                multipart_id, multipart_key):
+    def new_multipart_uploadjob(cls, store, storage_object_id, multipart_key):
         """ creates a new uploadjob object """
-        obj = cls(storage_object_id, multipart_id, multipart_key)
+        obj = cls(storage_object_id, multipart_key)
         store.add(obj)
         return obj
 
@@ -1388,8 +1383,6 @@ class ResumableUpload(object):
     when_last_active = DateTime(allow_none=False, default=AutoReload)
     # Whether this is a live upload or a done-with one
     status = lifecycle_status(allow_none=False)
-    # the multipart upload id
-    multipart_id = RawStr(allow_none=False)
     # the key for this multipart upload
     storage_key = StormUUID(allow_none=False)
     # the number of parts currently created
@@ -1403,13 +1396,12 @@ class ResumableUpload(object):
     # the crc context from compressing content
     crc_context = Int(allow_none=True)
 
-    def __init__(self, owner_id, volume_path, size, multipart_id, storage_key):
+    def __init__(self, owner_id, volume_path, size, storage_key):
         """ Create a blob upload """
         self.upload_id = uuid.uuid4()
         self.owner_id = owner_id
         self.volume_path = volume_path
         self.size = size
-        self.multipart_id = multipart_id
         self.storage_key = storage_key
         self.part_count = 0
         self.uploaded_bytes = 0

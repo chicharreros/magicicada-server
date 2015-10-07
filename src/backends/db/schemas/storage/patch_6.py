@@ -31,7 +31,6 @@ SQL = [
         when_last_active timestamp without time zone
             default timezone('UTC'::text, now()) not null,
         status lifecycle_status default 'Live'::lifecycle_status not null,
-        multipart_id bytea NOT NULL,
         storage_key uuid NOT NULL,
         part_count bigint NOT NULL,
         uploaded_bytes bigint NOT NULL,
@@ -68,10 +67,6 @@ SQL = [
     """
     COMMENT ON COLUMN resumable_upload.when_last_active IS
         'Timestamp for when the last chunk was created for this upload action';
-    """,
-    """
-    COMMENT ON COLUMN resumable_upload.multipart_id IS
-        'The upload_id returned by S3';
     """,
     """
     COMMENT ON COLUMN resumable_upload.storage_key IS

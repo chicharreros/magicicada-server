@@ -435,7 +435,6 @@ CREATE = [
         when_last_active timestamp without time zone
             default timezone('UTC'::text, now()) not null,
         status lifecycle_status default 'Live'::lifecycle_status not null,
-        multipart_id bytea,
         multipart_key uuid,
         uploaded_bytes bigint,
         inflated_size bigint,

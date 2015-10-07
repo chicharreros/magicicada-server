@@ -337,7 +337,6 @@ class DAL(object):
         d = dict(
             uploadjob_id=uj.id,
             uploaded_bytes=uj.uploaded_bytes,
-            multipart_id=uj.multipart_id,
             multipart_key=uj.multipart_key,
             chunk_count=uj.chunk_count,
             hash_context=uj.hash_context,
@@ -369,14 +368,6 @@ class DAL(object):
                                  inflated_size, deflated_size,
                                  multipart_key=multipart_key)
         return self._process_uploadjob(uj)
-
-    def set_uploadjob_multipart_id(self, user_id, volume_id,
-                                   uploadjob_id, multipart_id):
-        """Set the multipart id for an upload job."""
-        user = self._get_user(user_id)
-        uj = user.volume(volume_id).get_uploadjob(uploadjob_id)
-        uj.set_multipart_id(multipart_id)
-        return {}
 
     def delete_uploadjob(self, user_id, volume_id, uploadjob_id):
         """Delete an upload job."""

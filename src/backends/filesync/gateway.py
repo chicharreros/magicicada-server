@@ -1570,8 +1570,7 @@ class ReadOnlyVolumeGateway(GatewayBase):
             UploadJob.multipart_key == upload_id,
             UploadJob.storage_object_id == StorageObject.id,
             StorageObject.owner_id == self.owner.id,
-            StorageObject.id == node_id,
-            UploadJob.multipart_id != None]  # NOQA
+            StorageObject.id == node_id]
         node = self._get_node_simple(node_id)
         self._check_can_write_node(node)
         if hash_hint is not None:
@@ -1944,7 +1943,7 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
     @timing_metric
     def make_uploadjob(self, node_id, node_hash, new_hash, crc32,
                        inflated_size, deflated_size, enforce_quota=True,
-                       multipart_id=None, multipart_key=None):
+                       multipart_key=None):
         """Create an upload job for a FileNode."""
         if self.read_only:
             raise errors.NoPermission(self.readonly_error)
@@ -1974,7 +1973,7 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
         # if we have multipart_key defined it's multipart
         if multipart_key:
             upload = UploadJob.new_multipart_uploadjob(
-                self.store, node.id, multipart_id, multipart_key)
+                self.store, node.id, multipart_key)
         else:
             upload = UploadJob.new_uploadjob(self.store, node.id)
         upload.hash_hint = new_hash
@@ -2087,13 +2086,6 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
         job = self._get_uploadjob(job_id)
         job.add_part(size, inflated_size, crc32, hash_context,
                      magic_hash_context, decompress_context)
-        return dao.UploadJob(job, gateway=self)
-
-    @timing_metric
-    def set_uploadjob_multpart_id(self, job_id, multipart_id):
-        """Set the multipart_id to the specified upload job."""
-        job = self._get_uploadjob(job_id)
-        job.multipart_id = multipart_id
         return dao.UploadJob(job, gateway=self)
 
     @timing_metric

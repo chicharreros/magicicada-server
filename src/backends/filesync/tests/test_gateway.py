@@ -943,7 +943,6 @@ class SystemGatewayTestCase(StorageDALTestCase):
             file1 = vgw.make_file(root.id, 'file1-%d' % uid)
             up1 = vgw.make_uploadjob(file1.id, file1.content_hash, new_hash,
                                      crc, size, def_size,
-                                     multipart_id=str(uuid.uuid4()),
                                      multipart_key=uuid.uuid4())
             # change the when_started date for the test.
             store = get_filesync_store()
@@ -972,7 +971,6 @@ class SystemGatewayTestCase(StorageDALTestCase):
             file1 = vgw.make_file(root.id, 'file1-%d' % uid)
             up1 = vgw.make_uploadjob(file1.id, file1.content_hash, new_hash,
                                      crc, size, def_size,
-                                     multipart_id=str(uuid.uuid4()),
                                      multipart_key=uuid.uuid4())
             # change the when_started date for the test.
             store = get_filesync_store()
@@ -2875,15 +2873,12 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
         def_size = 10000
         upj1 = self.vgw.make_uploadjob(file1.id, file1.content_hash, new_hash,
                                        crc, size, def_size,
-                                       multipart_id=b'foo_1',
                                        multipart_key=uuid.uuid4())
         upj2 = self.vgw.make_uploadjob(file1.id, file1.content_hash, new_hash,
                                        crc, size, def_size,
-                                       multipart_id=b'foo_2',
                                        multipart_key=uuid.uuid4())
         upj3 = self.vgw.make_uploadjob(file2.id, file2.content_hash, new_hash,
                                        crc, size, def_size,
-                                       multipart_id=b'foo_3',
                                        multipart_key=uuid.uuid4())
         job = self.vgw.get_user_multipart_uploadjob(file1.id,
                                                     upj1.multipart_key)
@@ -2915,7 +2910,7 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
         def_size = 10000
         job = self.vgw.make_uploadjob(
             file1.id, file1.content_hash, new_hash, crc, size, def_size,
-            multipart_id=b'foo_1', multipart_key=uuid.uuid4())
+            multipart_key=uuid.uuid4())
         job = self.vgw.add_uploadjob_part(
             job.id, 10, 15, 1, b'hash context', b'magic hash context',
             b'zlib context')
@@ -2936,23 +2931,6 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
         self.assertEqual(job.hash_context, 'more hash context')
         self.assertEqual(job.magic_hash_context, 'more magic hash context')
         self.assertEqual(job.decompress_context, 'more zlib context')
-
-    def test_set_uploadjob_multipart_id(self):
-        """Test set_uploadjob_multpart_id."""
-        file1 = self.vgw.make_file(self.root.id, 'the file1 name')
-        new_hash = self.factory.get_fake_hash()
-        crc = 12345
-        size = 100
-        def_size = 10000
-        job = self.vgw.make_uploadjob(
-            file1.id, file1.content_hash, new_hash, crc, size, def_size,
-            multipart_key=uuid.uuid4())
-        self.assertEqual(job.multipart_id, None)
-        self.vgw.set_uploadjob_multpart_id(job.id, b'foo_2')
-        self.assertEqual(self.vgw.get_uploadjob(job.id).multipart_id, 'foo_2')
-        # check that we can set a value again and no exception is raised
-        self.vgw.set_uploadjob_multpart_id(job.id, b'foo_3')
-        self.assertEqual(self.vgw.get_uploadjob(job.id).multipart_id, 'foo_3')
 
     def test_set_uploadjob_when_last_active(self):
         """Test set_uploadjob_when_last_active."""
@@ -4507,7 +4485,7 @@ class MetricsTestCase(StorageDALTestCase):
             'make_file', 'make_subdirectory', 'make_tree', 'make_share',
             'delete_node', 'restore_node', 'move_node', 'make_uploadjob',
             'make_file_with_content', 'make_content', 'delete_uploadjob',
-            'add_uploadjob_part', 'set_uploadjob_multpart_id',
+            'add_uploadjob_part',
             'set_uploadjob_when_last_active', 'change_public_access',
             'get_node_parent_ids', 'undelete_volume',
         ]

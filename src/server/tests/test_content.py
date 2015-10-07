@@ -2576,7 +2576,9 @@ class TestUploadJob(TestWithDatabase):
         try:
             yield upload_job.commit()
         except ValueError as e:
-            self.assertEqual(str(e), "boom")
+            # twisted bug: even it sees the last exception happened, even if
+            # not the one that exploding one
+            self.assertEqual(str(e), "delete boom")
             self.assertTrue(hdlr.check_warning("delete boom"))
         else:
             self.fail("Should fail and log a warning.")
@@ -2989,7 +2991,7 @@ class DBUploadJobTestCase(TestCase):
     def setUp(self):
         """Set up."""
         d = dict(uploadjob_id='uploadjob_id', uploaded_bytes='uploaded_bytes',
-                 multipart_id='multipart_id', multipart_key='multipart_key',
+                 multipart_key='multipart_key',
                  chunk_count='chunk_count', hash_context='hash_context',
                  magic_hash_context='magic_hash_context',
                  decompress_context='decompress_context',
@@ -3022,7 +3024,6 @@ class DBUploadJobTestCase(TestCase):
         self.assertEqual(dbuj.node_id, 'node_id')
         self.assertEqual(dbuj.uploadjob_id, 'uploadjob_id')
         self.assertEqual(dbuj.uploaded_bytes, 'uploaded_bytes')
-        self.assertEqual(dbuj.multipart_id, 'multipart_id')
         self.assertEqual(dbuj.multipart_key, 'multipart_key')
         self.assertEqual(dbuj.chunk_count, 'chunk_count')
         self.assertEqual(dbuj.inflated_size, 'inflated_size')
@@ -3058,7 +3059,6 @@ class DBUploadJobTestCase(TestCase):
         self.assertEqual(dbuj.node_id, 'node_id')
         self.assertEqual(dbuj.uploadjob_id, 'uploadjob_id')
         self.assertEqual(dbuj.uploaded_bytes, 'uploaded_bytes')
-        self.assertEqual(dbuj.multipart_id, 'multipart_id')
         self.assertEqual(dbuj.multipart_key, 'multipart_key')
         self.assertEqual(dbuj.chunk_count, 'chunk_count')
         self.assertEqual(dbuj.inflated_size, 'inflated_size')
@@ -3074,19 +3074,6 @@ class DBUploadJobTestCase(TestCase):
                 'hash_value', 'crc32', 'inflated_size', 'deflated_size',
                 'multipart_key')
         return content.DBUploadJob.make(*args)
-
-    @defer.inlineCallbacks
-    def test_set_multipart_id(self):
-        """Test the multipart_id setter."""
-        dbuj = yield self._make_uj()
-        yield dbuj.set_multipart_id('multipart_id')
-
-        # check it called rpcdal correctly
-        method, attribs = self.user.recorded
-        self.assertEqual(method, 'set_uploadjob_multipart_id')
-        should = dict(user_id='fake_user_id', uploadjob_id='uploadjob_id',
-                      multipart_id='multipart_id', volume_id='volume_id')
-        self.assertEqual(attribs, should)
 
     @defer.inlineCallbacks
     def test_add_part(self):

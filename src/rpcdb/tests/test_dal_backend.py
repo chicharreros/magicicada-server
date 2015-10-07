@@ -972,7 +972,6 @@ class DALTestCase(TestCase):
         uj = mocker.mock()
         expect(uj.id).result('uj_id')
         expect(uj.uploaded_bytes).result('uploaded_bytes')
-        expect(uj.multipart_id).result('multipart_id')
         expect(uj.multipart_key).result('multipart_key')
         expect(uj.chunk_count).result('chunk_count')
         expect(uj.hash_context).result('hash_context')
@@ -999,7 +998,6 @@ class DALTestCase(TestCase):
             result = self.dal.get_uploadjob(**d)
 
         should = dict(uploadjob_id='uj_id', uploaded_bytes='uploaded_bytes',
-                      multipart_id='multipart_id',
                       multipart_key='multipart_key', chunk_count='chunk_count',
                       hash_context='hash_context',
                       magic_hash_context='magic_hash_context',
@@ -1016,7 +1014,6 @@ class DALTestCase(TestCase):
         uj = mocker.mock()
         expect(uj.id).result('uj_id')
         expect(uj.uploaded_bytes).result('uploaded_bytes')
-        expect(uj.multipart_id).result('multipart_id')
         expect(uj.multipart_key).result('multipart_key')
         expect(uj.chunk_count).result('chunk_count')
         expect(uj.hash_context).result('hash_context')
@@ -1045,7 +1042,6 @@ class DALTestCase(TestCase):
             result = self.dal.make_uploadjob(**d)
 
         should = dict(uploadjob_id='uj_id', uploaded_bytes='uploaded_bytes',
-                      multipart_id='multipart_id',
                       multipart_key='multipart_key', chunk_count='chunk_count',
                       hash_context='hash_context',
                       magic_hash_context='magic_hash_context',
@@ -1053,27 +1049,6 @@ class DALTestCase(TestCase):
                       inflated_size='inflated_size', crc32='crc32',
                       when_last_active='when_last_active')
         self.assertEqual(result, should)
-
-    def test_set_uploadjob_multipart_id(self):
-        """Set the multipart id to an uploadjob."""
-        mocker = Mocker()
-
-        # upload job
-        uj = mocker.mock()
-        expect(uj.set_multipart_id('multipart_id'))
-
-        # user
-        user = mocker.mock()
-        self.dal._get_user = lambda *a: user
-        expect(user.volume('volume_id')
-               .get_uploadjob('uploadjob_id')).result(uj)
-
-        with mocker:
-            d = dict(user_id='user_id', uploadjob_id='uploadjob_id',
-                     multipart_id='multipart_id', volume_id='volume_id')
-            result = self.dal.set_uploadjob_multipart_id(**d)
-
-        self.assertEqual(result, {})
 
     def test_delete_uploadjob(self):
         """Delete an uploadjob."""

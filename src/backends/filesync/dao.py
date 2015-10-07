@@ -686,12 +686,12 @@ class FileNode(StorageNode):
     @retryable_transaction()
     @fsync_commit
     def make_uploadjob(self, verify_hash, new_hash, crc32, size, deflated_size,
-                       multipart_id=None, multipart_key=None):
+                       multipart_key=None):
         """Create an UploadJob for this file."""
         self._load()
         return self._gateway.make_uploadjob(
             self.id, verify_hash, new_hash, crc32, size, deflated_size,
-            multipart_id=multipart_id, multipart_key=multipart_key)
+            multipart_key=multipart_key)
 
     @fsync_readonly
     def get_multipart_uploadjob(self, upload_id, hash_hint=None,
@@ -760,7 +760,6 @@ class UploadJob(VolumeObjectBase):
         self.when_started = upload.when_started
         self.when_last_active = upload.when_last_active
         self.status = upload.status
-        self.multipart_id = upload.multipart_id
         self.multipart_key = upload.multipart_key
         self.uploaded_bytes = upload.uploaded_bytes
         self.inflated_size = upload.inflated_size
@@ -806,13 +805,6 @@ class UploadJob(VolumeObjectBase):
         # also update the when_last_active value.
         self._gateway.set_uploadjob_when_last_active(
             self.id, datetime.datetime.utcnow())
-        self._load()
-
-    @retryable_transaction()
-    @fsync_commit
-    def set_multipart_id(self, multipart_id):
-        """Set the multipart_id on this job."""
-        self._gateway.set_uploadjob_multpart_id(self.id, multipart_id)
         self._load()
 
     @retryable_transaction()

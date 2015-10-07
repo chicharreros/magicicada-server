@@ -150,7 +150,7 @@ class DBUploadJob(object):
     """A proxy for Upload model objects."""
 
     def __init__(self, user, volume_id, node_id, uploadjob_id, uploaded_bytes,
-                 multipart_id, multipart_key, chunk_count, inflated_size,
+                 multipart_key, chunk_count, inflated_size,
                  crc32, hash_context, magic_hash_context, decompress_context,
                  when_last_active):
         self.__dict__ = locals()
@@ -185,15 +185,6 @@ class DBUploadJob(object):
         d.addCallback(lambda r: r.update(data) or r)
         d.addCallback(lambda r: cls(**r))
         return d
-
-    def set_multipart_id(self, multipart_id):
-        """Set the multipart id for the upload job."""
-        self.multipart_id = multipart_id
-        return self.user.rpc_dal.call('set_uploadjob_multipart_id',
-                                      user_id=self.user.id,
-                                      volume_id=self.volume_id,
-                                      uploadjob_id=self.uploadjob_id,
-                                      multipart_id=multipart_id)
 
     def add_part(self, chunk_size):
         """Add a part to an upload job."""
@@ -395,14 +386,12 @@ class BaseUploadJob(object):
         """Simple commit, overwrite for more detailed behaviour."""
         try:
             new_gen = yield self._commit()
-        except Exception as ex1:
+        finally:
             try:
                 yield self.uploadjob.delete()
-            except Exception as ex2:
-                self.logger.warning(
-                    "%s: while deleting uploadjob after an error, %s",
-                    ex2.__class__.__name__, ex2)
-            raise ex1
+            except Exception as exc:
+                self.logger.warning("%s(%s): while deleting uploadjob",
+                                    exc.__class__.__name__, exc)
         defer.returnValue(new_gen)
 
     @defer.inlineCallbacks
@@ -853,12 +842,6 @@ class User(object):
                                                 previous_hash, hash_value,
                                                 crc32, inflated_size,
                                                 deflated_size, multipart_key)
-
-                # TODO: this multipart id can be deprecated as we don't have
-                # an ID on S3 side anymore; will do in other branch just to not
-                # accumulate changes in this one
-                yield upload.set_multipart_id(str(uuid.uuid4()))
-
             except dataerrors.HashMismatch:
                 raise errors.ConflictError("Previous hash does not match.")
         else:
