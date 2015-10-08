@@ -20,7 +20,7 @@
 
 from __future__ import unicode_literals
 
-from backends.filesync import admin, dao, services
+from backends.filesync import admin, services
 from backends.filesync.tests.testcase import StorageDALTestCase
 
 
@@ -51,7 +51,7 @@ class AdminServicesTestCase(StorageDALTestCase):
         self.assertEqual(users[1].username, "bobby")
         users.filter = "juan"
         self.assertEqual(len(users.all()), 1)
-        self.assertTrue(isinstance(users[0], dao.StorageUser))
+        self.assertTrue(isinstance(users[0], services.DAOStorageUser))
         self.assertEqual(users[0].username, "juan")
         # test slicing
         users.filter = None

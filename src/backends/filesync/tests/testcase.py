@@ -29,7 +29,6 @@ from django.utils.timezone import now
 
 from backends.filesync import utils
 from backends.filesync.dbmanager import get_filesync_store, filesync_tm
-from backends.filesync.gateway import SystemGateway
 from backends.filesync.models import (
     STATUS_DEAD,
     STATUS_LIVE,
@@ -40,6 +39,7 @@ from backends.filesync.models import (
     StorageUser,
     UserVolume,
 )
+from backends.filesync.services import SystemGateway
 from backends.txlog.models import TransactionLog
 from backends.testing.testcase import DatabaseResourceTestCase
 

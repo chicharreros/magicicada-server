@@ -21,7 +21,7 @@
 from __future__ import unicode_literals
 
 from backends.filesync import errors
-from backends.filesync.gateway import SystemGateway
+from backends.filesync.services import SystemGateway
 from backends.filesync.dbmanager import (
     retryable_transaction,
     fsync_commit,

@@ -20,9 +20,8 @@
 
 from __future__ import unicode_literals
 
-from backends.filesync import dao
+from backends.filesync import services
 from backends.filesync.dbmanager import fsync_readonly, get_filesync_store
-from backends.filesync.gateway import StorageUserGateway
 from backends.filesync.models import StorageUser
 
 
@@ -49,8 +48,8 @@ class StorageUserFinder(object):
 
     def _get_dao_from_result(self, result):
         """Convert the result to a StorageUser DAO."""
-        user_dao = dao.StorageUser(result)
-        user_dao._gateway = StorageUserGateway(user_dao)
+        user_dao = services.DAOStorageUser(result)
+        user_dao._gateway = services.StorageUserGateway(user_dao)
         return user_dao
 
     @fsync_readonly

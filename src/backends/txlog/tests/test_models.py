@@ -24,7 +24,6 @@ from django.conf import settings
 from mock import patch
 
 from backends.filesync.dbmanager import get_filesync_store
-from backends.filesync.gateway import SystemGateway
 from backends.filesync.models import (
     STATUS_LIVE,
     STATUS_DEAD,
@@ -33,6 +32,7 @@ from backends.filesync.models import (
     StorageUser,
     UserVolume,
 )
+from backends.filesync.services import SystemGateway
 from backends.filesync.tests.testcase import ORMTestCase
 from backends.filesync.utils import get_public_file_url
 

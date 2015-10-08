@@ -25,9 +25,9 @@ import os
 from django.conf import settings
 
 from backends.filesync import errors
-from backends.filesync.dao import VolumeProxy
 from backends.filesync.logging import log_dal_function
 from backends.filesync.models import STATUS_LIVE, StorageObject
+from backends.filesync.services import VolumeProxy
 
 
 def date_formatter(dt):

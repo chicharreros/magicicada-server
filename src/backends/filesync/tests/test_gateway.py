@@ -35,16 +35,23 @@ from storm.locals import Store
 
 from backends.filesync.dbmanager import (
     get_filesync_store, filesync_tm as transaction)
-from backends.filesync.gateway import (
+from backends.filesync.services import (
+    DAODownload,
+    DAOStorageUser,
+    DAOUserVolume,
+    DirectoryNode,
+    FileNode,
     GatewayBase,
     ReadWriteVolumeGateway,
+    SharedDirectory,
     StorageUserGateway,
     SystemGateway,
+    UserInfo,
     fix_all_udfs_with_generation_out_of_sync,
     fix_udfs_with_generation_out_of_sync,
     timing_metric,
 )
-from backends.filesync import dao, errors, utils
+from backends.filesync import errors, utils
 from backends.filesync.models import (
     EMPTY_CONTENT_HASH,
     ROOT_VOLUME,
@@ -570,7 +577,7 @@ class SystemGatewayTestCase(StorageDALTestCase):
         root = StorageObject.get_root(store, user.id)
         self.assertEqual(root.volume_id, user.root_volume_id)
         self.assertEqual(root.owner_id, user.id)
-        self.assertTrue(isinstance(user, dao.StorageUser))
+        self.assertTrue(isinstance(user, DAOStorageUser))
 
     def test_create_or_update_user_update(self):
         """Test the basic make user method"""
@@ -707,7 +714,7 @@ class SystemGatewayTestCase(StorageDALTestCase):
         dl_url = 'http://download/url'
         download = self.gw.make_download(
             user.id, udf.id, 'path', dl_url)
-        self.assertTrue(isinstance(download, dao.Download))
+        self.assertTrue(isinstance(download, DAODownload))
         self.assertEqual(download.owner_id, user.id)
         self.assertEqual(download.volume_id, udf.id)
         self.assertEqual(download.file_path, 'path')
@@ -722,7 +729,7 @@ class SystemGatewayTestCase(StorageDALTestCase):
             get_filesync_store(), user.id, '~/path/name')
         download = self.gw.make_download(
             user.id, udf.id, 'path', 'http://download/url', ['key'])
-        self.assertTrue(isinstance(download, dao.Download))
+        self.assertTrue(isinstance(download, DAODownload))
         self.assertEqual(download.owner_id, user.id)
         self.assertEqual(download.volume_id, udf.id)
         self.assertEqual(download.file_path, 'path')
@@ -1852,7 +1859,7 @@ class ReadWriteVolumeGatewayUtilityTests(StorageDALTestCase):
         # make some files on a UDF...
         udf = UserVolume.create(
             self.storage_store, self.user.id, '~/thepath/thename')
-        udf_dao = dao.UserVolume(udf, self.user)
+        udf_dao = DAOUserVolume(udf, self.user)
         udf_vgw = ReadWriteVolumeGateway(self.user, udf=udf_dao)
         udf_root_id = udf_vgw.get_root().id
         for i in range(10):
@@ -2106,7 +2113,7 @@ class ReadWriteVolumeGatewayUtilityTests(StorageDALTestCase):
         # make some files on a UDF...
         udf = UserVolume.create(
             self.storage_store, self.user.id, '~/thepath/thename')
-        udf_dao = dao.UserVolume(udf, self.user)
+        udf_dao = DAOUserVolume(udf, self.user)
         udf_vgw = ReadWriteVolumeGateway(self.user, udf=udf_dao)
         udf_root_id = udf_vgw.get_root().id
         # make files on the root and make sure only they are returned
@@ -2281,7 +2288,7 @@ class ReadWriteVolumeGatewayUtilityTests(StorageDALTestCase):
         """Test chunked get_all_nodes with only one node, the root."""
         udf = UserVolume.create(
             self.storage_store, self.user.id, '~/thepath/thename')
-        udf_dao = dao.UserVolume(udf, self.user)
+        udf_dao = DAOUserVolume(udf, self.user)
         udf_vgw = ReadWriteVolumeGateway(self.user, udf=udf_dao)
         # sort them in the right order
         nodes = udf_vgw.get_all_nodes()
@@ -2471,14 +2478,14 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
         """Test get_quota."""
         self.owner_quota.load()
         quota = self.vgw.get_quota()
-        self.assertTrue(isinstance(quota, dao.UserInfo))
+        self.assertTrue(isinstance(quota, UserInfo))
         self.assertEqual(self.owner_quota.id, quota.id)
         self.assertEqual(self.owner_quota.free_bytes, quota.free_bytes)
 
     def test_get_root(self):
         """Test get_root."""
         node = self.vgw.get_root()
-        self.assertTrue(isinstance(node, dao.DirectoryNode))
+        self.assertTrue(isinstance(node, DirectoryNode))
         self.assertEqual(node.id, self.root.id)
 
     def test__get_root_node(self):
@@ -2494,7 +2501,7 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
     def test_get_user_volume(self):
         """Test get_user_volume method."""
         vol = self.vgw.get_user_volume()
-        self.assertTrue(isinstance(vol, dao.UserVolume))
+        self.assertTrue(isinstance(vol, DAOUserVolume))
         self.assertEqual(vol.id, self.root.volume_id)
 
     def test__get_left_joins(self):
@@ -2683,7 +2690,7 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
     def test_make_file(self):
         """Test make_file method."""
         node = self.vgw.make_file(self.root.id, 'the file name')
-        self.assertTrue(isinstance(node, dao.FileNode))
+        self.assertTrue(isinstance(node, FileNode))
         self.assertEqual(node.name, 'the file name')
         self.assertEqual(node.parent_id, self.root.id)
         self.assertEqual(node.volume_id, self.root.volume_id)
@@ -2720,7 +2727,7 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
     def test_make_subdirectory(self):
         """Test make_subdirectory method."""
         node = self.vgw.make_subdirectory(self.root.id, 'the file name')
-        self.assertTrue(isinstance(node, dao.DirectoryNode))
+        self.assertTrue(isinstance(node, DirectoryNode))
         self.assertEqual(node.name, 'the file name')
         self.assertEqual(node.parent_id, self.root.id)
         self.assertEqual(node.volume_id, self.root.volume_id)
@@ -3428,7 +3435,7 @@ class UDFReadWriteVolumeGatewayApiTest(CommonReadWriteVolumeGatewayApiTest):
         # make a test file using storm
         udf = UserVolume.create(
             self.storage_store, self.user.id, '~/thepath/thename')
-        udf_dao = dao.UserVolume(udf, self.user)
+        udf_dao = DAOUserVolume(udf, self.user)
         self.vgw = ReadWriteVolumeGateway(self.user, udf=udf_dao)
         self.root = self.storage_store.get(
             StorageObject, self.vgw.get_root().id)
@@ -3461,7 +3468,7 @@ class ShareReadWriteVolumeGatewayApiTest(CommonReadWriteVolumeGatewayApiTest):
         rw_share.accept()
         # self.store.add(self.wrong_share)
         transaction.commit()
-        share_dao = dao.SharedDirectory(rw_share, by_user=sharer)
+        share_dao = SharedDirectory(rw_share, by_user=sharer)
         self.vgw = ReadWriteVolumeGateway(self.user, share=share_dao)
         self.root = self.storage_store.get(
             StorageObject, self.vgw.get_root().id)
@@ -3582,7 +3589,7 @@ class UDFReadWriteVolumeGatewayTestCase(StorageDALTestCase):
         # make a test file using storm
         self.udf = UserVolume.create(
             self.storage_store, self.user.id, '~/thepath/thename')
-        udf_dao = dao.UserVolume(self.udf, self.user)
+        udf_dao = DAOUserVolume(self.udf, self.user)
         self.vgw = ReadWriteVolumeGateway(self.user, udf=udf_dao)
         self.root = self.storage_store.get(
             StorageObject, self.vgw.get_root().id)
@@ -3590,7 +3597,7 @@ class UDFReadWriteVolumeGatewayTestCase(StorageDALTestCase):
     def test_udf_volume(self):
         """Test a ReadWriteVolumeGateway for a UDF."""
         udf = self.udf
-        udf_dao = dao.UserVolume(udf, self.user)
+        udf_dao = DAOUserVolume(udf, self.user)
         vgw = ReadWriteVolumeGateway(self.user, udf=udf_dao)
         self.assertEqual(vgw.user, self.user)
         self.assertEqual(vgw.owner, self.user)
@@ -3615,7 +3622,7 @@ class UDFReadWriteVolumeGatewayTestCase(StorageDALTestCase):
         self.assertEqual(vgw.root_id, udf.root_id)
         # if the status is dead, the root is not acceptable
         udf.status = STATUS_DEAD
-        udf_dao = dao.UserVolume(udf, self.user)
+        udf_dao = DAOUserVolume(udf, self.user)
         self.assertRaises(errors.NoPermission,
                           ReadWriteVolumeGateway, self.user, udf=udf_dao)
         udf.status = STATUS_LIVE
@@ -3677,7 +3684,7 @@ class UDFReadWriteVolumeGatewayTestCase(StorageDALTestCase):
     def test_undelete_volume(self):
         """Test Undelete Volume from a UDF."""
         udf = self.udf
-        udf_dao = dao.UserVolume(udf, self.user)
+        udf_dao = DAOUserVolume(udf, self.user)
         vgw = ReadWriteVolumeGateway(self.user, udf=udf_dao)
         d = vgw.make_file(udf.root_id, 'thefile.txt')
         vgw.delete_node(d.id)
@@ -3725,7 +3732,7 @@ class ShareGatewayTestCase(StorageDALTestCase):
 
     def test_share_gateway(self):
         """Test basic properties of a share ReadWriteVolumeGateway."""
-        share_dao = dao.SharedDirectory(self.r_share, by_user=self.sharer)
+        share_dao = SharedDirectory(self.r_share, by_user=self.sharer)
         vgw = ReadWriteVolumeGateway(self.user, share=share_dao)
         self.assertEqual(vgw.user, self.user)
         self.assertEqual(vgw.owner, self.sharer)
@@ -3797,7 +3804,7 @@ class ShareGatewayTestCase(StorageDALTestCase):
 
     def test_modify_share_permissions(self):
         """Test permissions for a writable share ReadWriteVolumeGateway."""
-        share_dao = dao.SharedDirectory(self.rw_share, by_user=self.sharer)
+        share_dao = SharedDirectory(self.rw_share, by_user=self.sharer)
         vgw = ReadWriteVolumeGateway(self.user, share=share_dao)
         self.assertEqual(vgw.get_root().can_read, True)
         self.assertEqual(vgw.get_root().can_write, True)
@@ -3816,7 +3823,7 @@ class ShareGatewayTestCase(StorageDALTestCase):
         wrong_share = Share(
             self.sharer.id, self.rw_node.id, self.othersharee.id, 'WriteShare',
             Share.VIEW)
-        share_dao = dao.SharedDirectory(wrong_share, by_user=self.sharer)
+        share_dao = SharedDirectory(wrong_share, by_user=self.sharer)
         self.assertNotEqual(share_dao.shared_to_id, self.user.id)
         self.assertRaises(errors.NoPermission,
                           ReadWriteVolumeGateway, self.user, share=share_dao)
@@ -3825,7 +3832,7 @@ class ShareGatewayTestCase(StorageDALTestCase):
         """Shares that exist but are not accepted don't work."""
         self.r_share.accepted = False
         transaction.commit()
-        share_dao = dao.SharedDirectory(self.r_share, by_user=self.sharer)
+        share_dao = SharedDirectory(self.r_share, by_user=self.sharer)
         self.assertRaises(errors.NoPermission,
                           ReadWriteVolumeGateway, self.user, share=share_dao)
 
@@ -3833,7 +3840,7 @@ class ShareGatewayTestCase(StorageDALTestCase):
         """Dead shares share no files."""
         self.r_share.status = STATUS_DEAD
         transaction.commit()
-        share_dao = dao.SharedDirectory(self.r_share, by_user=self.sharer)
+        share_dao = SharedDirectory(self.r_share, by_user=self.sharer)
         self.assertRaises(errors.NoPermission, ReadWriteVolumeGateway,
                           self.user, share=share_dao)
 
@@ -3841,13 +3848,13 @@ class ShareGatewayTestCase(StorageDALTestCase):
         """Shares from inactive users don't work."""
         self.sharer.update(subscription=False)
         transaction.commit()
-        share_dao = dao.SharedDirectory(self.r_share, by_user=self.sharer)
+        share_dao = SharedDirectory(self.r_share, by_user=self.sharer)
         vgw = ReadWriteVolumeGateway(self.user, share=share_dao)
         self.assertRaises(errors.DoesNotExist, vgw._check_share)
 
     def test_readonly_share_fail(self):
         """Test make sure updates can't happen on a read only share"""
-        share_dao = dao.SharedDirectory(self.r_share, by_user=self.sharer)
+        share_dao = SharedDirectory(self.r_share, by_user=self.sharer)
         vgw = ReadWriteVolumeGateway(self.user, share=share_dao)
         root_id = vgw.get_root().id
         self.assertRaises(errors.NoPermission,
@@ -3876,7 +3883,7 @@ class ShareGatewayTestCase(StorageDALTestCase):
         # only so we can show what we're doing, not checking
         self.assertEqual(a_dir.path, '/WriteMe/s1/s1/s1')
         # now go add files and directories via the share
-        share_dao = dao.SharedDirectory(self.rw_share, by_user=self.sharer)
+        share_dao = SharedDirectory(self.rw_share, by_user=self.sharer)
         sgw = ReadWriteVolumeGateway(self.user, share=share_dao)
         d1 = sgw.make_subdirectory(a_dir.id, 'hi')
         self.assertEqual(d1.parent_id, a_dir.id)
@@ -3887,7 +3894,7 @@ class ShareGatewayTestCase(StorageDALTestCase):
     def test_node_not_on_volume(self):
         """Test to make sure nodes can't be retreived if they are not
         on the volume."""
-        share_dao = dao.SharedDirectory(self.rw_share, by_user=self.sharer)
+        share_dao = SharedDirectory(self.rw_share, by_user=self.sharer)
         sgw = ReadWriteVolumeGateway(self.user, share=share_dao)
         self.assertRaises(errors.DoesNotExist,
                           sgw.make_subdirectory, uuid.uuid4(), 'name')
@@ -3914,7 +3921,7 @@ class ShareGatewayTestCase(StorageDALTestCase):
 
     def test_share_on_share_error(self):
         """Make sure you can't share nodes from a shared volume."""
-        share_dao = dao.SharedDirectory(self.rw_share, by_user=self.sharer)
+        share_dao = SharedDirectory(self.rw_share, by_user=self.sharer)
         sgw = ReadWriteVolumeGateway(self.user, share=share_dao)
         d1 = sgw.make_subdirectory(sgw.get_root().id, 'hi')
         self.assertRaises(errors.NoPermission, sgw.make_share, d1.id, 'hi',
@@ -3922,7 +3929,7 @@ class ShareGatewayTestCase(StorageDALTestCase):
 
     def test_public_from_share_error(self):
         """Users cant make public files shared."""
-        share_dao = dao.SharedDirectory(self.rw_share, by_user=self.sharer)
+        share_dao = SharedDirectory(self.rw_share, by_user=self.sharer)
         sgw = ReadWriteVolumeGateway(self.user, share=share_dao)
         a_file = sgw.make_file(sgw.get_root().id, 'hi')
         self.assertRaises(errors.NoPermission,
@@ -3930,7 +3937,7 @@ class ShareGatewayTestCase(StorageDALTestCase):
 
     def test_upload_readonly(self):
         """Test get_uploadjob should fail on readonly share."""
-        share_dao = dao.SharedDirectory(self.r_share, by_user=self.sharer)
+        share_dao = SharedDirectory(self.r_share, by_user=self.sharer)
         sgw = ReadWriteVolumeGateway(self.user, share=share_dao)
         self.assertRaises(
             errors.NoPermission, sgw.make_uploadjob,
@@ -3939,7 +3946,7 @@ class ShareGatewayTestCase(StorageDALTestCase):
 
     def test_get_all_nodes_with_max_generation(self):
         """Test get_all_nodes with max_generation."""
-        share_dao = dao.SharedDirectory(self.rw_share, by_user=self.sharer)
+        share_dao = SharedDirectory(self.rw_share, by_user=self.sharer)
         sgw = ReadWriteVolumeGateway(self.user, share=share_dao)
         root = sgw.get_root()
         root_id = root.id
@@ -3966,7 +3973,7 @@ class ShareGatewayTestCase(StorageDALTestCase):
 
     def test_get_all_nodes_with_limit(self):
         """Test get_all_nodes with a limit."""
-        share_dao = dao.SharedDirectory(self.rw_share, by_user=self.sharer)
+        share_dao = SharedDirectory(self.rw_share, by_user=self.sharer)
         sgw = ReadWriteVolumeGateway(self.user, share=share_dao)
         root = sgw.get_root()
         root_id = root.id
@@ -3999,7 +4006,7 @@ class ShareGatewayTestCase(StorageDALTestCase):
 
     def test_get_all_nodes_with_max_generation_and_limit(self):
         """Test get_all_nodes with max_generation and limit."""
-        share_dao = dao.SharedDirectory(self.rw_share, by_user=self.sharer)
+        share_dao = SharedDirectory(self.rw_share, by_user=self.sharer)
         sgw = ReadWriteVolumeGateway(self.user, share=share_dao)
         root = sgw.get_root()
         root_id = root.id
@@ -4072,7 +4079,7 @@ class ShareGatewayTestCase(StorageDALTestCase):
 
     def test_get_all_nodes_chunked_with_changes(self):
         """Test chunked get_all_nodes with changes in the middle."""
-        share_dao = dao.SharedDirectory(self.rw_share, by_user=self.sharer)
+        share_dao = SharedDirectory(self.rw_share, by_user=self.sharer)
         sgw = ReadWriteVolumeGateway(self.user, share=share_dao)
         root = sgw.get_root()
         root_id = root.id
@@ -4141,7 +4148,7 @@ class ShareGatewayTestCase(StorageDALTestCase):
 
     def test_get_all_nodes_chunked_with_move_middle(self):
         """Test chunked get_all_nodes with a move in the middle."""
-        share_dao = dao.SharedDirectory(self.rw_share, by_user=self.sharer)
+        share_dao = SharedDirectory(self.rw_share, by_user=self.sharer)
         sgw = ReadWriteVolumeGateway(self.user, share=share_dao)
         root = sgw.get_root()
         root_id = root.id
@@ -4187,7 +4194,7 @@ class ShareGatewayTestCase(StorageDALTestCase):
 
     def test_get_all_nodes_chunked_only_root(self):
         """Test chunked get_all_nodes with only one node, the root."""
-        share_dao = dao.SharedDirectory(self.rw_share, by_user=self.sharer)
+        share_dao = SharedDirectory(self.rw_share, by_user=self.sharer)
         sgw = ReadWriteVolumeGateway(self.user, share=share_dao)
         # sort them in the right order
         nodes = sgw.get_all_nodes()

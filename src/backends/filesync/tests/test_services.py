@@ -23,9 +23,10 @@ from __future__ import unicode_literals
 import uuid
 import datetime
 
-from backends.filesync import dao, errors, utils
+from backends.filesync import errors, utils
 from backends.filesync.models import StorageUser
 from backends.filesync.services import (
+    DAOStorageUser,
     get_abandoned_uploadjobs,
     get_node,
     get_user_info,
@@ -48,7 +49,7 @@ class DataServicesTestCase(StorageDALTestCase):
 
     def assert_storage_user(
             self, storage_user, user_id, visible_name, max_storage_bytes):
-        self.assertIsInstance(storage_user, dao.StorageUser)
+        self.assertIsInstance(storage_user, DAOStorageUser)
         self.assertEqual(storage_user.id, user_id)
         self.assertEqual(storage_user.visible_name, visible_name)
         quota = storage_user.get_quota()
@@ -66,7 +67,7 @@ class DataServicesTestCase(StorageDALTestCase):
         user = make_storage_user(
             1, "Cool UserName", "Visible Name", MAX_STORAGE_BYTES)
         user = get_storage_user(1)
-        self.assertTrue(isinstance(user, dao.StorageUser))
+        self.assertTrue(isinstance(user, DAOStorageUser))
         user.update(subscription=False)
         self.assertRaises(errors.DoesNotExist, get_storage_user, 1)
         user = get_storage_user(1, active_only=False)
@@ -78,7 +79,7 @@ class DataServicesTestCase(StorageDALTestCase):
         self.assertRaises(errors.LockedUserError, get_storage_user, user.id)
         # and ignore the lock too
         user = get_storage_user(user.id, readonly=True)
-        self.assertTrue(isinstance(user, dao.StorageUser))
+        self.assertTrue(isinstance(user, DAOStorageUser))
 
     def test_get_node(self):
         """Test the get_node function."""

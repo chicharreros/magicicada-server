@@ -31,7 +31,7 @@ from mocker import Mocker, expect
 from storm.database import Connection
 from storm.tracer import install_tracer, remove_tracer_type
 
-from backends.filesync import dao, errors, services, utils
+from backends.filesync import errors, services, utils
 from backends.filesync.dbmanager import get_filesync_store
 from backends.filesync.models import (
     STATUS_LIVE,
@@ -63,18 +63,18 @@ class DAOInitTestCase(StorageDALTestCase):
     def test_StorageUser(self):
         """Test StorageUser init"""
         u = StorageUser(1, 'theusername', 'visible name')
-        u_dao = dao.StorageUser(u)
+        u_dao = services.DAOStorageUser(u)
         self._compare_props(u, u_dao, ['id', 'username', 'root_volume_id',
                                        'visible_name'])
         self.assertEqual(u_dao.is_active, True)
         u.subscription_status = STATUS_DEAD
-        u_dao = dao.StorageUser(u)
+        u_dao = services.DAOStorageUser(u)
         self.assertEqual(u_dao.is_active, False)
 
     def test_UserInfo(self):
         """Test UserInfo init."""
         info = StorageUserInfo(1, 100)
-        i = dao.UserInfo(info)
+        i = services.UserInfo(info)
         self.assertEqual(i.max_storage_bytes, info.max_storage_bytes)
         self.assertEqual(i.used_storage_bytes, info.used_storage_bytes)
         self.assertEqual(i.free_bytes, info.free_bytes)
@@ -83,10 +83,10 @@ class DAOInitTestCase(StorageDALTestCase):
         """Test StorageNode init."""
         # the owner of the node
         u = StorageUser(1, 'theusername', 'visible name')
-        owner = dao.StorageUser(u)
+        owner = services.DAOStorageUser(u)
         # the FileNodeContent of the node
         cb = self.factory.get_test_contentblob()
-        content = dao.FileNodeContent(cb)
+        content = services.FileNodeContent(cb)
         # the node
         node = StorageObject(1, 'Name', StorageObject.FILE)
         node.parent_id = uuid.uuid4()
@@ -101,15 +101,14 @@ class DAOInitTestCase(StorageDALTestCase):
         # it generates either a FileNode or DirectoryNode object, and normally
         # requires a gateway as the first parameter. In addition, it can be
         # created along with a mimetype, content, and owner DAO
-        node_dao = dao.StorageNode.factory(None, node, owner=owner,
-                                           permissions=perms,
-                                           content=content)
+        node_dao = services.StorageNode.factory(
+            None, node, owner=owner, permissions=perms, content=content)
         self._compare_props(
             node, node_dao,
             ['id', 'kind', 'parent_id', 'owner_id', 'status', 'when_created',
              'when_last_modified', 'generation', 'generation_created',
              'mimetype', 'public_uuid'])
-        self.assertTrue(isinstance(node_dao, dao.FileNode))
+        self.assertTrue(isinstance(node_dao, services.FileNode))
         # mimetype object will not be directly accessible
         self.assertEqual(node_dao.nodekey, utils.make_nodekey(None, node.id))
         self.assertEqual(node_dao.content, content)
@@ -128,16 +127,15 @@ class DAOInitTestCase(StorageDALTestCase):
         self.assertEqual(node_dao.public_key, None)
         node.generation = None
         node.generation_created = None
-        node_dao = dao.StorageNode.factory(None, node, owner=owner,
-                                           permissions=perms,
-                                           content=content)
+        node_dao = services.StorageNode.factory(
+            None, node, owner=owner, permissions=perms, content=content)
         self.assertEqual(node_dao.generation, 0)
         self.assertEqual(node_dao.generation_created, 0)
         # basic check for a directory
         node.kind = StorageObject.DIRECTORY
-        dir_dao = dao.StorageNode.factory(None, node, owner=owner,
-                                          content=content, permissions={})
-        self.assertTrue(isinstance(dir_dao, dao.DirectoryNode))
+        dir_dao = services.StorageNode.factory(
+            None, node, owner=owner, content=content, permissions={})
+        self.assertTrue(isinstance(dir_dao, services.DirectoryNode))
         # content for Directories is ignored
         self.assertEqual(dir_dao.content, None)
         self.assertEqual(dir_dao.can_read, False)
@@ -147,31 +145,32 @@ class DAOInitTestCase(StorageDALTestCase):
     def test_FileNodeContent(self):
         """Test ContentBlob init."""
         cb = self.factory.get_test_contentblob()
-        cb_dao = dao.FileNodeContent(cb)
+        cb_dao = services.FileNodeContent(cb)
         self._compare_props(cb, cb_dao, ['hash', 'size', 'deflated_size',
                                          'storage_key', 'crc32', 'status',
                                          'magic_hash', 'when_created'])
         cb.size = 0
-        cb_dao = dao.FileNodeContent(cb)
+        cb_dao = services.FileNodeContent(cb)
         self.assertEqual(cb_dao.deflated_size, 0)
         self.assertEqual(cb_dao.storage_key, None)
         cb.size = 10
         cb.deflated_size = None
-        cb_dao = dao.FileNodeContent(cb)
+        cb_dao = services.FileNodeContent(cb)
         self.assertEqual(cb_dao.deflated_size, 0)
 
     def test_SharedFolder(self):
         """Test SharedFolder init."""
         # to test the shared_to and shared_by properties
         u = StorageUser(1, 'theusername', 'visible name')
-        user1 = dao.StorageUser(u)
-        user2 = dao.StorageUser(u)
+        user1 = services.DAOStorageUser(u)
+        user2 = services.DAOStorageUser(u)
 
         share = Share(
             1, uuid.uuid4(), 2, 'share name', Share.VIEW, 'email')
-        share_dao = dao.SharedDirectory(share, by_user=user1, to_user=user2)
-        self._compare_props(share, share_dao, ['name', 'accepted',
-                                               'when_shared', 'status'])
+        share_dao = services.SharedDirectory(
+            share, by_user=user1, to_user=user2)
+        self._compare_props(
+            share, share_dao, ['name', 'accepted', 'when_shared', 'status'])
         self.assertEqual(share_dao.root_id, share.subtree)
         self.assertEqual(share_dao.read_only, True)
         self.assertEqual(share_dao.offered_to_email, share.email)
@@ -182,11 +181,11 @@ class DAOInitTestCase(StorageDALTestCase):
         """Test UserVolume init."""
         udf = UserVolume(1, uuid.uuid4(), '~/the path')
         udf.id = uuid.uuid4()
-        udf_dao = dao.UserVolume(udf, None)
+        udf_dao = services.DAOUserVolume(udf, None)
         self._compare_props(udf, udf_dao, ['id', 'owner_id', 'root_id',
                                            'path', 'generation'])
         udf.generation = None
-        udf_dao = dao.UserVolume(udf, None)
+        udf_dao = services.DAOUserVolume(udf, None)
         self.assertEqual(udf_dao.generation, 0)
 
     def test_UploadJob(self):
@@ -198,7 +197,7 @@ class DAOInitTestCase(StorageDALTestCase):
         upload.deflated_size_hint = 54321
         upload.when_started = datetime.utcnow()
         upload.when_last_active = datetime.utcnow()
-        upload_dao = dao.UploadJob(upload)
+        upload_dao = services.DAOUploadJob(upload)
         self._compare_props(upload, upload_dao,
                             ['storage_object_id', 'chunk_count',
                              'hash_hint', 'crc32_hint', 'deflated_size_hint',
@@ -247,7 +246,7 @@ class VolumeProxyTestCase(StorageDALTestCase):
         root = user.volume().root
         # the root on the volume proxy is an uninitialized DirectoryNode
         # the id is set to 'root' until it get's resolve.
-        self.assertTrue(isinstance(root, dao.DirectoryNode))
+        self.assertTrue(isinstance(root, services.DirectoryNode))
         # the root won't get resolved until a db operation is needed
         self.assertEqual(volume.root.id, 'root')
         self.assertEqual(root.id, 'root')
@@ -305,8 +304,8 @@ class VolumeProxyTestCase(StorageDALTestCase):
         user = self.create_user()
         volume = user.volume().get_volume()
         root = user.volume().get_root()
-        self.assertTrue(isinstance(root, dao.DirectoryNode))
-        self.assertTrue(isinstance(volume, dao.UserVolume))
+        self.assertTrue(isinstance(root, services.DirectoryNode))
+        self.assertTrue(isinstance(volume, services.DAOUserVolume))
         self.assertEqual(volume.id, user.root_volume_id)
         self.assertEqual(root.id, volume.root_id)
 
@@ -316,8 +315,8 @@ class VolumeProxyTestCase(StorageDALTestCase):
         udf = user.make_udf('~/Documents')
         volume = user.volume(udf.id).get_volume()
         root = user.volume(udf.id).get_root()
-        self.assertTrue(isinstance(root, dao.DirectoryNode))
-        self.assertTrue(isinstance(volume, dao.UserVolume))
+        self.assertTrue(isinstance(root, services.DirectoryNode))
+        self.assertTrue(isinstance(volume, services.DAOUserVolume))
         self.assertEqual(volume.id, udf.id)
         self.assertEqual(root.id, volume.root_id)
 
@@ -329,8 +328,8 @@ class VolumeProxyTestCase(StorageDALTestCase):
         user2.get_share(share.id).accept()
         volume = user2.volume(share.id).get_volume()
         root = user2.volume(share.id).get_root()
-        self.assertTrue(isinstance(root, dao.DirectoryNode))
-        self.assertTrue(isinstance(volume, dao.UserVolume))
+        self.assertTrue(isinstance(root, services.DirectoryNode))
+        self.assertTrue(isinstance(volume, services.DAOUserVolume))
         self.assertEqual(volume.id, user.root_volume_id)
         self.assertEqual(root.id, volume.root_id)
 
@@ -683,7 +682,7 @@ class DAOTestCase(StorageDALTestCase):
         user = self.create_user()
         root = user.volume().root
         dir = root.make_subdirectory('A New Subdirectory')
-        self.assertTrue(isinstance(dir, dao.DirectoryNode))
+        self.assertTrue(isinstance(dir, services.DirectoryNode))
         self.assertEqual(dir.parent_id, root.id)
         children = root.get_children()
         self.assertEqual(len(children), 1)
@@ -733,7 +732,7 @@ class DAOTestCase(StorageDALTestCase):
         user = self.create_user()
         root = user.root
         file = root.make_file('A new file')
-        self.assertTrue(isinstance(file, dao.FileNode))
+        self.assertTrue(isinstance(file, services.FileNode))
         self.assertEqual(file.parent_id, root.id)
         children = root.get_children()
         self.assertEqual(len(children), 1)
@@ -1587,38 +1586,3 @@ class StormStatementRecorder(object):
 
     def __str__(self):
         return str(self.statements)
-
-
-class UserDAOTest(StorageDALTestCase):
-    """Tests for UserDAO."""
-
-    def test_gets_a_random_user_id(self):
-        """Tests if the DAO retrieves a random ID."""
-        user_dao = dao.UserDAO()
-
-        user = self.factory.make_user()
-
-        expected_id = user.id
-        actual_id = user_dao.get_random_user_id()
-
-        self.assertEqual(actual_id, expected_id)
-
-    def test_makes_sure_always_to_return_a_random_id(self):
-        """All user IDs should be retrieved.
-
-        (Given their probability to raise up in the random search).
-
-        """
-        user_dao = dao.UserDAO()
-
-        user1 = self.factory.make_user()
-        user2 = self.factory.make_user()
-
-        searches = 100
-        expected_user_ids = sorted(set((user1.id, user2.id)))
-        retrieved_ids = [user_dao.get_random_user_id()
-                         for i in xrange(searches)]
-        actual_user_ids = sorted(set(retrieved_ids))
-
-        self.assertEqual(len(retrieved_ids), 100)
-        self.assertEqual(actual_user_ids, expected_user_ids)
