@@ -193,18 +193,15 @@ class DAOInitTestCase(StorageDALTestCase):
         upload = UploadJob(uuid.uuid4())
         upload.hash_hint = b'fake hash hint'
         upload.crc32_hint = 1234
-        upload.inflated_size_hint = 12345
-        upload.deflated_size_hint = 54321
         upload.when_started = datetime.utcnow()
         upload.when_last_active = datetime.utcnow()
         upload_dao = services.DAOUploadJob(upload)
         self._compare_props(upload, upload_dao,
                             ['storage_object_id', 'chunk_count',
-                             'hash_hint', 'crc32_hint', 'deflated_size_hint',
-                             'inflated_size_hint', 'when_started',
+                             'hash_hint', 'crc32_hint', 'when_started',
                              'when_last_active',
-                             'multipart_key', 'uploaded_bytes', 'hash_context',
-                             'decompress_context'])
+                             'multipart_key', 'uploaded_bytes',
+                             ])
 
     def test_Download(self):
         """Test Download init."""
@@ -906,17 +903,16 @@ class DAOTestCase(StorageDALTestCase):
         new_hash = self.factory.get_fake_hash()
         crc = 12345
         size = 100
-        deflated_size = 10000
         #
         # Some steps to simulate what happens during put content.
         #
         # first the expected failures
         self.assertRaises(errors.QuotaExceeded, file.make_uploadjob,
-                          file.content_hash, new_hash, crc, 300, deflated_size)
+                          file.content_hash, new_hash, crc, 300)
         self.assertRaises(errors.HashMismatch, file.make_uploadjob,
-                          'WRONG OLD HASH', new_hash, crc, 300, deflated_size)
+                          'WRONG OLD HASH', new_hash, crc, 300)
         upload_job = file.make_uploadjob(file.content_hash, new_hash, crc,
-                                         size, deflated_size)
+                                         size)
         job = user.volume().get_uploadjob(upload_job.id)
         self.assertEqual(job.id, upload_job.id)
         jobs = user.get_uploadjobs()
@@ -929,36 +925,23 @@ class DAOTestCase(StorageDALTestCase):
 
         # now play a bit with multipart support
         job = file.make_uploadjob(file.content_hash, new_hash, crc, size,
-                                  deflated_size, multipart_key=uuid.uuid4())
+                                  multipart_key=uuid.uuid4())
         old = job.when_last_active
-        job.add_part(
-            10, 15, 1, b'hash context', b'magic hash context', b'zlib context')
+        job.add_part(10)
         self.assertTrue(job.when_last_active > old)
         self.assertEqual(job.uploaded_bytes, 10)
-        self.assertEqual(job.inflated_size, 15)
-        self.assertEqual(job.crc32, 1)
         self.assertEqual(job.chunk_count, 1)
-        self.assertEqual(job.hash_context, 'hash context')
-        self.assertEqual(job.magic_hash_context, 'magic hash context')
-        self.assertEqual(job.decompress_context, 'zlib context')
         old = job.when_last_active
-        job.add_part(
-            10, 30, 2, b'more hash context', b'more magic hash context',
-            b'more zlib context')
+        job.add_part(10)
         self.assertTrue(job.when_last_active > old)
         self.assertEqual(job.uploaded_bytes, 20)
-        self.assertEqual(job.inflated_size, 30)
-        self.assertEqual(job.crc32, 2)
         self.assertEqual(job.chunk_count, 2)
-        self.assertEqual(job.hash_context, 'more hash context')
-        self.assertEqual(job.magic_hash_context, 'more magic hash context')
-        self.assertEqual(job.decompress_context, 'more zlib context')
         self.assertEqual(job.file, file)
         job.delete()
 
         # update the last active time
         job = file.make_uploadjob(file.content_hash, new_hash, crc, size,
-                                  deflated_size, multipart_key=uuid.uuid4())
+                                  multipart_key=uuid.uuid4())
         old = job.when_last_active
         job.touch()
         self.assertTrue(job.when_last_active > old)

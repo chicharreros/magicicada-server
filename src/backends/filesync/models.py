@@ -1107,12 +1107,6 @@ class UploadJob(object):
     # The crc32 the client claims that the completely uploaded
     # file should have.
     crc32_hint = Int(allow_none=False)
-    # The total size which the client claims that the completely uploaded
-    # file should have.
-    inflated_size_hint = Int(allow_none=False)
-    # The total size which the client claims that the completely uploaded
-    # deflated file should have.
-    deflated_size_hint = Int(allow_none=False)
 
     # When the upload was started.
     when_started = DateTime(allow_none=False, default=AutoReload)
@@ -1126,16 +1120,6 @@ class UploadJob(object):
     multipart_key = StormUUID(allow_none=True)
     # the number of the uploaded bytes so far.
     uploaded_bytes = Int(allow_none=True)
-    # the inflated size
-    inflated_size = Int(allow_none=True)
-    # the crc32
-    crc32 = Int(allow_none=True)
-    # the hash context of this resumable upload
-    hash_context = RawStr(allow_none=True)
-    # the magic hash context of this resumable upload
-    magic_hash_context = RawStr(allow_none=True)
-    # the decompressobj context of this resumable upload
-    decompress_context = RawStr(allow_none=True)
 
     def __init__(self, storage_object_id, multipart_key=None):
         """ Create a blob upload """
@@ -1143,9 +1127,6 @@ class UploadJob(object):
         self.chunk_count = 0
         self.uploaded_bytes = 0
         self.multipart_key = multipart_key
-        self.hash_context = None
-        self.magic_hash_context = None
-        self.decompress_context = None
         self.when_last_active = datetime.datetime.utcnow()
         self.status = STATUS_LIVE
 
@@ -1163,16 +1144,10 @@ class UploadJob(object):
         store.add(obj)
         return obj
 
-    def add_part(self, size, inflated_size, crc32,
-                 hash_context, magic_hash_context, decompress_context):
+    def add_part(self, size):
         """Add a part of size: 'size' and increment the chunk count."""
         self.uploaded_bytes += size
-        self.inflated_size = inflated_size
-        self.crc32 = crc32
         self.chunk_count += 1
-        self.hash_context = hash_context
-        self.magic_hash_context = magic_hash_context
-        self.decompress_context = decompress_context
 
 
 def validate_volume_path(obj, attr, value):

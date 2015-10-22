@@ -2104,25 +2104,12 @@ class TestUploadJob(ORMTestCase):
         job.inflated_size_hint = 10
         job.deflated_size_hint = 10
         self.store.flush()
-        job.add_part(
-            10, 15, 1, b'hash context', b'magic hash context', b'zlib context')
+        job.add_part(10)
         self.assertEqual(job.chunk_count, 1)
-        self.assertEqual(job.crc32, 1)
-        self.assertEqual(job.inflated_size, 15)
         self.assertEqual(job.uploaded_bytes, 10)
-        self.assertEqual(job.hash_context, 'hash context')
-        self.assertEqual(job.magic_hash_context, 'magic hash context')
-        self.assertEqual(job.decompress_context, 'zlib context')
-        job.add_part(
-            10, 30, 2, b'more hash context', b'more magic hash context',
-            b'more zlib context')
+        job.add_part(10)
         self.assertEqual(job.chunk_count, 2)
-        self.assertEqual(job.crc32, 2)
-        self.assertEqual(job.inflated_size, 30)
         self.assertEqual(job.uploaded_bytes, 20)
-        self.assertEqual(job.hash_context, 'more hash context')
-        self.assertEqual(job.magic_hash_context, 'more magic hash context')
-        self.assertEqual(job.decompress_context, 'more zlib context')
 
     def test_uploadjob_find(self):
         """Test add_part method."""
@@ -2135,14 +2122,11 @@ class TestUploadJob(ORMTestCase):
         job.crc32_hint = 0
         job.inflated_size_hint = 10
         job.deflated_size_hint = 10
-        job.add_part(
-            10, 10, 1, b'hash context', b'magic hash context', b'zlib context')
+        job.add_part(10)
         self.store.flush()
         same_job = self.store.get(UploadJob, job.uploadjob_id)
         self.assertEqual(job.uploaded_bytes, same_job.uploaded_bytes)
         self.assertEqual(job.chunk_count, same_job.chunk_count)
-        self.assertEqual(job.crc32, same_job.crc32)
-        self.assertEqual(job.inflated_size, same_job.inflated_size)
 
 
 class TestStorageUserInfo(ORMTestCase):

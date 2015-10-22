@@ -2802,25 +2802,21 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
         new_hash = self.factory.get_fake_hash()
         crc = 12345
         size = 100
-        def_size = 10000
         # expected failures
         f = self.vgw.make_uploadjob
         self.assertRaises(
             errors.DoesNotExist, f,
-            uuid.uuid4(), a_file.content_hash, new_hash, crc, 300, def_size)
+            uuid.uuid4(), a_file.content_hash, new_hash, crc, 300)
         self.assertRaises(
             errors.QuotaExceeded, f,
-            a_file.id, a_file.content_hash, new_hash, crc, 300, def_size)
+            a_file.id, a_file.content_hash, new_hash, crc, 300)
         self.assertRaises(
             errors.HashMismatch, f,
-            a_file.id, 'WRONG OLD HASH', new_hash, crc, 300, def_size)
-        upload_job = f(a_file.id, a_file.content_hash, new_hash, crc,
-                       size, def_size)
+            a_file.id, 'WRONG OLD HASH', new_hash, crc, 300)
+        upload_job = f(a_file.id, a_file.content_hash, new_hash, crc, size)
         self.assertEqual(upload_job.storage_object_id, a_file.id)
         self.assertEqual(upload_job.hash_hint, new_hash)
         self.assertEqual(upload_job.crc32_hint, crc)
-        self.assertEqual(upload_job.inflated_size_hint, size)
-        self.assertEqual(upload_job.deflated_size_hint, def_size)
         self.assertEqual(upload_job.status, STATUS_LIVE)
         self.assertEqual(upload_job.content_exists, False)
         self.assertEqual(upload_job.file.id, a_file.id)
@@ -2836,13 +2832,13 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
         a_file = self.vgw.make_file(self.root.id, 'the file name')
         new_hash = self.factory.get_fake_hash()
         crc = 12345
-        size = def_size = 300
+        size = 300
         f = self.vgw.make_uploadjob
         self.assertRaises(
             errors.QuotaExceeded, f, a_file.id, a_file.content_hash,
-            new_hash, crc, size, def_size, enforce_quota=True)
+            new_hash, crc, size, enforce_quota=True)
         upload_job = f(a_file.id, a_file.content_hash, new_hash, crc,
-                       size, def_size, enforce_quota=False)
+                       size, enforce_quota=False)
         self.assertTrue(upload_job is not None)
 
     def test_get_user_uploadjobs(self):
@@ -2855,13 +2851,12 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
         new_hash = self.factory.get_fake_hash()
         crc = 12345
         size = 100
-        def_size = 10000
         self.vgw.make_uploadjob(
-            file1.id, file1.content_hash, new_hash, crc, size, def_size)
+            file1.id, file1.content_hash, new_hash, crc, size)
         self.vgw.make_uploadjob(
-            file1.id, file1.content_hash, new_hash, crc, size, def_size)
+            file1.id, file1.content_hash, new_hash, crc, size)
         self.vgw.make_uploadjob(
-            file2.id, file2.content_hash, new_hash, crc, size, def_size)
+            file2.id, file2.content_hash, new_hash, crc, size)
         jobs = list(self.vgw.get_user_uploadjobs())
         self.assertEqual(len(jobs), 3)
         jobs = list(self.vgw.get_user_uploadjobs(node_id=file1.id))
@@ -2877,22 +2872,17 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
         new_hash = self.factory.get_fake_hash()
         crc = 12345
         size = 100
-        def_size = 10000
         upj1 = self.vgw.make_uploadjob(file1.id, file1.content_hash, new_hash,
-                                       crc, size, def_size,
-                                       multipart_key=uuid.uuid4())
+                                       crc, size, multipart_key=uuid.uuid4())
         upj2 = self.vgw.make_uploadjob(file1.id, file1.content_hash, new_hash,
-                                       crc, size, def_size,
-                                       multipart_key=uuid.uuid4())
+                                       crc, size, multipart_key=uuid.uuid4())
         upj3 = self.vgw.make_uploadjob(file2.id, file2.content_hash, new_hash,
-                                       crc, size, def_size,
-                                       multipart_key=uuid.uuid4())
+                                       crc, size, multipart_key=uuid.uuid4())
         job = self.vgw.get_user_multipart_uploadjob(file1.id,
                                                     upj1.multipart_key)
         self.assertEqual(job.id, upj1.id)
-        # using extra arguments: hash, crc, size and deflated size
         job = self.vgw.get_user_multipart_uploadjob(
-            file1.id, upj2.multipart_key, new_hash, crc, size, def_size)
+            file1.id, upj2.multipart_key, new_hash, crc)
         self.assertEqual(job.id, upj2.id)
         # with a file_id without any uploadjob
         self.assertRaises(errors.DoesNotExist,
@@ -2914,30 +2904,15 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
         new_hash = self.factory.get_fake_hash()
         crc = 12345
         size = 100
-        def_size = 10000
         job = self.vgw.make_uploadjob(
-            file1.id, file1.content_hash, new_hash, crc, size, def_size,
+            file1.id, file1.content_hash, new_hash, crc, size,
             multipart_key=uuid.uuid4())
-        job = self.vgw.add_uploadjob_part(
-            job.id, 10, 15, 1, b'hash context', b'magic hash context',
-            b'zlib context')
+        job = self.vgw.add_uploadjob_part(job.id, 10)
         self.assertEqual(job.uploaded_bytes, 10)
-        self.assertEqual(job.inflated_size, 15)
-        self.assertEqual(job.crc32, 1)
         self.assertEqual(job.chunk_count, 1)
-        self.assertEqual(job.hash_context, 'hash context')
-        self.assertEqual(job.magic_hash_context, 'magic hash context')
-        self.assertEqual(job.decompress_context, 'zlib context')
-        job = self.vgw.add_uploadjob_part(
-            job.id, 10, 30, 2, b'more hash context',
-            b'more magic hash context', b'more zlib context')
+        job = self.vgw.add_uploadjob_part(job.id, 10)
         self.assertEqual(job.uploaded_bytes, 20)
-        self.assertEqual(job.inflated_size, 30)
-        self.assertEqual(job.crc32, 2)
         self.assertEqual(job.chunk_count, 2)
-        self.assertEqual(job.hash_context, 'more hash context')
-        self.assertEqual(job.magic_hash_context, 'more magic hash context')
-        self.assertEqual(job.decompress_context, 'more zlib context')
 
     def test_set_uploadjob_when_last_active(self):
         """Test set_uploadjob_when_last_active."""
@@ -2945,9 +2920,8 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
         new_hash = self.factory.get_fake_hash()
         crc = 12345
         size = 100
-        def_size = 10000
         job = self.vgw.make_uploadjob(
-            file1.id, file1.content_hash, new_hash, crc, size, def_size,
+            file1.id, file1.content_hash, new_hash, crc, size,
             multipart_key=uuid.uuid4())
         new_last_active = datetime.datetime.utcnow() + datetime.timedelta(1)
         self.vgw.set_uploadjob_when_last_active(job.id, new_last_active)

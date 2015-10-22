@@ -150,21 +150,17 @@ class DBUploadJob(object):
     """A proxy for Upload model objects."""
 
     def __init__(self, user, volume_id, node_id, uploadjob_id, uploaded_bytes,
-                 multipart_key, chunk_count, inflated_size,
-                 crc32, hash_context, magic_hash_context, decompress_context,
-                 when_last_active):
+                 multipart_key, chunk_count, when_last_active):
         self.__dict__ = locals()
 
     @classmethod
-    def get(cls, user, volume_id, node_id, uploadjob_id, hash_value, crc32,
-            inflated_size, deflated_size):
+    def get(cls, user, volume_id, node_id, uploadjob_id, hash_value, crc32):
         """Get a multipart upload job."""
         data = dict(user=user, volume_id=volume_id,
                     node_id=node_id)
         kwargs = dict(user_id=user.id, volume_id=volume_id, node_id=node_id,
                       uploadjob_id=uploadjob_id,
-                      hash_value=hash_value, crc32=crc32,
-                      inflated_size=inflated_size, deflated_size=deflated_size)
+                      hash_value=hash_value, crc32=crc32)
         d = user.rpc_dal.call('get_uploadjob', **kwargs)
         d.addCallback(lambda r: r.update(data) or r)
         d.addCallback(lambda r: cls(**r))
@@ -172,15 +168,14 @@ class DBUploadJob(object):
 
     @classmethod
     def make(cls, user, volume_id, node_id, previous_hash,
-             hash_value, crc32, inflated_size, deflated_size, multipart_key):
+             hash_value, crc32, inflated_size, multipart_key):
         """Make an upload job."""
         data = dict(user=user, volume_id=volume_id,
                     node_id=node_id, multipart_key=multipart_key)
         kwargs = dict(user_id=user.id, volume_id=volume_id, node_id=node_id,
                       previous_hash=previous_hash,
                       hash_value=hash_value, crc32=crc32,
-                      inflated_size=inflated_size,
-                      deflated_size=deflated_size, multipart_key=multipart_key)
+                      inflated_size=inflated_size, multipart_key=multipart_key)
         d = user.rpc_dal.call('make_uploadjob', **kwargs)
         d.addCallback(lambda r: r.update(data) or r)
         d.addCallback(lambda r: cls(**r))
@@ -188,13 +183,8 @@ class DBUploadJob(object):
 
     def add_part(self, chunk_size):
         """Add a part to an upload job."""
-        # TODO: change the rest of the chain (from here to the DB itself) to
-        # not use all these parameters
         kwargs = dict(user_id=self.user.id, volume_id=self.volume_id,
-                      uploadjob_id=self.uploadjob_id,
-                      chunk_size=chunk_size, inflated_size=0, crc32=0,
-                      hash_context='', magic_hash_context='',
-                      decompress_context='')
+                      uploadjob_id=self.uploadjob_id, chunk_size=chunk_size)
         return self.user.rpc_dal.call('add_part_to_uploadjob', **kwargs)
 
     @defer.inlineCallbacks
@@ -824,9 +814,7 @@ class User(object):
             else:
                 try:
                     upload = yield DBUploadJob.get(self, vol_id, node_id,
-                                                   uploadid, hash_value, crc32,
-                                                   inflated_size,
-                                                   deflated_size)
+                                                   uploadid, hash_value, crc32)
                 except dataerrors.DoesNotExist:
                     # there is no uploadjob with the specified id
                     upload = None
@@ -841,7 +829,7 @@ class User(object):
                 upload = yield DBUploadJob.make(self, vol_id, node_id,
                                                 previous_hash, hash_value,
                                                 crc32, inflated_size,
-                                                deflated_size, multipart_key)
+                                                multipart_key)
             except dataerrors.HashMismatch:
                 raise errors.ConflictError("Previous hash does not match.")
         else:

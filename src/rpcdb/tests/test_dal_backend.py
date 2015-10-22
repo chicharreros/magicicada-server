@@ -974,35 +974,23 @@ class DALTestCase(TestCase):
         expect(uj.uploaded_bytes).result('uploaded_bytes')
         expect(uj.multipart_key).result('multipart_key')
         expect(uj.chunk_count).result('chunk_count')
-        expect(uj.hash_context).result('hash_context')
-        expect(uj.magic_hash_context).result('magic_hash_context')
-        expect(uj.decompress_context).result('decompress_context')
-        expect(uj.inflated_size).result('inflated_size')
-        expect(uj.crc32).result('crc32')
         expect(uj.when_last_active).result('when_last_active')
 
         # user
         user = mocker.mock()
         self.dal._get_user = lambda *a: user
         expect(user.volume('volume_id').get_node('node_id')
-               .get_multipart_uploadjob('uploadjob_id', 'hash_value', 'crc32',
-                                        'inflated_size', 'deflated_size')
+               .get_multipart_uploadjob('uploadjob_id', 'hash_value', 'crc32')
                ).result(uj)
 
         with mocker:
             d = dict(user_id='user_id', volume_id='volume_id',
                      node_id='node_id', uploadjob_id='uploadjob_id',
-                     hash_value='hash_value', crc32='crc32',
-                     inflated_size='inflated_size',
-                     deflated_size='deflated_size')
+                     hash_value='hash_value', crc32='crc32')
             result = self.dal.get_uploadjob(**d)
 
         should = dict(uploadjob_id='uj_id', uploaded_bytes='uploaded_bytes',
                       multipart_key='multipart_key', chunk_count='chunk_count',
-                      hash_context='hash_context',
-                      magic_hash_context='magic_hash_context',
-                      decompress_context='decompress_context',
-                      inflated_size='inflated_size', crc32='crc32',
                       when_last_active='when_last_active')
         self.assertEqual(result, should)
 
@@ -1016,11 +1004,6 @@ class DALTestCase(TestCase):
         expect(uj.uploaded_bytes).result('uploaded_bytes')
         expect(uj.multipart_key).result('multipart_key')
         expect(uj.chunk_count).result('chunk_count')
-        expect(uj.hash_context).result('hash_context')
-        expect(uj.magic_hash_context).result('magic_hash_context')
-        expect(uj.decompress_context).result('decompress_context')
-        expect(uj.inflated_size).result('inflated_size')
-        expect(uj.crc32).result('crc32')
         expect(uj.when_last_active).result('when_last_active')
 
         # user
@@ -1028,8 +1011,7 @@ class DALTestCase(TestCase):
         self.dal._get_user = lambda *a: user
         expect(user.volume('volume_id').get_node('node_id')
                .make_uploadjob('previous_hash', 'hash_value', 'crc32',
-                               'inflated_size', 'deflated_size',
-                               multipart_key='multipart_key')
+                               'inflated_size', multipart_key='multipart_key')
                ).result(uj)
 
         with mocker:
@@ -1037,16 +1019,11 @@ class DALTestCase(TestCase):
                      node_id='node_id', previous_hash='previous_hash',
                      hash_value='hash_value', crc32='crc32',
                      inflated_size='inflated_size',
-                     deflated_size='deflated_size',
                      multipart_key='multipart_key')
             result = self.dal.make_uploadjob(**d)
 
         should = dict(uploadjob_id='uj_id', uploaded_bytes='uploaded_bytes',
                       multipart_key='multipart_key', chunk_count='chunk_count',
-                      hash_context='hash_context',
-                      magic_hash_context='magic_hash_context',
-                      decompress_context='decompress_context',
-                      inflated_size='inflated_size', crc32='crc32',
                       when_last_active='when_last_active')
         self.assertEqual(result, should)
 
@@ -1077,9 +1054,7 @@ class DALTestCase(TestCase):
 
         # upload job
         uj = mocker.mock()
-        expect(uj.add_part('chunk_size', 'inflated_size', 'crc32',
-                           'hash_context', 'magic_hash_context',
-                           'decompress_context'))
+        expect(uj.add_part('chunk_size'))
 
         # user
         user = mocker.mock()
@@ -1089,11 +1064,7 @@ class DALTestCase(TestCase):
 
         with mocker:
             d = dict(user_id='user_id', uploadjob_id='uploadjob_id',
-                     chunk_size='chunk_size', inflated_size='inflated_size',
-                     crc32='crc32', hash_context='hash_context',
-                     magic_hash_context='magic_hash_context',
-                     decompress_context='decompress_context',
-                     volume_id='volume_id')
+                     chunk_size='chunk_size', volume_id='volume_id')
             result = self.dal.add_part_to_uploadjob(**d)
 
         self.assertEqual(result, {})

@@ -339,34 +339,25 @@ class DAL(object):
             uploaded_bytes=uj.uploaded_bytes,
             multipart_key=uj.multipart_key,
             chunk_count=uj.chunk_count,
-            hash_context=uj.hash_context,
-            magic_hash_context=uj.magic_hash_context,
-            decompress_context=uj.decompress_context,
-            inflated_size=uj.inflated_size,
-            crc32=uj.crc32,
             when_last_active=uj.when_last_active,
         )
         return d
 
     def get_uploadjob(self, user_id, volume_id, node_id, uploadjob_id,
-                      hash_value, crc32, inflated_size,
-                      deflated_size):
+                      hash_value, crc32):
         """Make an upload job for a node."""
         user = self._get_user(user_id)
         node = user.volume(volume_id).get_node(node_id)
-        uj = node.get_multipart_uploadjob(uploadjob_id, hash_value, crc32,
-                                          inflated_size, deflated_size)
+        uj = node.get_multipart_uploadjob(uploadjob_id, hash_value, crc32)
         return self._process_uploadjob(uj)
 
     def make_uploadjob(self, user_id, volume_id, node_id, previous_hash,
-                       hash_value, crc32, inflated_size,
-                       deflated_size, multipart_key):
+                       hash_value, crc32, inflated_size, multipart_key):
         """Make an upload job for a node."""
         user = self._get_user(user_id)
         node = user.volume(volume_id).get_node(node_id)
         uj = node.make_uploadjob(previous_hash, hash_value, crc32,
-                                 inflated_size, deflated_size,
-                                 multipart_key=multipart_key)
+                                 inflated_size, multipart_key=multipart_key)
         return self._process_uploadjob(uj)
 
     def delete_uploadjob(self, user_id, volume_id, uploadjob_id):
@@ -377,13 +368,11 @@ class DAL(object):
         return {}
 
     def add_part_to_uploadjob(self, user_id, volume_id, uploadjob_id,
-                              chunk_size, inflated_size, crc32, hash_context,
-                              magic_hash_context, decompress_context):
+                              chunk_size):
         """Add a part to an upload job."""
         user = self._get_user(user_id)
         uj = user.volume(volume_id).get_uploadjob(uploadjob_id)
-        uj.add_part(chunk_size, inflated_size, crc32,
-                    hash_context, magic_hash_context, decompress_context)
+        uj.add_part(chunk_size)
         return {}
 
     def touch_uploadjob(self, user_id, volume_id, uploadjob_id):

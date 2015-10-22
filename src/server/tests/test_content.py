@@ -882,7 +882,7 @@ class TestPutContent(TestWithDatabase):
         """make sure we dont raise exceptions on deleted files"""
         so_file = self.usr0.root.make_file(u"foobar")
         upload_job = so_file.make_uploadjob(
-            so_file.content_hash, "sha1:100", 0, 100, 100)
+            so_file.content_hash, "sha1:100", 0, 100)
         # kill file
         so_file.delete()
         upload_job.delete()
@@ -1891,7 +1891,7 @@ class TestMultipartPutContent(TestWithDatabase):
             node = self.usr0.volume(None).get_node(make_req.new_id)
             self.assertRaises(errors.DoesNotExist,
                               node.get_multipart_uploadjob, putc_req.upload_id,
-                              hash_value, crc32_value, size, deflated_size)
+                              hash_value, crc32_value)
 
         return self.callback_test(test, add_default_callbacks=True)
 
@@ -2350,8 +2350,7 @@ class TestUploadJob(TestWithDatabase):
         node_id = r['node_id']
         node = yield c_user.get_node(self.user.root_volume_id, node_id, None)
         args = (c_user, self.user.root_volume_id, node_id, node.content_hash,
-                hash_value, crc32_value, size,
-                deflated_size, str(uuid.uuid4()))
+                hash_value, crc32_value, size, str(uuid.uuid4()))
         upload = yield content.DBUploadJob.make(*args)
         upload_job = self.upload_class(c_user, node, node.content_hash,
                                        hash_value, crc32_value, size,
@@ -2602,9 +2601,7 @@ class TestUploadJob(TestWithDatabase):
         d = content.DBUploadJob.get(self.content_user, node.volume_id,
                                     node.id, upload_job.upload_id,
                                     upload_job.hash_hint,
-                                    upload_job.crc32_hint,
-                                    upload_job.inflated_size_hint,
-                                    upload_job.deflated_size_hint)
+                                    upload_job.crc32_hint)
         yield self.assertFailure(d, errors.DoesNotExist)
 
     @defer.inlineCallbacks
@@ -2699,7 +2696,7 @@ class TestNode(TestWithDatabase):
         node = yield content_user.get_node(user.root_volume_id, node_id, None)
         args = (content_user, self.user.root_volume_id, node_id,
                 node.content_hash, hash_value, crc32_value, size,
-                deflated_size, str(uuid.uuid4()))
+                str(uuid.uuid4()))
         upload = yield content.DBUploadJob.make(*args)
         upload_job = content.UploadJob(content_user, node, node.content_hash,
                                        hash_value, crc32_value, size,
@@ -2991,11 +2988,7 @@ class DBUploadJobTestCase(TestCase):
     def setUp(self):
         """Set up."""
         d = dict(uploadjob_id='uploadjob_id', uploaded_bytes='uploaded_bytes',
-                 multipart_key='multipart_key',
-                 chunk_count='chunk_count', hash_context='hash_context',
-                 magic_hash_context='magic_hash_context',
-                 decompress_context='decompress_context',
-                 inflated_size='inflated_size', crc32='crc32',
+                 multipart_key='multipart_key', chunk_count='chunk_count',
                  when_last_active='when_last_active')
         self.user = self.FakeUser(to_return=d)
         return super(DBUploadJobTestCase, self).setUp()
@@ -3004,7 +2997,7 @@ class DBUploadJobTestCase(TestCase):
     def test_get(self):
         """Test the getter."""
         args = (self.user, 'volume_id', 'node_id', 'uploadjob_id',
-                'hash_value', 'crc32', 'inflated_size', 'deflated_size')
+                'hash_value', 'crc32')
         dbuj = yield content.DBUploadJob.get(*args)
 
         # check it called rpcdal correctly
@@ -3012,9 +3005,7 @@ class DBUploadJobTestCase(TestCase):
         self.assertEqual(method, 'get_uploadjob')
         should = dict(user_id='fake_user_id', volume_id='volume_id',
                       node_id='node_id', uploadjob_id='uploadjob_id',
-                      hash_value='hash_value', crc32='crc32',
-                      inflated_size='inflated_size',
-                      deflated_size='deflated_size')
+                      hash_value='hash_value', crc32='crc32')
         self.assertEqual(attribs, should)
 
         # check it built the instance correctly
@@ -3026,19 +3017,13 @@ class DBUploadJobTestCase(TestCase):
         self.assertEqual(dbuj.uploaded_bytes, 'uploaded_bytes')
         self.assertEqual(dbuj.multipart_key, 'multipart_key')
         self.assertEqual(dbuj.chunk_count, 'chunk_count')
-        self.assertEqual(dbuj.inflated_size, 'inflated_size')
-        self.assertEqual(dbuj.crc32, 'crc32')
-        self.assertEqual(dbuj.hash_context, 'hash_context')
-        self.assertEqual(dbuj.magic_hash_context, 'magic_hash_context')
-        self.assertEqual(dbuj.decompress_context, 'decompress_context')
         self.assertEqual(dbuj.when_last_active, 'when_last_active')
 
     @defer.inlineCallbacks
     def test_make(self):
         """Test the builder."""
         args = (self.user, 'volume_id', 'node_id', 'previous_hash',
-                'hash_value', 'crc32', 'inflated_size', 'deflated_size',
-                'multipart_key')
+                'hash_value', 'crc32', 'inflated_size', 'multipart_key')
         dbuj = yield content.DBUploadJob.make(*args)
 
         # check it called rpcdal correctly
@@ -3048,7 +3033,6 @@ class DBUploadJobTestCase(TestCase):
                       node_id='node_id', previous_hash='previous_hash',
                       hash_value='hash_value', crc32='crc32',
                       inflated_size='inflated_size',
-                      deflated_size='deflated_size',
                       multipart_key='multipart_key')
         self.assertEqual(attribs, should)
 
@@ -3061,18 +3045,12 @@ class DBUploadJobTestCase(TestCase):
         self.assertEqual(dbuj.uploaded_bytes, 'uploaded_bytes')
         self.assertEqual(dbuj.multipart_key, 'multipart_key')
         self.assertEqual(dbuj.chunk_count, 'chunk_count')
-        self.assertEqual(dbuj.inflated_size, 'inflated_size')
-        self.assertEqual(dbuj.crc32, 'crc32')
-        self.assertEqual(dbuj.hash_context, 'hash_context')
-        self.assertEqual(dbuj.magic_hash_context, 'magic_hash_context')
-        self.assertEqual(dbuj.decompress_context, 'decompress_context')
         self.assertEqual(dbuj.when_last_active, 'when_last_active')
 
     def _make_uj(self):
         """Helper to create the upload job."""
         args = (self.user, 'volume_id', 'node_id', 'previous_hash',
-                'hash_value', 'crc32', 'inflated_size', 'deflated_size',
-                'multipart_key')
+                'hash_value', 'crc32', 'inflated_size', 'multipart_key')
         return content.DBUploadJob.make(*args)
 
     @defer.inlineCallbacks
@@ -3085,9 +3063,7 @@ class DBUploadJobTestCase(TestCase):
         method, attribs = self.user.recorded
         self.assertEqual(method, 'add_part_to_uploadjob')
         should = dict(user_id='fake_user_id', uploadjob_id='uploadjob_id',
-                      chunk_size='chunk_size', inflated_size=0, crc32=0,
-                      hash_context='', magic_hash_context='',
-                      decompress_context='', volume_id='volume_id')
+                      chunk_size='chunk_size', volume_id='volume_id')
         self.assertEqual(attribs, should)
 
     @defer.inlineCallbacks

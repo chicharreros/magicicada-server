@@ -428,19 +428,13 @@ CREATE = [
         chunk_count integer DEFAULT 0 NOT NULL,
         hash_hint bytea,
         crc32_hint bigint,
-        inflated_size_hint bigint,
-        deflated_size_hint bigint,
         when_started timestamp without time zone
             default timezone('UTC'::text, now()) not null,
         when_last_active timestamp without time zone
             default timezone('UTC'::text, now()) not null,
         status lifecycle_status default 'Live'::lifecycle_status not null,
         multipart_key uuid,
-        uploaded_bytes bigint,
-        inflated_size bigint,
-        crc32 bigint,
-        hash_context bytea,
-        decompress_context bytea
+        uploaded_bytes bigint
     ) WITH (
         autovacuum_vacuum_scale_factor = 0.02
     );
@@ -469,14 +463,6 @@ CREATE = [
     """
     COMMENT ON COLUMN UploadJob.crc32_hint IS
         'The crc32 the client claims that the uploaded file should have.';
-    """,
-    """
-    COMMENT ON COLUMN UploadJob.inflated_size_hint IS
-        'The size which the client claims that the uploaded file should have.';
-    """,
-    """
-    COMMENT ON COLUMN UploadJob.deflated_size_hint IS
-        'The size of the deflated content';
     """,
     """
     COMMENT ON COLUMN UploadJob.when_started IS

@@ -709,24 +709,21 @@ class FileNode(StorageNode):
 
     @retryable_transaction()
     @fsync_commit
-    def make_uploadjob(self, verify_hash, new_hash, crc32, size, deflated_size,
+    def make_uploadjob(self, verify_hash, new_hash, crc32, size,
                        multipart_key=None):
         """Create an UploadJob for this file."""
         self._load()
         return self._gateway.make_uploadjob(
-            self.id, verify_hash, new_hash, crc32, size, deflated_size,
+            self.id, verify_hash, new_hash, crc32, size,
             multipart_key=multipart_key)
 
     @fsync_readonly
     def get_multipart_uploadjob(self, upload_id, hash_hint=None,
-                                crc32_hint=None, inflated_size_hint=None,
-                                deflated_size_hint=None):
+                                crc32_hint=None):
         """Get the multipart UploadJob with upload_id for this file."""
         self._load()
         return self._gateway.get_user_multipart_uploadjob(
-            self.id, upload_id, hash_hint=hash_hint, crc32_hint=crc32_hint,
-            inflated_size_hint=inflated_size_hint,
-            deflated_size_hint=deflated_size_hint)
+            self.id, upload_id, hash_hint=hash_hint, crc32_hint=crc32_hint)
 
     @fsync_readonly
     def get_content(self):
@@ -779,18 +776,11 @@ class DAOUploadJob(VolumeObjectBase):
         self.chunk_count = upload.chunk_count
         self.hash_hint = upload.hash_hint
         self.crc32_hint = upload.crc32_hint
-        self.inflated_size_hint = upload.inflated_size_hint
-        self.deflated_size_hint = upload.deflated_size_hint
         self.when_started = upload.when_started
         self.when_last_active = upload.when_last_active
         self.status = upload.status
         self.multipart_key = upload.multipart_key
         self.uploaded_bytes = upload.uploaded_bytes
-        self.inflated_size = upload.inflated_size
-        self.crc32 = upload.crc32
-        self.hash_context = upload.hash_context
-        self.magic_hash_context = upload.magic_hash_context
-        self.decompress_context = upload.decompress_context
         self._file = file
 
     @property
@@ -820,12 +810,9 @@ class DAOUploadJob(VolumeObjectBase):
 
     @retryable_transaction()
     @fsync_commit
-    def add_part(self, size, inflated_size, crc32, hash_context,
-                 magic_hash_context, decompress_context):
+    def add_part(self, size):
         """Add part info to this uploadjob."""
-        self._gateway.add_uploadjob_part(self.id, size, inflated_size, crc32,
-                                         hash_context, magic_hash_context,
-                                         decompress_context)
+        self._gateway.add_uploadjob_part(self.id, size)
         # also update the when_last_active value.
         self._gateway.set_uploadjob_when_last_active(
             self.id, datetime.datetime.utcnow())
@@ -2601,9 +2588,7 @@ class ReadOnlyVolumeGateway(GatewayBase):
 
     @timing_metric
     def get_user_multipart_uploadjob(self, node_id, upload_id, hash_hint=None,
-                                     crc32_hint=None,
-                                     inflated_size_hint=None,
-                                     deflated_size_hint=None):
+                                     crc32_hint=None):
         """Get multipart uploadjob."""
         conditions = [
             UploadJob.status == STATUS_LIVE,
@@ -2617,12 +2602,6 @@ class ReadOnlyVolumeGateway(GatewayBase):
             conditions.append(UploadJob.hash_hint == hash_hint)
         if crc32_hint is not None:
             conditions.append(UploadJob.crc32_hint == crc32_hint)
-        if inflated_size_hint is not None:
-            conditions.append(
-                UploadJob.inflated_size_hint == inflated_size_hint)
-        if deflated_size_hint is not None:
-            conditions.append(
-                UploadJob.deflated_size_hint == deflated_size_hint)
         job = self.store.find(UploadJob, *conditions).one()
         if job is None:
             raise errors.DoesNotExist(self.uploadjob_dne_error)
@@ -2980,8 +2959,7 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
 
     @timing_metric
     def make_uploadjob(self, node_id, node_hash, new_hash, crc32,
-                       inflated_size, deflated_size, enforce_quota=True,
-                       multipart_key=None):
+                       inflated_size, enforce_quota=True, multipart_key=None):
         """Create an upload job for a FileNode."""
         if self.read_only:
             raise errors.NoPermission(self.readonly_error)
@@ -3016,8 +2994,6 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
             upload = UploadJob.new_uploadjob(self.store, node.id)
         upload.hash_hint = new_hash
         upload.crc32_hint = crc32
-        upload.inflated_size_hint = inflated_size
-        upload.deflated_size_hint = deflated_size
         self.store.flush()
         new_content = self.store.find(
             ContentBlob, ContentBlob.hash == new_hash,
@@ -3115,13 +3091,10 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
         return upload_dao
 
     @timing_metric
-    def add_uploadjob_part(self, job_id, size, inflated_size, crc32,
-                           hash_context, magic_hash_context,
-                           decompress_context):
+    def add_uploadjob_part(self, job_id, size):
         """Add a part to an uploadjob with: size"""
         job = self._get_uploadjob(job_id)
-        job.add_part(size, inflated_size, crc32, hash_context,
-                     magic_hash_context, decompress_context)
+        job.add_part(size)
         return DAOUploadJob(job, gateway=self)
 
     @timing_metric
