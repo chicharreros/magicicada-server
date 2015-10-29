@@ -1076,6 +1076,7 @@ class TestPutContent(TestWithDatabase):
         expect(upload_job.offset).result(0)
         expect(upload_job.connect()).result(defer.succeed(None))
         expect(upload_job.upload_id).result("hola")
+        expect(upload_job.storage_key).result("storage_key")
         expect(user.username).count(2).result('')
         storage_server.user = user
 

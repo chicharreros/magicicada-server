@@ -1912,7 +1912,8 @@ class PutContentResponse(SimpleRequestResponse):
         factory = self.protocol.factory
         factory.metrics.meter('%s.upload.begin' % (upload_type,), 1)
         factory.metrics.gauge('%s.upload' % (upload_type,), offset)
-        self.log.debug('%s begin content from offset %d', upload_type, offset)
+        self.log.debug('%s begin content from offset %d, storing to %s',
+                       upload_type, offset, self.upload_job.storage_key)
 
 
 class GetDeltaResponse(SimpleRequestResponse):

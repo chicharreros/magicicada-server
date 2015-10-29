@@ -1430,6 +1430,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
             self.ops = defer.succeed(None)
             self.deferred = defer.Deferred()
             self.called = []
+            self.storage_key = "fake storagekey"
 
         def stop(self):
             """Fake."""
@@ -2221,8 +2222,8 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
         name = metrics.fully_qualify_name(name)
         self.assertTrue(isinstance(metrics._metrics[name],
                         GaugeMetric))
-        self.assertTrue(self.handler.check_debug(upload_type, "begin content",
-                                                 "from offset 10"))
+        self.assertTrue(self.handler.check_debug(
+            upload_type, "begin content", "from offset 10", "fake storagekey"))
 
     def test__send_begin_new_upload_id(self):
         """Test sendbegin when the upload_id received is invalid."""
@@ -2239,8 +2240,8 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
         self.assertEqual(self.last_msg.begin_content.upload_id, '12')
 
         upload_type = self.response.upload_job.__class__.__name__
-        self.assertTrue(self.handler.check_debug(upload_type, "begin content",
-                                                 "from offset 0"))
+        self.assertTrue(self.handler.check_debug(
+            upload_type, "begin content", "from offset 0", "fake storagekey"))
 
     def test_putcontent_double_done(self):
         """Double call to self.done()."""

@@ -234,7 +234,7 @@ class BaseUploadJob(object):
         self.deferred = defer.Deferred()
         self.deferred.addErrback(self._handle_errors)
         self._initial_data = True
-        self._storage_key = None
+        self.storage_key = None
         self.canceling = False
         self.logger = logging.getLogger('storage.server')
 
@@ -277,11 +277,11 @@ class BaseUploadJob(object):
 
     def _start_receiving(self):
         """Prepare the upload job to start receiving streaming bytes."""
-        self._storage_key = self.uploadjob.multipart_key
+        self.storage_key = self.uploadjob.multipart_key
         offset = self.uploadjob.uploaded_bytes
 
         self.consumer = self.user.manager.factory.diskstorage.put(
-            str(self._storage_key), offset)
+            str(self.storage_key), offset)
 
         streaming = offset == 0  # hash on the fly if receive from start
         self.producer = upload.ProxyHashingProducer(self.consumer, streaming)
@@ -411,7 +411,7 @@ class BaseUploadJob(object):
         if self.producer.crc32 != self.crc32_hint:
             raise errors.UploadCorrupt(self._crc32_hint_mismatch)
 
-        storage_key = self._storage_key
+        storage_key = self.storage_key
         if storage_key is None:
             storage_key = self.file_node.storage_key
         if storage_key is None and self.inflated_size == 0:
