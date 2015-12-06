@@ -35,6 +35,7 @@ from twisted.internet import defer
 
 from backends.filesync import errors as dataerrors
 from backends.filesync.models import Share
+from magicicada import settings
 from ubuntuone.storage.server import errors, upload
 from ubuntuone.storageprotocol import protocol_pb2
 
@@ -153,6 +154,9 @@ class DBUploadJob(object):
                  multipart_key, chunk_count, when_last_active):
         self.__dict__ = locals()
 
+        # will only update the DB with parts when accumulate over a trigger
+        self.unsaved_count = 0
+
     @classmethod
     def get(cls, user, volume_id, node_id, uploadjob_id, hash_value, crc32):
         """Get a multipart upload job."""
@@ -183,9 +187,16 @@ class DBUploadJob(object):
 
     def add_part(self, chunk_size):
         """Add a part to an upload job."""
-        kwargs = dict(user_id=self.user.id, volume_id=self.volume_id,
-                      uploadjob_id=self.uploadjob_id, chunk_size=chunk_size)
-        return self.user.rpc_dal.call('add_part_to_uploadjob', **kwargs)
+        self.unsaved_count += chunk_size
+        if self.unsaved_count >= settings.api_server.STORAGE_CHUNK_SIZE:
+            self.unsaved_count -= settings.api_server.STORAGE_CHUNK_SIZE
+            kwargs = dict(user_id=self.user.id, volume_id=self.volume_id,
+                          uploadjob_id=self.uploadjob_id,
+                          chunk_size=chunk_size)
+            d = self.user.rpc_dal.call('add_part_to_uploadjob', **kwargs)
+        else:
+            d = defer.succeed(True)
+        return d
 
     @defer.inlineCallbacks
     def delete(self):

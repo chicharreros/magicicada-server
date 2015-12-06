@@ -2117,12 +2117,7 @@ class TestChunkedContent(TestWithDatabase):
         def auth(client):
 
             def raise_quota(_):
-
-                # we need a bigger quota for this test...
-                def _raise_quota(new_size):
-                    self.usr0.update(max_storage_bytes=new_size)
-                d = threads.deferToThread(_raise_quota, size * 2)
-                return d
+                self.usr0.update(max_storage_bytes=size * 2)
 
             def check_content(content):
                 self.assertEqual(content.data, deflated_data)
@@ -2185,6 +2180,43 @@ class TestChunkedContent(TestWithDatabase):
         d = self.test_putcontent_chunked(get_fail=True)
         self.assertFails(d, 'NOT_AVAILABLE')
         return d
+
+    def test_deferred_add_part_to_uj(self):
+        """Check that parts are added to upload job only after a limit."""
+        size = int(settings.api_server.STORAGE_CHUNK_SIZE * 2.5)
+        data = os.urandom(size)
+        deflated_data = zlib.compress(data)
+        hash_object = content_hash_factory()
+        hash_object.update(data)
+        hash_value = hash_object.content_hash()
+        crc32_value = crc32(data)
+        deflated_size = len(deflated_data)
+
+        recorded_calls = []
+        orig_call = self.service.rpcdal_client.call
+
+        def recording_call(method, **parameters):
+            if method == 'add_part_to_uploadjob':
+                recorded_calls.append(parameters)
+            return orig_call(method, **parameters)
+
+        self.service.rpcdal_client.call = recording_call
+
+        @defer.inlineCallbacks
+        def test(client):
+            yield client.dummy_authenticate("open sesame")
+            yield self.usr0.update(max_storage_bytes=size * 2)
+            root = yield client.get_root()
+            mkfile_req = yield client.make_file(request.ROOT, root, "hola")
+            putcontent_req = yield client.put_content_request(
+                request.ROOT, mkfile_req.new_id, NO_CONTENT_HASH, hash_value,
+                crc32_value, size, deflated_size, StringIO(deflated_data))
+            yield putcontent_req.deferred
+
+            # check calls; there should be only 2, as size == chunk size * 2.5
+            self.assertEqual(len(recorded_calls), 2)
+
+        return self.callback_test(test, add_default_callbacks=True)
 
 
 class UserTest(TestWithDatabase):
@@ -3058,13 +3090,14 @@ class DBUploadJobTestCase(TestCase):
     def test_add_part(self):
         """Test add_part method."""
         dbuj = yield self._make_uj()
-        yield dbuj.add_part('chunk_size')
+        chunk_size = int(settings.api_server.STORAGE_CHUNK_SIZE) + 1
+        yield dbuj.add_part(chunk_size)
 
         # check it called rpcdal correctly
         method, attribs = self.user.recorded
         self.assertEqual(method, 'add_part_to_uploadjob')
         should = dict(user_id='fake_user_id', uploadjob_id='uploadjob_id',
-                      chunk_size='chunk_size', volume_id='volume_id')
+                      chunk_size=chunk_size, volume_id='volume_id')
         self.assertEqual(attribs, should)
 
     @defer.inlineCallbacks
