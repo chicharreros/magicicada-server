@@ -2383,7 +2383,7 @@ class TestUploadJob(TestWithDatabase):
         node_id = r['node_id']
         node = yield c_user.get_node(self.user.root_volume_id, node_id, None)
         args = (c_user, self.user.root_volume_id, node_id, node.content_hash,
-                hash_value, crc32_value, size, str(uuid.uuid4()))
+                hash_value, crc32_value, size)
         upload = yield content.DBUploadJob.make(*args)
         upload_job = self.upload_class(c_user, node, node.content_hash,
                                        hash_value, crc32_value, size,
@@ -2728,8 +2728,7 @@ class TestNode(TestWithDatabase):
         node_id = r['node_id']
         node = yield content_user.get_node(user.root_volume_id, node_id, None)
         args = (content_user, self.user.root_volume_id, node_id,
-                node.content_hash, hash_value, crc32_value, size,
-                str(uuid.uuid4()))
+                node.content_hash, hash_value, crc32_value, size)
         upload = yield content.DBUploadJob.make(*args)
         upload_job = content.UploadJob(content_user, node, node.content_hash,
                                        hash_value, crc32_value, size,
@@ -3056,7 +3055,8 @@ class DBUploadJobTestCase(TestCase):
     def test_make(self):
         """Test the builder."""
         args = (self.user, 'volume_id', 'node_id', 'previous_hash',
-                'hash_value', 'crc32', 'inflated_size', 'multipart_key')
+                'hash_value', 'crc32', 'inflated_size')
+        self.patch(uuid, 'uuid4', lambda: "test unique id")
         dbuj = yield content.DBUploadJob.make(*args)
 
         # check it called rpcdal correctly
@@ -3066,7 +3066,7 @@ class DBUploadJobTestCase(TestCase):
                       node_id='node_id', previous_hash='previous_hash',
                       hash_value='hash_value', crc32='crc32',
                       inflated_size='inflated_size',
-                      multipart_key='multipart_key')
+                      multipart_key='test unique id')
         self.assertEqual(attribs, should)
 
         # check it built the instance correctly
@@ -3076,14 +3076,14 @@ class DBUploadJobTestCase(TestCase):
         self.assertEqual(dbuj.node_id, 'node_id')
         self.assertEqual(dbuj.uploadjob_id, 'uploadjob_id')
         self.assertEqual(dbuj.uploaded_bytes, 'uploaded_bytes')
-        self.assertEqual(dbuj.multipart_key, 'multipart_key')
+        self.assertEqual(dbuj.multipart_key, 'test unique id')
         self.assertEqual(dbuj.chunk_count, 'chunk_count')
         self.assertEqual(dbuj.when_last_active, 'when_last_active')
 
     def _make_uj(self):
         """Helper to create the upload job."""
         args = (self.user, 'volume_id', 'node_id', 'previous_hash',
-                'hash_value', 'crc32', 'inflated_size', 'multipart_key')
+                'hash_value', 'crc32', 'inflated_size')
         return content.DBUploadJob.make(*args)
 
     @defer.inlineCallbacks
@@ -3129,3 +3129,17 @@ class DBUploadJobTestCase(TestCase):
 
         # check updated attrib
         self.assertEqual(dbuj.when_last_active, 'new_when_last_active')
+
+    @defer.inlineCallbacks
+    def test_bogus_upload_job(self):
+        """Check the not-going-to-db upload job."""
+        self.patch(uuid, 'uuid4', lambda: "test unique id")
+        uj = content.BogusUploadJob()
+
+        # basic attributes
+        self.assertEqual(uj.multipart_key, "test unique id")
+        self.assertEqual(uj.uploaded_bytes, 0)
+
+        # check methods
+        yield uj.add_part(123)
+        yield uj.delete()

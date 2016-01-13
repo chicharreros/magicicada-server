@@ -172,8 +172,9 @@ class DBUploadJob(object):
 
     @classmethod
     def make(cls, user, volume_id, node_id, previous_hash,
-             hash_value, crc32, inflated_size, multipart_key):
+             hash_value, crc32, inflated_size):
         """Make an upload job."""
+        multipart_key = uuid.uuid4()
         data = dict(user=user, volume_id=volume_id,
                     node_id=node_id, multipart_key=multipart_key)
         kwargs = dict(user_id=user.id, volume_id=volume_id, node_id=node_id,
@@ -217,6 +218,22 @@ class DBUploadJob(object):
                                          volume_id=self.volume_id,
                                          uploadjob_id=self.uploadjob_id)
         self.when_last_active = r['when_last_active']
+
+
+class BogusUploadJob(object):
+    """A proxy for Upload that really doesn't do anything, for small files."""
+    def __init__(self):
+        self.multipart_key = uuid.uuid4()  # unique id for the upload
+        self.uploaded_bytes = 0  # always start from 0 (non resumable)
+        self._bogus_deferred = defer.succeed(True)
+
+    def add_part(self, _):
+        """Bogus add part."""
+        return self._bogus_deferred
+
+    def delete(self):
+        """Bogus delete."""
+        return self._bogus_deferred
 
 
 class BaseUploadJob(object):
@@ -452,7 +469,7 @@ class BaseUploadJob(object):
 
 
 class UploadJob(BaseUploadJob):
-    """A non-resumable upload job."""
+    """A simple upload job."""
 
     def __init__(self, user, file_node, previous_hash, hash_hint, crc32_hint,
                  inflated_size_hint, deflated_size_hint,
@@ -460,8 +477,7 @@ class UploadJob(BaseUploadJob):
         super(UploadJob, self).__init__(user, file_node, previous_hash,
                                         hash_hint, crc32_hint,
                                         inflated_size_hint, deflated_size_hint,
-                                        session_id, blob_exists,
-                                        magic_hash)
+                                        session_id, blob_exists, magic_hash)
         self.uploadjob = upload
 
     @property
@@ -789,8 +805,7 @@ class User(object):
             defer.returnValue(upload_job)
 
         upload_job = yield self._get_upload_job(
-            vol_id, node_id,
-            previous_hash, hash_value, crc32, inflated_size,
+            vol_id, node_id, previous_hash, hash_value, crc32, inflated_size,
             deflated_size, session_id, blob_exists, magic_hash, upload_id)
         defer.returnValue(upload_job)
 
@@ -830,19 +845,18 @@ class User(object):
                     # there is no uploadjob with the specified id
                     upload = None
 
-        # TODO: only get an upload if deflated size is bigger than some limit
-        # (so we just don't do all the mambo jambo for files smaller than what
-        # we get in a simple message... say, <64K).
         if upload is None:
-            # no uploadjob found, create a new one.
-            try:
-                multipart_key = uuid.uuid4()
-                upload = yield DBUploadJob.make(self, vol_id, node_id,
-                                                previous_hash, hash_value,
-                                                crc32, inflated_size,
-                                                multipart_key)
-            except dataerrors.HashMismatch:
-                raise errors.ConflictError("Previous hash does not match.")
+            # no uploadjob found, create a new one: if the file is small just
+            # get a bo
+            if deflated_size <= settings.api_server.STORAGE_CHUNK_SIZE:
+                upload = BogusUploadJob()
+            else:
+                try:
+                    upload = yield DBUploadJob.make(self, vol_id, node_id,
+                                                    previous_hash, hash_value,
+                                                    crc32, inflated_size)
+                except dataerrors.HashMismatch:
+                    raise errors.ConflictError("Previous hash does not match.")
         else:
             # update the when_last_active value.
             yield upload.touch()
