@@ -1,4 +1,4 @@
-# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
+# Copyright 2015-2016 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -18,7 +18,6 @@
 import os
 
 from twisted.internet import defer, reactor
-from twisted.protocols.ftp import FileConsumer
 
 # the levels of directories for the tree where will store all nodes
 DIRS_LEVELS = 3
@@ -91,17 +90,35 @@ class FileReaderProducer(object):
         self.resumeProducing()
 
 
-class FileWriterConsumer(FileConsumer):
+class FileWriterConsumer(object):
     """A file consumer (writes to disk) starting from a filepath."""
 
     def __init__(self, filepath, offset):
         self.filepath = filepath
+        self.temppath = temppath = filepath + ".temp"
+
         if offset:
-            fh = open(filepath, 'ab')
+            fh = open(temppath, 'ab')
             fh.seek(offset)
         else:
-            fh = open(filepath, 'wb')
-        super(FileWriterConsumer, self).__init__(fh)
+            fh = open(temppath, 'wb')
+        self.fh = fh
+
+    def registerProducer(self, producer, streaming):
+        self.producer = producer
+        assert streaming
+
+    def unregisterProducer(self):
+        self.producer = None
+        self.fh.close()
+
+    def write(self, data):
+        self.fh.write(data)
+
+    def commit(self):
+        """Commit the file."""
+        self.fh.close()
+        os.rename(self.temppath, self.filepath)
 
 
 class DiskStorage(object):

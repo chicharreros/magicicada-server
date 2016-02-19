@@ -1,5 +1,5 @@
 # Copyright 2008-2015 Canonical
-# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
+# Copyright 2015-2016 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -76,6 +76,7 @@ class ProxyHashingProducerTest(UploadTestCase):
             yield producer.dataReceived(message[part:part + chunk_sz])
         producer.stopProducing()
         yield producer.flush_decompressor()
+        consumer.commit()
 
         with open(consumer.filepath, "rb") as fh:
             self.assertEqual(fh.read(), message)
@@ -109,6 +110,7 @@ class ProxyHashingProducerTest(UploadTestCase):
 
         # stop and re-check
         producer.stopProducing()
+        consumer.commit()
         yield producer.flush_decompressor()
         with open(consumer.filepath, "rb") as fh:
             self.assertEqual(fh.read(), message)

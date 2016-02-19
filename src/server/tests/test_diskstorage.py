@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
+# Copyright 2015-2016 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -83,6 +83,7 @@ class BaseTestCase(TwistedTestCase):
         consumer = ds.put(node_id)
         consumer.write(data)
         consumer.unregisterProducer()
+        consumer.commit()
 
         # check the file
         path = ds._get_treepath(node_id)
@@ -106,14 +107,40 @@ class BaseTestCase(TwistedTestCase):
         consumer.write(data1)
         consumer.unregisterProducer()
 
-        # write more
+        # write more and finish
         data2 = b' and part 2'
         consumer = ds.put(node_id, len(data1))
         consumer.write(data2)
         consumer.unregisterProducer()
+        consumer.commit()
 
         # check the file
         path = ds._get_treepath(node_id)
         with open(os.path.join(path, node_id), 'rb') as fh:
             written = fh.read()
         self.assertEqual(written, data1 + data2)
+
+    def test_put_node_rename_on_commit(self):
+        # write it
+        node_id = "dinw78cdync8"
+        ds = DiskStorage(self.tmpdir)
+        data = 'test content to write'
+        consumer = ds.put(node_id)
+        consumer.write(data)
+        path = ds._get_treepath(node_id)
+
+        # at this point, it's all written in a temp file, check it (however,
+        # manually flush as we still didn't close it)
+        consumer.fh.flush()
+        with open(consumer.temppath, 'rb') as fh:
+            written = fh.read()
+        self.assertEqual(written, data)
+
+        # now let it know it's all done
+        consumer.commit()
+
+        # check the final file is there and the temp is gone
+        with open(os.path.join(path, node_id), 'rb') as fh:
+            written = fh.read()
+        self.assertEqual(written, data)
+        self.assertFalse(os.path.exists(consumer.temppath))

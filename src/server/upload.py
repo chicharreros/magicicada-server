@@ -1,5 +1,5 @@
 # Copyright 2008-2015 Canonical
-# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
+# Copyright 2015-2016 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -137,6 +137,9 @@ class NullConsumer(object):
         """Unregister producer."""
         if self.producer is not None:
             self.producer.consumer = self.producer = None
+
+    def commit(self):
+        """Nothing to do in a null consumer."""
 
     def cancel(self):
         """Cancel this consumer."""
