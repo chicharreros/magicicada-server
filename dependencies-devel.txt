@@ -1,5 +1,6 @@
 dbus
 openssl
+postgresql-client-9.1
 python-dbus
 python-gobject
 python-httplib2
