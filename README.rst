@@ -60,6 +60,13 @@ Then you need to start the LXC instance and ssh into it::
     sudo lxc-start -n magicicada-precise
     ssh magicicada-precise
 
+Add the Postgresql official apt rule following the instructions from (needed so
+the next step can install Postgresql 9.5 properly):
+
+http://wiki.postgresql.org/wiki/Apt
+
+(no need to actually install anything, the next item will take care of that)
+
 Install tools and dependencies (you will be prompted for your password for sudo
 access)::
 

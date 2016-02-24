@@ -1,9 +1,9 @@
 bzr
 gcc
 make
-postgresql-9.1
+postgresql-9.5
 postgresql-contrib
-postgresql-plpython-9.1
+postgresql-plpython-9.5
 protobuf-compiler
 python-boto
 python-bson

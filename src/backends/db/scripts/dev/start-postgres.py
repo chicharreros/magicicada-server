@@ -39,7 +39,7 @@ def start():
         return 0
 
     pg_bin = None
-    for path in ("/usr/lib/postgresql/9.1/bin",):
+    for path in ("/usr/lib/postgresql/9.5/bin",):
         if os.path.isdir(path):
             pg_bin = path
             break

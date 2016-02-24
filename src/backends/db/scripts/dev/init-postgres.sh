@@ -31,8 +31,8 @@ function setup_database() {
     mkdir -p "$TESTDIR"
     chmod 700 "$TESTDIR"
 
-    if [ -d /usr/lib/postgresql/9.1 ]; then
-        export PGBINDIR=/usr/lib/postgresql/9.1/bin
+    if [ -d /usr/lib/postgresql/9.5 ]; then
+        export PGBINDIR=/usr/lib/postgresql/9.5/bin
     else
         echo "Cannot find valid parent for PGBINDIR"
     fi

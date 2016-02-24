@@ -16,8 +16,31 @@
 #
 # For further info, check  http://launchpad.net/magicicada-server
 
-"""
-Add a function to help on getting formatted stats on running transactions.
+"""Add a function to help on getting formatted stats on running transactions.
+
+           View "pg_catalog.pg_stat_activity"
+      Column      |           Type           | Modifiers
+------------------+--------------------------+-----------
+ datid            | oid                      |
+ datname          | name                     |
+ pid              | integer                  |
+ usesysid         | oid                      |
+ usename          | name                     |
+ application_name | text                     |
+ client_addr      | inet                     |
+ client_hostname  | text                     |
+ client_port      | integer                  |
+ backend_start    | timestamp with time zone |
+ xact_start       | timestamp with time zone |
+ query_start      | timestamp with time zone |
+ state_change     | timestamp with time zone |
+ waiting          | boolean                  |
+ state            | text                     |
+ backend_xid      | xid                      |
+ backend_xmin     | xid                      |
+ query            | text                     |
+
+
 """
 
 SQL = [
@@ -29,15 +52,14 @@ SQL = [
         SET search_path TO public
         AS $$
         SELECT
-            datid, datname, procpid, usesysid, usename,
+            datid, datname, pid AS procpid, usesysid, usename,
             application_name, client_addr, client_hostname, client_port,
-            backend_start, xact_start, query_start, waiting,
+            backend_start, xact_start, query_start, state_change, waiting,
+            state, backend_xid, backend_xmin,
             CASE
-                WHEN current_query LIKE '<IDLE>%'
-                    OR current_query LIKE 'autovacuum:%'
-                    THEN current_query
-                ELSE
-                    '<HIDDEN>'
+                WHEN query LIKE '<IDLE>%' OR query LIKE 'autovacuum:%'
+                THEN query
+                ELSE '<HIDDEN>'
             END AS current_query
         FROM pg_catalog.pg_stat_activity;
     $$;
