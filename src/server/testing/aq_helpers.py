@@ -767,7 +767,7 @@ class MethodInterferer(object):
         """Nukes the method"""
         self.old = getattr(self.obj, self.meth)
         if func is None:
-            func = lambda *_, **__: None
+            def func(*args, **kwargs): return None
         setattr(self.obj, self.meth, func)
         return info
 
@@ -810,7 +810,7 @@ class NukeAQClient(object):
         """Nukes the method"""
         self.old = getattr(self.aq.client, self.meth)
         if func is None:
-            func = lambda *_, **__: defer.Deferred
+            def func(*args, **kwargs): return defer.Deferred
         setattr(self.aq.client, self.meth, func)
         return info
 

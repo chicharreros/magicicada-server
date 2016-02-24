@@ -34,16 +34,6 @@ chunk should take, and it will figure out how many items you need to process
 per chunk to get close to your ideal time between stops.  Chunk sizes will
 adjust themselves dynamically to actual performance."""
 
-__metaclass__ = type
-
-__all__ = [
-    'DBLoopTuner',
-    'ITunableLoop',
-    'LoopTuner',
-    'TunableLoop',
-]
-
-
 import logging
 import sys
 import time
@@ -52,10 +42,7 @@ from datetime import timedelta
 
 import transaction
 
-from zope.interface import (
-    implements,
-    Interface,
-)
+from zope.interface import implements, Interface
 
 
 class ITunableLoop(Interface):
@@ -101,7 +88,7 @@ class IDBTunableLoop(ITunableLoop):
         """Get the Storm store for which to execute the loop."""
 
 
-class LoopTuner:
+class LoopTuner(object):
     """A loop that tunes itself to approximate an ideal time per iteration.
 
     Use this for large processing jobs that need to be broken down into chunks
@@ -379,7 +366,7 @@ class DBLoopTuner(LoopTuner):
         return self._time()
 
 
-class TunableLoop:
+class TunableLoop(object):
     """A base implementation of `ITunableLoop`."""
     implements(ITunableLoop)
 

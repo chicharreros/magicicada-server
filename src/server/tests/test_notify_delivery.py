@@ -81,12 +81,11 @@ class TestDelivery(TwistedTestCase):
         self.free_bytes = 0
         self.node_volume_id = uuid.uuid4()
         self.content_node = self.mocker.mock()
-        content_class = lambda _: self.content
         MetricsConnector.register_metrics("sli", instance=ExtendedMetrics())
         MetricsConnector.register_metrics("root", instance=ExtendedMetrics())
         MetricsConnector.register_metrics("user", instance=ExtendedMetrics())
         self.factory = StorageServerFactory(
-            content_class=content_class,
+            content_class=lambda _: self.content,
             reactor=self.fake_reactor)
 
     @inlineCallbacks

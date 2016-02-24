@@ -62,7 +62,8 @@ except ImportError:
     version_info = None
 
 
-noop = lambda *args, **kwargs: None
+def noop(*args, **kwargs):
+    return
 
 
 class FakeNode(object):
@@ -85,13 +86,17 @@ class FakeUser(object):
     """A fake user."""
     id = 42
     username = 'username'
-    get_root = lambda self: (123, 456)  # root_id, gen
-    set_client_caps = lambda self, caps: None
+
+    def get_root(self):
+        return (123, 456)  # root_id, gen
+
+    def set_client_caps(self, caps):
+        return
 
 
 class FakeProducer(object):
     """A fake producer."""
-    dummy = lambda *s: None
+    def dummy(*s): return
     resumeProducing = stopProducing = pauseProducing = startProducing = dummy
 
 

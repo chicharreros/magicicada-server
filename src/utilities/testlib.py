@@ -20,6 +20,7 @@
 
 from __future__ import unicode_literals
 
+import logging
 import os
 import re
 import unittest
@@ -38,7 +39,6 @@ import testresources
 COVERAGE_DIR = "./tmp/coverage"
 WORKING_DIR = "./tmp/trial"
 
-import logging
 logging.setLoggerClass(logging.Logger)
 
 

@@ -147,8 +147,8 @@ def timed_call(scope=None):
             else:
                 status_code = getattr(result, "status_code", None)
                 if status_code is not None:
-                    meter.timing(view.__module__ + "." + view.func_name
-                                 + "." + str(status_code),
+                    meter.timing(view.__module__ + "." + view.func_name +
+                                 "." + str(status_code),
                                  time.time() - start_time)
                 else:
                     meter.timing(

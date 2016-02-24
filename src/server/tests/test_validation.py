@@ -31,10 +31,9 @@ def is_protocol_error(failure):
     Returns whether the failure is a PROTOCOL_ERROR
     """
     return (failure.check(request.StorageProtocolProtocolError) or
-            failure.getErrorMessage() == 'PROTOCOL_ERROR'
-            or re.search(r'^\s*type: PROTOCOL_ERROR\s*$',
-                         failure.getErrorMessage(),
-                         re.MULTILINE))
+            failure.getErrorMessage() == 'PROTOCOL_ERROR' or
+            re.search(r'^\s*type: PROTOCOL_ERROR\s*$',
+                      failure.getErrorMessage(), re.MULTILINE))
 
 
 def fail_check(client):

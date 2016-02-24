@@ -20,9 +20,6 @@
 
 from __future__ import absolute_import
 
-__metaclass__ = type
-__all__ = ["FilesyncDatabaseResource"]
-
 import os
 
 import psycopg2

@@ -18,8 +18,6 @@
 
 """Infrastructure for tracking activity on database connections."""
 
-__metaclass__ = type
-
 import re
 
 
@@ -35,7 +33,7 @@ class DatabaseNotEnabled(Exception):
             "An attempt was made to use %s without enabling it." % dbname)
 
 
-class DatabaseWatcher:
+class DatabaseWatcher(object):
     """Watch database connections for use and commits."""
 
     def __init__(self, module):
@@ -129,7 +127,7 @@ class DatabaseWatcher:
         self._used_databases.add(dbname)
 
 
-class ConnectionWrapper:
+class ConnectionWrapper(object):
     """A wrapper around a DB-API connection that reports commits."""
 
     def __init__(self, dbwatcher, dbname, real_connection):
@@ -158,7 +156,7 @@ class ConnectionWrapper:
         setattr(self._real_connection, attr, value)
 
 
-class CursorWrapper:
+class CursorWrapper(object):
     """A wrapper around a DB-API cursor that reports executes."""
 
     def __init__(self, connection, real_cursor):

@@ -2641,8 +2641,13 @@ class TestUploadJob(TestWithDatabase):
     def test_add_operation_ok(self):
         _, _, upload_job = yield self.make_upload(20)
         called = []
-        fake_operation = lambda _: called.append('operation')
-        fake_error_handler = lambda _: called.append('error')
+
+        def fake_operation(_):
+            called.append('operation')
+
+        def fake_error_handler(_):
+            called.append('error')
+
         upload_job.add_operation(fake_operation, fake_error_handler)
         yield upload_job.ops
         self.assertEqual(called, ['operation'])
@@ -2655,8 +2660,10 @@ class TestUploadJob(TestWithDatabase):
         def crash(_):
             called.append('operation')
             raise ValueError("crash")
-        fake_error_handler = \
-            lambda failure: called.append('error: ' + str(failure.value))
+
+        def fake_error_handler(failure):
+            called.append('error: ' + str(failure.value))
+
         upload_job.add_operation(crash, fake_error_handler)
         yield upload_job.ops
         self.assertEqual(called, ['operation', 'error: crash'])

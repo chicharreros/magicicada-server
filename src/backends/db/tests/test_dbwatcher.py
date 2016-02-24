@@ -18,14 +18,12 @@
 
 """Tests for the backends.tools.dbwatcher module."""
 
-__metaclass__ = type
-
 import mocker
 
 from backends.db import dbwatcher
 
 
-class StubModule:
+class StubModule(object):
     """A stub implementation of part of the DB-API module interface."""
 
     def __init__(self):
@@ -36,7 +34,7 @@ class StubModule:
         return StubConnection()
 
 
-class StubConnection:
+class StubConnection(object):
     """A stub implementation of the DB-API connection interface."""
     connection_attribute = 42
 
@@ -56,7 +54,7 @@ class StubConnection:
         pass
 
 
-class StubCursor:
+class StubCursor(object):
     """A stub implementation of the DB-API cursor interface."""
     cursor_attribute = 42
 

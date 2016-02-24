@@ -18,9 +18,6 @@
 
 """Authentication backends for the storage server."""
 
-__metaclass__ = type
-__all__ = ["AuthenticationProvider", "DummyAuthProvider", "SimpleAuthProvider"]
-
 import logging
 
 from twisted.internet import defer
@@ -32,7 +29,7 @@ from ubuntuone.storage.rpcdb import auth_backend
 logger = logging.getLogger("storage.server")
 
 
-class AuthenticationProvider:
+class AuthenticationProvider(object):
     """Provides authentication services to the server."""
 
     def __init__(self, factory):

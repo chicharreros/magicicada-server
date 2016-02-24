@@ -28,8 +28,6 @@ from optparse import OptionParser
 
 import psycopg2
 
-psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
-
 from django.conf import settings
 
 

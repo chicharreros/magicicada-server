@@ -22,16 +22,6 @@
 
 from __future__ import unicode_literals
 
-import os
-import readline
-
-readline.parse_and_bind('tab: complete')
-
-# Mimic the real interactive interpreter's loading of $PYTHONSTARTUP file.
-startup = os.environ.get('PYTHONSTARTUP')
-if startup:
-    execfile(startup)
-
 from backends.filesync.notifier.notifier import register_notifier_for_bus
 from backends.filesync.notifier.testing.testcase import AccumulatingNotifyBus
 from backends.filesync import services  # NOQA
@@ -54,6 +44,6 @@ tim.get_share(share.id).accept()
 
 file = tim.volume(share.id).root.make_file("file.txt")
 
-#You also can see events queued for MQ:
+# You also can see events queued for MQ:
 print nb.events
 """

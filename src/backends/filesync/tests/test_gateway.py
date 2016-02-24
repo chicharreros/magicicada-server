@@ -1948,10 +1948,12 @@ class ReadWriteVolumeGatewayUtilityTests(StorageDALTestCase):
         hash = self.factory.get_fake_hash()
         key = uuid.uuid4()
         root_id = self.vgw.get_root().id
+
+        def mkfile(i, m):
+            return self.vgw.make_file_with_content(
+                root_id, 'file%s' % i, hash, 1, 1, 1, key, mimetype=m)
+
         # make a bunch of files with content
-        mkfile = lambda i, m: self.vgw.make_file_with_content(
-            root_id, 'file%s' % i, hash,
-            1, 1, 1, key, mimetype=m)
         nodes = [mkfile(i, 'image/tif') for i in range(10)]
         # make a bunch of files with content and the wrong mimetype
         other_nodes = [mkfile(i, 'fake') for i in range(100, 110)]
@@ -1976,10 +1978,12 @@ class ReadWriteVolumeGatewayUtilityTests(StorageDALTestCase):
         hash = self.factory.get_fake_hash()
         key = uuid.uuid4()
         root_id = self.vgw.get_root().id
+
+        def mkfile(i, m):
+            return self.vgw.make_file_with_content(
+                root_id, 'file%s.tif' % i, hash, 1, 1, 1, key, mimetype=m)
+
         # make a bunch of files with content
-        mkfile = lambda i, m: self.vgw.make_file_with_content(
-            root_id, 'file%s.tif' % i, hash,
-            1, 1, 1, key, mimetype=m)
         [mkfile(i, 'image/tif') for i in range(10)]
         all_nodes = self.vgw.get_all_nodes(
             kind=StorageObject.FILE, with_content=True)
@@ -1992,10 +1996,12 @@ class ReadWriteVolumeGatewayUtilityTests(StorageDALTestCase):
         hash = self.factory.get_fake_hash()
         key = uuid.uuid4()
         root_id = self.vgw.get_root().id
+
+        def mkfile(i, m):
+            return self.vgw.make_file_with_content(
+                root_id, 'file%s.tif' % i, hash, 1, 1, 1, key, mimetype=m)
+
         # make a bunch of files with content
-        mkfile = lambda i, m: self.vgw.make_file_with_content(
-            root_id, 'file%s.tif' % i, hash,
-            1, 1, 1, key, mimetype=m)
         [mkfile(i, 'image/tif') for i in range(10)]
         all_nodes = self.vgw.get_all_nodes(with_content=True,
                                            mimetypes=['image/tif'])
@@ -2306,9 +2312,12 @@ class ReadWriteVolumeGatewayUtilityTests(StorageDALTestCase):
         # make some directories
         dir1 = self.vgw.make_subdirectory(root_id, 'dir2')
         dir2 = self.vgw.make_subdirectory(dir1.id, 'dir1')
-        mkfile = lambda p, i: self.vgw.make_file(p, 'file%s.txt' % i)
+
+        def mkfile(dir_id, i):
+            return self.vgw.make_file(dir_id, 'file%s.txt' % i)
+
         # make some files
-        [mkfile(root_id, i) for i in range(10)]
+        [mkfile(root_id, 'file%s.txt' % i) for i in range(10)]
         files1 = [mkfile(dir1.id, i) for i in range(10)]
         files2 = [mkfile(dir2.id, i) for i in range(10)]
         nodes = self.vgw.get_deleted_files()
@@ -3354,9 +3363,11 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
         root_id = self.root.id
         hash = self.factory.get_fake_hash()
         key = uuid.uuid4()
+
         # only files with content are returned.
-        make_file = lambda id, name: self.vgw.make_file_with_content(
-            id, name, hash, 123, 1, 1, key)
+        def make_file(i, n):
+            return self.vgw.make_file_with_content(i, n, hash, 123, 1, 1, key)
+
         a = self.vgw.make_subdirectory(root_id, 'a')
         ab = self.vgw.make_subdirectory(a.id, 'ab')
         abc = self.vgw.make_subdirectory(ab.id, 'abc')

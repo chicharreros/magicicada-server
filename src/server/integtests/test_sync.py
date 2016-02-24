@@ -1437,9 +1437,8 @@ class TestConflict(TestServerBase):
 
         def change_local(req):
             """do the local change"""
-            f = open(self.root_dir + "/test_file", "w")
-            f.write(data_conflict)
-            f.close()
+            with open(self.root_dir + "/test_file", "w") as f:
+                f.write(data_conflict)
             d = self.client.unlink(request.ROOT, req.new_id)
             return d
 
@@ -1448,14 +1447,15 @@ class TestConflict(TestServerBase):
             self.assertRaises(IOError,
                               open, self.root_dir + '/test_file')
             try:
-                data_in_conflict = open(self.root_dir
-                                        + '/test_file.u1conflict').read()
-                self.assertTrue(data_in_conflict == data_conflict)
+                with open(self.root_dir + '/test_file.u1conflict') as f:
+                    data_in_conflict = f.read()
             except IOError:
                 # sometimes the delete will take so long that the file will
                 # be uploaded to the server before it happens.
                 # this should still converge. nothing anywhere.
                 return self.check()
+            else:
+                self.assertEqual(data_in_conflict, data_conflict)
 
         yield self.get_client()
         req = yield self.client.make_file(request.ROOT, self.root_id,

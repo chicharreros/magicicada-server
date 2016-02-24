@@ -21,8 +21,6 @@
 These are the edge test cases that don't belong in the doctest.
 """
 
-__metaclass__ = type
-
 import math
 import time
 

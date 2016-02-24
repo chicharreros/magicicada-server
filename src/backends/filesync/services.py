@@ -1355,8 +1355,8 @@ class SystemGateway(GatewayBase):
     def get_public_file(self, public_key, use_uuid=False):
         """Get a public file."""
         node = self._get_public_node(public_key, use_uuid)
-        if (node.content is None or node.content.storage_key is None
-                or node.kind != StorageObject.FILE):
+        if (node.content is None or node.content.storage_key is None or
+                node.kind != StorageObject.FILE):
             # if the file has no content, we should not be able to get it
             raise errors.DoesNotExist(self.publicfile_dne_error)
         return node

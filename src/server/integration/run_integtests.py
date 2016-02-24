@@ -24,7 +24,6 @@ import random
 import shutil
 import signal
 import subprocess
-import sys
 import time
 
 from optparse import OptionParser
@@ -34,12 +33,8 @@ import dbus.mainloop.glib  # this is black magic. DO NOT REMOVE!
 
 from distutils.spawn import find_executable
 
-# fix paths 1, to include lib for most basic stuff
-LIB_DIR = os.path.abspath("lib")
-sys.path.insert(0, LIB_DIR)
-
 from twisted.internet import glib2reactor
-glib2reactor.install()  # before any reactor import
+glib2reactor.install()  # NOQA: before any reactor import
 
 from django.conf import settings
 from utilities import utils, dev_launcher
@@ -52,6 +47,7 @@ from ubuntuone.storage.server.testing.testcase import create_test_user
 # to make dbus work
 dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
 
+LIB_DIR = os.path.abspath("lib")
 
 # this should be done manually before:
 DEP_STARTOAUTH = """

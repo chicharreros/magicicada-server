@@ -31,9 +31,9 @@ from bzrlib.workingtree import WorkingTree
 
 def _bad_rootdir(rootdir):
     """Tell whether the given rootdir is bad"""
-    return (rootdir is None                      # shouldn't happen
-            or not isdir(rootdir)                # garbage in env or bzr error
-            or not os.access(rootdir, os.R_OK))  # perms are wrong
+    return (rootdir is None or                # shouldn't happen
+            not isdir(rootdir) or             # garbage in env or bzr error
+            not os.access(rootdir, os.R_OK))  # perms are wrong
 
 
 def get_rootdir():

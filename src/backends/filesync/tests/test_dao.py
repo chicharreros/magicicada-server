@@ -339,9 +339,12 @@ class VolumeProxyTestCase(StorageDALTestCase):
         crc = 12345
         size = 100
         deflated_size = 10000
-        mkfile = lambda i: user.root.make_file_with_content(
-            'f%s' % i, hash, crc, size, deflated_size, storage_key,
-            mimetype=mime)
+
+        def mkfile(i):
+            return user.root.make_file_with_content(
+                'f%s' % i, hash, crc, size, deflated_size, storage_key,
+                mimetype=mime)
+
         files = [mkfile(i) for i in range(10)]
         nodes = user.volume().get_all_nodes(kind=StorageObject.FILE)
         self.assertEqual(nodes, files)
@@ -1369,8 +1372,8 @@ class GenerationsDAOTestCase(StorageDALTestCase):
     def test_delta_info_multi(self):
         """Test of free_bytes and generation from deltas with many changes."""
         user = self.create_user(max_storage_bytes=1000)
-        mfc = lambda u, i: self.factory.make_file(u, u.root, 'f%s' % i)
-        files = [mfc(user, i) for i in range(10)]
+        files = [self.factory.make_file(user, user.root, 'f%s' % i)
+                 for i in range(10)]
         file_size = files[0].content.size
         new_gen = user.volume().get_volume().generation
         generation, free_bytes, delta = user.volume().get_delta(1, limit=5)
@@ -1389,8 +1392,8 @@ class GenerationsDAOTestCase(StorageDALTestCase):
         """Test get_from_scratch."""
         user = self.create_user(max_storage_bytes=1000)
         root = user.root.load()
-        mfc = lambda u, i: self.factory.make_file(u, root, 'f%s' % i)
-        files = [mfc(user, i) for i in range(10)]
+        files = [self.factory.make_file(user, root, 'f%s' % i)
+                 for i in range(10)]
         file_size = files[0].content.size
         new_gen = user.volume().get_volume().generation
         files_with_root = [root] + files

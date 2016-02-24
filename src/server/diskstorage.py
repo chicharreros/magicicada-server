@@ -64,8 +64,8 @@ class FileReaderProducer(object):
             if self.pausing_deferred is None:
                 reactor.callLater(0, self._readloop, flag, consumer)
             else:
-                f = lambda _: reactor.callLater(0, self._readloop,
-                                                flag, consumer)
+                def f(_):
+                    return reactor.callLater(0, self._readloop, flag, consumer)
                 self.pausing_deferred.addCallback(f)
         else:
             self._fh.close()

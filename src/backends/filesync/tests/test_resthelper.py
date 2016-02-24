@@ -81,7 +81,6 @@ class MockNode(object):
     generation = 1
     generation_created = 1
     mimetype = 'text'
-    has_children = lambda _: False
     public_url = "public url"
     is_public = False
     vol_type = 'root'
@@ -94,6 +93,9 @@ class MockNode(object):
         """Fake content within a Node."""
         size = 12000
     content = _content()
+
+    def has_children(self):
+        return False
 
 
 class ResourceMapperTestCase(unittest.TestCase):

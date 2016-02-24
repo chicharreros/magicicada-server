@@ -32,7 +32,9 @@ from twisted.python.util import makeStatBar
 from backends.filesync.services import get_storage_user
 from backends.filesync.tests.testcase import Factory
 
-utf2unicode = lambda s: unicode(s, 'utf-8', 'replace')
+
+def utf2unicode(s):
+    return unicode(s, 'utf-8', 'replace')
 
 
 def make_udf(user, sample):
@@ -65,7 +67,7 @@ def main(username, sharer, wlist, num):
             sys.stdout.write(home + progbar((cols - 2) * (num - len(l)) / num))
             sys.stdout.flush()
     else:
-        progress = lambda l: None
+        def progress(l): return
 
     # UDF
     udf = user.make_udf('~/abundant-files')
