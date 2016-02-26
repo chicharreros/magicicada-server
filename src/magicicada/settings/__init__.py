@@ -119,11 +119,12 @@ WSGI_APPLICATION = 'magicicada.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/1.8/ref/settings/#databases
 
+PG_HOST = os.environ.get('PG_HOST', '/dev/shm/pg_magicicada')
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
         'NAME': 'filesync',
-        'HOST': '/dev/shm/pg_magicicada',
+        'HOST': PG_HOST,
         'USER': 'postgres',
         'OPTIONS': {
             'isolation_level': ISOLATION_LEVEL_REPEATABLE_READ,
@@ -132,7 +133,7 @@ DATABASES = {
     'filesync': {
         'ENGINE': 'storm.django.backend',
         'NAME': 'filesync',
-        'HOST': '/dev/shm/pg_magicicada',
+        'HOST': PG_HOST,
         'PORT': 5432,
         'USER': 'postgres',
         'OPTIONS': {'isolation': 'repeatable-read'},

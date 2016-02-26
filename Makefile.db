@@ -1,0 +1,37 @@
+SHELL_ENV = DJANGO_SETTINGS_MODULE=$(DJANGO_SETTINGS_MODULE) PYTHONPATH=$(PYTHONPATH)
+PGNAME = $(shell $(SHELL_ENV) $(PYTHON) -c "from django.conf import settings; print settings.DATABASES['default']['NAME']")
+PGHOST = $(shell $(SHELL_ENV) $(PYTHON) -c "from django.conf import settings; print settings.DATABASES['default']['HOST']")
+PGUSER = $(shell $(SHELL_ENV) $(PYTHON) -c "from django.conf import settings; print settings.DATABASES['default']['USER']")
+DATA_DIR = $(PGHOST)/data
+LOG_FILE = $(PGHOST)/postgresql.log
+CONF_FILE = $(PGHOST)/postgresql.conf
+PGBIN = /usr/lib/postgresql/9.5/bin
+PGCTL = $(PGBIN)/pg_ctl
+PGINIT = $(PGBIN)/initdb
+
+
+migrate:
+	$(DJANGO_MANAGE) migrate --noinput
+
+setup-db:
+	mkdir -p $(DATA_DIR)
+	$(PGINIT) -A trust -D $(DATA_DIR)
+	echo "fsync = off" > $(CONF_FILE)
+	$(PGCTL) start -w -D $(DATA_DIR) -l $(LOG_FILE) -o "-F -k $(PGHOST) -h ''"
+	PGHOST=$(PGHOST) createdb $(PGNAME)
+	PGHOST=$(PGHOST) createuser --superuser --createdb $(PGUSER)
+
+start-db:
+	$(MAKE) setup-db
+	$(MAKE) migrate
+	./lib/backends/db/scripts/schema --all
+
+stop-db:
+	PGHOST=$(PGHOST) dropdb $(PGNAME)
+	$(PGCTL) stop -w -D $(DATA_DIR) -m smart
+	rm -rf $(PGHOST)
+
+reset-db:
+	PGHOST=$(PGHOST) dropdb $(PGNAME)
+	PGHOST=$(PGHOST) createdb $(PGNAME)
+	$(MAKE) migrate

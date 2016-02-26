@@ -52,6 +52,8 @@ ifneq ($(strip $(STRIP_BZR)),)
 TAR_EXTRA += --exclude .bzr
 endif
 
+include Makefile.db
+
 sourcedeps: $(SOURCEDEPS_TAG)
 
 clean-sourcedeps:
@@ -63,8 +65,6 @@ ifndef EXPORT_FROM_BZR
 endif
 	$(MAKE) build-sourcedeps
 	touch $(SOURCEDEPS_TAG)
-
-DB_TAG=/dev/shm/pg_magicicada/.s.PGSQL.5432.lock
 
 build: link-sourcedeps build-sourcedeps version
 
@@ -122,7 +122,7 @@ clean: stop
 lint:
 	virtualenv $(ENV)
 	$(ENV)/bin/pip install flake8 rst2html5
-	$(ENV)/bin/flake8 --filename='*.py' src
+	$(ENV)/bin/flake8 --filename='*.py' --exclude='migrations' src
 	dev-scripts/check_readme.sh
 
 etags: sourcedeps
@@ -148,18 +148,6 @@ start-base:
 	$(MAKE) start-statsd || ( $(MAKE) stop ; exit 1 )
 
 stop:  stop-filesync-dummy-group stop-supervisor stop-db stop-statsd stop-dbus
-
-$(DB_TAG):
-	lib/backends/db/scripts/dev/start-database.sh
-
-start-db: $(DB_TAG) schema
-
-schema:
-	$(DJANGO_MANAGE) migrate --noinput
-	./lib/backends/db/scripts/schema --all
-
-stop-db:
-	lib/backends/db/scripts/dev/stop-database.sh
 
 start-dbus:
 	dev-scripts/start-dbus.sh
@@ -213,7 +201,7 @@ admin:
 	$(DJANGO_ADMIN) $(ARGS)
 
 .PHONY: sourcedeps link-sourcedeps build-sourcedeps build-deploy-sourcedeps \
-	build clean version lint test ci-test schema \
+	build clean version lint test ci-test \
 	build-for-deployment clean-sourcedeps tarball \
 	start stop load-sample-data publish-api-port \
 	start-supervisor stop-supervisor \

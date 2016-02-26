@@ -30,7 +30,7 @@ from utilities.utils import os_exec, is_running
 
 def start():
     """Start Postgres."""
-    sock_dir = '/dev/shm/pg_magicicada'
+    sock_dir = os.environ.get('PG_HOST', '/dev/shm/pg_magicicada')
     data_dir = os.path.join(sock_dir, "data")
     pidfile = os.path.join(data_dir, "postmaster.pid")
 
