@@ -1,5 +1,5 @@
 # Copyright 2008-2015 Canonical
-# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
+# Copyright 2015-2016 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -160,17 +160,6 @@ class TestShareClientMove(TestSharesSync, test_sync.TestClientMove):
 
 class TestShareServerBase(TestSharesSync, test_sync.TestServerBase):
     """ Base test case for server-side share related tests. """
-
-    def make_file__legacy(self, username, filename, parent):
-        """ create a file in the server. """
-        d = self.get_client_by_user(username)
-        d.addCallback(lambda _: self.client.make_file(
-            request.ROOT, parent, filename))
-        d.addCallback(lambda _:
-                      self.main.wait_for_nirvana(last_event_interval=1))
-        d.addCallback(lambda _: self.check(username + '_share_dir',
-                                           username + '_share_id'))
-        return d
 
     def make_file(self, username, filename, parent):
         """ create a file in the server. """

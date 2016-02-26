@@ -1,5 +1,5 @@
 # Copyright 2008-2015 Canonical
-# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
+# Copyright 2015-2016 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -767,93 +767,6 @@ class TestSharesWithData(TestWithDatabase):
                     self.share, self.filero, NO_CONTENT_HASH, hash_value,
                     crc32_value, size, StringIO(data)))
             d.addCallbacks(client.test_fail, lambda x: client.test_done())
-
-        return self.callback_test(auth)
-
-
-class TestSharesWithDataLegacy(TestWithDatabase):
-    """Tests that require simple sharing data setup, but legacy."""
-
-    @defer.inlineCallbacks
-    def setUp(self):
-        """Create users, files and shares."""
-        yield super(TestSharesWithDataLegacy, self).setUp()
-
-        root1 = self.usr1.root
-        root2 = self.usr2.root
-        file = root2.make_file(u"file")
-        filero = root2.make_file(u"file")
-        rwdir = root2.make_subdirectory(u"rwdir")
-        filerw = rwdir.make_file(u"file")
-        subdir = root2.make_subdirectory(u"subdir")
-        subfile = subdir.make_file(u"subfile")
-        subsubdir = subdir.make_subdirectory(u"subsubdir")
-        subsubfile = subsubdir.make_file(u"subsubfile")
-        store = dbmanager.get_filesync_store()
-        # set all files with an empty hash
-        store.find(
-            StorageObject, StorageObject.kind == StorageObject.FILE).set(
-                _content_hash=EMPTY_HASH)
-        store.commit()
-
-        share = root2.share(0, u"foo", readonly=True)
-        share_other = root2.share(self.usr1.id, u"foo", readonly=True)
-        subshare = subdir.share(0, u"foo2", readonly=True)
-        share_owner = root1.share(0, u"foo3", readonly=True)
-        share_modify = rwdir.share(0, u"foo4")
-        for s in self.usr0.get_shared_to(accepted=False):
-            s.accept()
-        for s in self.usr1.get_shared_to(accepted=False):
-            s.accept()
-
-        self.share = str(share.id)
-        self.share_modify = str(share_modify.id)
-        self.subshare = str(subshare.id)
-        self.share_other = str(share_other.id)
-        self.share_owner = str(share_owner.id)
-        self.root = root2.id
-        self.file = str(file.id)
-        self.filero = str(filero.id)
-        self.subdir = subdir.id
-        self.subfile = subfile.id
-        self.subsubdir = subsubdir.id
-        self.subsubfile = subsubfile.id
-        self.rwdir = rwdir.id
-        self.filerw = str(filerw.id)
-
-    def test_get_content_on_share(self):
-        """read a file on a share."""
-
-        def auth(client):
-            """auth"""
-            d = client.dummy_authenticate("open sesame")
-            # need to put data to be able to retrieve it!
-            d.addCallback(
-                lambda r: client.get_content(
-                    self.share, self.file, EMPTY_HASH))
-            d.addCallbacks(client.test_done, client.test_fail)
-
-        return self.callback_test(auth)
-
-    def test_put_content_on_share(self):
-        """write a file on a share."""
-        data = "*" * 100000
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
-
-        def auth(client):
-            """auth"""
-            d = client.dummy_authenticate("open sesame")
-            d.addCallback(
-                lambda r: client.put_content(
-                    self.share_modify, self.filerw, EMPTY_HASH, hash_value,
-                    crc32_value, size, deflated_size, StringIO(deflated_data)))
-            d.addCallbacks(client.test_done, client.test_fail)
 
         return self.callback_test(auth)
 
