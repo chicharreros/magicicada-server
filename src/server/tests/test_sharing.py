@@ -25,12 +25,8 @@ from StringIO import StringIO
 
 from twisted.internet import reactor, defer
 
-from backends.filesync import errors, dbmanager
-from backends.filesync.models import (
-    STATUS_LIVE,
-    StorageObject,
-    Share,
-)
+from backends.filesync import errors
+from backends.filesync.models import STATUS_LIVE, Share
 from ubuntuone.storage.server.testing.testcase import (
     TestWithDatabase, FactoryHelper)
 from ubuntuone.storageprotocol import request

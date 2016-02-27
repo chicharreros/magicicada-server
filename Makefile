@@ -116,7 +116,7 @@ test: lint sourcedeps clean version start-base start-dbus raw-test stop
 ci-test:
 	$(MAKE) test TESTFLAGS="-1 $(TESTFLAGS)"
 
-clean: stop
+clean:
 	rm -rf tmp/* _trial_temp
 
 lint:
@@ -147,7 +147,7 @@ start-base:
 	$(MAKE) start-db && $(MAKE) start-supervisor && $(MAKE) start-dbus && \
 	$(MAKE) start-statsd || ( $(MAKE) stop ; exit 1 )
 
-stop:  stop-filesync-dummy-group stop-supervisor stop-db stop-statsd stop-dbus
+stop: stop-filesync-dummy-group stop-supervisor stop-db stop-statsd stop-dbus
 
 start-dbus:
 	dev-scripts/start-dbus.sh
