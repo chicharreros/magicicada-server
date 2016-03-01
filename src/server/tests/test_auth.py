@@ -26,7 +26,6 @@ from ubuntuone.devtools.handlers import MementoHandler
 
 from backends.filesync.errors import DoesNotExist
 from ubuntuone.storage.server.auth import (
-    AuthenticationProvider,
     DummyAuthProvider,
     SimpleAuthProvider,
 )
@@ -47,19 +46,13 @@ class AuthenticationBaseTestCase(TestWithDatabase):
 
         return auth_d
 
-
-class AuthenticationProviderTests(AuthenticationBaseTestCase):
-    """Fixture for authentication provider tests."""
-
-    auth_provider_class = AuthenticationProvider
-
     @defer.inlineCallbacks
     def setUp(self):
-        yield super(AuthenticationProviderTests, self).setUp()
-        self.provider = self.auth_provider_class(self.service.factory)
+        yield super(AuthenticationBaseTestCase, self).setUp()
+        self.provider = self.service.factory.auth_provider
 
 
-class DummyProviderTests(AuthenticationProviderTests):
+class DummyProviderTests(AuthenticationBaseTestCase):
     """Tests for the dummy authentication provider."""
 
     auth_provider_class = DummyAuthProvider
@@ -69,7 +62,7 @@ class DummyProviderTests(AuthenticationProviderTests):
         """The dummy authentication provider succeeds with a valid token."""
         auth_params = {"dummy_token": "open sesame"}
         user = yield self.provider.authenticate(auth_params, None)
-        self.assertEqual(user.id, 0)
+        self.assertEqual(user.id, self.usr0.id)
         # the same user is returned by repeated calls
         user2 = yield self.provider.authenticate(auth_params, None)
         self.assertEqual(user.id, user2.id)
@@ -88,7 +81,7 @@ class DummyProviderTests(AuthenticationProviderTests):
         self.assertEqual(user, None)
 
 
-class SimpleAuthProviderTests(AuthenticationProviderTests):
+class SimpleAuthProviderTests(AuthenticationBaseTestCase):
     """Tests for the simple authentication provider."""
 
     auth_provider_class = SimpleAuthProvider

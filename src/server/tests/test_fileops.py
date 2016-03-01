@@ -67,23 +67,19 @@ class TestMove(TestWithDatabase):
 
     def test_move_invalid_character(self):
         """Try to move a dir to a name with invalid characters and fail."""
+
+        @defer.inlineCallbacks
         def auth(client):
-            d = client.dummy_authenticate("open sesame")
-            d.addCallback(lambda r: client.get_root())
-            d.addCallback(self.save_req, 'root_id')
-            d.addCallback(lambda r: client.make_dir(request.ROOT, r, "hola"))
-            d.addCallback(lambda req: client.move(request.ROOT, req.new_id,
-                                                  self._state.root_id,
-                                                  "hola / "))
+            yield client.dummy_authenticate("open sesame")
+            root = yield client.get_root()
+            self.save_req(root, 'root_id')
+            req = yield client.make_dir(request.ROOT, root, "hola")
+            d = client.move(
+                request.ROOT, req.new_id, self._state.root_id, "hola / ")
+            res = yield self.assertFailure(d, request.StorageRequestError)
+            self.assertEqual(str(res), "INVALID_FILENAME")
 
-            def check(failure):
-                """Checks the error returned."""
-                self.assertIsInstance(failure.value,
-                                      request.StorageRequestError)
-                client.test_done(True)
-
-            d.addCallbacks(client.test_fail, check)
-        return self.callback_test(auth)
+        return self.callback_test(auth, add_default_callbacks=True)
 
     def test_move_file_overwrite(self):
         """Rename over an existing file."""

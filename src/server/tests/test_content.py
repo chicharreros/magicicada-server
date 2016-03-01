@@ -590,7 +590,7 @@ class TestPutContent(TestWithDatabase):
                     return request
 
                 def read(innerself, cant):
-                    '''If second read, cancel and trigger test.'''
+                    """If second read, cancel and trigger test."""
                     innerself.notifs += 1
                     if innerself.notifs == 2:
                         innerself.request.cancel()
@@ -2099,10 +2099,6 @@ class TestChunkedContent(TestWithDatabase):
         # tune the config for this tests
         self.patch(settings.api_server, 'STORAGE_CHUNK_SIZE', 1024 * 1024)
 
-    @defer.inlineCallbacks
-    def tearDown(self):
-        yield super(TestChunkedContent, self).tearDown()
-
     def test_putcontent_chunked(self, put_fail=False, get_fail=False):
         """Checks a chunked putcontent."""
         size = int(settings.api_server.STORAGE_CHUNK_SIZE * 1.5)
@@ -2170,13 +2166,13 @@ class TestChunkedContent(TestWithDatabase):
         return self.callback_test(auth, timeout=10)
 
     def test_putcontent_chunked_putfail(self):
-        '''Assures that chunked putcontent fails with "try again".'''
+        """Assures that chunked putcontent fails with "try again"."""
         d = self.test_putcontent_chunked(put_fail=True)
         self.assertFails(d, 'TRY_AGAIN')
         return d
 
     def test_putcontent_chunked_getfail(self):
-        '''Assures that chunked putcontent fails with "try again".'''
+        """Assures that chunked putcontent fails with "try again"."""
         d = self.test_putcontent_chunked(get_fail=True)
         self.assertFails(d, 'NOT_AVAILABLE')
         return d
@@ -2349,12 +2345,7 @@ class TestUploadJob(TestWithDatabase):
             return reactor.callLater(0.1, x)
 
         self._cooperator = task.Cooperator(scheduler=slowScheduler)
-
-    @defer.inlineCallbacks
-    def tearDown(self):
-        """Tear down."""
-        self._cooperator.stop()
-        yield super(TestUploadJob, self).tearDown()
+        self.addCleanup(self._cooperator.stop)
 
     @defer.inlineCallbacks
     def make_upload(self, size):
@@ -2410,7 +2401,6 @@ class TestUploadJob(TestWithDatabase):
         size = self.double_size
         deflated_data, hash_value, upload_job = yield self.make_upload(size)
         yield upload_job.connect()
-        all_sent_deferred = defer.Deferred()
 
         # now let's upload some data
         def data_iter(chunk_size=request.MAX_MESSAGE_SIZE):
@@ -2418,10 +2408,8 @@ class TestUploadJob(TestWithDatabase):
             for part in range(0, len(deflated_data), chunk_size):
                 yield upload_job.add_data(
                     deflated_data[part:part + chunk_size])
-            all_sent_deferred.callback(True)
 
-        self._cooperator.coiterate(data_iter())
-        yield all_sent_deferred
+        yield self._cooperator.coiterate(data_iter())
         yield upload_job.commit()
 
         # verify node content

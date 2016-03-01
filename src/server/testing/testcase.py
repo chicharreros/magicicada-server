@@ -92,9 +92,8 @@ class State(object):
 
 
 class BaseProtocolTestCase(TwistedTestCase):
-    """
-    Reusable part of ProtocolTestCase
-    """
+    """Reusable part of ProtocolTestCase."""
+
     # do we need to create oops files?
     createOOPSFiles = False
     heartbeat_interval = 0
@@ -408,10 +407,10 @@ class TestWithDatabase(ProtocolTestCase, StorageDALTestCase):
         yield super(TestWithDatabase, self).setUp()
 
         users = (
-            (0, u'usr0', 'pass0'),
-            (1, u'usr1', 'pass1'),
+            (0, u'usr0', 'open sesame'),
+            (1, u'usr1', 'friend'),
             (2, u'usr2', 'pass2'),
-            (3, u'usr3', 'pass3'),
+            (3, u'usr3', 'usr3'),
         )
         for user_id, username, password in users:
             user = create_test_user(
@@ -419,6 +418,9 @@ class TestWithDatabase(ProtocolTestCase, StorageDALTestCase):
             setattr(self, username, user)
             # set the password in the object just as a test simplifier
             user.password = password
+            dummy_tokens = getattr(self.auth_provider_class, '_allowed', None)
+            if dummy_tokens:
+                dummy_tokens[password] = user.id
 
         # tune the config for this tests
         self.patch(settings.api_server, 'STORAGE_CHUNK_SIZE', 1024 * 64)

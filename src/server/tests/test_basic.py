@@ -409,6 +409,9 @@ class ServerStatusTest(TestWithDatabase):
     @defer.inlineCallbacks
     def test_status_OK(self):
         """Test the OK status response."""
+        status = self.site.resource.children['status']
+        # override user_id with a existing user
+        status.user_id = self.usr0.id
         response = yield client.getPage(self.url)
         self.assertEqual(response, 'Status OK\n')
 

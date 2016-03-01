@@ -44,7 +44,7 @@ class TestCreateShare(TestWithDatabase):
         """Test deletion of an offered by me share."""
 
         @defer.inlineCallbacks
-        def _do_delete(client):
+        def do_delete(client):
             """Callback to do delete."""
             # authenticate and create a root to share
             yield client.dummy_authenticate("open sesame")
@@ -55,14 +55,8 @@ class TestCreateShare(TestWithDatabase):
             yield client.delete_share(share_id)
             self.assertRaises(errors.DoesNotExist,
                               self.usr1.get_share, share_id)
-            client.test_done()
 
-        def do_delete(client):
-            """Test body callback."""
-            d = _do_delete(client)
-            d.addErrback(client.test_fail)
-
-        return self.callback_test(do_delete)
+        return self.callback_test(do_delete, add_default_callbacks=True)
 
     def test_delete_volume(self):
         """Test deletion of an offered to me and accepted share."""
@@ -542,11 +536,11 @@ class TestSharesWithData(TestWithDatabase):
         subsubdir = subdir.make_subdirectory(u"subsubdir")
         subsubfile = subsubdir.make_file(u"subsubfile")
 
-        share = root2.share(0, u"foo", readonly=True)
+        share = root2.share(self.usr0.id, u"foo", readonly=True)
         share_other = root2.share(self.usr1.id, u"foo", readonly=True)
-        subshare = subdir.share(0, u"foo2", readonly=True)
-        share_owner = root1.share(0, u"foo3", readonly=True)
-        share_modify = rwdir.share(0, u"foo4")
+        subshare = subdir.share(self.usr0.id, u"foo2", readonly=True)
+        share_owner = root1.share(self.usr0.id, u"foo3", readonly=True)
+        share_modify = rwdir.share(self.usr0.id, u"foo4")
         for s in self.usr0.get_shared_to(accepted=False):
             s.accept()
         for s in self.usr1.get_shared_to(accepted=False):
@@ -835,7 +829,7 @@ class TestListShares(TestWithDatabase):
     def _create_share(self, _, accepted=False):
         """Creates a share, optionally accepted."""
         root = self.usr1.root.load()
-        share = root.share(0, u"sharename", readonly=True)
+        share = root.share(self.usr0.id, u"sharename", readonly=True)
         if accepted:
             self.usr0.get_share(share.id).accept()
         # save the node id to be able to compare it later
@@ -1067,113 +1061,110 @@ class TestSharesNotified(TestWithDatabase):
 
     def test_notify_shared_node(self):
         """The notif should be sent to other users if the node is shared."""
+
+        d1 = defer.Deferred()
+        d2 = defer.Deferred()
+
+        @defer.inlineCallbacks
         def login1(client):
             """client1 login"""
-            self._state.client1 = client
-            d = client.dummy_authenticate("open sesame")  # for user #0
-            d.addCallback(lambda _: new_client())
-            d.addCallback(make_notification)
+            self.addCleanup(client.transport.loseConnection)
+            yield client.dummy_authenticate("open sesame")  # for user #0
+            # new client
+            reactor.connectTCP('localhost', self.port, factory2)
+            yield d2
+            # get the root
+            root_id = yield client.get_root()
+            # create the share
+            yield client.create_share(
+                root_id, self.usr1.username, u"name", Share.VIEW)
+            # mark the share as accepted by hand, so we don't
+            # have to emulate the whole process just for this test
+            shares = [s for s in self.usr1.get_shared_to()
+                      if s.shared_by_id == self.usr0.id]
+            share = shares[0]
+            share.accept()
+            # also store it in the state for further control
+            self._state.share_id = share.id
+            # create a file in the root
+            yield client.make_file(request.ROOT, root_id, "hola")
 
+        @defer.inlineCallbacks
         def login2(client):
             """client2 login"""
-            self._state.client2 = client
+            self.addCleanup(client.transport.loseConnection)
             client.set_volume_new_generation_callback(on_notification)
-            d = client.dummy_authenticate("friend")  # for user #1
-            d.addCallback(done_auth)
+            yield client.dummy_authenticate("friend")  # for user #1
+            d2.callback(None)
 
         # setup
         factory = FactoryHelper(login1)
         factory2 = FactoryHelper(login2)
-        d1 = defer.Deferred()
-        d2 = defer.Deferred()
         timeout = reactor.callLater(3, d1.errback, Exception("timeout"))
-
-        def new_client():
-            """add the second client"""
-            reactor.connectTCP('localhost', self.port, factory2)
-            return d2
 
         def on_notification(volume, generation):
             """notification arrived, check and cleanup"""
             # check
             self.assertEqual(volume, self._state.share_id)
-
             # cleanup
             factory.timeout.cancel()
             factory2.timeout.cancel()
             timeout.cancel()
             d1.callback(True)
-            self._state.client1.transport.loseConnection()
-            self._state.client2.transport.loseConnection()
-
-        def done_auth(result):
-            """authentication done for client2, we can start making changes"""
-            d2.callback(result)
-
-        def mark_share(_):
-            # mark the share as accepted by hand, so we don't
-            # have to emulate the whole process just for this test
-            shares = [s for s in self.usr1.get_shared_to()
-                      if s.shared_by_id == 0]
-            share = shares[0]
-            share.accept()
-            # also store it in the state for further control
-            self._state.share_id = share.id
-
-        def make_notification(_):
-            """create a change that should create a notification"""
-            # create the share
-            d = self._state.client1.get_root()
-            d.addCallback(self.save_req, 'root_id')
-
-            # create the share
-            d.addCallback(
-                lambda r: self._state.client1.create_share(
-                    r, self.usr1.username, u"name", Share.VIEW))
-            d.addCallback(mark_share)
-
-            # create a file in the root
-            d.addCallback(
-                lambda _: self._state.client1.make_file(
-                    request.ROOT, self._state.root_id, "hola"))
 
         reactor.connectTCP('localhost', self.port, factory)
         return d1
 
     def test_share_node_deleted(self):
-        '''Remove the node that was shared.'''
+        """Remove the node that was shared."""
+
+        d1 = defer.Deferred()
+        d2 = defer.Deferred()
+
+        @defer.inlineCallbacks
         def login1(client):
             """client1 login"""
+            self.addCleanup(client.transport.loseConnection)
             self._state.client1 = client
-            d = client.dummy_authenticate("open sesame")  # for user #0
-            d.addCallback(new_client)
-            d.addCallback(make_notification)
+            yield client.dummy_authenticate("open sesame")  # for user #0
+            reactor.connectTCP('localhost', self.port, factory2)
+            yield d2
+            # create the share
+            root_id = yield client.get_root()
+            # create the dir to share
+            req = yield client.make_dir(request.ROOT, root_id, "hi")
+            # create the share
+            yield client.create_share(
+                req.new_id, self.usr1.username, u"name", Share.VIEW)
+            # mark the share as accepted by hand, so we don't
+            # have to emulate the whole process just for this test
+            share = self.usr1.get_shared_to(accepted=False)[0]
+            share.accept()
+            # also store it in the state for further control
+            self._state.share_id = share.id
+            # remove the shared node
+            yield client.unlink(request.ROOT, req.new_id)
 
+        @defer.inlineCallbacks
         def login2(client):
             """client2 login"""
+            self.addCleanup(client.transport.loseConnection)
             self._state.client2 = client
             client.set_share_change_callback(notif1)
-            d = client.dummy_authenticate("friend")  # for user #1
-            d.addCallback(done_auth)
+            yield client.dummy_authenticate("friend")  # for user #1
+            d2.callback(True)
 
         # setup
         factory = FactoryHelper(login1)
         factory2 = FactoryHelper(login2)
-        d1 = defer.Deferred()
-        d2 = defer.Deferred()
         timeout = reactor.callLater(3, d1.errback, Exception("timeout"))
 
-        def new_client(_):
-            """add the second client"""
-            reactor.connectTCP('localhost', self.port, factory2)
-            return d2
-
         def notif1(share_info):
-            '''First notification, for the created share.'''
+            """First notification, for the created share."""
             self._state.client2.set_share_delete_callback(notif2)
 
         def notif2(share_id):
-            '''Second notification, the tested one.'''
+            """Second notification, the tested one."""
             # find the real share
             self.assertRaises(errors.DoesNotExist,
                               self.usr1.get_share, self._state.share_id)
@@ -1182,50 +1173,13 @@ class TestSharesNotified(TestWithDatabase):
             factory.timeout.cancel()
             factory2.timeout.cancel()
             timeout.cancel()
-            d1.callback((share_id))
-            self._state.client1.transport.loseConnection()
-            self._state.client2.transport.loseConnection()
-
-        def done_auth(result):
-            """authentication done for client2, we can start making changes"""
-            d2.callback(result)
-
-        def mark_share(_):
-            # mark the share as accepted by hand, so we don't
-            # have to emulate the whole process just for this test
-            share = self.usr1.get_shared_to(accepted=False)[0]
-            share.accept()
-            # also store it in the state for further control
-            self._state.share_id = share.id
-
-        def make_notification(_):
-            """create a change that should create a notification"""
-            # create the share
-            client1 = self._state.client1
-            d = client1.get_root()
-            d.addCallback(self.save_req, 'root_id')
-
-            # create the dir to share
-            d.addCallback(lambda r: client1.make_dir(request.ROOT, r, "hi"))
-            d.addCallback(self.save_req, "req")
-
-            # create the share
-            d.addCallback(
-                lambda _: client1.create_share(
-                    self._state.req.new_id, self.usr1.username,
-                    u"name", Share.VIEW))
-            d.addCallback(mark_share)
-
-            # remove the shared node
-            d.addCallback(
-                lambda _: client1.unlink(request.ROOT, self._state.req.new_id))
+            d1.callback(share_id)
 
         reactor.connectTCP('localhost', self.port, factory)
         return d1
-    test_share_node_deleted.skip = 'LP: #766088'
 
     def test_share_node_overwritten_with_move(self):
-        '''Move something else over the node that was shared.'''
+        """Move something else over the node that was shared."""
         def login1(client):
             """client1 login"""
             self._state.client1 = client
@@ -1253,11 +1207,11 @@ class TestSharesNotified(TestWithDatabase):
             return d2
 
         def notif1(share_id):
-            '''First notification, for the created share.'''
+            """First notification, for the created share."""
             self._state.client2.set_share_delete_callback(notif2)
 
         def notif2(share_id):
-            '''Second notification, the tested one.'''
+            """Second notification, the tested one."""
             # find the real share
             self.assertRaises(errors.DoesNotExist,
                               self.usr1.get_share, self._state.share_id)

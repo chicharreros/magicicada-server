@@ -125,21 +125,19 @@ class TestOops(TestWithDatabase):
         """Test that the user id and username is included in the extra data"""
         @defer.inlineCallbacks
         def poisoned_ping(client):
-            try:
-                pd = self.service.factory.protocols[0].wait_for_poison()
-                self.service.factory.protocols[0].poison("ping")
-                message = protocol_pb2.Message()
-                message.id = 5
-                message.type = protocol_pb2.Message.PING
-                client.sendMessage(message)
-                yield pd
+            pd = self.service.factory.protocols[0].wait_for_poison()
+            self.service.factory.protocols[0].poison("ping")
+            message = protocol_pb2.Message()
+            message.id = 5
+            message.type = protocol_pb2.Message.PING
+            client.sendMessage(message)
+            yield pd
 
-                oops_data = self.get_oops_data()
-                self.assertEqual("Service was poisoned with: ping",
-                                 oops_data["value"])
-                self.assertEqual("0,0,usr0", oops_data["username"])
-            except Exception, e:
-                raise e
+            oops_data = self.get_oops_data()
+            self.assertEqual("Service was poisoned with: ping",
+                             oops_data["value"])
+            self.assertEqual("%s,%s,usr0" % (self.usr0.id, self.usr0.id),
+                             oops_data["username"])
 
         def auth(client):
             d = client.dummy_authenticate("open sesame")

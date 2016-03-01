@@ -773,20 +773,20 @@ class TestFSM(TestWithDatabase):
             d.addCallback(lambda _: self.wait_for_nirvana(.5))
         return d
 
+    @defer.inlineCallbacks
     def test_connection_lost(self):
         """Try to connect."""
-        d = self.connect()
         dd = defer.Deferred()
-        d.addCallback(lambda _: self.wait_for_nirvana(.5))
-        d.addCallback(lambda _: self.aq.connector.transport.loseConnection())
-        d.addCallback(lambda _: reactor.callLater(1, dd.callback, None))
-        d.addCallback(lambda _: dd)
+
+        yield self.connect()
+        yield self.wait_for_nirvana(.5)
+        yield self.aq.connector.transport.loseConnection()
+        yield reactor.callLater(1, dd.callback, None)
+        yield dd
         # check that the connection lost event is issued:
-        d.addCallback(lambda _: self.assertIn(('SYS_CONNECTION_LOST', {}),
-                                              self.listener.q))
+        yield self.assertIn(('SYS_CONNECTION_LOST', {}), self.listener.q)
         # test that we reconnect:
-        d.addCallback(lambda _: self.wait_for_nirvana(.5))
-        return d
+        yield lambda _: self.wait_for_nirvana(.5)
 
     def test_init(self):
         """Check that, when started, state is INIT."""

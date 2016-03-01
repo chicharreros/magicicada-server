@@ -92,8 +92,10 @@ class TestListVolumes(TestWithDatabase):
             d.addCallbacks(client.test_done, client.test_fail)
         return self.callback_test(auth)
 
-    def _create_share(self, _, accept=False, dead=False, from_id=1):
+    def _create_share(self, _, accept=False, dead=False, from_id=None):
         """Create the share to me."""
+        if from_id is None:
+            from_id = self.usr1.id
         fromusr = get_storage_user(from_id)
         node = fromusr.root.load()
         share = node.share(self.usr0.id, u"name", readonly=True)
@@ -324,28 +326,29 @@ class TestListVolumes(TestWithDatabase):
             self.assertEqual(share.free_bytes,
                              self.usr1.get_quota().free_bytes)
 
+        @defer.inlineCallbacks
         def auth(client):
             """Authenticate and test."""
-            d = client.dummy_authenticate("open sesame")
-            d.addCallback(lambda r: client.get_root())
-            d.addCallback(self.save_req, "root")
+            client.dummy_authenticate("open sesame")
+            root = yield client.get_root()
+            self.save_req(root, "root")
 
             # create two udfs, kill one
-            d.addCallback(lambda _: client.create_udf(u"~/ñ", u"foo"))
-            d.addCallback(self.save_req, "udf")
-            d.addCallback(lambda _: client.create_udf(u"~/moño", u"groovy"))
-            d.addCallback(lambda r: client.delete_volume(r.volume_id))
+            udf = yield client.create_udf(u"~/ñ", u"foo")
+            self.save_req(udf, "udf")
+            result = yield client.create_udf(u"~/moño", u"groovy")
+            yield client.delete_volume(result.volume_id)
 
             # create two shares, one dead (the second one should be the live
             # one because the helper function stores data for comparison)
-            d.addCallback(self._create_share, accept=True, dead=True)
-            d.addCallback(self._create_share, accept=True, from_id=2)
+            self._create_share(None, accept=True, dead=True)
+            self._create_share(None, accept=True, from_id=self.usr2.id)
 
             # list the volumes and check
-            d.addCallback(lambda _: client.list_volumes())
-            d.addCallback(check)
-            d.addCallbacks(client.test_done, client.test_fail)
-        return self.callback_test(auth)
+            req = yield client.list_volumes()
+            check(req)
+
+        return self.callback_test(auth, add_default_callbacks=True)
 
 
 class TestDataWithVolumes(TestWithDatabase):

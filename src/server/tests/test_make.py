@@ -25,7 +25,7 @@ import zlib
 
 from StringIO import StringIO
 
-from twisted.internet import threads, defer
+from twisted.internet import defer
 
 from backends.filesync import errors
 from ubuntuone.storageprotocol import request, volumes
@@ -50,27 +50,23 @@ class TestMakeFile(TestWithDatabase):
         return self.callback_test(auth)
 
     def build_mime_test(filename, file_mime):
-        """create test cases for mime type checking."""
+        """Create test cases for mime type checking."""
         def test_mkfile_mime_type(self):
             """Create a file."""
+            @defer.inlineCallbacks
             def auth(client):
                 def check_file(result):
-                    def _check_file():
-                        try:
-                            file = self.usr0.get_node(result.new_id)
-                        except errors.DoesNotExist:
-                            raise ValueError("storage object is missing")
-                        assert(file.mimetype == file_mime)
-                    d = threads.deferToThread(_check_file)
-                    return d
-                d = client.dummy_authenticate("open sesame")
-                d.addCallbacks(lambda r: client.get_root(), client.test_fail)
-                d.addCallbacks(
-                    lambda r: client.make_file(request.ROOT, r, filename),
-                    client.test_fail)
-                d.addCallback(check_file)
-                d.addCallbacks(client.test_done, client.test_fail)
-            return self.callback_test(auth)
+                    try:
+                        f = self.usr0.get_node(result.new_id)
+                    except errors.DoesNotExist:
+                        raise ValueError("storage object is missing")
+                    self.assertEqual(f.mimetype, file_mime)
+
+                yield client.dummy_authenticate("open sesame")
+                root = yield client.get_root()
+                result = yield client.make_file(request.ROOT, root, filename)
+                check_file(result)
+            return self.callback_test(auth, add_default_callbacks=True)
         return test_mkfile_mime_type
 
     test_mkfile_mime1 = build_mime_test("image.png", "image/png")

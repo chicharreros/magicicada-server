@@ -33,7 +33,8 @@ from ubuntuone.syncdaemon import states
 
 
 class TestSharesSync(test_sync.TestSync):
-    """ Base class for shares tests. """
+    """Base class for shares tests."""
+
     called = 0
 
     def handle_SYS_STATE_CHANGED(self, state):
