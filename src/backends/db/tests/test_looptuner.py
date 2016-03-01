@@ -21,6 +21,8 @@
 These are the edge test cases that don't belong in the doctest.
 """
 
+from __future__ import unicode_literals
+
 import math
 import time
 

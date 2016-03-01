@@ -16,9 +16,9 @@
 #
 # For further info, check  http://launchpad.net/magicicada-server
 
-"""A data access layer for storage data
+"""A data access layer for storage data.
 
-The data access layer serves as an abstraction to the data model. Storm models,
+The data access layer serves as an abstraction to the data model. Models,
 referencesets, recordsets are converted to Data Access Objects (DAO)
 or lists of DAOs and all access is subsequently performed via the DAO.
 

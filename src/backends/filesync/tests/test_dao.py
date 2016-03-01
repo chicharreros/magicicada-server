@@ -48,17 +48,20 @@ from backends.filesync.tests.testcase import StorageDALTestCase
 
 
 class DAOInitTestCase(StorageDALTestCase):
-    """Test to make sure DAOs are properly initialized from the storm models.
+    """Test to make sure DAOs are properly initialized from the models.
 
     These tests have no database access.
     """
 
-    def _compare_props(self, storm_object, dao_object, properties):
-        """Compare the common properties between a storm model and dao"""
+    def _compare_props(self, instance, dao_object, properties):
+        """Compare the common properties between a model and dao."""
         for prop in properties:
+            instance_value = getattr(instance, prop)
+            dao_value = getattr(dao_object, prop)
             self.assertEqual(
-                getattr(storm_object, prop), getattr(dao_object, prop),
-                'Property %s does not match' % prop)
+                instance_value, dao_value,
+                'Property %r does not match (instance has %r, dao has %r)' %
+                (prop, instance_value, dao_value))
 
     def test_StorageUser(self):
         """Test StorageUser init"""
@@ -243,7 +246,7 @@ class VolumeProxyTestCase(StorageDALTestCase):
         root = user.volume().root
         # the root on the volume proxy is an uninitialized DirectoryNode
         # the id is set to 'root' until it get's resolve.
-        self.assertTrue(isinstance(root, services.DirectoryNode))
+        self.assertIsInstance(root, services.DirectoryNode)
         # the root won't get resolved until a db operation is needed
         self.assertEqual(volume.root.id, 'root')
         self.assertEqual(root.id, 'root')
@@ -301,8 +304,8 @@ class VolumeProxyTestCase(StorageDALTestCase):
         user = self.create_user()
         volume = user.volume().get_volume()
         root = user.volume().get_root()
-        self.assertTrue(isinstance(root, services.DirectoryNode))
-        self.assertTrue(isinstance(volume, services.DAOUserVolume))
+        self.assertIsInstance(root, services.DirectoryNode)
+        self.assertIsInstance(volume, services.DAOUserVolume)
         self.assertEqual(volume.id, user.root_volume_id)
         self.assertEqual(root.id, volume.root_id)
 
@@ -312,8 +315,8 @@ class VolumeProxyTestCase(StorageDALTestCase):
         udf = user.make_udf('~/Documents')
         volume = user.volume(udf.id).get_volume()
         root = user.volume(udf.id).get_root()
-        self.assertTrue(isinstance(root, services.DirectoryNode))
-        self.assertTrue(isinstance(volume, services.DAOUserVolume))
+        self.assertIsInstance(root, services.DirectoryNode)
+        self.assertIsInstance(volume, services.DAOUserVolume)
         self.assertEqual(volume.id, udf.id)
         self.assertEqual(root.id, volume.root_id)
 
@@ -325,8 +328,8 @@ class VolumeProxyTestCase(StorageDALTestCase):
         user2.get_share(share.id).accept()
         volume = user2.volume(share.id).get_volume()
         root = user2.volume(share.id).get_root()
-        self.assertTrue(isinstance(root, services.DirectoryNode))
-        self.assertTrue(isinstance(volume, services.DAOUserVolume))
+        self.assertIsInstance(root, services.DirectoryNode)
+        self.assertIsInstance(volume, services.DAOUserVolume)
         self.assertEqual(volume.id, user.root_volume_id)
         self.assertEqual(root.id, volume.root_id)
 
@@ -351,7 +354,7 @@ class VolumeProxyTestCase(StorageDALTestCase):
         nodes = user.volume().get_all_nodes(mimetypes=['xxx'])
         self.assertEqual(nodes, [])
         nodes = user.volume().get_all_nodes(mimetypes=[mime],
-                                            with_content='True')
+                                            with_content=True)
         self.assertEqual(nodes, files)
         self.assertEqual(nodes[0].content.hash, hash)
 
@@ -625,9 +628,11 @@ class DAOTestCase(StorageDALTestCase):
         self.assertEqual(userb_e.full_path, '/d/e')
         # make sure paths in deltas are correct
         vol, free, delta = userb.volume(share.id).get_delta(0)
+        self.assertEqual(len(delta), 2)
         self.assertEqual(delta[0].full_path, '/d')
         self.assertEqual(delta[1].full_path, '/d/e')
         vol, free, delta = userb.volume(share.id).get_from_scratch()
+        self.assertEqual(len(delta), 3)
         self.assertEqual(delta[0].full_path, '/')
         self.assertEqual(delta[1].full_path, '/d')
         self.assertEqual(delta[2].full_path, '/d/e')
@@ -667,22 +672,22 @@ class DAOTestCase(StorageDALTestCase):
         share = user.root.share(user2.id, 'TheShare')
         share2 = user2.get_share(share.id)
         s = share2.accept()
-        self.assertTrue(s is share2)
+        self.assertIs(s, share2)
         s = share.set_access(True)
-        self.assertTrue(s is share)
+        self.assertIs(s, share)
         s = share.delete()
-        self.assertTrue(s is share)
+        self.assertIs(s, share)
         share = user.root.share(user2.id, 'TheShare')
         share2 = user2.get_share(share.id)
         s = share2.decline()
-        self.assertTrue(s is share2)
+        self.assertIs(s, share2)
 
     def test_DirectoryNode(self):
         """Test DirectoryNode features in api."""
         user = self.create_user()
         root = user.volume().root
         dir = root.make_subdirectory('A New Subdirectory')
-        self.assertTrue(isinstance(dir, services.DirectoryNode))
+        self.assertIsInstance(dir, services.DirectoryNode)
         self.assertEqual(dir.parent_id, root.id)
         children = root.get_children()
         self.assertEqual(len(children), 1)
@@ -707,7 +712,7 @@ class DAOTestCase(StorageDALTestCase):
         self.assertFalse(root.has_children())
         self.assertFalse(root.has_children(kind=StorageObject.FILE))
         self.assertFalse(root.has_children(kind=StorageObject.DIRECTORY))
-
+        #
         # do it the lazy way:
         #
         dir = user.volume().root.make_subdirectory('LazyDir')
@@ -732,7 +737,7 @@ class DAOTestCase(StorageDALTestCase):
         user = self.create_user()
         root = user.root
         file = root.make_file('A new file')
-        self.assertTrue(isinstance(file, services.FileNode))
+        self.assertIsInstance(file, services.FileNode)
         self.assertEqual(file.parent_id, root.id)
         children = root.get_children()
         self.assertEqual(len(children), 1)
@@ -878,7 +883,7 @@ class DAOTestCase(StorageDALTestCase):
                           size, deflated_size, storage_key, enforce_quota=True)
         node = f(name, hash, crc, size, deflated_size, storage_key,
                  mimetype=mime, enforce_quota=False)
-        self.assertTrue(node is not None)
+        self.assertIsNotNone(node)
 
     def test_make_file_with_content_overwrite_hashmismatch(self):
         """Make file with contentblob enforces quota check (or not)."""
@@ -931,12 +936,12 @@ class DAOTestCase(StorageDALTestCase):
                                   multipart_key=uuid.uuid4())
         old = job.when_last_active
         job.add_part(10)
-        self.assertTrue(job.when_last_active > old)
+        self.assertGreater(job.when_last_active, old)
         self.assertEqual(job.uploaded_bytes, 10)
         self.assertEqual(job.chunk_count, 1)
         old = job.when_last_active
         job.add_part(10)
-        self.assertTrue(job.when_last_active > old)
+        self.assertGreater(job.when_last_active, old)
         self.assertEqual(job.uploaded_bytes, 20)
         self.assertEqual(job.chunk_count, 2)
         self.assertEqual(job.file, file)
@@ -947,7 +952,7 @@ class DAOTestCase(StorageDALTestCase):
                                   multipart_key=uuid.uuid4())
         old = job.when_last_active
         job.touch()
-        self.assertTrue(job.when_last_active > old)
+        self.assertGreater(job.when_last_active, old)
 
     def test_encode_decode(self):
         """Make sure encode/decode can handle UUIDs properly."""
@@ -1108,8 +1113,7 @@ class DAOTestCase(StorageDALTestCase):
             udf_file.change_public_access(True)
             # user has no access to noread files
         nodes = user.get_public_files()
-        self.assertTrue(isinstance(nodes, list),
-                        'get_public_files should return a list')
+        self.assertIsInstance(nodes, list)
         self.assertEqual(10, len(nodes))
 
     def test_get_public_folders(self):
@@ -1120,8 +1124,7 @@ class DAOTestCase(StorageDALTestCase):
             d = user.root.make_subdirectory('folder_%s' % i)
             d.change_public_access(True, allow_directory=True)
         nodes = user.get_public_folders()
-        self.assertTrue(isinstance(nodes, list),
-                        'get_public_folders should return a list')
+        self.assertIsInstance(nodes, list)
         self.assertEqual(5, len(nodes))
 
     def test_change_public_access_file(self):
@@ -1216,13 +1219,8 @@ class DAOTestCase(StorageDALTestCase):
         self.create_file(user, size=file_size)
         self.assertEqual(user.get_quota().free_bytes, 0)
 
-        try:
-            user.volume().undelete_all('RestoreHere')
-        except errors.QuotaExceeded:
-            self.fail("Shouldn't have failed to undelete when exceeding "
-                      "quota.")
-        else:
-            self.assertEqual(user.get_quota().free_bytes, 0)
+        user.volume().undelete_all('RestoreHere')
+        self.assertEqual(user.get_quota().free_bytes, 0)
 
     def test_reusable_content(self):
         """Test StorageUser.is_reusable_content."""
@@ -1303,7 +1301,7 @@ class DAOTestCase(StorageDALTestCase):
         """Make file with contentblob."""
         user = self.create_user(max_storage_bytes=200000)
         dirs = user.volume().get_directories_with_mimetypes(['image/jpeg'])
-        self.assertEqual(len(dirs), 0)
+        self.assertEqual(dirs, [])
         hash = self.factory.get_fake_hash()
         key = uuid.uuid4()
         crc = 12345
@@ -1324,19 +1322,15 @@ class DAOTestCase(StorageDALTestCase):
         ab.make_file_with_content('file2.txt', hash, crc, size, dsize, key)
         ab.make_file('file3.jpg')
         dirs = user.volume().get_directories_with_mimetypes(['image/jpeg'])
-        self.assertEqual(len(dirs), 2)
-        self.assertTrue('/a' in [d.full_path for d in dirs])
-        self.assertTrue('/b' in [d.full_path for d in dirs])
+        dirs = [d.full_path for d in dirs]
+        self.assertItemsEqual(dirs, ['/a', '/b'])
         dirs = user.volume().get_directories_with_mimetypes(['text/plain'])
-        self.assertEqual(len(dirs), 2)
-        self.assertTrue('/a/b' in [d.full_path for d in dirs])
-        self.assertTrue('/b' in [d.full_path for d in dirs])
+        dirs = [d.full_path for d in dirs]
+        self.assertItemsEqual(dirs, ['/a/b', '/b'])
         dirs = user.volume().get_directories_with_mimetypes(
             ['image/jpeg', 'text/plain'])
-        self.assertEqual(len(dirs), 3)
-        self.assertTrue('/a' in [d.full_path for d in dirs])
-        self.assertTrue('/a/b' in [d.full_path for d in dirs])
-        self.assertTrue('/b' in [d.full_path for d in dirs])
+        dirs = [d.full_path for d in dirs]
+        self.assertItemsEqual(dirs, ['/a', '/a/b', '/b'])
 
 
 class GenerationsDAOTestCase(StorageDALTestCase):

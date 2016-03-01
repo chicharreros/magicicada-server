@@ -22,13 +22,13 @@ from __future__ import unicode_literals
 
 import datetime
 import logging
+import posixpath
 import os
 import types
 import uuid
 
 from operator import attrgetter
 
-import posixpath as pypath
 from mock import patch
 from psycopg2 import IntegrityError
 from storm.locals import Store
@@ -69,6 +69,7 @@ from backends.filesync.models import (
     UserVolume,
 )
 from backends.filesync.notifier.notifier import (
+    EventNotifier,
     ShareAccepted,
     ShareCreated,
     ShareDeclined,
@@ -106,15 +107,27 @@ class FakeUDF(object):
         self.path = path
 
 
+class DummyNotifier(EventNotifier):
+    """Keep track of notifications sent from gateway via notifier."""
+
+    def __init__(self):
+        super(DummyNotifier, self).__init__()
+        self.notifications = []
+
+    def on_event(self, value):
+        self.notifications.append(value)
+
+    def reset(self):
+        self.notifications = []
+
+
 class GatewayBaseTestCase(StorageDALTestCase):
-    """Test the System level gateway"""
+    """Test the System level gateway."""
 
     def setUp(self):
         super(GatewayBaseTestCase, self).setUp()
-        self.gw = GatewayBase()
-        self.notifications = []
-        self.patch(self.gw._notifier, 'on_event',
-                   lambda e: self.notifications.append(e))
+        self.dummy_notifier = DummyNotifier()
+        self.gw = GatewayBase(notifier=self.dummy_notifier)
 
     def test_get_user(self):
         """Test get_user"""
@@ -170,7 +183,7 @@ class GatewayBaseTestCase(StorageDALTestCase):
         vol_id = uuid.uuid4()
         self.gw.queue_new_generation(1, vol_id, 3)
         transaction.commit()
-        self.assertEqual(self.notifications, [
+        self.assertEqual(self.dummy_notifier.notifications, [
             VolumeNewGeneration(1, vol_id, 3, self.gw.session_id)
         ])
 
@@ -187,7 +200,7 @@ class GatewayBaseTestCase(StorageDALTestCase):
                           access, accepted)
         getattr(self.gw, method_name)(share)
         transaction.commit()
-        self.assertEqual(self.notifications, [
+        self.assertEqual(self.dummy_notifier.notifications, [
             event_class(share_id, name, root_id, shared_by_id, shared_to_id,
                         access, accepted)
         ])
@@ -217,7 +230,7 @@ class GatewayBaseTestCase(StorageDALTestCase):
         udf = FakeUDF(owner_id, root_id, udf_id, suggested_path)
         self.gw.queue_udf_create(udf)
         transaction.commit()
-        self.assertEqual(self.notifications, [
+        self.assertEqual(self.dummy_notifier.notifications, [
             UDFCreate(owner_id, root_id, udf_id, suggested_path,
                       self.gw.session_id)
         ])
@@ -231,7 +244,8 @@ class GatewayBaseTestCase(StorageDALTestCase):
         udf = FakeUDF(owner_id, udf_id, root_id, suggested_path)
         self.gw.queue_udf_delete(udf)
         transaction.commit()
-        self.assertEqual(self.notifications, [UDFDelete(owner_id, udf_id)])
+        self.assertEqual(
+            self.dummy_notifier.notifications, [UDFDelete(owner_id, udf_id)])
 
 
 class EventNotificationTest(StorageDALTestCase):
@@ -240,13 +254,12 @@ class EventNotificationTest(StorageDALTestCase):
     def setUp(self):
         super(EventNotificationTest, self).setUp()
         self.user = self.create_user(id=1, username='user1')
-        self.gw = GatewayBase(session_id=uuid.uuid4())
-        self.vgw = ReadWriteVolumeGateway(self.user)
+        self.dummy_notifier = DummyNotifier()
+        self.gw = GatewayBase(
+            session_id=uuid.uuid4(), notifier=self.dummy_notifier)
+        self.vgw = ReadWriteVolumeGateway(
+            self.user, notifier=self.dummy_notifier)
         self.root = self.vgw.get_root()
-
-        self.notifications = []
-        self.patch(self.vgw._notifier, 'on_event',
-                   lambda e: self.notifications.append(e))
 
     def setup_shares(self):
         """Create shares for tests"""
@@ -272,14 +285,14 @@ class EventNotificationTest(StorageDALTestCase):
         self.share2.accept()
         self.share3.accept()
         transaction.commit()
-        self.notifications = []
+        self.dummy_notifier.reset()
 
     def test_queue_new_generation_generation_None(self):
         """When a new volume generation is None."""
         vol_id = uuid.uuid4()
         self.gw.queue_new_generation(1, vol_id, None)
         transaction.commit()
-        self.assertEqual(self.notifications, [
+        self.assertEqual(self.dummy_notifier.notifications, [
             VolumeNewGeneration(1, vol_id, 0, self.gw.session_id)
         ])
 
@@ -291,16 +304,16 @@ class EventNotificationTest(StorageDALTestCase):
         transaction.commit()
         self.assertIn(VolumeNewGeneration(self.user.id, None, node.
                                           generation, self.vgw.session_id),
-                      self.notifications)
+                      self.dummy_notifier.notifications)
         self.assertIn(VolumeNewGeneration(self.user1.id, self.share1.id, node.
                                           generation, self.vgw.session_id),
-                      self.notifications)
+                      self.dummy_notifier.notifications)
         self.assertIn(VolumeNewGeneration(self.user2.id, self.share2.id, node.
                                           generation, self.vgw.session_id),
-                      self.notifications)
+                      self.dummy_notifier.notifications)
         self.assertIn(VolumeNewGeneration(self.user3.id, self.share3.id, node.
                                           generation, self.vgw.session_id),
-                      self.notifications)
+                      self.dummy_notifier.notifications)
 
     def test_handle_node_change_from_share(self):
         """Test the handle_node_change."""
@@ -313,23 +326,23 @@ class EventNotificationTest(StorageDALTestCase):
 
         self.assertIn(VolumeNewGeneration(self.user.id, None,
                                           node.generation, vgw.session_id),
-                      self.notifications)
+                      self.dummy_notifier.notifications)
         self.assertIn(VolumeNewGeneration(self.user3.id, self.share3.id,
                                           node.generation, vgw.session_id),
-                      self.notifications)
+                      self.dummy_notifier.notifications)
         self.assertIn(VolumeNewGeneration(self.user2.id, self.share2.id,
                                           node.generation, vgw.session_id),
-                      self.notifications)
+                      self.dummy_notifier.notifications)
         self.assertIn(VolumeNewGeneration(self.user1.id, self.share1.id,
                                           node.generation, vgw.session_id),
-                      self.notifications)
+                      self.dummy_notifier.notifications)
 
     def test_make_file(self):
         """Make sure make_file sends a notification."""
         # the root node gets a notification as a directory content change
         f = self.vgw.make_file(self.root.id, 'filename')
         transaction.commit()
-        self.assertEqual(self.notifications, [
+        self.assertEqual(self.dummy_notifier.notifications, [
             VolumeNewGeneration(self.user.id, None, f.generation,
                                 self.vgw.session_id)
         ])
@@ -342,7 +355,7 @@ class EventNotificationTest(StorageDALTestCase):
         f = self.vgw.make_file(self.root.id, 'filename', hash=cb.hash,
                                magic_hash='magic')
         transaction.commit()
-        self.assertEqual(self.notifications, [
+        self.assertEqual(self.dummy_notifier.notifications, [
             VolumeNewGeneration(self.user.id, None, f.generation,
                                 self.vgw.session_id)
         ])
@@ -355,7 +368,7 @@ class EventNotificationTest(StorageDALTestCase):
         # the root node gets a notification as a directory content change
         self.vgw.make_file(self.root.id, 'dirname')
         transaction.commit()
-        self.notifications = []
+        self.dummy_notifier.reset()
         self.vgw.make_file(self.root.id, 'dirname')
         transaction.commit()
 
@@ -370,10 +383,10 @@ class EventNotificationTest(StorageDALTestCase):
         f = self.vgw.make_file_with_content(
             self.root.id, name, hash, crc, size, deflated_size, storage_key)
         transaction.commit()
-        self.notifications = []
+        self.dummy_notifier.reset()
         f = self.vgw.delete_node(f.id)
         transaction.commit()
-        self.assertEqual(self.notifications, [
+        self.assertEqual(self.dummy_notifier.notifications, [
             VolumeNewGeneration(self.user.id, None, f.generation,
                                 self.vgw.session_id)
         ])
@@ -389,13 +402,13 @@ class EventNotificationTest(StorageDALTestCase):
         a_file = self.vgw.make_file_with_content(
             self.root.id, name, hash, crc, size, deflated_size, storage_key)
         transaction.commit()
-        self.notifications = []
+        self.dummy_notifier.reset()
         self.vgw.delete_node(a_file.id)
         transaction.commit()
-        self.notifications = []
+        self.dummy_notifier.reset()
         node = self.vgw.restore_node(a_file.id)
         transaction.commit()
-        self.assertEqual(self.notifications, [
+        self.assertEqual(self.dummy_notifier.notifications, [
             VolumeNewGeneration(self.user.id, None, node.generation,
                                 self.vgw.session_id)
         ])
@@ -405,7 +418,7 @@ class EventNotificationTest(StorageDALTestCase):
         # the root node gets a notification as a directory content change
         d = self.vgw.make_subdirectory(self.root.id, 'dirname')
         transaction.commit()
-        self.assertEqual(self.notifications, [
+        self.assertEqual(self.dummy_notifier.notifications, [
             VolumeNewGeneration(self.user.id, None, d.generation,
                                 self.vgw.session_id)
         ])
@@ -418,7 +431,7 @@ class EventNotificationTest(StorageDALTestCase):
         # the root node gets a notification as a directory content change
         self.vgw.make_subdirectory(self.root.id, 'dirname')
         transaction.commit()
-        self.notifications = []
+        self.dummy_notifier.reset()
         self.vgw.make_subdirectory(self.root.id, 'dirname')
         transaction.commit()
 
@@ -426,10 +439,10 @@ class EventNotificationTest(StorageDALTestCase):
         """Make sure make_subdirectory sends notifications."""
         d = self.vgw.make_subdirectory(self.root.id, 'dir')
         transaction.commit()
-        self.notifications = []
+        self.dummy_notifier.reset()
         d = self.vgw.delete_node(d.id)
         transaction.commit()
-        self.assertEqual(self.notifications, [
+        self.assertEqual(self.dummy_notifier.notifications, [
             VolumeNewGeneration(self.user.id, None, d.generation,
                                 self.vgw.session_id)
         ])
@@ -439,10 +452,11 @@ class EventNotificationTest(StorageDALTestCase):
         root_id = self.vgw.get_root().id
         d1 = self.vgw.make_subdirectory(root_id, 'dira1')
         transaction.commit()
-        self.notifications = []
+        self.dummy_notifier.reset()
         self.vgw.move_node(d1.id, d1.parent_id, d1.name)
         transaction.commit()
         # no expected events...
+        self.assertEqual(self.dummy_notifier.notifications, [])
 
     def test_move_notification_with_overwrite(self):
         """Make sure moves send the corrent notifications."""
@@ -458,11 +472,11 @@ class EventNotificationTest(StorageDALTestCase):
         self.vgw.make_file_with_content(dira1.id, name, hash, crc,
                                         size, deflated_size, storage_key)
         transaction.commit()
-        self.notifications = []
+        self.dummy_notifier.reset()
         n = self.vgw.move_node(dira2.id, root_id, 'dira1')
         transaction.commit()
         # we get two generations, one for the delete and one for the move
-        self.assertEqual(self.notifications, [
+        self.assertEqual(self.dummy_notifier.notifications, [
             VolumeNewGeneration(self.user.id, None, n.generation - 1,
                                 self.vgw.session_id),
             VolumeNewGeneration(self.user.id, None, n.generation,
@@ -475,10 +489,10 @@ class EventNotificationTest(StorageDALTestCase):
         dira1 = self.vgw.make_subdirectory(root_id, 'dira1')
         dira2 = self.vgw.make_subdirectory(dira1.id, 'dira2')
         transaction.commit()
-        self.notifications = []
+        self.dummy_notifier.reset()
         n = self.vgw.move_node(dira2.id, root_id, 'dirc1')
         transaction.commit()
-        self.assertEqual(self.notifications, [
+        self.assertEqual(self.dummy_notifier.notifications, [
             VolumeNewGeneration(self.user.id, None, n.generation,
                                 self.vgw.session_id)
         ])
@@ -496,7 +510,7 @@ class EventNotificationTest(StorageDALTestCase):
                                             size, deflated_size, storage_key,
                                             magic_hash=magic_hash)
         transaction.commit()
-        self.assertEqual(self.notifications, [
+        self.assertEqual(self.dummy_notifier.notifications, [
             VolumeNewGeneration(self.user.id, None, n.generation,
                                 self.vgw.session_id)
         ])
@@ -513,14 +527,14 @@ class EventNotificationTest(StorageDALTestCase):
         f(self.root.id, name, hash, crc, size, deflated_size,
           storage_key, mimetype='image/tif')
         transaction.commit()
-        self.notifications = []
+        self.dummy_notifier.reset()
         size = 101
         newhash = self.factory.get_fake_hash('CXXYYY')
         newstorage_key = uuid.uuid4()
         n = f(self.root.id, name, newhash, crc, size, deflated_size,
               newstorage_key)
         transaction.commit()
-        self.assertEqual(self.notifications, [
+        self.assertEqual(self.dummy_notifier.notifications, [
             VolumeNewGeneration(self.user.id, None, n.generation,
                                 self.vgw.session_id)
         ])
@@ -529,7 +543,7 @@ class EventNotificationTest(StorageDALTestCase):
         """Make sure make_content sends correct notifications."""
         filenode = self.vgw.make_file(self.root.id, 'the file name')
         transaction.commit()
-        self.notifications = []
+        self.dummy_notifier.reset()
         new_hash = self.factory.get_fake_hash()
         new_storage_key = uuid.uuid4()
         crc = 12345
@@ -539,7 +553,7 @@ class EventNotificationTest(StorageDALTestCase):
                                         new_hash, crc, size, def_size,
                                         new_storage_key)
         transaction.commit()
-        self.assertEqual(self.notifications, [
+        self.assertEqual(self.dummy_notifier.notifications, [
             VolumeNewGeneration(self.user.id, None, newnode.generation,
                                 self.vgw.session_id)
         ])
@@ -548,10 +562,10 @@ class EventNotificationTest(StorageDALTestCase):
         """Test that change_public_access don't send a node_update event."""
         f = self.vgw.make_file(self.root.id, 'filename')
         transaction.commit()
-        self.notifications = []
+        self.dummy_notifier.reset()
         f = self.vgw.change_public_access(f.id, True)
         transaction.commit()
-        self.assertEqual(self.notifications, [
+        self.assertEqual(self.dummy_notifier.notifications, [
             VolumeNewGeneration(self.user.id, None, f.generation,
                                 self.vgw.session_id)
         ])
@@ -577,7 +591,7 @@ class SystemGatewayTestCase(StorageDALTestCase):
         root = StorageObject.get_root(store, user.id)
         self.assertEqual(root.volume_id, user.root_volume_id)
         self.assertEqual(root.owner_id, user.id)
-        self.assertTrue(isinstance(user, DAOStorageUser))
+        self.assertIsInstance(user, DAOStorageUser)
 
     def test_create_or_update_user_update(self):
         """Test the basic make user method"""
@@ -790,7 +804,7 @@ class SystemGatewayTestCase(StorageDALTestCase):
         download2_url = 'http://download/url/2'
         download2 = self.gw.make_download(
             user.id, udf.id, file_path, download2_url, download_key)
-
+        assert download1.status_change_date < download2.status_change_date
         download = self.gw.get_download(
             user.id, udf.id, file_path, download1_url, download_key)
         self.assertNotEqual(download.id, download1.id)
@@ -1045,7 +1059,7 @@ class SystemGatewayPublicFileTestCase(StorageDALTestCase):
         utils.set_public_uuid = False
         file_dao = self.vgw.change_public_access(self.file.id, True)
         self.assertNotEquals(file_dao.public_id, None)
-        self.assertEqual(file_dao.public_uuid, None)
+        self.assertIsNotNone(file_dao.public_uuid)
         public_id = file_dao.public_id
         public_key = file_dao.public_key
         # Once a file has been made public, it can be looked up by its ID.
@@ -1060,7 +1074,7 @@ class SystemGatewayPublicFileTestCase(StorageDALTestCase):
         self.assertRaises(errors.DoesNotExist,
                           self.gw.get_public_file, public_key)
 
-        # public_id stays the same when set back to public
+        # public stays the same when set back to public
         self.assertEqual(file_dao.public_id, None)
         file_dao = self.vgw.change_public_access(file_dao.id, True)
         self.assertEqual(file_dao.public_id, public_id)
@@ -1528,7 +1542,7 @@ class StorageUserGatewayTestCase(StorageDALTestCase):
         self.assertEqual(1, len(nodes))
         self.assertEqual(node.id, nodes[0].id)
         self.assertEqual(node.volume_id, nodes[0].volume_id)
-        self.assertNotEquals(None, node.publicfile_id)
+        self.assertIsNotNone(nodes[0].public_uuid)
         # now test it with more than one file (and some dirs too)
 
         def create_files(root):
@@ -1620,7 +1634,7 @@ class StorageUserGatewayTestCase(StorageDALTestCase):
         self.assertFalse(blobexists)
         self.assertEqual(storage_key, None)
 
-    def _make_file_with_content(self, hash_value, gw=None):
+    def _make_file_with_content(self, hash_value, magic_hash=None, gw=None):
         """Make a file with some content."""
         name = 'filename'
         storage_key = uuid.uuid4()
@@ -1631,8 +1645,9 @@ class StorageUserGatewayTestCase(StorageDALTestCase):
             gw = self.gw
         vgw = gw.get_root_gateway()
         root = vgw.get_root()
-        n = vgw.make_file_with_content(root.id, name, hash_value, crc, size,
-                                       deflated_size, storage_key)
+        n = vgw.make_file_with_content(
+            root.id, name, hash_value, crc, size, deflated_size, storage_key,
+            magic_hash=magic_hash)
         return n
 
     def test_reusable_content_same_owner_no_magic(self):
@@ -1646,11 +1661,7 @@ class StorageUserGatewayTestCase(StorageDALTestCase):
     def test_reusable_content_same_owner_with_magic(self):
         """Test update_content will reuse owned content."""
         hash_value = self.factory.get_fake_hash()
-        node = self._make_file_with_content(hash_value)
-        get_filesync_store().find(
-            ContentBlob,
-            ContentBlob.hash == node.content_hash
-        ).set(magic_hash=b'magic')
+        node = self._make_file_with_content(hash_value, magic_hash=b'magic')
         blobexists, storage_key = self.gw.is_reusable_content(hash_value,
                                                               'magic')
         self.assertTrue(blobexists)
@@ -1675,11 +1686,8 @@ class StorageUserGatewayTestCase(StorageDALTestCase):
         assert user2.id != self.user.id
 
         hash_value = self.factory.get_fake_hash()
-        node = self._make_file_with_content(hash_value, gw=user2._gateway)
-        get_filesync_store().find(
-            ContentBlob,
-            ContentBlob.hash == node.content_hash
-        ).set(magic_hash=b'magic')
+        node = self._make_file_with_content(
+            hash_value, gw=user2._gateway, magic_hash=b'magic')
         self.assertTrue(self.gw.is_reusable_content(hash_value, 'magic'))
         blobexists, storage_key = self.gw.is_reusable_content(hash_value,
                                                               'magic')
@@ -1704,11 +1712,7 @@ class StorageUserGatewayTestCase(StorageDALTestCase):
     def test__get_reusable_content_same_owner_with_magic(self):
         """Test update_content will reuse owned content."""
         hash_value = self.factory.get_fake_hash()
-        node = self._make_file_with_content(hash_value)
-        get_filesync_store().find(
-            ContentBlob,
-            ContentBlob.hash == node.content_hash
-        ).set(magic_hash=b'magic')
+        node = self._make_file_with_content(hash_value, magic_hash=b'magic')
         blobexists, blob = self.gw._get_reusable_content(hash_value, 'magic')
         self.assertTrue(blobexists)
         self.assertEqual(blob.hash, node.content_hash)
@@ -1732,11 +1736,8 @@ class StorageUserGatewayTestCase(StorageDALTestCase):
         assert user2.id != self.user.id
 
         hash_value = self.factory.get_fake_hash()
-        node = self._make_file_with_content(hash_value, gw=user2._gateway)
-        get_filesync_store().find(
-            ContentBlob,
-            ContentBlob.hash == node.content_hash
-        ).set(magic_hash=b'magic')
+        node = self._make_file_with_content(
+            hash_value, gw=user2._gateway, magic_hash=b'magic')
         self.assertTrue(self.gw._get_reusable_content(hash_value, 'magic'))
         blobexists, blob = self.gw._get_reusable_content(hash_value, 'magic')
         self.assertTrue(blobexists)
@@ -2455,7 +2456,7 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
 
     def setup_volume(self):
         """Setup the volume used for this test case."""
-        # make a test file using storm
+        # make a test file in the database
         self.owner = self.user
         self.owner_quota = self.owner.get_quota()
         self.vgw = self.user._gateway.get_root_gateway()
@@ -2465,15 +2466,16 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
         self.file._content_hash = EMPTY_CONTENT_HASH
         self.file.mimetype = 'fakemime'
 
-    def tweak_users_quota(self, user_id, max_bytes, used_bytes=0):
+    def tweak_users_quota(self, dao_user, max_bytes, used_bytes=0):
         """Utility to toy with the user's quota."""
-        self.gw.get_user(user_id)
+        self.gw.get_user(dao_user.id)
         store = get_filesync_store()
         store.find(
             StorageUserInfo,
-            StorageUserInfo.id == user_id
+            StorageUserInfo.id == dao_user.id
         ).set(max_storage_bytes=max_bytes, used_storage_bytes=used_bytes)
         store.commit()
+        dao_user._load()
 
     def test__get_quota(self):
         """Test _get_quota."""
@@ -2711,11 +2713,10 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
 
     def test_make_file_with_magic(self):
         """Test make_file method."""
-        cb = self.factory.get_test_contentblob('FakeContent')
-        cb.magic_hash = b'magic'
-        get_filesync_store().add(cb)
+        cb = self.factory.make_content_blob(
+            content='FakeContent', magic_hash=b'magic')
         # make enough room
-        self.tweak_users_quota(self.owner.id, cb.deflated_size)
+        self.tweak_users_quota(self.owner, cb.deflated_size)
         node = self.vgw.make_file(self.root.id, 'the file name',
                                   hash=cb.hash, magic_hash=cb.magic_hash)
         self.assertEqual(node.content_hash, cb.hash)
@@ -2723,9 +2724,8 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
     def test_make_file_with_magic_bad_hashes(self):
         """Test make_file method with a bad hash raises an exception."""
         # make a content blob with a magic hash
-        cb = self.factory.get_test_contentblob('FakeContent')
-        cb.magic_hash = b'magic'
-        get_filesync_store().add(cb)
+        cb = self.factory.make_content_blob(
+            content='FakeContent', magic_hash=b'magic')
         self.assertRaises(errors.HashMismatch,
                           self.vgw.make_file, self.root.id, 'name.txt',
                           hash=b'wronghash')
@@ -2960,13 +2960,13 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
                           file_id, 'YYYY', new_hash, crc, size, def_size, None)
 
         # after the upload job was created/started, the users quota was reduced
-        self.tweak_users_quota(self.owner.id, size - 1)
+        self.tweak_users_quota(self.owner, size - 1)
         self.assertRaises(errors.QuotaExceeded, self.vgw.make_content,
                           file_id, old_hash, new_hash,
                           crc, size, def_size, new_storage_key)
 
-        # fix their quota...
-        self.tweak_users_quota(self.owner.id, size + 1)
+        # fix their quota and clear former contents...
+        self.tweak_users_quota(self.owner, size + 1)
         self.vgw.make_content(file_id, old_hash, new_hash, crc, size, def_size,
                               new_storage_key, magic_hash=magic_hash)
 
@@ -3019,7 +3019,7 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
         new_storage_key = uuid.uuid4()
         crc = 12345
         size = def_size = 100
-        self.tweak_users_quota(self.owner.id, size - 1)
+        self.tweak_users_quota(self.owner, size - 1)
         self.assertRaises(errors.QuotaExceeded, self.vgw.make_content,
                           filenode.id, filenode.content_hash, new_hash,
                           crc, size, def_size, new_storage_key)
@@ -3155,7 +3155,7 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
         # create it without magic hash, as old times
         n = self.vgw.make_file_with_content(self.root.id, name, hash, crc,
                                             size, deflated_size, storage_key)
-        assert n.content.magic_hash is None
+        assert n.content.magic_hash is None, n.content.magic_hash
 
         # create with same content, now with magic_hash
         n = self.vgw.make_file_with_content(self.root.id, name, hash, crc,
@@ -3214,8 +3214,9 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
         self.assertEqual(dira1.parent_id, dirb1.id)
         self.assertEqual(dira1.name, 'newname')
         dira6 = self.vgw.get_node(dira6.id)
-        path = pypath.join(self.vgw.get_root().full_path,
-                           'dirb1/newname/dira2/dira3/dira4/dira5')
+        path = posixpath.join(
+            self.vgw.get_root().full_path,
+            'dirb1/newname/dira2/dira3/dira4/dira5')
         self.assertEqual(dira6.path, path)
         dirb2 = self.vgw.get_node(dirb2.id)
         # make sure moving with the same name deletes old node and descendants
@@ -4326,8 +4327,7 @@ class GenerationsTestCase(StorageDALTestCase):
         """Test deltas across volumes to make sure they don't intermingle."""
         # root nodes
         r_file1 = self.vgw.make_file(self.vgw.get_root().id, 'file1.txt')
-        r_dir = self.vgw.make_subdirectory(
-            self.vgw.get_root().id, 'directory')
+        r_dir = self.vgw.make_subdirectory(self.vgw.get_root().id, 'directory')
         # make some nodes on a user gateway
         udf = self.ugw.make_udf('~/This')
         udf_gw = self.ugw.get_volume_gateway(udf=udf)
@@ -4544,7 +4544,7 @@ class MetricsTestCase(StorageDALTestCase):
         self.gw.make_file(root_id, 'filename')
         for informed in self.informed:
             if informed[0] == 'make_file':
-                self.assertTrue(isinstance(informed[1], float))
+                self.assertIsInstance(informed[1], float)
                 break
         else:
             self.fail('Timing was not informed for this method.')
@@ -4556,7 +4556,8 @@ class MetricsTestCase(StorageDALTestCase):
 
         # make a share from default user to other user and accept it
         root_id = self.gw.get_root().id
-        share = self.gw.make_share(root_id, 'hi', user_id=2, readonly=False)
+        share = self.gw.make_share(
+            root_id, 'hi', user_id=other_user.id, readonly=False)
         share = StorageUserGateway(other_user).accept_share(share.id)
 
         # do the operation in the gw from the share
@@ -4567,7 +4568,7 @@ class MetricsTestCase(StorageDALTestCase):
         # as she is the owner of the volume where the node was created
         for informed in self.informed:
             if informed[0] == 'make_file':
-                self.assertTrue(isinstance(informed[1], float))
+                self.assertIsInstance(informed[1], float)
                 break
         else:
             self.fail('Timing was not informed for this method.')

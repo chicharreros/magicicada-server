@@ -32,7 +32,11 @@ often.
 The LoopTuner solves this.  You tell it what you want to do and how long each
 chunk should take, and it will figure out how many items you need to process
 per chunk to get close to your ideal time between stops.  Chunk sizes will
-adjust themselves dynamically to actual performance."""
+adjust themselves dynamically to actual performance.
+
+"""
+
+from __future__ import unicode_literals
 
 import logging
 import sys

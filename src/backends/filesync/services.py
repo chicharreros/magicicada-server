@@ -19,7 +19,7 @@
 """Gateway objects for accessing Data Access Objects (DAO) from the database.
 
 Each Gateway performs actions based on a security principal and limits the
-actions based on the pricipal. In the case of a ReadWriteVolumeGateway,
+actions based on the principal. In the case of a ReadWriteVolumeGateway,
 security is imposed based on the user's access to the storage objects.
 """
 
@@ -136,8 +136,8 @@ class DAOStorageUser(DAOBase):
     """A Storage User DAO.
 
     This will be the main DAO for accessing all storage data on behalf of a
-    user. All the data access performed from this class will return DAOs and
-    not storm abjects.
+    user. All the data access performed from this class will return DAOs.
+
     """
 
     def __init__(self, user):
@@ -479,47 +479,51 @@ class StorageNode(VolumeObjectBase):
                 self.id == other.id and self.vol_id == other.vol_id)
 
     @staticmethod
-    def factory(gateway, object, permissions=None, content=None, udf=None,
+    def factory(gateway, node, permissions=None, content=None, udf=None,
                 owner=None):
-        """Create the appropriate DAO from storm model."""
-        if object.kind == StorageObject.FILE:
+        """Create the appropriate DAO from model."""
+        assert owner is None or isinstance(owner, DAOStorageUser)
+        if node.kind == StorageObject.FILE:
             klass = FileNode
-        elif object.kind == StorageObject.DIRECTORY:
+        elif node.kind == StorageObject.DIRECTORY:
             klass = DirectoryNode
-        o = klass(object.id, gateway=gateway)
-        o.kind = object.kind
-        o.parent_id = object.parent_id
-        o.owner_id = object.owner_id
-        o.path = object.path
-        o.full_path = object.full_path
-        o.name = object.name
+        else:
+            raise errors.StorageError(
+                'Invalid kind %s when creating a StorageNode' % node.kind)
+        o = klass(node.id, gateway=gateway)
+        o.kind = node.kind
+        o.parent_id = node.parent_id
+        o.owner_id = node.owner_id
+        o.path = node.path
+        o.full_path = node.full_path
+        o.name = node.name
         # if this has a gateway, and it was a share, we want the root
         # to appear as a root, and the paths to start at the root
         if gateway and gateway.share:
-            if object.id == gateway.root_id:
+            if node.id == gateway.root_id:
                 o.parent_id = None
                 o.path = '/'
                 o.name = ''
                 o.full_path = '/'
             else:
                 # mask the root path
-                o.path = object.path[len(gateway.root_path_mask)::]
+                o.path = node.path[len(gateway.root_path_mask)::]
                 o.path = o.path if o.path else '/'
                 o.full_path = pypath.join(o.path, o.name)
-        o.volume_id = object.volume_id
-        o.public_id = object.publicfile_id
-        o.public_uuid = object.public_uuid
-        o.status = object.status
-        o.when_created = object.when_created
-        o.when_last_modified = object.when_last_modified
-        o.generation = object.generation or 0
-        o.generation_created = object.generation_created or 0
+        o.volume_id = node.volume_id
+        o.public_id = node.publicfile_id
+        o.public_uuid = node.public_uuid
+        o.status = node.status
+        o.when_created = node.when_created
+        o.when_last_modified = node.when_last_modified
+        o.generation = node.generation or 0
+        o.generation_created = node.generation_created or 0
         o._owner = owner
         o._udf = udf
-        o.mimetype = object.mimetype
-        if object.kind == StorageObject.FILE:
+        o.mimetype = node.mimetype
+        if node.kind == StorageObject.FILE:
             # only files have content
-            o.content_hash = object.content_hash
+            o.content_hash = node.content_hash
             o._content = content
         # just a sanity check
         if owner:
@@ -767,8 +771,7 @@ class FileNodeContent(object):
 class DAOUploadJob(VolumeObjectBase):
     """DAO for an Upload Job"""
 
-    def __init__(self, upload, file=None,
-                 gateway=None, volume=None):
+    def __init__(self, upload, file=None, gateway=None, volume=None):
         """Create DAO from storm model"""
         super(DAOUploadJob, self).__init__(volume, gateway)
         self.id = upload.uploadjob_id
@@ -1486,6 +1489,7 @@ class StorageUserGateway(GatewayBase):
 
     def __init__(self, user, session_id=None):
         super(StorageUserGateway, self).__init__(session_id)
+        assert isinstance(user, DAOStorageUser)
         # also set the 'owner' for being explicit to whom share the
         # timing metrics should be reported against
         self.owner = self.user = user
@@ -1662,7 +1666,8 @@ class StorageUserGateway(GatewayBase):
     def get_shared_to(self, accepted=None):
         """Get shares shared to this user.
 
-        accepted can be True, False, or None (to get all)
+        accepted can be True, False, or None (to get all).
+
         """
         if not self.user.is_active:
             raise errors.NoPermission(self.inactive_user_error)
@@ -2067,6 +2072,7 @@ class ReadOnlyVolumeGateway(GatewayBase):
                  notifier=None):
         super(ReadOnlyVolumeGateway, self).__init__(session_id=session_id,
                                                     notifier=notifier)
+        assert isinstance(user, DAOStorageUser)
         self.user = user
         self.udf = None
         self.root_id = None
@@ -3017,6 +3023,10 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
         If a file node with name == name as a child of parent_id it will get
         updated with the new content.
         """
+        if mimetype is None:
+            mime = mimetypes.guess_type(name)[0]
+            mimetype = unicode(mime) if mime else ''
+
         parent = self._get_directory_node(parent_id)
         fnode = parent.get_child_by_name(name)
         is_new = False
@@ -3029,9 +3039,6 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
         elif previous_hash and fnode.content_hash != previous_hash:
             raise errors.HashMismatch("File hash has changed.")
 
-        if mimetype is None:
-            mime = mimetypes.guess_type(name)[0]
-            mimetype = unicode(mime) if mime else None
         if mimetype:
             fnode.mimetype = mimetype
 

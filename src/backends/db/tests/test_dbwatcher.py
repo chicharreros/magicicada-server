@@ -18,6 +18,8 @@
 
 """Tests for the backends.tools.dbwatcher module."""
 
+from __future__ import unicode_literals
+
 import mocker
 
 from backends.db import dbwatcher

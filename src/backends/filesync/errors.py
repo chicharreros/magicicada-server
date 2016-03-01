@@ -55,7 +55,7 @@ class NotADirectory(StorageError):
 class QuotaExceeded(StorageError):
     """This action would exceed the user's quota."""
 
-    def __init__(self, msg, volume_id, free_bytes):
+    def __init__(self, msg, volume_id=None, free_bytes=None):
         super(QuotaExceeded, self).__init__(msg)
         self.volume_id = volume_id
         self.free_bytes = free_bytes
@@ -84,5 +84,7 @@ class InvalidVolumePath(InvalidFilename):
 class LockedUserError(StorageError):
     """An attemp to get a locked user."""
 
-    def __str__(self):
-        return str(self.args) if self.args else "User Locked"
+    def __init__(self, msg=None, *args, **kwargs):
+        if msg is None:
+            msg = "User Locked"
+        return super(LockedUserError, self).__init__(msg, *args, **kwargs)

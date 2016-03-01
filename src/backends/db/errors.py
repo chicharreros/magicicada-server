@@ -18,6 +18,8 @@
 
 """Exceptions raised by database."""
 
+from __future__ import unicode_literals
+
 
 class RetryLimitReached(Exception):
     """Raised when there have been to many retries."""
