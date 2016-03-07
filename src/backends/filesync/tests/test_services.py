@@ -21,9 +21,10 @@
 from __future__ import unicode_literals
 
 import uuid
-import datetime
 
-from backends.filesync import errors, utils
+from django.utils.timezone import now
+
+from backends.filesync import errors
 from backends.filesync.models import StorageUser
 from backends.filesync.services import (
     DAOStorageUser,
@@ -107,13 +108,11 @@ class DataServicesTestCase(StorageDALTestCase):
     def test_get_abandoned_uploadjobs(self):
         """Test the get_abandoned_uploadjobs function."""
         self.assertRaises(TypeError, get_abandoned_uploadjobs)
-        jobs = get_abandoned_uploadjobs(datetime.datetime.now(), 100)
+        jobs = get_abandoned_uploadjobs(now(), 100)
         self.assertTrue(isinstance(jobs, list))
 
     def test_get_public_file(self):
         """Test the get_public_file function."""
-        save_setting = utils.set_public_uuid
-        utils.set_public_uuid = False
         user = self.factory.make_user(
             1, "Cool UserName", "Visible Name", 10)
         a_file = user.volume().root.make_file_with_content(
@@ -123,9 +122,7 @@ class DataServicesTestCase(StorageDALTestCase):
         f1 = get_public_file(public_key)
         self.assertEqual(f1, a_file)
         a_file.change_public_access(False)
-        self.assertRaises(errors.DoesNotExist,
-                          get_public_file, public_key, use_uuid=False)
-        utils.set_public_uuid = save_setting
+        self.assertRaises(errors.DoesNotExist, get_public_file, public_key)
 
     def test_get_public_directory(self):
         """Test the get_public_directory function."""
@@ -144,8 +141,6 @@ class DataServicesTestCase(StorageDALTestCase):
 
     def test_get_public_file_public_uuid(self):
         """Test the get_public_file function."""
-        save_setting = utils.set_public_uuid
-        utils.set_public_uuid = True
         user = self.factory.make_user(
             1, "Cool UserName", "Visible Name", 10)
         a_file = user.volume().root.make_file_with_content(
@@ -153,12 +148,7 @@ class DataServicesTestCase(StorageDALTestCase):
         a_file.change_public_access(True)
         public_key = a_file.public_key
         # get the file using the public uuid
-        f1 = get_public_file(public_key, use_uuid=True)
+        f1 = get_public_file(public_key)
         self.assertEqual(f1, a_file)
-        # can't get the file using the old id
-        self.assertRaises(errors.DoesNotExist,
-                          get_public_file, public_key)
         a_file.change_public_access(False)
-        self.assertRaises(errors.DoesNotExist,
-                          get_public_file, public_key, use_uuid=True)
-        utils.set_public_uuid = save_setting
+        self.assertRaises(errors.DoesNotExist, get_public_file, public_key)

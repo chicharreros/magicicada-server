@@ -161,29 +161,17 @@ def decode_base62(string, allow_padding=False):
     return value
 
 
-# This is a setting used during testing and transition to the new public files
-# urls and will be removed once we enable the new public URL feature.
-# Since there is no way to go back once this setting is enabled,
-# it is not used in a configuration file.
-set_public_uuid = True
-
-
-def get_node_public_key(node, from_uuid=False):
+def get_node_public_key(node):
     """Get a node's public_key."""
-    if from_uuid:
+    if node.public_uuid is not None:
         return encode_base62(node.public_uuid.int, padded_to=22)
-    else:
-        return encode_base62(node.publicfile_id)
 
 
 def get_public_file_url(node):
     """Return the url to a public file."""
-    if settings.UPDOWN_PUBLIC_URL_PREFIX_2 and node.public_uuid:
-        return '%s%s' % (settings.UPDOWN_PUBLIC_URL_PREFIX_2,
-                         get_node_public_key(node, True))
-    elif node.publicfile_id:
-        return '%s%s/' % (settings.UPDOWN_PUBLIC_URL_PREFIX,
-                          get_node_public_key(node, False))
+    public_key = get_node_public_key(node)
+    if public_key is not None:
+        return '%s/%s' % (settings.PUBLIC_URL_PREFIX.rstrip('/'), public_key)
 
 
 def get_keywords_from_path(volume_path):

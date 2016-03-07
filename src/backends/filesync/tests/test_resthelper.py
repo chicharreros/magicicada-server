@@ -26,9 +26,8 @@ import os
 import unittest
 import uuid
 
-from datetime import datetime
-
 from django.conf import settings
+from django.utils.timezone import now
 
 from metrics.tests import FakeMetrics
 from backends.filesync import errors
@@ -64,7 +63,7 @@ class MockVolume(object):
     id = uuid.uuid4()
     is_root = False
     path = "~/Documents"
-    when_created = datetime.utcnow()
+    when_created = now()
 
 
 class MockNode(object):
@@ -76,8 +75,8 @@ class MockNode(object):
     full_path = '/a/b/c/d/file.txt'
     name = 'file.txt'
     content_hash = 'abcdefg'
-    when_created = datetime.utcnow()
-    when_last_modified = datetime.utcnow()
+    when_created = now()
+    when_last_modified = now()
     generation = 1
     generation_created = 1
     mimetype = 'text'

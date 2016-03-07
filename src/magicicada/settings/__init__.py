@@ -184,6 +184,7 @@ LOG_FORMAT = '%(asctime)s %(levelname)-8s %(name)s[%(process)d]: %(message)s'
 LOG_LEVEL = 5
 LOG_TO_SYSLOG = False
 OOPS_PATH = os.path.join(BASE_DIR, 'tmp', 'oops')
+PUBLIC_URL_PREFIX = 'http://some_url'
 ROOT_USERVOLUME_NAME = 'Magicicada'
 ROOT_USERVOLUME_PATH = '~/' + ROOT_USERVOLUME_NAME
 SERVICE_GROUP = 'filesync'
@@ -192,9 +193,6 @@ STATSD_SERVERS = 'localhost:8125'
 STORAGE_PROXY_PORT = None
 SYSLOG_FORMAT = (
     '%(processName)-13s %(levelname)-8s %(name)s[%(process)d]: %(message)s')
-UPDOWN_PUBLIC_URL_PREFIX = 'http://some_url/p/'
-UPDOWN_PUBLIC_URL_PREFIX_2 = 'http://some_url/'
-
 
 from . import api_server  # noqa
 from . import ssl_proxy  # noqa

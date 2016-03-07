@@ -23,10 +23,10 @@ from __future__ import unicode_literals
 import re
 import uuid
 
-from datetime import datetime
 from operator import attrgetter
 
 from django.conf import settings
+from django.utils.timezone import now
 from mocker import Mocker, expect
 from storm.database import Connection
 from storm.tracer import install_tracer, remove_tracer_type
@@ -111,7 +111,7 @@ class DAOInitTestCase(StorageDALTestCase):
             ['id', 'kind', 'parent_id', 'owner_id', 'status', 'when_created',
              'when_last_modified', 'generation', 'generation_created',
              'mimetype', 'public_uuid'])
-        self.assertTrue(isinstance(node_dao, services.FileNode))
+        self.assertIsInstance(node_dao, services.FileNode)
         # mimetype object will not be directly accessible
         self.assertEqual(node_dao.nodekey, utils.make_nodekey(None, node.id))
         self.assertEqual(node_dao.content, content)
@@ -121,11 +121,11 @@ class DAOInitTestCase(StorageDALTestCase):
         self.assertEqual(node_dao.can_delete, True)
         node_dao.public_id = 1
         # test public_key property
-        self.assertEqual(node_dao.public_key,
-                         utils.get_node_public_key(node_dao, True))
+        self.assertEqual(
+            node_dao.public_key, utils.get_node_public_key(node_dao))
         node_dao.public_uuid = None
-        self.assertEqual(node_dao.public_key,
-                         utils.get_node_public_key(node_dao, False))
+        self.assertEqual(
+            node_dao.public_key, utils.get_node_public_key(node_dao))
         node_dao.public_id = None
         self.assertEqual(node_dao.public_key, None)
         node.generation = None
@@ -138,7 +138,7 @@ class DAOInitTestCase(StorageDALTestCase):
         node.kind = StorageObject.DIRECTORY
         dir_dao = services.StorageNode.factory(
             None, node, owner=owner, content=content, permissions={})
-        self.assertTrue(isinstance(dir_dao, services.DirectoryNode))
+        self.assertIsInstance(dir_dao, services.DirectoryNode)
         # content for Directories is ignored
         self.assertEqual(dir_dao.content, None)
         self.assertEqual(dir_dao.can_read, False)
@@ -196,8 +196,8 @@ class DAOInitTestCase(StorageDALTestCase):
         upload = UploadJob(uuid.uuid4())
         upload.hash_hint = b'fake hash hint'
         upload.crc32_hint = 1234
-        upload.when_started = datetime.utcnow()
-        upload.when_last_active = datetime.utcnow()
+        upload.when_started = now()
+        upload.when_last_active = now()
         upload_dao = services.DAOUploadJob(upload)
         self._compare_props(upload, upload_dao,
                             ['storage_object_id', 'chunk_count',
@@ -1128,24 +1128,7 @@ class DAOTestCase(StorageDALTestCase):
         self.assertEqual(5, len(nodes))
 
     def test_change_public_access_file(self):
-        """Test the basics of changing public access to a file."""
-        utils.set_public_uuid = False
-        user = self.create_user()
-        f1 = user.root.make_file('a-file.txt')
-        # It has no public ID
-        self.assertEqual(f1.public_uuid, None)
-        self.assertEqual(f1.public_url, None)
-        # It now has a public ID
-        f1.change_public_access(True)
-        self.assertEqual(f1.public_uuid, None)
-        self.assertNotEqual(f1.public_url, None)
-        f1.change_public_access(False)
-        self.assertEqual(f1.public_uuid, None)
-        self.assertEqual(f1.public_url, None)
-
-    def test_change_public_access_file_uuid(self):
         """Test the basics of changing public access to a file using uuid."""
-        utils.set_public_uuid = True
         user = self.create_user()
         f1 = user.root.make_file('a-file.txt')
         # It has no public ID

@@ -25,7 +25,6 @@ security is imposed based on the user's access to the storage objects.
 
 from __future__ import unicode_literals
 
-import datetime
 import mimetypes
 import os
 import posixpath as pypath
@@ -36,6 +35,7 @@ from functools import wraps
 from weakref import WeakValueDictionary
 
 from django.conf import settings
+from django.utils.timezone import now
 from storm.locals import SQL
 from storm.expr import Or, LeftJoin, Desc, And
 from storm.info import ClassAlias
@@ -555,10 +555,7 @@ class StorageNode(VolumeObjectBase):
     @property
     def public_key(self):
         """Return the public key for this node."""
-        if self.public_uuid:
-            return utils.get_node_public_key(self, True)
-        if self.public_id:
-            return utils.get_node_public_key(self)
+        return utils.get_node_public_key(self)
 
     @property
     def owner(self):
@@ -817,16 +814,14 @@ class DAOUploadJob(VolumeObjectBase):
         """Add part info to this uploadjob."""
         self._gateway.add_uploadjob_part(self.id, size)
         # also update the when_last_active value.
-        self._gateway.set_uploadjob_when_last_active(
-            self.id, datetime.datetime.utcnow())
+        self._gateway.set_uploadjob_when_last_active(self.id, now())
         self._load()
 
     @retryable_transaction()
     @fsync_commit
     def touch(self):
         """Update the when_last_active attribute."""
-        self._gateway.set_uploadjob_when_last_active(
-            self.id, datetime.datetime.utcnow())
+        self._gateway.set_uploadjob_when_last_active(self.id, now())
         self._load()
 
 
@@ -1236,11 +1231,7 @@ class SystemGateway(GatewayBase):
 
     def create_or_update_user(self, user_id, username, visible_name,
                               max_storage_bytes):
-        """Create or update a StorageUser and related data.
-
-        This happens when a user subscribes to the service. If they upgrade or
-        reactivate a subscription, this would get called again.
-        """
+        """Create or update a StorageUser and related data."""
         user = self.store.get(StorageUser, user_id)
         if user is None:
             user = StorageUser.new(
@@ -1292,11 +1283,7 @@ class SystemGateway(GatewayBase):
 
     def claim_shareoffer(self, user_id, username, visible_name,
                          shareoffer_id):
-        """Claim a share offer sent to an email.
-
-        This is a strange function in that the user may not have subscribed yet
-        and may not have a storage user record.
-        """
+        """Claim a share offer sent to an email."""
         # A anonymous share offer is a share sent to an email address but not
         # to a specific user. We also don't let user's claim their own share
         share, byuser = self._get_shareoffer(shareoffer_id)
@@ -1316,7 +1303,7 @@ class SystemGateway(GatewayBase):
         self.queue_share_accepted(share_dao)
         return share_dao
 
-    def _get_public_node(self, public_key, use_uuid=False):
+    def _get_public_node(self, public_key):
         """Get a node from a public key."""
         if public_key is None:
             raise errors.DoesNotExist(self.publicfile_dne_error)
@@ -1325,14 +1312,9 @@ class SystemGateway(GatewayBase):
         except utils.Base62Error:
             raise errors.DoesNotExist(self.publicfile_dne_error)
 
-        if use_uuid:
-            public_id = uuid.UUID(int=public_id)
-            publicnode = self.store.find(
-                PublicNode, PublicNode.public_uuid == public_id).one()
-        else:
-            publicnode = self.store.find(
-                PublicNode, PublicNode.id == public_id,
-                PublicNode.public_uuid == None).one()  # NOQA
+        public_id = uuid.UUID(int=public_id)
+        publicnode = self.store.find(
+            PublicNode, PublicNode.public_uuid == public_id).one()
         if publicnode is None:
             raise errors.DoesNotExist(self.publicfile_dne_error)
 
@@ -1350,14 +1332,14 @@ class SystemGateway(GatewayBase):
     def get_public_directory(self, public_key, mimetypes=None):
         """Get a public directory."""
         # Use UUIDs instead of the old method
-        node = self._get_public_node(public_key, use_uuid=True)
+        node = self._get_public_node(public_key)
         if node.kind != StorageObject.DIRECTORY:
             raise errors.DoesNotExist(self.publicfile_dne_error)
         return node
 
-    def get_public_file(self, public_key, use_uuid=False):
+    def get_public_file(self, public_key):
         """Get a public file."""
-        node = self._get_public_node(public_key, use_uuid)
+        node = self._get_public_node(public_key)
         if (node.content is None or node.content.storage_key is None or
                 node.kind != StorageObject.FILE):
             # if the file has no content, we should not be able to get it
@@ -3105,10 +3087,10 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
         return DAOUploadJob(job, gateway=self)
 
     @timing_metric
-    def set_uploadjob_when_last_active(self, job_id, datetime):
-        """Set when_last_active to datetime.utcnow()."""
+    def set_uploadjob_when_last_active(self, job_id, timestamp):
+        """Set when_last_active to timestamp."""
         job = self._get_uploadjob(job_id)
-        job.when_last_active = datetime
+        job.when_last_active = timestamp
         return DAOUploadJob(job, gateway=self)
 
     def _make_public(self, fnode):
@@ -3123,7 +3105,7 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
                 # Flush the store to ensure the new PublicNode has
                 # a database ID.
                 self.store.flush()
-            if (utils.set_public_uuid and fnode.public_uuid is None):
+            if fnode.public_uuid is None:
                 fnode.public_uuid = uuid.uuid4()
                 publicfile.public_uuid = fnode.public_uuid
             fnode.publicfile_id = publicfile.id
@@ -3279,10 +3261,10 @@ def claim_shareoffer(user_id, username, visible_name, share_offer_id):
 
 
 @fsync_readonly
-def get_public_file(public_key, use_uuid=False):
+def get_public_file(public_key):
     """Get a public file."""
     gw = SystemGateway()
-    return gw.get_public_file(public_key, use_uuid=use_uuid)
+    return gw.get_public_file(public_key)
 
 
 @fsync_readonly

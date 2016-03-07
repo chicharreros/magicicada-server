@@ -36,7 +36,7 @@ class StorageUserFinder(object):
         self.filter = filter
 
     def _find_users(self):
-        """Perform storm query based on current filter."""
+        """Perform query based on current filter."""
         store = get_filesync_store()
         conditions = []
         if self.filter is not None:
@@ -67,7 +67,7 @@ class StorageUserFinder(object):
 
     @fsync_readonly
     def is_empty(self):
-        """Return True if there are any results."""
+        """Return True if there are no results."""
         return self._find_users().is_empty()
 
     @fsync_readonly

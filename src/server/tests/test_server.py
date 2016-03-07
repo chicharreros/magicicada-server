@@ -21,7 +21,6 @@
 """Test Storage Server requests/responses."""
 
 import collections
-import datetime
 import logging
 import os
 import types
@@ -29,6 +28,7 @@ import time
 import uuid
 import weakref
 
+from django.utils.timezone import now
 from metrics.metricsconnector import MetricsConnector
 from mocker import expect, Mocker, MockerTestCase, ARGS, KWARGS, ANY
 from twisted.python.failure import Failure
@@ -2433,7 +2433,7 @@ class GetDeltaResponseTestCase(SimpleRequestResponseTestCase):
         self.patch(settings.api_server, 'MAX_DELTA_INFO', 5)
         # create a few fake nodes
         nodes = []
-        now = datetime.datetime.utcnow()
+        right_now = now()
         for i in range(10):
             node = FakeNode()
             node.id = str(uuid.uuid4())
@@ -2446,7 +2446,7 @@ class GetDeltaResponseTestCase(SimpleRequestResponseTestCase):
             node.content_hash = 'sha1:foo'
             node.crc32 = 10
             node.size = 1024
-            node.last_modified = int(time.mktime(now.timetuple()))
+            node.last_modified = int(time.mktime(right_now.timetuple()))
             nodes.append(node)
         gen = self.response._send_delta_info(nodes, 'share_id')
         gen.next()
@@ -2508,7 +2508,7 @@ class RescanFromScratchResponseTestCase(SimpleRequestResponseTestCase):
         self.patch(settings.api_server, 'GET_FROM_SCRATCH_LIMIT', 5)
         # build fake nodes
         nodes = []
-        now = datetime.datetime.now()
+        right_now = now()
         for i in range(20):
             node = FakeNode()
             node.id = str(uuid.uuid4())
@@ -2522,7 +2522,7 @@ class RescanFromScratchResponseTestCase(SimpleRequestResponseTestCase):
             node.content_hash = 'sha1:foo'
             node.crc32 = 10
             node.size = 1024
-            node.last_modified = int(time.mktime(now.timetuple()))
+            node.last_modified = int(time.mktime(right_now.timetuple()))
             nodes.append(node)
         # set required caps
         self.response.protocol.working_caps = server.PREFERRED_CAP

@@ -20,8 +20,9 @@
 
 from __future__ import unicode_literals
 
-import datetime
+from datetime import timedelta
 
+from django.utils.timezone import now
 from mock import patch
 
 from backends.filesync import dbmanager
@@ -142,7 +143,7 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
             self.assertRaises(
                 RuntimeError, utils.update_last_row,
                 worker_name=b'test_worker_name', row_id=1,
-                timestamp=datetime.datetime.utcnow())
+                timestamp=now())
 
     def _convert_txlogs_to_dicts(self, txlogs):
         """Convert a list of TransactionLog objects into dictionaries.
@@ -315,10 +316,10 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         """Test that txnlogs not old enough are maintained, instead of being
         deleted."""
 
-        now = datetime.datetime.utcnow()
-        limit_datetime = now - datetime.timedelta(days=7)
+        right_now = now()
+        limit_datetime = right_now - timedelta(days=7)
         # Not so old
-        old_datetime = limit_datetime + datetime.timedelta(seconds=1)
+        old_datetime = limit_datetime + timedelta(seconds=1)
 
         self.factory.make_transaction_log(tx_id=1)
         self.factory.make_transaction_log(tx_id=2, timestamp=old_datetime)
@@ -339,8 +340,8 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
     def test_deletes_old_enough_txlogs(self):
         """Test that txnlogs old enough are deleted."""
 
-        now = datetime.datetime.utcnow()
-        timestamp_limit = now - datetime.timedelta(days=7)
+        right_now = now()
+        timestamp_limit = right_now - timedelta(days=7)
         # Old enough
         old_datetime = timestamp_limit
 
@@ -368,8 +369,8 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         """Test that txnlogs old enough are deleted and are within the quantity
         limit given."""
 
-        now = datetime.datetime.utcnow()
-        timestamp_limit = now - datetime.timedelta(days=7)
+        right_now = now()
+        timestamp_limit = right_now - timedelta(days=7)
         # Old enough
         old_datetime = timestamp_limit
         quantity_limit = 2
@@ -400,8 +401,8 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
     def test_deletes_txlogs_slice(self):
         """Delete a txlog slice by date and quantity."""
 
-        now = datetime.datetime.utcnow()
-        timestamp_limit = now - datetime.timedelta(days=7)
+        right_now = now()
+        timestamp_limit = right_now - timedelta(days=7)
         # Old enough
         old_dt = timestamp_limit
         quantity_limit = 2
@@ -415,7 +416,7 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         ]
         self.store.commit()
 
-        removed = utils.delete_txlogs_slice(date=now.date(),
+        removed = utils.delete_txlogs_slice(date=right_now.date(),
                                             quantity_limit=quantity_limit)
 
         self.store.rollback()  # Shouldn't affect the deletion result
@@ -429,15 +430,15 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
 
     def test_get_row_by_time_with_no_data(self):
         """Test the get_row_by_time function when no data is present."""
-        txid, _ = utils.get_row_by_time(datetime.datetime.utcnow())
+        txid, _ = utils.get_row_by_time(now())
         self.assertEqual(txid, None)
 
     def test_get_row_by_time_with_data(self):
         """Test get_row_by_time function when data is present."""
-        ts = datetime.datetime.utcnow()
+        ts = now()
         txlogs = [
-            self.factory.make_transaction_log(
-                timestamp=ts + datetime.timedelta(i, 0)) for i in range(5)]
+            self.factory.make_transaction_log(timestamp=ts + timedelta(i, 0))
+            for i in range(5)]
         tstamp = txlogs[2].timestamp
         txid, newtstamp = utils.get_row_by_time(tstamp)
         self.assertEqual(txid, txlogs[2].id)
@@ -445,10 +446,10 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
 
     def test_get_row_by_time_timestamp_twice(self):
         """Test get_row_by_time having two lines with same timestamp."""
-        ts = datetime.datetime.utcnow()
+        ts = now()
         txlogs = [
-            self.factory.make_transaction_log(
-                timestamp=ts + datetime.timedelta(i, 0)) for i in range(5)]
+            self.factory.make_transaction_log(timestamp=ts + timedelta(i, 0))
+            for i in range(5)]
         # put the timestamp of [3] into [1], the function should return the
         # id of [1]
         tstamp = txlogs[1].timestamp = txlogs[3].timestamp
@@ -459,10 +460,10 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
 
     def test_get_row_by_time_not_exact(self):
         """Test get_row_by_time not giving an exact timestamp."""
-        ts = datetime.datetime.utcnow()
+        ts = now()
         txlogs = [
-            self.factory.make_transaction_log(
-                timestamp=ts + datetime.timedelta(i, 0)) for i in range(5)]
+            self.factory.make_transaction_log(timestamp=ts + timedelta(i, 0))
+            for i in range(5)]
 
         # get a timestamp in the middle of [2] and [3], the function should
         # return the id of [3]
@@ -477,7 +478,7 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
     def test_get_row_by_time_nothing_found(self):
         """Test get_row_by_time with a big enough timestamp."""
         txlogs = [self.factory.make_transaction_log() for i in range(2)]
-        tstamp = txlogs[-1].timestamp + datetime.timedelta(seconds=1)
+        tstamp = txlogs[-1].timestamp + timedelta(seconds=1)
         txid, newtstamp = utils.get_row_by_time(tstamp)
         self.assertEqual(txid, None)
         self.assertEqual(newtstamp, None)

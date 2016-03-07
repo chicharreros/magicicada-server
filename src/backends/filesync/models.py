@@ -20,13 +20,13 @@
 
 from __future__ import unicode_literals
 
-import datetime
 import os
 import re
 import uuid
 
 from types import NoneType
 
+from django.utils.timezone import now
 from storm.locals import (Int, DateTime, Unicode, RawStr, Reference, SQL,
                           Storm, Store, Bool, ReferenceSet)
 from storm.expr import Or, Sum, Desc
@@ -135,7 +135,7 @@ def undelete_volume(store, owner_id, volume_id, restore_parent, limit=100):
         for d in deleted[:limit]:
             leaf = parent.build_tree_from_path(d.path)
             d.undelete(leaf)
-        root.when_last_modified = datetime.datetime.utcnow()
+        root.when_last_modified = now()
         return parent
 
 
@@ -325,7 +325,7 @@ class ContentBlob(object):
     when_created = DateTime(allow_none=True)
 
     def __init__(self):
-        self.when_created = datetime.datetime.utcnow()
+        self.when_created = now()
 
     @classmethod
     def make_empty(cls, store):
@@ -334,7 +334,7 @@ class ContentBlob(object):
         o.hash = EMPTY_CONTENT_HASH
         o.crc32 = 0
         o.size = 0
-        o.when_created = datetime.datetime.utcnow()
+        o.when_created = now()
         store.add(o)
         return o
 
@@ -564,7 +564,7 @@ class StorageObject(Storm):
         curr_size = getattr(self.content, 'size', 0)
         self._update_used_bytes(new_content.size - curr_size)
         self._content = new_content
-        self.when_last_modified = datetime.datetime.utcnow()
+        self.when_last_modified = now()
         self.update_generation()
 
         from backends.txlog.models import TransactionLog
@@ -639,10 +639,10 @@ class StorageObject(Storm):
             self.parent_id = new_parent_id
             self.path = pypath.join(new_parent_path, new_parent_name)
         self.name = new_name
-        now = datetime.datetime.utcnow()
+        right_now = now()
         if old_parent.id != new_parent_id:
-            old_parent.when_last_modified = now
-        new_parent.when_last_modified = now
+            old_parent.when_last_modified = right_now
+        new_parent.when_last_modified = right_now
 
         from backends.txlog.models import TransactionLog
         TransactionLog.record_move(self, old_name, old_parent)
@@ -731,14 +731,14 @@ class StorageObject(Storm):
             if new_parent:
                 # if we have a suitable parent, update the parent
                 self.parent = new_parent
-                self.parent.when_last_modified = datetime.datetime.utcnow()
+                self.parent.when_last_modified = now()
             else:
                 # if we can't find a suitable parent, we need to restore the
                 # old one.
                 self.parent.undelete()
         else:
             # if the parent was live, we just need to update the timestamp
-            self.parent.when_last_modified = datetime.datetime.utcnow()
+            self.parent.when_last_modified = now()
 
     def unlink(self):
         """Mark the node as Dead."""
@@ -758,7 +758,7 @@ class StorageObject(Storm):
         # case unnecessary) implicit flush.
         with implicit_flushes_blocked_on(Store.of(self)):
             self.status = STATUS_DEAD
-            self.when_last_modified = datetime.datetime.utcnow()
+            self.when_last_modified = now()
             self.update_generation()
 
         from backends.txlog.models import TransactionLog
@@ -767,7 +767,7 @@ class StorageObject(Storm):
         if self.kind == StorageObject.FILE:
             self._update_used_bytes(0 - getattr(self.content, 'size', 0))
         if self.parent_id != ROOT_PARENTID:
-            self.parent.when_last_modified = datetime.datetime.utcnow()
+            self.parent.when_last_modified = now()
 
     def unlink_tree(self):
         """Unlink and entire directory and it's subdirectories"""
@@ -791,13 +791,13 @@ class StorageObject(Storm):
             TransactionLog.record_unlink_tree(self)
 
             self.descendants.set(status=STATUS_DEAD,
-                                 when_last_modified=datetime.datetime.utcnow())
+                                 when_last_modified=now())
 
         self.status = STATUS_DEAD
-        self.when_last_modified = datetime.datetime.utcnow()
+        self.when_last_modified = now()
 
         if self.parent_id != ROOT_PARENTID:
-            self.parent.when_last_modified = datetime.datetime.utcnow()
+            self.parent.when_last_modified = now()
 
     @property
     def tree_size(self):
@@ -844,7 +844,7 @@ class StorageObject(Storm):
                               kind=StorageObject.DIRECTORY,
                               parent=self)
         store.add(node)
-        self.when_last_modified = datetime.datetime.utcnow()
+        self.when_last_modified = now()
         return node
 
     def make_file(self, name):
@@ -864,7 +864,7 @@ class StorageObject(Storm):
                               kind=StorageObject.FILE,
                               parent=self)
         store.add(node)
-        self.when_last_modified = datetime.datetime.utcnow()
+        self.when_last_modified = now()
         return node
 
     @staticmethod
@@ -1127,7 +1127,7 @@ class UploadJob(object):
         self.chunk_count = 0
         self.uploaded_bytes = 0
         self.multipart_key = multipart_key
-        self.when_last_active = datetime.datetime.utcnow()
+        self.when_last_active = now()
         self.status = STATUS_LIVE
 
     @classmethod
@@ -1195,7 +1195,7 @@ class UserVolume(Storm):
         self.path = path.strip('/')
         self.status = STATUS_LIVE
         self.generation = 0
-        self.when_created = datetime.datetime.utcnow()
+        self.when_created = now()
 
     def delete(self):
         """Delete the UDF."""
@@ -1337,7 +1337,7 @@ class Download(object):
     def set_status(self, status):
         """Set the status of the download, and update the change date."""
         self._status = status
-        self.status_change_date = datetime.datetime.utcnow()
+        self.status_change_date = now()
     status = property(get_status, set_status)
 
 
@@ -1392,4 +1392,4 @@ class ResumableUpload(object):
         self.hash_context = hash_context
         self.magic_hash_context = magic_hash_context
         self.crc_context = crc_context
-        self.when_last_active = datetime.datetime.utcnow()
+        self.when_last_active = now()

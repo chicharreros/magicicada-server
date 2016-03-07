@@ -20,15 +20,16 @@
 
 from __future__ import unicode_literals
 
-import datetime
 import logging
 import posixpath
 import os
 import types
 import uuid
 
+from datetime import timedelta
 from operator import attrgetter
 
+from django.utils.timezone import now
 from mock import patch
 from psycopg2 import IntegrityError
 from storm.locals import Store
@@ -320,7 +321,8 @@ class EventNotificationTest(StorageDALTestCase):
         self.setup_shares()
         node = get_filesync_store().get(StorageObject, self.d3.id)
         share = self.user1.get_share(self.share1.id)
-        vgw = ReadWriteVolumeGateway(self.user1, share=share)
+        vgw = ReadWriteVolumeGateway(
+            self.user1, share=share, notifier=self.dummy_notifier)
         vgw.handle_node_change(node)
         transaction.commit()
 
@@ -968,12 +970,11 @@ class SystemGatewayTestCase(StorageDALTestCase):
             # change the when_started date for the test.
             store = get_filesync_store()
             uploadjob = store.get(UploadJob, up1.id)
-            uploadjob.when_last_active = (
-                datetime.datetime.now() - datetime.timedelta(uid))
+            uploadjob.when_last_active = now() - timedelta(uid)
         transaction.commit()
         # check that filtering by date works as expected.
         for idx in range(0, 10):
-            date = datetime.datetime.now() - datetime.timedelta(idx)
+            date = now() - timedelta(idx)
             jobs = list(self.gw.get_abandoned_uploadjobs(date))
             self.assertEqual(len(jobs), 10 - idx)
 
@@ -996,11 +997,10 @@ class SystemGatewayTestCase(StorageDALTestCase):
             # change the when_started date for the test.
             store = get_filesync_store()
             uploadjob = store.get(UploadJob, up1.id)
-            uploadjob.when_last_active = (
-                datetime.datetime.now() - datetime.timedelta(10))
+            uploadjob.when_last_active = now() - timedelta(10)
         transaction.commit()
         # check that filtering by date works as expected.
-        date = datetime.datetime.now() - datetime.timedelta(9)
+        date = now() - timedelta(9)
         jobs = self.gw.get_abandoned_uploadjobs(date)
         self.assertEqual(len(jobs), 10)
         self.gw.cleanup_uploadjobs(jobs)
@@ -1026,11 +1026,6 @@ class SystemGatewayPublicFileTestCase(StorageDALTestCase):
             self.root.id, name, hash, crc, size, deflated_size, storage_key,
             mimetype='fakemime')
         self.file = self.vgw._get_node_simple(file1.id)
-        self.save_flag = utils.set_public_uuid
-
-    def tearDown(self):
-        utils.set_public_uuid = self.save_flag
-        super(SystemGatewayPublicFileTestCase, self).tearDown()
 
     def get_get_public_file_DoesNotExist(self):
         """Get get_public_file with unknown key."""
@@ -1040,7 +1035,6 @@ class SystemGatewayPublicFileTestCase(StorageDALTestCase):
 
     def test_get_public_file_no_content(self):
         """Test get_public_file when file has no content."""
-        utils.set_public_uuid = False
         file_dao = self.vgw.change_public_access(self.file.id, True)
         self.file._content_hash = None
         self.assertRaises(errors.DoesNotExist,
@@ -1048,7 +1042,6 @@ class SystemGatewayPublicFileTestCase(StorageDALTestCase):
 
     def test_get_public_file_no_storage_key(self):
         """Test get_public_file when file has no storage_key."""
-        utils.set_public_uuid = False
         file_dao = self.vgw.change_public_access(self.file.id, True)
         self.file.content.storage_key = None
         self.assertRaises(errors.DoesNotExist,
@@ -1056,57 +1049,23 @@ class SystemGatewayPublicFileTestCase(StorageDALTestCase):
 
     def test_get_public_file(self):
         """Tests for get_public_file."""
-        utils.set_public_uuid = False
         file_dao = self.vgw.change_public_access(self.file.id, True)
-        self.assertNotEquals(file_dao.public_id, None)
+        self.assertIsNotNone(file_dao.public_id)
         self.assertIsNotNone(file_dao.public_uuid)
-        public_id = file_dao.public_id
-        public_key = file_dao.public_key
-        # Once a file has been made public, it can be looked up by its ID.
-        file2 = self.gw.get_public_file(public_key)
-        self.assertEqual(file2.id, self.file.id)
-        self.assertEqual(file2.mimetype, 'fakemime')
-        # this file was created with content, the content must be returned
-        self.assertNotEquals(file2.content, None)
-
-        # DoesNotExist is raised if that file is made private.
-        file_dao = self.vgw.change_public_access(self.file.id, False)
-        self.assertRaises(errors.DoesNotExist,
-                          self.gw.get_public_file, public_key)
-
-        # public stays the same when set back to public
-        self.assertEqual(file_dao.public_id, None)
-        file_dao = self.vgw.change_public_access(file_dao.id, True)
-        self.assertEqual(file_dao.public_id, public_id)
-
-        # DoesNotExist is raised if the underlying file is deleted.
-        self.vgw.delete_node(self.file.id)
-        self.assertRaises(errors.DoesNotExist,
-                          self.gw.get_public_file, public_key)
-
-    def test_get_public_file_public_uuid(self):
-        """Tests for get_public_file."""
-        utils.set_public_uuid = True
-        file_dao = self.vgw.change_public_access(self.file.id, True)
-        self.assertNotEquals(file_dao.public_id, None)
-        self.assertNotEquals(file_dao.public_uuid, None)
         public_id = file_dao.public_id
         public_uuid = file_dao.public_uuid
         public_key = file_dao.public_key
         # Once a file has been made public, it can be looked up by its UUID.
-        file2 = self.gw.get_public_file(public_key, use_uuid=True)
+        file2 = self.gw.get_public_file(public_key)
         self.assertEqual(file2.id, self.file.id)
         self.assertEqual(file2.mimetype, self.file.mimetype)
         # this file was created with content, the content must be returned
         self.assertNotEquals(file2.content, None)
-        # but not it's public_id since the config is set to use uuid
-        self.assertRaises(errors.DoesNotExist,
-                          self.gw.get_public_file, public_key)
 
         # DoesNotExist is raised if that file is made private.
         file_dao = self.vgw.change_public_access(self.file.id, False)
         self.assertRaises(errors.DoesNotExist,
-                          self.gw.get_public_file, public_key, True)
+                          self.gw.get_public_file, public_key)
 
         # public_id stays the same when set back to public
         self.assertEqual(file_dao.public_id, None)
@@ -1116,15 +1075,13 @@ class SystemGatewayPublicFileTestCase(StorageDALTestCase):
 
         # DoesNotExist is raised if the underlying file is deleted.
         self.vgw.delete_node(self.file.id)
-        self.assertRaises(errors.DoesNotExist,
-                          self.gw.get_public_file, public_key, use_uuid=True)
+        self.assertRaises(
+            errors.DoesNotExist, self.gw.get_public_file, public_key)
 
     def test_get_public_file_user_locked(self):
         """get_public_file works with a locked user."""
-        utils.set_public_uuid = False
         file_dao = self.vgw.change_public_access(self.file.id, True)
-        self.assertNotEquals(file_dao.public_id, None)
-        self.assertEqual(file_dao.public_uuid, None)
+        self.assertIsNotNone(file_dao.public_uuid)
         public_key = file_dao.public_key
         # lock the user
         suser = self.store.get(StorageUser, self.user1.id)
@@ -1146,12 +1103,6 @@ class SystemGatewayPublicDirectoryTestCase(StorageDALTestCase):
         self.root = self.vgw.get_root()
         dir1 = self.vgw.make_subdirectory(self.root.id, 'a-folder')
         self.dir = self.vgw._get_node_simple(dir1.id)
-        self.save_flag = utils.set_public_uuid
-        utils.set_public_uuid = True
-
-    def tearDown(self):
-        utils.set_public_uuid = self.save_flag
-        super(SystemGatewayPublicDirectoryTestCase, self).tearDown()
 
     def get_get_public_directory_DoesNotExist(self):
         """Get get_public_file with unknown key."""
@@ -2932,7 +2883,7 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
         job = self.vgw.make_uploadjob(
             file1.id, file1.content_hash, new_hash, crc, size,
             multipart_key=uuid.uuid4())
-        new_last_active = datetime.datetime.utcnow() + datetime.timedelta(1)
+        new_last_active = now() + timedelta(1)
         self.vgw.set_uploadjob_when_last_active(job.id, new_last_active)
         up_job = self.vgw.get_uploadjob(job.id)
         self.assertEqual(up_job.when_last_active, new_last_active)
@@ -4289,22 +4240,8 @@ class GenerationsTestCase(StorageDALTestCase):
         self.assertEqual(f1.generation, 2)
         self.assertEqual(f1.generation_created, 1)
 
-    def test_change_public_access_without_public_uuid(self):
+    def test_change_public_access(self):
         """Test change public access."""
-        saved_flag = utils.set_public_uuid
-        utils.set_public_uuid = False
-        a_file = self.vgw.make_file(self.vgw.get_root().id, 'the file name')
-        a_file = self.vgw.change_public_access(a_file.id, True)
-        f1 = self.storage_store.get(StorageObject, a_file.id)
-        self.assertEqual(f1.generation, 2)
-        self.assertEqual(f1.generation_created, 1)
-        self.assertEqual(f1.public_uuid, None)
-        utils.set_public_uuid = saved_flag
-
-    def test_change_public_access_with_public_uuid(self):
-        """Test change public access."""
-        saved_flag = utils.set_public_uuid
-        utils.set_public_uuid = True
         a_file = self.vgw.make_file(self.vgw.get_root().id, 'the file name')
         a_file = self.vgw.change_public_access(a_file.id, True)
         f1 = self.storage_store.get(StorageObject, a_file.id)
@@ -4321,7 +4258,6 @@ class GenerationsTestCase(StorageDALTestCase):
         a_file = self.vgw.change_public_access(a_file.id, True)
         f1 = self.storage_store.get(StorageObject, a_file.id)
         self.assertEqual(f1.public_uuid, public_uuid)
-        utils.set_public_uuid = saved_flag
 
     def test_deltas_across_volumes(self):
         """Test deltas across volumes to make sure they don't intermingle."""

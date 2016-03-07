@@ -122,24 +122,21 @@ class NodeKeyTests(unittest.TestCase):
     def test_get_node_public_key(self):
         """Test get_node_public_key."""
         node = FakeNode()
-        node.public_id = 1
         node.public_uuid = uuid.UUID(int=12)
-        self.assertTrue(get_node_public_key(node, False),
-                        encode_base62(node.public_id))
-        self.assertTrue(get_node_public_key(node, True),
-                        encode_base62(node.public_uuid.int, padded_to=22))
+        self.assertEqual(
+            get_node_public_key(node),
+            encode_base62(node.public_uuid.int, padded_to=22))
 
     def test_get_public_url(self):
         """Test get_public_url function."""
         node = FakeNode()
-        self.assertTrue(get_public_file_url(node) is None)
-        node.public_id = 1
-        self.assertTrue(get_public_file_url(node).endswith(
-            '/%s/' % encode_base62(node.public_id)))
+        self.assertIsNone(get_public_file_url(node))
         # using a short value here to make sure padding works
         node.public_uuid = uuid.UUID(int=12)
-        self.assertTrue(get_public_file_url(node).endswith(
-            '/%s' % encode_base62(node.public_uuid.int, padded_to=22)))
+        key = encode_base62(node.public_uuid.int, padded_to=22)
+        self.assertEqual(
+            get_public_file_url(node),
+            '%s/%s' % (settings.PUBLIC_URL_PREFIX, key))
 
 
 class Base62Tests(unittest.TestCase):

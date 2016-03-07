@@ -20,9 +20,9 @@
 
 import os
 import gc
-import datetime
 
 from django.conf import settings
+from django.utils.timezone import now
 
 
 SIGMELIAE = 44
@@ -35,7 +35,7 @@ def meliae_dump():
 
         dump_dir = settings.LOG_FOLDER
         filename = os.path.join(dump_dir, 'meliae-%s.json' % (
-            datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S",)))
+            now().strftime("%Y%m%d%H%M%S",)))
         gc.collect()
         scanner.dump_all_objects(filename)
     except ImportError as e:
@@ -50,7 +50,7 @@ def gc_dump():
     """Dump GC usage."""
     try:
         dump_dir = settings.LOG_FOLDER
-        tstamp = datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S")
+        tstamp = now().strftime("%Y%m%d%H%M%S")
         fname = os.path.join(dump_dir, 'gcdump-%s.txt' % (tstamp,))
         fh = open(fname, "w")
 

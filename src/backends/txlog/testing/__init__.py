@@ -18,9 +18,9 @@
 
 """Testing helpers for txlog."""
 
-import datetime
 import uuid
 
+from django.utils.timezone import now
 from backends.txlog.models import TransactionLog
 
 
@@ -38,7 +38,7 @@ def txn_log_as_dict(txn_id=1, node_id=None, owner_id=1, volume_id=None,
     if path is None:
         path = u'/%s' % unicode(uuid.uuid4())
     if timestamp is None:
-        timestamp = datetime.datetime.utcnow()
+        timestamp = now()
     return dict(
         txn_id=txn_id, node_id=node_id, owner_id=owner_id, volume_id=volume_id,
         op_type=op_type, path=path, generation=generation, timestamp=timestamp,

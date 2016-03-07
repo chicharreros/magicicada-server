@@ -18,24 +18,21 @@
 
 """Some generic utilities."""
 
-from datetime import datetime
-
+from __future__ import unicode_literals
 from django.contrib.auth.models import User
 
 from backends.filesync import services
 
 
-def create_test_user(username=u"fred", email=u"fred@bedrock.com",
-                     first_name=u"Fredrick", last_name=u"Flintsone",
-                     id=None, password=None):
+def create_test_user(
+        username='fred', email='fred@bedrock.com', first_name='Fredrick',
+        last_name='Flintsone', password=None, id=None):
     """Create a user used for testing."""
     try:
         user = User.objects.get(username=username)
     except User.DoesNotExist:
-        now = datetime.utcnow()
         user = User(id=id, username=unicode(username), email=unicode(email),
-                    is_staff=False, is_active=True, is_superuser=False,
-                    last_login=now, date_joined=now)
+                    is_staff=False, is_active=True, is_superuser=False)
         user.set_password(password)
         user.save()
     user.first_name = unicode(first_name)

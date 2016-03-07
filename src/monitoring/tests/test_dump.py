@@ -18,6 +18,8 @@
 
 """Tests for monitoring dump."""
 
+from __future__ import unicode_literals
+
 import gc
 import shutil
 import tempfile

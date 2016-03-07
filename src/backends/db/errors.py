@@ -20,6 +20,8 @@
 
 from __future__ import unicode_literals
 
+from django.db import IntegrityError  # NOQA
+
 
 class RetryLimitReached(Exception):
     """Raised when there have been to many retries."""
@@ -27,10 +29,6 @@ class RetryLimitReached(Exception):
     def __init__(self, msg, extra_info=None):
         super(RetryLimitReached, self).__init__(msg)
         self.extra_info = extra_info
-
-
-class IntegrityError(Exception):
-    """Raised when there has been an integrity error."""
 
 
 class NoTimeoutTracer(Exception):

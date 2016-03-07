@@ -18,6 +18,8 @@
 
 """Tests for the stats worker."""
 
+from __future__ import unicode_literals
+
 import logging
 
 from mocker import Mocker, expect

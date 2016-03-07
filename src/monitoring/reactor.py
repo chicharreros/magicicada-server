@@ -18,6 +18,8 @@
 
 """A thread that measures responsiveness of the twisted reactor."""
 
+from __future__ import unicode_literals
+
 import os
 import sys
 import time

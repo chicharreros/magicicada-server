@@ -27,7 +27,6 @@ from itertools import count
 
 from django.utils.timezone import now
 
-from backends.filesync import utils
 from backends.filesync.dbmanager import get_filesync_store, filesync_tm
 from backends.filesync.models import (
     STATUS_DEAD,
@@ -52,12 +51,6 @@ class StorageDALTestCase(DatabaseResourceTestCase):
         super(StorageDALTestCase, self).setUp()
         self.factory = Factory()
         self.store = get_filesync_store()
-        self.save_utils_set_public_uuid = utils.set_public_uuid
-
-    def tearDown(self):
-        """Tear down."""
-        utils.set_public_uuid = self.save_utils_set_public_uuid
-        super(StorageDALTestCase, self).tearDown()
 
     def patch(self, obj, attr_name, new_val):
         """Patch!"""
@@ -168,7 +161,7 @@ class Factory(object):
         """Return a hashkey."""
         return b'sha1:' + hashlib.sha1(key or str(uuid.uuid4())).hexdigest()
 
-    def get_test_contentblob(self, content=None):
+    def get_test_contentblob(self, content=None, magic_hash=None):
         """Get a content blob."""
         if content:
             content = content.encode('utf-8')
@@ -180,6 +173,12 @@ class Factory(object):
         cb.storage_key = uuid.uuid4()
         cb.content = content
         cb.status = STATUS_LIVE
+        cb.magic_hash = magic_hash
+        return cb
+
+    def make_content_blob(self, content=None, magic_hash=None):
+        cb = self.get_test_contentblob(content, magic_hash)
+        get_filesync_store().add(cb)
         return cb
 
     def content_blob_args(self):

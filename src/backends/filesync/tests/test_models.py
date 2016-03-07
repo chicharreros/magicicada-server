@@ -24,8 +24,10 @@ import psycopg2
 import threading
 import unittest
 import uuid
-import datetime
 
+from datetime import datetime
+
+from django.utils.timezone import now
 from mock import patch
 from storm.expr import Or, Max
 
@@ -1372,9 +1374,9 @@ class TestStorageObject(TestStorageObjectBase):
         self.store.add(content)
         root = StorageObject.get_root(self.store, user.id)
         file = root.make_file('a_File')
-        before = datetime.datetime.utcnow()
+        before = now()
         file.content = content
-        after = datetime.datetime.utcnow()
+        after = now()
         self.assertTrue(after > file.when_last_modified > before)
 
     def test_update_last_modified_on_make(self):
@@ -1382,14 +1384,14 @@ class TestStorageObject(TestStorageObjectBase):
         user = self.make_user(1, 'a_test_user')
         root = StorageObject.get_root(self.store, user.id)
         subdir = root.make_subdirectory('subdir')
-        before_file = datetime.datetime.utcnow()
+        before_file = now()
         subdir.make_file('a_File')
-        after_file = datetime.datetime.utcnow()
+        after_file = now()
         self.assertTrue(after_file > subdir.when_last_modified > before_file)
 
-        before_dir = datetime.datetime.utcnow()
+        before_dir = now()
         subdir.make_subdirectory('subsubdir')
-        after_dir = datetime.datetime.utcnow()
+        after_dir = now()
         self.assertTrue(after_dir > subdir.when_last_modified > before_dir)
 
     def test_max_used_bytes(self):
@@ -2198,8 +2200,7 @@ class DownloadTests(TestStorageObjectBase):
         self.assertEqual(download.file_path, 'file_path')
         self.assertEqual(download.download_url, 'http://download/url')
         self.assertEqual(download.status, Download.STATUS_QUEUED)
-        self.assertTrue(
-            isinstance(download.status_change_date, datetime.datetime))
+        self.assertIsInstance(download.status_change_date, datetime)
         self.assertEqual(download.node_id, None)
         self.assertEqual(download.error_message, None)
 

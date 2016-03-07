@@ -18,6 +18,7 @@
 
 """Process that inform metrics about other processes and the machine."""
 
+from __future__ import unicode_literals
 from __future__ import with_statement
 
 import os
