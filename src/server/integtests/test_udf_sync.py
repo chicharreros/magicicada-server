@@ -45,7 +45,6 @@ class TestUDFSync(test_sync.TestSync):
 
     def handle_default(self, event_name, *args, **kwargs):
         """Stub implementation."""
-        pass
 
     @defer.inlineCallbacks
     def setUp(self):
@@ -125,10 +124,6 @@ class TestUDFBasic2(TestUDFSync, test_sync.TestBasic2):
         yield super(TestUDFBasic2, self).setUp()
         self.root_dir = self.my_udf_dir
 
-    def tearDown(self):
-        """Cleanup the test."""
-        return super(TestUDFBasic2, self).tearDown()
-
 
 class TestUDFClientMove(TestUDFSync, test_sync.TestClientMove):
     """Move on the client (inside UDF)."""
@@ -138,10 +133,6 @@ class TestUDFClientMove(TestUDFSync, test_sync.TestClientMove):
         """Set the root_dir = my_udf_dir."""
         yield super(TestUDFClientMove, self).setUp()
         self.root_dir = self.my_udf_dir
-
-    def tearDown(self):
-        """ cleanup the test """
-        return super(TestUDFClientMove, self).tearDown()
 
 
 class TestUDFServerBase(TestUDFSync, test_sync.TestServerBase):
@@ -241,10 +232,6 @@ class TestUDFServerMove(TestUDFServerBase):
         self.other_udf = yield self.create_udf('TestUDF2')
         self.other_udf_id = self.other_udf.id
         self.other_udf_dir = self.other_udf.path
-
-    def tearDown(self):
-        """Cleanup the test."""
-        return super(TestUDFServerMove, self).tearDown()
 
     @defer.inlineCallbacks
     def test_simple_move(self):

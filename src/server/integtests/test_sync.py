@@ -91,7 +91,7 @@ def deferToThread(func, *args, **kwargs):
         """inner"""
         try:
             r = func(*args, **kwargs)
-        except Exception, e:
+        except Exception as e:
             reactor.callFromThread(d.errback, e)
         else:
             reactor.callFromThread(d.callback, r)
@@ -111,8 +111,7 @@ def filter_symlinks(root, listdir):
 
 class TestSync(TestWithDatabase):
     """Basic test setup"""
-    # this all takes a lot of time
-    timeout = 300
+
     _ignore_cancelled_downloads = True
 
     def no_op(self):
@@ -158,8 +157,11 @@ class TestSync(TestWithDatabase):
         self.error_handler = ErrorHandler()
         logger = logging.getLogger("fsyncsrvr.SyncDaemon.sync")
         logger.addHandler(self.error_handler)
+        self.addCleanup(logger.removeHandler, self.error_handler)
+
         logger = logging.getLogger("twisted")
         logger.addHandler(self.error_handler)
+        self.addCleanup(logger.removeHandler, self.error_handler)
 
     def _wait_for_dead_nirvana(self):
         """Wait until it's disconnected."""
@@ -192,10 +194,6 @@ class TestSync(TestWithDatabase):
             yield self._wait_for_dead_nirvana()
         finally:
             # make sure no errors were reported
-            logger = logging.getLogger("fsyncsrvr.SyncDaemon.sync")
-            logger.removeHandler(self.error_handler)
-            logger = logging.getLogger("twisted")
-            logger.removeHandler(self.error_handler)
             if self.error_handler.errors:
                 errs = "\n".join(e.getMessage()
                                  for e in self.error_handler.errors)

@@ -35,10 +35,6 @@ from django.conf import settings
 from twisted.python import log
 
 
-# disable storm txn logger
-txn_logger = logging.getLogger('txn')
-txn_logger.propagate = False
-
 # define the TRACE level
 TRACE = 5
 logging.addLevelName(TRACE, "TRACE")

@@ -27,7 +27,6 @@ from backends.filesync.dbmanager import get_filesync_store
 from backends.filesync.models import (
     STATUS_LIVE,
     STATUS_DEAD,
-    PublicNode,
     StorageObject,
     StorageUser,
     UserVolume,
@@ -79,7 +78,7 @@ class TestTransactionLog(BaseTransactionLogTestCase):
         # self.assertEqual(txlog.volume_id, expected['volume_id'])
         # self.assertEqual(txlog.node_id, expected['node_id'])
         # self.assertEqual(txlog.owner_id, expected['owner_id'])
-        msg = 'Value for %r must be %r (for %r instead).'
+        msg = 'Value for %r must be %r (got %r instead).'
         for k, v in expected.iteritems():
             actual = getattr(txlog, k)
             self.assertEqual(actual, v, msg % (k, v, actual))
@@ -131,10 +130,12 @@ class TestTransactionLog(BaseTransactionLogTestCase):
                 udf.root_node, TransactionLog.OP_DELETE)}
 
         for i in range(0, 5):
-            f = self._make_file(parent=udf.root_node, mimetype=self.mimetype)
+            f = self.factory.make_file(
+                parent=udf.root_node, mimetype=self.mimetype)
             expected_rows[f.id] = self._get_dict_with_txlog_attrs_from(
                 f, TransactionLog.OP_DELETE,
                 extra=dict(generation=udf.generation))
+        self.clear_txlogs()
 
         udf.delete()
 
@@ -167,7 +168,9 @@ class TestTransactionLog(BaseTransactionLogTestCase):
     def test_txlog_when_unlinking_file(self):
         """Check that we store a TransactionLog with the file attributes.
         """
-        node = self._make_file(mimetype=self.mimetype)
+        node = self.factory.make_file(mimetype=self.mimetype)
+        self.clear_txlogs()
+
         node.unlink()
         expected = self._get_dict_with_txlog_attrs_from(
             node, TransactionLog.OP_DELETE,
@@ -202,13 +205,14 @@ class TestTransactionLog(BaseTransactionLogTestCase):
                     'volume_path': settings.ROOT_USERVOLUME_PATH}))}
 
         for i in range(0, 5):
-            f = self._make_file(parent=directory, mimetype=self.mimetype)
+            f = self.factory.make_file(
+                parent=directory, mimetype=self.mimetype)
             expected_rows[f.id] = self._get_dict_with_txlog_attrs_from(
                 f, TransactionLog.OP_DELETE,
                 extra=dict(extra_data_dict={
                     'kind': f.kind,
                     'volume_path': settings.ROOT_USERVOLUME_PATH}))
-
+        self.clear_txlogs()
         directory.unlink_tree()
 
         # All TransactionLog entries created will have the directory's
@@ -223,7 +227,8 @@ class TestTransactionLog(BaseTransactionLogTestCase):
         descendants."""
         root = self.factory.make_directory()
         subdir = self.factory.make_directory(parent=root)
-        f = self._make_file(parent=subdir, mimetype=self.mimetype)
+        f = self.factory.make_file(parent=subdir, mimetype=self.mimetype)
+        self.clear_txlogs()
 
         root.unlink_tree()
 
@@ -241,8 +246,9 @@ class TestTransactionLog(BaseTransactionLogTestCase):
         user = self.factory.make_user()
         dir1 = self.factory.make_directory(user=user)
         dir2 = self.factory.make_directory(user=user)
-        f = self._make_file(parent=dir1, mimetype=self.mimetype)
+        f = self.factory.make_file(parent=dir1, mimetype=self.mimetype)
         orig_path = f.full_path
+        self.clear_txlogs()
 
         f.move(dir2.id, f.name)
 
@@ -252,7 +258,7 @@ class TestTransactionLog(BaseTransactionLogTestCase):
 
     def test__get_extra_data_for_new_node(self):
         """Check that _get_extra_data_for_new_node includes all we need."""
-        f = self._make_file()
+        f = self.factory.make_file()
         f_extra_data = dict(
             size=f.content.size, storage_key=unicode(f.content.storage_key),
             publicfile_id=None, public_uuid=None, content_hash=f.content_hash,
@@ -271,9 +277,12 @@ class TestTransactionLog(BaseTransactionLogTestCase):
             user=user, name='current-parent')
         dir1 = self.factory.make_directory(
             name='dir1', parent=current_parent)
-        f = self._make_file(name='f.jpg', parent=dir1, mimetype=self.mimetype)
+        f = self.factory.make_file(
+            name='f.jpg', parent=dir1, mimetype=self.mimetype)
         f_orig_path = f.full_path
         dir_orig_path = dir1.full_path
+        self.clear_txlogs()
+
         dir1.move(new_parent.id, dir1.name)
         f_extra_data = TransactionLog._get_extra_data_for_new_node(
             f, f.volume.path)
@@ -304,16 +313,17 @@ class TestTransactionLog(BaseTransactionLogTestCase):
             user=user, name='current-parent')
         dir1 = self.factory.make_directory(name='dir1', parent=parent)
         dir11 = self.factory.make_directory(name='dir1.1', parent=dir1)
-        f1 = self._make_file(
+        f1 = self.factory.make_file(
             name='f1.jpg', parent=dir1, mimetype=self.mimetype)
-        f11 = self._make_file(
+        f11 = self.factory.make_file(
             name='f11.jpg', parent=dir11, mimetype=self.mimetype)
         nodes = [(dir1, dir1.full_path), (dir11, dir11.full_path),
                  (f1, f1.full_path), (f11, f11.full_path)]
 
         # Now move dir1 to new_parent.
-        new_parent = self.factory.make_directory(
-            user=user, name='new-parent')
+        new_parent = self.factory.make_directory(user=user, name='new-parent')
+        self.clear_txlogs()
+
         dir1.move(new_parent.id, dir1.name)
 
         expected = {}
@@ -335,9 +345,9 @@ class TestTransactionLog(BaseTransactionLogTestCase):
             user=user, name='current-parent')
         dir1 = self.factory.make_directory(
             name='dir1', parent=current_parent)
-        f = self._make_file(
+        f = self.factory.make_file(
             name='f.jpg', parent=dir1, mimetype=self.mimetype)
-
+        self.clear_txlogs()
         dir1_orig_path = dir1.full_path
         f_orig_path = f.full_path
         dir1.move(dir1.parent.id, 'new-name')
@@ -356,7 +366,7 @@ class TestTransactionLog(BaseTransactionLogTestCase):
 
     def test_txlog_for_move_with_same_parent_and_name(self):
         root = self.factory.make_directory()
-        f = self._make_file(parent=root, mimetype=self.mimetype)
+        f = self.factory.make_file(parent=root, mimetype=self.mimetype)
 
         self.assertRaises(
             ValueError, TransactionLog.record_move, f, f.name, f.parent)
@@ -385,8 +395,9 @@ class TestTransactionLog(BaseTransactionLogTestCase):
         self.assertStoredTransactionLogsMatch({node.id: expected_attrs})
 
     def test_txlog_for_content_change(self):
-        node = self._make_file(mimetype=self.mimetype)
+        node = self.factory.make_file(mimetype=self.mimetype)
         new_content = self.factory.make_content()
+        self.clear_txlogs()
 
         node.content = new_content
 
@@ -398,12 +409,8 @@ class TestTransactionLog(BaseTransactionLogTestCase):
         self.assertStoredTransactionLogsMatch({node.id: expected_attrs})
 
     def test_txlog_when_publishing_directory(self):
-        directory = self.factory.make_directory()
-        publicfile = self.store.add(
-            PublicNode(directory.id, directory.owner_id))
-        self.store.flush()
-
-        directory.publicfile_id = publicfile.id
+        directory = self.factory.make_directory(public=True)
+        assert directory.public_uuid is not None
 
         public_url = get_public_file_url(directory)
         self.assertIsNotNone(public_url)
@@ -433,11 +440,12 @@ class TestTransactionLog(BaseTransactionLogTestCase):
         self.assertStoredTransactionLogsMatch({directory.id: expected_attrs})
 
     def test_txlog_for_public_access_change_on_interesting_file(self):
-        node = self._make_file(mimetype=self.mimetype)
-        publicfile = self.store.add(PublicNode(node.id, node.owner_id))
-        self.store.flush()
+        node = self.factory.make_file(mimetype=self.mimetype)
+        publicnode = self.factory.make_public_node(node)
+        self.clear_txlogs()
 
-        node.publicfile_id = publicfile.id
+        node.public_uuid = publicnode.public_uuid
+        node.publicfile_id = publicnode.id
 
         public_url = get_public_file_url(node)
         self.assertIsNotNone(public_url)
@@ -633,19 +641,6 @@ class TestTransactionLog(BaseTransactionLogTestCase):
 
     def assertNoTransactionLogEntriesExist(self):
         self.assertEqual([], list(self.store.find(TransactionLog)))
-
-    def _make_file(self, name=None, parent=None, mimetype=None):
-        """Creates a new file with the given attributes.
-
-        We disable txlog before creating the file and re-enable it later so
-        that no entries are created when the file content is changed in
-        factory.make_file().  This is just to avoid poluting the
-        TransactionLog table with things the tests don't really care about.
-        """
-        result = self.factory.make_file(
-            name=name, parent=parent, mimetype=mimetype)
-        self.clear_txlogs()
-        return result
 
     def _get_dict_with_txlog_attrs_from_share(self, share, node, op_type):
         when_last_changed = share.when_last_changed

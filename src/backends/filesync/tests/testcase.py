@@ -231,6 +231,12 @@ class ORMObjectFactory(Factory):
         self.store.add(content)
         return content
 
+    def make_public_node(self, node):
+        publicnode = self.store.add(
+            PublicNode(node.id, node.owner_id, uuid.uuid4()))
+        self.store.flush()
+        return publicnode
+
     def make_file(self, user=None, parent=None, name=None,
                   mimetype='text/plain', public=False):
         """Create a file node."""
@@ -245,8 +251,8 @@ class ORMObjectFactory(Factory):
             parent=parent)
         f.content = self.make_content()
         if public:
-            publicfile = self.store.add(PublicNode(f.id, f.owner_id))
-            self.store.flush()
+            publicfile = self.make_public_node(f)
+            f.public_uuid = publicfile.public_uuid
             f.publicfile_id = publicfile.id
         self.store.add(f)
         return f
@@ -276,8 +282,8 @@ class ORMObjectFactory(Factory):
             parent = UserVolume.get_root(self.store, user.id).root_node
         subdir = parent.make_subdirectory(name)
         if public:
-            publicfile = self.store.add(PublicNode(subdir.id, subdir.owner_id))
-            self.store.flush()
+            publicfile = self.make_public_node(subdir)
+            subdir.public_uuid = publicfile.public_uuid
             subdir.publicfile_id = publicfile.id
         return subdir
 

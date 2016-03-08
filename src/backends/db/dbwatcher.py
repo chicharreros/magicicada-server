@@ -100,7 +100,7 @@ class DatabaseWatcher(object):
         try:
             self._callbacks[dbname].remove(callback)
         except KeyError:
-            raise
+            print 'Callback %r does not exist for %r' % (callback, dbname)
 
     def reset(self, dbname):
         """Reset the used and dirty states for a database."""

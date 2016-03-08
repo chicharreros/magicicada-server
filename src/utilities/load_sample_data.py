@@ -23,12 +23,14 @@ Called by the namesake in the top level utilities/ directory.
 
 from __future__ import unicode_literals
 
+import django
+
 from utilities.userutils import (
     add_auth_info_to_keyfile,
     delete_all_data,
 )
-from ubuntuone.storage.server.testing.testcase import create_test_user
 
+django.setup()
 SAMPLE_USERS = [
     {'username': "hola", 'password': "23456789",
      'full_name': "Hola Frijoles",
@@ -47,6 +49,7 @@ SAMPLE_USERS = [
 
 def main():
     """Preload the website with some data."""
+    from ubuntuone.storage.server.testing.testcase import create_test_user
     # clear out existing data
     delete_all_data()
     for user_data in SAMPLE_USERS:

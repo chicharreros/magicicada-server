@@ -23,7 +23,7 @@
 
 ./.sourcecode/configglue                  ~configglue/configglue/trunk;revno=1
 ./.sourcecode/dirspec                     ~ubuntuone-control-tower/dirspec/trunk;revno=14
-./.sourcecode/django                      ~ubuntuone-pqm-team/django/stable;revno=15
+./.sourcecode/django                      ~ubuntuone-pqm-team/django/stable;revno=17
 ./.sourcecode/mock                        ~ubuntuone-pqm-team/python-mock/stable;revno=1
 ./.sourcecode/oauthlib                    ~ubuntuone-pqm-team/oauthlib/stable;revno=209
 ./.sourcecode/oops                        ~canonical-launchpad-branches/python-oops/trunk;revno=37

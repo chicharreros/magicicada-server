@@ -22,19 +22,11 @@
 
 import os
 import sys
-import warnings
 
-warnings.simplefilter("ignore")
 sys.path.insert(0, os.path.abspath('lib'))
 
 TESTDIRS = [
     'src',
-    'lib/ubuntuone/storage/tests',
-    'lib/metrics/tests',
-    'lib/ubuntuone/monitoring/tests',
-    'lib/ubuntuone/supervisor/tests',
-    'lib/ubuntuone/txutils/tests',
-    'lib/tests',
 ]
 for td in TESTDIRS:
     sys.path.insert(0, os.path.abspath(td))
@@ -83,9 +75,10 @@ if __name__ == "__main__":
 
     (options, args) = parser.parse_args()
 
+    setup_environment("magicicada.settings")
+
     from utilities.testlib import test_with_trial
 
-    setup_environment("magicicada.settings")
     testroots = args
     topdir = os.path.abspath(os.path.dirname(__file__))
     status = test_with_trial(options, topdir, TESTDIRS, testroots)
