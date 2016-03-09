@@ -37,10 +37,10 @@ from twisted.internet.protocol import connectionDone
 from twisted.python.failure import Failure
 from twisted.trial.unittest import TestCase as TwistedTestCase
 
-from metrics import METER_UTILITY
 from backends.filesync.tests.testcase import StorageDALTestCase
 from backends.utils import create_test_user
 from magicicada import settings
+from metrics import METER_UTILITY
 from ubuntuone.storage.server.auth import DummyAuthProvider
 from ubuntuone.storage.server.server import (
     PREFERRED_CAP,
@@ -161,6 +161,11 @@ class BaseProtocolTestCase(TwistedTestCase):
         log.info("finished test %s.%s", self.__class__.__name__,
                  self._testMethodName)
         yield super(BaseProtocolTestCase, self).tearDown()
+
+    def make_user(self, username=None, **kwargs):
+        if username is None:
+            username = self.factory.get_unique_unicode()
+        return create_test_user(username=username, **kwargs)
 
 
 class ClientTestHelper(object):
@@ -407,14 +412,13 @@ class TestWithDatabase(ProtocolTestCase, StorageDALTestCase):
         yield super(TestWithDatabase, self).setUp()
 
         users = (
-            (0, u'usr0', 'open sesame'),
-            (1, u'usr1', 'friend'),
-            (2, u'usr2', 'pass2'),
-            (3, u'usr3', 'usr3'),
+            (u'usr0', 'open sesame'),
+            (u'usr1', 'friend'),
+            (u'usr2', 'pass2'),
+            (u'usr3', 'usr3'),
         )
-        for user_id, username, password in users:
-            user = create_test_user(
-                id=user_id, username=username, password=password)
+        for username, password in users:
+            user = self.make_user(username=username, password=password)
             setattr(self, username, user)
             # set the password in the object just as a test simplifier
             user.password = password

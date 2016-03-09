@@ -36,18 +36,14 @@ from twisted.names import dns
 from twisted.names.common import ResolverBase
 from twisted.python.failure import Failure
 
-from ubuntuone.storage.server.testing.testcase import (
-    BaseProtocolTestCase,
-    create_test_user,
-)
-
 from backends.filesync.tests.testcase import StorageDALTestCase
 from magicicada import settings
+from ubuntuone import platform
 from ubuntuone.storage.server import ssl_proxy
+from ubuntuone.storage.server.auth import SimpleAuthProvider
+from ubuntuone.storage.server.testing.testcase import BaseProtocolTestCase
 from ubuntuone.storageprotocol import request, sharersp, client
 from ubuntuone.storageprotocol.content_hash import content_hash_factory, crc32
-from ubuntuone.storage.server.auth import SimpleAuthProvider
-from ubuntuone import platform
 from ubuntuone.syncdaemon.action_queue import ActionQueue, ActionQueueCommand
 from ubuntuone.syncdaemon import main, volume_manager, tritcask, logger
 from ubuntuone.syncdaemon.event_queue import EventQueue
@@ -350,7 +346,7 @@ class TestWithDatabase(BaseProtocolTestCase, StorageDALTestCase):
                 'username': username,
                 'password': password,
             }
-            user = create_test_user(username=username, password=password)
+            user = self.make_user(username=username, password=password)
             self.storage_users[username] = user
         self.dns_srv = None
 

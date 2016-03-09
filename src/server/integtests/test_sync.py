@@ -311,7 +311,8 @@ class TestBrokenNode(TestSync):
         # check that the file is still there, with the same contents.
         file_path = self.root_dir + "/test_file"
         self.assertTrue(os.path.exists(file_path))
-        self.assertEqual(open(file_path).read(), "foo")
+        with open(file_path) as f:
+            self.assertEqual(f.read(), "foo")
         # re-get the file and check the server content is fixed
         afile = root.get_child_by_name(u"test_file")
         self.assertTrue(afile.content.hash)
@@ -674,9 +675,6 @@ class TestClientDelete(TestSync):
         d.addCallback(remove)
         d.addCallback(lambda _: self.check())
         return d
-    test_sync_a_dir_and_subfile_and_delete.skip = (
-        'Fails in PQM with: '
-        'ubuntuone.storageprotocol.errors.NotAvailableError: NOT_AVAILABLE')
 
     def test_sync_a_symlink_and_delete(self):
         """fail to sync+delete one symlink (sync/delete nothing!)"""
@@ -1357,9 +1355,8 @@ class TestTimings(TestServerBase):
         # check that everything is ok
         l = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
         self.assertEqual(l, ["test_file"])
-        f = open(self.root_dir + "/test_file")
-        content = f.read()
-        f.close()
+        with open(self.root_dir + "/test_file") as f:
+            content = f.read()
         self.assertEqual(content, ":)")
         yield self.compare_server()
 
@@ -1580,8 +1577,6 @@ class TestConflict(TestServerBase):
                       self.main.wait_for_nirvana(last_event_interval=0.5))
         d.addCallback(lambda _: content_check())
         return d
-    test_double_make_conflict_w_dir_and_file.skip = (
-        "Fails in PQM with ALREADY_EXISTS, see Bug #705655")
 
     @defer.inlineCallbacks
     def test_makefile_problem_retry(self):
@@ -2258,7 +2253,8 @@ class TestMoveWhileInProgress(TestServerBase):
 
 
 class TestMoveWhileInProgress2(TestServerBase):
-    """handle more new move cases."""
+    """Handle more new move cases."""
+
     def test_local_move_file_while_uploading_no_wait(self):
         """local change after server change waiting for upload no wait."""
 

@@ -1134,7 +1134,7 @@ class TestPutContent(TestWithDatabase):
 
     def _get_users(self, max_storage_bytes):
         """Get both storage and content users."""
-        s_user = self.factory.make_user(
+        s_user = self.make_user(
             max_storage_bytes=max_storage_bytes)
         c_user = content.User(self.service.factory.content, s_user.id,
                               s_user.root_volume_id, s_user.username,
@@ -1507,9 +1507,8 @@ class TestPutContent(TestWithDatabase):
         crc32_value = crc32(data)
         size = len(data)
         deflated_size = len(deflated_data)
-        # create the content blob without a magic hash in a different
-        # user.
-        self.factory.make_user(100, u'my_user', u'', 2 ** 20)
+        # create the content blob without a magic hash in a different user.
+        self.make_user(u'my_user', max_storage_bytes=2 ** 20)
         self.usr3.make_filepath_with_content(
             settings.ROOT_USERVOLUME_PATH + u"/file.txt", hash_value,
             crc32_value, size, deflated_size, uuid.uuid4())
@@ -1907,7 +1906,7 @@ class TestMultipartPutContent(TestWithDatabase):
         size = len(data)
         deflated_size = len(deflated_data)
         # create the content blob without a magic hash in a different user.
-        self.factory.make_user(100, u'my_user', u'', 2 ** 20)
+        self.make_user(u'my_user', max_storage_bytes=2 ** 20)
         self.usr3.make_filepath_with_content(
             settings.ROOT_USERVOLUME_PATH + u"/file.txt",
             hash_value, crc32_value, size, deflated_size, uuid.uuid4())
@@ -1977,7 +1976,7 @@ class TestPutContentInternalError(TestWithDatabase):
         error, instead of wait until the full upload is done.
         """
         chunk_size = settings.api_server.STORAGE_CHUNK_SIZE
-        user = self.create_user(max_storage_bytes=chunk_size ** 2)
+        user = self.make_user(max_storage_bytes=chunk_size ** 2)
         content_user = content.User(self.service.factory.content, user.id,
                                     user.root_volume_id, user.username,
                                     user.visible_name)
@@ -2223,7 +2222,7 @@ class UserTest(TestWithDatabase):
         yield super(UserTest, self).setUp()
 
         # user and root to use in the tests
-        u = self.suser = self.create_user(max_storage_bytes=64 ** 2)
+        u = self.suser = self.make_user(max_storage_bytes=64 ** 2)
         self.user = content.User(self.service.factory.content, u.id,
                                  u.root_volume_id, u.username, u.visible_name)
 
@@ -2295,7 +2294,7 @@ class UserTest(TestWithDatabase):
     @defer.inlineCallbacks
     def test_get_free_bytes_own_share(self):
         """Get the user free bytes asking for same user's share."""
-        other_user = self.create_user(id=2, username=u'user2')
+        other_user = self.make_user(username=u'user2')
         share = self.suser.root.share(other_user.id, u"sharename")
         self.suser.update(max_storage_bytes=1000)
         fb = yield self.user.get_free_bytes(share.id)
@@ -2304,8 +2303,7 @@ class UserTest(TestWithDatabase):
     @defer.inlineCallbacks
     def test_get_free_bytes_othershare_ok(self):
         """Get the user free bytes for other user's share."""
-        other_user = self.create_user(id=2, username=u'user2',
-                                      max_storage_bytes=500)
+        other_user = self.make_user(username=u'user2', max_storage_bytes=500)
         share = other_user.root.share(self.suser.id, u"sharename")
         fb = yield self.user.get_free_bytes(share.id)
         self.assertEqual(fb, 500)
@@ -2313,8 +2311,7 @@ class UserTest(TestWithDatabase):
     @defer.inlineCallbacks
     def test_get_free_bytes_othershare_bad(self):
         """Get the user free bytes for a share of a user that is not valid."""
-        other_user = self.create_user(id=2, username=u'user2',
-                                      max_storage_bytes=500)
+        other_user = self.make_user(username=u'user2', max_storage_bytes=500)
         share = other_user.root.share(self.suser.id, u"sharename")
         other_user.update(subscription=False)
         d = self.user.get_free_bytes(share.id)
@@ -2333,7 +2330,7 @@ class TestUploadJob(TestWithDatabase):
         self.chunk_size = settings.api_server.STORAGE_CHUNK_SIZE
         self.half_size = self.chunk_size / 2
         self.double_size = self.chunk_size * 2
-        self.user = self.create_user(max_storage_bytes=self.chunk_size ** 2)
+        self.user = self.make_user(max_storage_bytes=self.chunk_size ** 2)
         self.content_user = content.User(self.service.factory.content,
                                          self.user.id,
                                          self.user.root_volume_id,
@@ -2680,7 +2677,7 @@ class TestNode(TestWithDatabase):
         self.chunk_size = settings.api_server.STORAGE_CHUNK_SIZE
         self.half_size = self.chunk_size / 2
         self.double_size = self.chunk_size * 2
-        self.user = self.create_user(max_storage_bytes=self.chunk_size ** 2)
+        self.user = self.make_user(max_storage_bytes=self.chunk_size ** 2)
         self.suser = content.User(self.service.factory.content, self.user.id,
                                   self.user.root_volume_id, self.user.username,
                                   self.user.visible_name)
@@ -2783,7 +2780,7 @@ class TestGenerations(TestWithDatabase):
     def setUp(self):
         """Setup the test."""
         yield super(TestGenerations, self).setUp()
-        self.suser = u = self.create_user(max_storage_bytes=64 ** 2)
+        self.suser = u = self.make_user(max_storage_bytes=64 ** 2)
         self.user = content.User(self.service.factory.content, u.id,
                                  u.root_volume_id, u.username, u.visible_name)
 
@@ -2867,7 +2864,7 @@ class TestContentManagerTests(TestWithDatabase):
     def setUp(self):
         """Setup the test."""
         yield super(TestContentManagerTests, self).setUp()
-        self.suser = self.create_user(max_storage_bytes=64 ** 2)
+        self.suser = self.make_user(max_storage_bytes=64 ** 2)
         self.cm = content.ContentManager(self.service.factory)
         self.cm.rpcdal_client = self.service.rpcdal_client
 

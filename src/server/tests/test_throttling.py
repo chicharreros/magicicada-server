@@ -26,7 +26,6 @@ from StringIO import StringIO
 from twisted.internet import threads, defer
 from twisted.internet.protocol import connectionDone
 
-
 from backends.filesync.dbmanager import get_filesync_store, filesync_tm
 from backends.filesync.models import ContentBlob
 from ubuntuone.storageprotocol import request, client
@@ -182,8 +181,6 @@ class TestThrottling(TestWithDatabase):
             return d
 
         return self.callback_test(auth, timeout=1)
-
-    test_putcontent.skip = "This is failing in PQM, Bug #423779"
 
     def test_putcontent_slow(self, num_files=1):
         """Test putting content to a file with very low bandwidth and fail

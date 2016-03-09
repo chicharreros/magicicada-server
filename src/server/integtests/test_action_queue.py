@@ -641,9 +641,6 @@ class TestContent(TestContentBase):
             raise Exception('data does not match')
         self.main.event_q.push('SYS_USER_DISCONNECT')
 
-    test_partial_download.skip = (
-        "Failing with DirtyReactorAggregateError in tarmac.")
-
 
 class TestShares(TestBase):
     """Test things related to shares."""

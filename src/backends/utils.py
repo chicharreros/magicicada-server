@@ -26,7 +26,8 @@ from backends.filesync import services
 
 def create_test_user(
         username='fred', email='fred@bedrock.com', first_name='Fredrick',
-        last_name='Flintsone', password=None, id=None):
+        last_name='Flintsone', password=None,
+        id=None, max_storage_bytes=2 ** 20):
     """Create a user used for testing."""
     try:
         user = User.objects.get(username=username)
@@ -45,6 +46,6 @@ def create_test_user(
     # create also the storage user
     visible_name = "%s %s" % (user.first_name, user.last_name)
     storage_user = services.make_storage_user(
-        account_user.id, username, visible_name, 2 ** 20)
+        account_user.id, username, visible_name, max_storage_bytes)
 
     return storage_user

@@ -30,7 +30,7 @@ class QuotaTest(TestWithDatabase):
     """Test account and quota info."""
 
     def test_quota(self):
-        """Test quota info """
+        """Test quota info."""
         self.usr0.update(max_storage_bytes=2 ** 16)
         usr2 = services.make_storage_user(1, u"otheruser",
                                           u"Other User", 2 ** 17)
@@ -58,7 +58,7 @@ class QuotaTest(TestWithDatabase):
         self.usr0.update(max_storage_bytes=2 ** 16)
         # need to do something that just can't happen normally
         store = dbmanager.get_filesync_store()
-        info = store.get(StorageUserInfo, 0)
+        info = store.get(StorageUserInfo, self.usr0.id)
         info.used_storage_bytes = 2 ** 17
         store.commit()
 

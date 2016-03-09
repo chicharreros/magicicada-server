@@ -45,7 +45,7 @@ class RequiredCapsDecoratorTests(TestCase):
         yield super(RequiredCapsDecoratorTests, self).tearDown()
 
     def test_mismatch(self):
-        """test tha a test is correctly skipped"""
+        """Test that a test is correctly skipped."""
         result = TestResult()
 
         syncdaemon.REQUIRED_CAPS = set(['supercalifragilistico'])

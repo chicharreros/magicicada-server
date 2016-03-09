@@ -60,23 +60,37 @@ class TestShutdown(TwistedTestCase, StorageDALTestCase):
         self.usr0 = make_storage_user(0, u"dummy", u"", 2 ** 20)
 
     @defer.inlineCallbacks
-    def test_shutdown_upload(self):
-        """Stop and restart the server."""
+    def create_service(self):
         # create a server
         service = StorageServerService(
             0, auth_provider_class=DummyAuthProvider, heartbeat_interval=0)
         yield service.startService()
+        self.addCleanup(service.stopService)
 
+        defer.returnValue(service)
+
+    @defer.inlineCallbacks
+    def connect_client(self, service):
         # create a user, connect a client
-        usr0 = make_storage_user(0, u"dummy", u"", 2 ** 20)
         d = defer.Deferred()
         f = TestClientFactory()
         f.connected = d.callback
         reactor.connectTCP("localhost", service.port, f)
         client = yield d
-
         # auth, get root, create a file
+        service.factory.auth_provider._allowed["open sesame"] = self.usr0.id
         yield client.dummy_authenticate("open sesame")
+
+        # see that the server has not protocols alive
+        self.addCleanup(service.factory.wait_for_shutdown)
+
+        defer.returnValue(client)
+
+    @defer.inlineCallbacks
+    def test_shutdown_upload(self):
+        """Stop and restart the server."""
+        service = yield self.create_service()
+        client = yield self.connect_client(service)
         root = yield client.get_root()
         mkfile_req = yield client.make_file(request.ROOT, root, "hola")
 
@@ -89,51 +103,29 @@ class TestShutdown(TwistedTestCase, StorageDALTestCase):
         except:
             client.transport.loseConnection()
 
-        # see that the server has not protocols alive
-        yield service.factory.wait_for_shutdown()
-        ujobs = usr0.get_uploadjobs(node_id=mkfile_req.new_id)
+        ujobs = self.usr0.get_uploadjobs(node_id=mkfile_req.new_id)
         self.assertEqual(ujobs, [])
-
-        yield service.stopService()
 
     @defer.inlineCallbacks
     def test_shutdown_metrics(self):
         """Stop and restart the server."""
-        # create a server
-        service = StorageServerService(
-            0, auth_provider_class=DummyAuthProvider, heartbeat_interval=0)
-
-        yield service.startService()
+        service = yield self.create_service()
 
         # ensure we employ the correct metric name.
         name = service.metrics.fully_qualify_name('server_start')
-        self.assertTrue(isinstance(service.metrics._metrics[name],
-                        MeterMetric))
+        self.assertIsInstance(
+            service.metrics._metrics[name], MeterMetric)
         name = service.metrics.fully_qualify_name('services_active')
-        self.assertTrue(isinstance(service.metrics._metrics[name],
-                        CounterMetric))
+        self.assertIsInstance(
+            service.metrics._metrics[name], CounterMetric)
         self.assertEqual(service.metrics._metrics[name].count(), 1)
-
-        yield service.stopService()
 
     @defer.inlineCallbacks
     def test_requests_leak(self):
         """Test that the server waits for pending requests."""
-        # create a server
-        self.service = StorageServerService(
-            auth_provider_class=DummyAuthProvider,
-            heartbeat_interval=0)
-        # start it
-        yield self.service.startService()
+        service = yield self.create_service()
+        client = yield self.connect_client(service)
 
-        make_storage_user(0, u"dummy", u"", 2 ** 20)
-        client_d = defer.Deferred()
-        f = TestClientFactory()
-        f.connected = client_d.callback
-        reactor.connectTCP("localhost", self.service.port, f)
-        client = yield client_d
-        # start with a client
-        yield client.dummy_authenticate("open sesame")
         root_id = yield client.get_root()
         # create a bunch of files
         mk_deferreds = []
@@ -151,16 +143,4 @@ class TestShutdown(TwistedTestCase, StorageDALTestCase):
             reactor.callLater(0.1, client.transport.loseConnection)
             yield defer.DeferredList(mk_deferreds)
         finally:
-            self.assertTrue(self.service.factory.protocols[0].requests)
-            # wait for protocol shutdown (this was hanging waiting for requests
-            # to finish)
-            yield self.service.factory.protocols[0].wait_for_shutdown()
-            # see that the server has not protocols alive
-            yield self.service.factory.wait_for_shutdown()
-            # cleanup
-            yield self.service.stopService()
-
-    test_requests_leak.skip = """
-        There seems to be a race condition on this test.
-        Skipped because of https://bugs.launchpad.net/bugs/989680
-    """
+            self.assertTrue(service.factory.protocols[0].requests)
