@@ -163,12 +163,13 @@ class Factory(object):
 
     def get_test_contentblob(self, content=None, magic_hash=None):
         """Get a content blob."""
-        if content:
-            content = content.encode('utf-8')
+        if content is None:
+            content = 'random content - ' + self.get_unique_unicode()
+        content = content.encode('utf-8')
         cb = ContentBlob()
         cb.hash = self.get_fake_hash(content)
         cb.crc32 = 1023
-        cb.size = 1024
+        cb.size = len(content)
         cb.deflated_size = 10000
         cb.storage_key = uuid.uuid4()
         cb.content = content

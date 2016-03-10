@@ -82,9 +82,3 @@ so all transaction management is handled in the DataServices Layer
 |   lots of functions that behave differently based on the parameters passed
 |
 """
-
-from __future__ import unicode_literals
-
-from ubuntuone.storageprotocol.content_hash import content_hash_factory
-
-EMPTY_CONTENT_HASH = content_hash_factory().content_hash()

@@ -54,7 +54,6 @@ from backends.filesync.services import (
 )
 from backends.filesync import errors, utils
 from backends.filesync.models import (
-    EMPTY_CONTENT_HASH,
     ROOT_VOLUME,
     STATUS_LIVE,
     STATUS_DEAD,
@@ -925,7 +924,7 @@ class SystemGatewayTestCase(StorageDALTestCase):
         storage_store = get_filesync_store()
         root = StorageObject.get_root(storage_store, user.id)
         node = root.make_file('TheName')
-        node._content_hash = EMPTY_CONTENT_HASH
+        assert node.content is None, node.content
         node.mimetype = 'fakemime'
         new_node = sgw.get_node(node.id)
         self.assertEqual(node.id, new_node.id)
@@ -1486,7 +1485,7 @@ class StorageUserGatewayTestCase(StorageDALTestCase):
         storage_store = get_filesync_store()
         root = StorageObject.get_root(storage_store, self.user.id)
         node = root.make_file('TheName')
-        node._content_hash = EMPTY_CONTENT_HASH
+        assert node.content is None, node.content
         node.mimetype = 'fakemime'
         vgw.change_public_access(node.id, True)
         nodes = list(self.gw.get_public_files())
@@ -1502,7 +1501,7 @@ class StorageUserGatewayTestCase(StorageDALTestCase):
                 d = root.make_subdirectory(dname)
                 for fname, j in [('file_%s' % j, j) for j in xrange(10)]:
                     f = d.make_file(fname)
-                    f._content_hash = EMPTY_CONTENT_HASH
+                    assert f.content is None
                     f.mimetype = 'fakemime'
                     if j % 2:
                         continue
@@ -1725,9 +1724,7 @@ class StorageUserGatewayTestCase(StorageDALTestCase):
                 d2.id, 'picture3.jpg', hash_value, 100, 100, 100,
                 uuid.uuid4())
             d3 = vgw.make_tree(root.id, '/a/path/with/pics4')
-            vgw.make_file_with_content(
-                d3.id, 'picture.jpg',
-                EMPTY_CONTENT_HASH, 0, 0, 0, uuid.uuid4())
+            vgw.make_file(d3.id, 'picture.jpg')  # no content
         # this udf's results should not show up
         self.gw.delete_udf(udf3.id)
         dirs = list(self.gw.get_photo_directories())
@@ -2414,7 +2411,7 @@ class CommonReadWriteVolumeGatewayApiTest(StorageDALTestCase):
         self.root = self.storage_store.get(
             StorageObject, self.vgw.get_root().id)
         self.file = self.root.make_file('TheName')
-        self.file._content_hash = EMPTY_CONTENT_HASH
+        self.file.content = self.factory.make_content_blob()
         self.file.mimetype = 'fakemime'
 
     def tweak_users_quota(self, dao_user, max_bytes, used_bytes=0):
@@ -3377,7 +3374,7 @@ class UDFReadWriteVolumeGatewayApiTest(CommonReadWriteVolumeGatewayApiTest):
         self.root = self.storage_store.get(
             StorageObject, self.vgw.get_root().id)
         self.file = self.root.make_file('TheName')
-        self.file._content_hash = EMPTY_CONTENT_HASH
+        self.file.content = self.factory.make_content_blob()
         self.file.mimetype = 'fakemime'
 
 
@@ -3410,7 +3407,7 @@ class ShareReadWriteVolumeGatewayApiTest(CommonReadWriteVolumeGatewayApiTest):
         self.root = self.storage_store.get(
             StorageObject, self.vgw.get_root().id)
         self.file = self.root.make_file('TheName')
-        self.file._content_hash = EMPTY_CONTENT_HASH
+        self.file.content = self.factory.make_content_blob()
         self.file.mimetype = 'fakemime'
 
 #
@@ -3435,7 +3432,7 @@ class RootReadWriteVolumeGatewayTestCase(StorageDALTestCase):
         vgw = self.user._gateway.get_root_gateway()
         root = self.storage_store.get(StorageObject, vgw.get_root().id)
         self.file = root.make_file('TheName')
-        self.file._content_hash = EMPTY_CONTENT_HASH
+        self.file.content = self.factory.make_content_blob()
         self.file.mimetype = 'fakemime'
 
     def test_root_volume(self):

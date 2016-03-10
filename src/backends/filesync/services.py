@@ -51,7 +51,6 @@ from backends.filesync.dbmanager import (
     retryable_transaction,
 )
 from backends.filesync.models import (
-    EMPTY_CONTENT_HASH,
     ROOT_PARENTID,
     STATUS_LIVE,
     STATUS_DEAD,
@@ -2611,7 +2610,7 @@ class ReadOnlyVolumeGateway(GatewayBase):
             ParentObject.id == StorageObject.parent_id,
             StorageObject.owner_id == self.owner.id,
             StorageObject.status == STATUS_LIVE,
-            StorageObject._content_hash != EMPTY_CONTENT_HASH,
+            StorageObject._content != None,  # NOQA
             StorageObject.mimetype.is_in(mimetypes)]
         if self.is_root_volume:
             conditions.append(

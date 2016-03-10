@@ -161,13 +161,6 @@ class TestContentBlob(ORMTestCase):
         cb = self.create(ContentBlob, **self.factory.content_blob_args())
         self.assertNotEqual(cb.when_created, None)
 
-    def test_make_empty(self):
-        """Tests an empty ContentBlob."""
-        self.store.find(ContentBlob).remove()
-        cb = ContentBlob.make_empty(self.store)
-        filesync_tm.commit()
-        self.assertNotEqual(cb.when_created, None)
-
 
 class TestStorageObjectBase(ORMTestCase):
     """Base class for tests for StorageObject."""

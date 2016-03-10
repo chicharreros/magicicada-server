@@ -36,7 +36,6 @@ import posixpath as pypath
 
 from django.conf import settings
 from backends.db.store import implicit_flushes_blocked_on
-from backends.filesync import EMPTY_CONTENT_HASH
 from backends.filesync.errors import (
     DirectoriesHaveNoContent,
     InvalidFilename,
@@ -308,17 +307,6 @@ class ContentBlob(object):
 
     def __init__(self):
         self.when_created = now()
-
-    @classmethod
-    def make_empty(cls, store):
-        """Create the empty content blob."""
-        o = cls()
-        o.hash = EMPTY_CONTENT_HASH
-        o.crc32 = 0
-        o.size = 0
-        o.when_created = now()
-        store.add(o)
-        return o
 
 
 def get_path_startswith(node):
