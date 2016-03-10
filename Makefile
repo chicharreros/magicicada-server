@@ -122,7 +122,7 @@ clean:
 lint:
 	virtualenv $(ENV)
 	$(ENV)/bin/pip install flake8 rst2html5
-	$(ENV)/bin/flake8 --filename='*.py' --exclude='migrations' src
+	$(ENV)/bin/flake8 --filename='*.py' --exclude='migrations,future_migrations' src
 	dev-scripts/check_readme.sh
 
 etags: sourcedeps

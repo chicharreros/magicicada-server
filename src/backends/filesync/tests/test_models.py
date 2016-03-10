@@ -40,7 +40,6 @@ from backends.filesync.models import (
     ContentBlob,
     Download,
     MoveFromShare,
-    PublicNode,
     ResumableUpload,
     Share,
     ShareVolumeDelta,
@@ -49,8 +48,6 @@ from backends.filesync.models import (
     StorageUserInfo,
     UploadJob,
     UserVolume,
-    delete_user_data,
-    delete_user_main_data,
     get_path_startswith,
     validate_name,
     undelete_volume,
@@ -86,55 +83,6 @@ class TestStorageUser(ORMTestCase):
         thread.start()
         thread.join()
         self.assertTrue(self.failed)
-
-    def test_delete_user_main_data(self):
-        """Test delete_user_main_data."""
-        user1 = self.make_user(1, 'shorttimer')
-        user2 = self.make_user(2, 'sherry')
-        user3 = self.make_user(3, 'sammy')
-        self.store.add(PublicNode(uuid.uuid4(), user1.id))
-        self.store.add(PublicNode(uuid.uuid4(), user2.id))
-        self.store.add(PublicNode(uuid.uuid4(), user3.id))
-        self.store.add(Share(
-            user1.id, uuid.uuid4(), user2.id, 'Fake1', Share.VIEW))
-        self.store.add(Share(
-            user2.id, uuid.uuid4(), user1.id, 'Fake2', Share.VIEW))
-        self.store.add(Share(
-            user3.id, uuid.uuid4(), user2.id, 'Fake3', Share.VIEW))
-        self.store.commit()
-        self.assertEqual(3, self.store.find(StorageUser).count())
-        self.assertEqual(3, self.store.find(PublicNode).count())
-        self.assertEqual(3, self.store.find(Share).count())
-        delete_user_main_data(self.store, user1.id)
-        self.store.commit()
-        self.assertEqual(2, self.store.find(StorageUser).count())
-        self.assertEqual(2, self.store.find(PublicNode).count())
-        self.assertEqual(1, self.store.find(Share).count())
-
-    def test_delete_user_data(self):
-        """Test delete_user_data."""
-        ui = self.store.add(StorageUserInfo(1, 2 ** 16))
-        self.store.add(Download(ui.id, uuid.uuid4(), 'x', 'x'))
-        udf = UserVolume.create(self.store, ui.id, '~/p/n')
-        self.store.add(MoveFromShare.from_move(
-            udf.root_node, uuid.uuid4()))
-        cb = ContentBlob.make_empty(self.store)
-        cb.hash = b'trashhash'
-        ob = udf.root_node.make_file('file.txt')
-        ob._content_hash = cb.hash
-        self.store.add(UploadJob(ob.id))
-        self.assertEqual(1, self.store.find(StorageUserInfo).count())
-        self.assertEqual(2, self.store.find(StorageObject).count())
-        self.assertEqual(1, self.store.find(UserVolume).count())
-        self.assertEqual(1, self.store.find(UploadJob).count())
-        self.assertEqual(1, self.store.find(Download).count())
-        delete_user_data(self.store, ui.id)
-        self.store.commit()
-        self.assertEqual(0, self.store.find(StorageUserInfo).count())
-        self.assertEqual(0, self.store.find(StorageObject).count())
-        self.assertEqual(0, self.store.find(UserVolume).count())
-        self.assertEqual(0, self.store.find(UploadJob).count())
-        self.assertEqual(0, self.store.find(Download).count())
 
 
 class TestSharing(ORMTestCase):

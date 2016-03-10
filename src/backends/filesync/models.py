@@ -88,24 +88,6 @@ def lifecycle_status(**kwargs):
     return StormEnum(STATUS_LIVE, STATUS_DEAD, **kwargs)
 
 
-def delete_user_main_data(store, id):
-    """Delete all the main data for a user."""
-    store.find(PublicNode, PublicNode.owner_id == id).remove()
-    store.find(Share, Or(Share.shared_by == id,
-                         Share.shared_to == id)).remove()
-    store.find(StorageUser, StorageUser.id == id).remove()
-
-
-def delete_user_data(store, id):
-    """Delete all the data for a user."""
-    store.find(MoveFromShare, MoveFromShare.owner_id == id).remove()
-    store.find(Download, Download.owner_id == id).remove()
-    # Remove all the root nodes for the user.
-    # With the cascade, this will also delete children, UserVolumes, uploadjobs
-    store.find(StorageObject, StorageObject.owner_id == id).remove()
-    store.find(StorageUserInfo, StorageUserInfo.id == id).remove()
-
-
 def undelete_volume(store, owner_id, volume_id, restore_parent, limit=100):
     """Undelete all the files the user ever deleted on this volume.
 
