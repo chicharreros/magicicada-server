@@ -21,17 +21,6 @@
 import unittest
 
 from backends.db import store
-from backends.testing.testcase import DatabaseResourceTestCase
-
-
-class StoreTestCase(DatabaseResourceTestCase):
-    """Getting a store returns one configured with FilesyncDatabase."""
-
-    def test_get_filesync_store(self):
-        """Test get_filesync_store returns the expected store."""
-        db = store.get_filesync_store().get_database()
-        self.assertTrue(isinstance(db, store.FilesyncDatabase))
-        self.assertEqual('filesync', db.name)
 
 
 class FilesyncDatabaseTestCase(unittest.TestCase):

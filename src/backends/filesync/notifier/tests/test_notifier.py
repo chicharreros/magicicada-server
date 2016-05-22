@@ -23,6 +23,7 @@ from __future__ import unicode_literals
 import unittest
 import uuid
 
+from backends.filesync.dbmanager import fsync_commit
 from backends.filesync.models import Share
 from backends.filesync.notifier import notifier
 from backends.filesync.notifier.notifier import (
@@ -36,8 +37,7 @@ from backends.filesync.notifier.notifier import (
     UDFDelete,
     VolumeNewGeneration,
 )
-
-from transaction import ThreadTransactionManager
+from backends.testing.testcase import BaseTestCase
 
 
 class FakeNode(object):
@@ -67,25 +67,17 @@ class FakeShare(object):
                 self.shared_to_id, self.access, self.accepted)
 
 
-class TestEventNotifier(unittest.TestCase):
+class TestEventNotifier(BaseTestCase):
     """Test the EventNotifier class."""
-
-    def patch(self, obj, attr_name, new_val):
-        """Patch!"""
-        old_val = getattr(obj, attr_name)
-        setattr(obj, attr_name, new_val)
-        self.addCleanup(setattr, obj, attr_name, old_val)
 
     def setUp(self):
         """Set up."""
         super(TestEventNotifier, self).setUp()
-        self.tx_manager = ThreadTransactionManager()
-        self.notifier = EventNotifier(tx_manager=self.tx_manager)
+        self.notifier = EventNotifier()
         self.patch(notifier, 'get_notifier', lambda: self.notifier)
 
         self.notifications = []
-        self.patch(self.notifier, 'on_event',
-                   lambda event: self.notifications.append(event))
+        self.patch(self.notifier, 'on_event', self.notifications.append)
 
     def test_notify_properties(self):
         """Test getter and setter for notify handler."""
@@ -96,32 +88,32 @@ class TestEventNotifier(unittest.TestCase):
     def test_broadcast_share_created(self):
         """Test broadcast of an share creation."""
         share = FakeShare()
-        self.notifier.queue_share_created(share)
-        self.tx_manager.commit()
+        with fsync_commit():
+            self.notifier.queue_share_created(share)
         self.assertEqual(self.notifications,
                          [ShareCreated(*share.event_args)])
 
     def test_broadcast_share_deleted(self):
         """Test broadcast of an share deletion."""
         share = FakeShare()
-        self.notifier.queue_share_deleted(share)
-        self.tx_manager.commit()
+        with fsync_commit():
+            self.notifier.queue_share_deleted(share)
         self.assertEqual(self.notifications,
                          [ShareDeleted(*share.event_args)])
 
     def test_broadcast_share_accepted(self):
         """Test broadcast of an share accepted."""
         share = FakeShare()
-        self.notifier.queue_share_accepted(share)
-        self.tx_manager.commit()
+        with fsync_commit():
+            self.notifier.queue_share_accepted(share)
         self.assertEqual(self.notifications,
                          [ShareAccepted(*share.event_args)])
 
     def test_broadcast_share_declined(self):
         """Test broadcast of an share declined."""
         share = FakeShare()
-        self.notifier.queue_share_declined(share)
-        self.tx_manager.commit()
+        with fsync_commit():
+            self.notifier.queue_share_declined(share)
         self.assertEqual(self.notifications,
                          [ShareDeclined(*share.event_args)])
 
@@ -130,16 +122,16 @@ class TestEventNotifier(unittest.TestCase):
         udf_id = uuid.uuid4()
         root_id = uuid.uuid4()
         suggested_path = "foo"
-        self.notifier.queue_udf_create(0, udf_id, root_id, suggested_path)
-        self.tx_manager.commit()
+        with fsync_commit():
+            self.notifier.queue_udf_create(0, udf_id, root_id, suggested_path)
         self.assertEqual(self.notifications,
                          [UDFCreate(0, udf_id, root_id, suggested_path, None)])
 
     def test_broadcast_udf_delete(self):
         """Test broadcast of an udf creation."""
         udf_id = uuid.uuid4()
-        self.notifier.queue_udf_delete(0, udf_id)
-        self.tx_manager.commit()
+        with fsync_commit():
+            self.notifier.queue_udf_delete(0, udf_id)
         self.assertEqual(self.notifications,
                          [UDFDelete(0, udf_id, None)])
 
@@ -148,8 +140,9 @@ class TestEventNotifier(unittest.TestCase):
         user_id = 1
         volume_id = uuid.uuid4()
         new_gen = 77
-        self.notifier.queue_volume_new_generation(user_id, volume_id, new_gen)
-        self.tx_manager.commit()
+        with fsync_commit():
+            self.notifier.queue_volume_new_generation(
+                user_id, volume_id, new_gen)
         self.assertEqual(self.notifications,
                          [VolumeNewGeneration(user_id, volume_id,
                                               new_gen, None)])
@@ -160,11 +153,10 @@ class TestEventNotifier(unittest.TestCase):
         udf_a = uuid.uuid4()
         udf_b = uuid.uuid4()
         udf_c = uuid.uuid4()
-        self.tx_manager.begin()
-        self.notifier.queue_udf_delete(1, udf_a, source_session)
-        self.notifier.queue_udf_delete(1, udf_b)
-        self.assertEqual([], self.notifications)
-        self.tx_manager.commit()
+        with fsync_commit():
+            self.notifier.queue_udf_delete(1, udf_a, source_session)
+            self.notifier.queue_udf_delete(1, udf_b)
+            self.assertEqual([], self.notifications)
 
         # should have sent notifications after commit
         event_a = self.notifications[0]
@@ -175,10 +167,9 @@ class TestEventNotifier(unittest.TestCase):
         self.assertEqual(event_b.source_session, None)
         self.notifications[:] = []
 
-        self.tx_manager.begin()
-        self.notifier.queue_udf_delete(1, udf_c)
-        self.assertEqual([], self.notifications)
-        self.tx_manager.commit()
+        with fsync_commit():
+            self.notifier.queue_udf_delete(1, udf_c)
+            self.assertEqual([], self.notifications)
         # make sure we don't re-send from previous transactions
         event_c = self.notifications[0]
         self.assertEqual(event_c.udf_id, udf_c)
@@ -187,22 +178,24 @@ class TestEventNotifier(unittest.TestCase):
     def test_no_delivery_after_abort(self):
         """Test that notifs queued for an aborted transaction are not sent."""
         source_session = uuid.uuid4()
-        udf_a = uuid.uuid4()
-        udf_b = uuid.uuid4()
-        udf_c = uuid.uuid4()
+        udf_a = 'udf-a'
+        udf_b = 'udf-b'
+        udf_c = 'udf-c'
 
-        self.tx_manager.begin()
-        self.notifier.queue_udf_delete(1, udf_a, source_session)
-        self.notifier.queue_udf_delete(1, udf_b)
-        self.assertEqual([], self.notifications)
-        self.tx_manager.abort()
-        # should not send any notifications
-        self.assertEqual([], self.notifications)
+        try:
+            with fsync_commit():
+                self.notifier.queue_udf_delete(1, udf_a, source_session)
+                self.notifier.queue_udf_delete(1, udf_b)
+                self.assertEqual([], self.notifications)
+                raise ValueError('Foo')
+        except ValueError:
+            # should not send any notifications
+            self.assertEqual([], self.notifications)
 
-        self.tx_manager.begin()
-        self.notifier.queue_udf_delete(1, udf_c)
-        self.assertEqual([], self.notifications)
-        self.tx_manager.commit()
+        with fsync_commit():
+            self.notifier.queue_udf_delete(1, udf_c)
+            self.assertEqual([], self.notifications)
+
         # make sure we don't re-send from previous transactions
         event_c = self.notifications[0]
         self.assertEqual(event_c.udf_id, udf_c)

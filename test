@@ -35,8 +35,10 @@ for td in TESTDIRS:
 def setup_environment(django_settings):
     """Setup the envrionment for running tests."""
     ROOTDIR = os.path.abspath(os.path.curdir)
-    os.environ["DJANGO_SETTINGS_MODULE"] = django_settings
-    os.environ["XDG_CACHE_HOME"] = os.path.join(ROOTDIR, 'tmp', 'xdg_cache')
+    os.environ.setdefault('MAGICICADA_DEBUG', '1')
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', django_settings)
+    os.environ.setdefault(
+        'XDG_CACHE_HOME', os.path.join(ROOTDIR, 'tmp', 'xdg_cache'))
 
     dbus_address_file = os.path.join(ROOTDIR, 'tmp', 'dbus.address')
     if os.path.exists(dbus_address_file):

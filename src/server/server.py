@@ -2680,8 +2680,7 @@ class StorageServerService(OrderedMultiService):
         if heartbeat_interval is None:
             heartbeat_interval = float(settings.api_server.HEARTBEAT_INTERVAL)
         self.heartbeat_interval = heartbeat_interval
-        self.rpcdal_client = None
-        self.rpcauth_client = None
+        self.rpc_dal = None
         self.logger = logging.getLogger('storage.server')
         self.servername = settings.api_server.SERVERNAME
         self.logger.info('Starting %s', self.servername)
@@ -2738,20 +2737,19 @@ class StorageServerService(OrderedMultiService):
         """The status service port."""
         return get_service_port(self.status_service)
 
-    def start_rpc_client(self):
+    def start_rpc_dal(self):
         """Setup the rpc client."""
         self.logger.info('Starting the RPC clients.')
-        self.rpcdal_client = inthread.ThreadedNonRPC(inthread.DAL_BACKEND)
-        self.rpcauth_client = inthread.ThreadedNonRPC(inthread.AUTH_BACKEND)
+        self.rpc_dal = inthread.ThreadedNonRPC()
 
     @inlineCallbacks
     def startService(self):
         """Start listening on two ports."""
         self.logger.info('- - - - - SERVER STARTING')
         yield OrderedMultiService.startService(self)
-        yield defer.maybeDeferred(self.start_rpc_client)
-        self.factory.content.rpcdal_client = self.rpcdal_client
-        self.factory.rpcauth_client = self.rpcauth_client
+        yield defer.maybeDeferred(self.start_rpc_dal)
+        self.factory.content.rpc_dal = self.rpc_dal
+        self.factory.rpc_dal = self.rpc_dal
         self.stats_worker.start()
         self.metrics.meter('server_start')
         self.metrics.increment('services_active')

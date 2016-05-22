@@ -1,4 +1,3 @@
-# Copyright 2008-2015 Canonical
 # Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
@@ -16,25 +15,24 @@
 #
 # For further info, check  http://launchpad.net/magicicada-server
 
-"""TestCases for testing with backends."""
-
-from __future__ import unicode_literals
-
-from django.test import TransactionTestCase
-from django.test.client import RequestFactory
-
-from backends.testing.factory import Factory
+import django.dispatch
 
 
-class BaseTestCase(TransactionTestCase):
-    """Base TestCase: provides a Factory and a RequestFactory."""
+content_changed = django.dispatch.Signal(
+    providing_args=['instance', 'content_added', 'new_size', 'enforce_quota'])
 
-    request_factory = RequestFactory()
-    factory = Factory()
-    maxDiff = None
+node_moved = django.dispatch.Signal(
+    providing_args=['instance', 'old_name', 'old_parent', 'descendants'])
 
-    def patch(self, obj, attr_name, new_val):
-        """Patch!"""
-        old_val = getattr(obj, attr_name)
-        setattr(obj, attr_name, new_val)
-        self.addCleanup(setattr, obj, attr_name, old_val)
+pre_kill = django.dispatch.Signal(providing_args=['instance'])
+
+post_kill = django.dispatch.Signal(providing_args=['instance'])
+
+pre_unlink_tree = django.dispatch.Signal(
+    providing_args=['instance', 'descendants'])
+
+post_unlink_tree = django.dispatch.Signal(
+    providing_args=['instance', 'descendants'])
+
+public_access_changed = django.dispatch.Signal(
+    providing_args=['instance', 'public'])

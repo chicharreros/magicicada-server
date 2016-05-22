@@ -21,55 +21,48 @@
 from __future__ import unicode_literals
 
 import logging
+import os
 import time
 
 from twisted.internet import defer, threads
 
-from ubuntuone.storage.rpcdb import (
-    AUTH_BACKEND,
-    DAL_BACKEND,
-    auth_backend,
-    dal_backend,
-)
+from ubuntuone.storage.rpcdb import backend
 
 
 # log setup
-logger = logging.getLogger("storage.server.rpc")
-logger.setLevel(logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 
 class ThreadedNonRPC(object):
     """A threaded way to call endpoints, not really an RPC."""
 
-    services = {
-        DAL_BACKEND: dal_backend.DAL(),
-        AUTH_BACKEND: auth_backend.Auth(),
-    }
-
-    def __init__(self, service_name):
-        self.service_name = service_name
-        self.service = self.services[service_name]
+    def __init__(self):
+        super(ThreadedNonRPC, self).__init__()
+        self.backend = backend.DAL()
+        if int(os.getenv('MAGICICADA_DEBUG')):
+            self.defer = defer.maybeDeferred
+        else:
+            self.defer = threads.deferToThread
 
     @defer.inlineCallbacks
     def call(self, funcname, **kwargs):
-        """Call the method in the service."""
-        servname = self.service_name
+        """Call the method in the backend."""
         user_id = kwargs.get('user_id')
-        logger.info("Call to %s.%s (user=%s) started",
-                    servname, funcname, user_id)
+        logger.info("Call to %s (user=%s) started", funcname, user_id)
 
         start_time = time.time()
         try:
-            method = getattr(self.service, funcname)
-            result = yield threads.deferToThread(method, **kwargs)
+            method = getattr(self.backend, funcname)
+            result = yield self.defer(method, **kwargs)
         except Exception as exc:
             time_delta = time.time() - start_time
-            logger.info("Call %s.%s (user=%s) ended with error: %s (%s) "
-                        "- time: %s", servname, funcname, user_id,
-                        exc.__class__.__name__, exc, time_delta)
+            logger.info(
+                "Call %s (user=%s) ended with error: %s (%s) - time: %s",
+                funcname, user_id, exc.__class__.__name__, exc, time_delta)
             raise
 
         time_delta = time.time() - start_time
-        logger.info("Call to %s.%s (user=%s) ended OK - time: %s",
-                    servname, funcname, user_id, time_delta)
+        logger.info(
+            "Call to %s (user=%s) ended OK - time: %s",
+            funcname, user_id, time_delta)
         defer.returnValue(result)

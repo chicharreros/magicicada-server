@@ -22,8 +22,14 @@ from __future__ import unicode_literals
 
 import uuid
 
+from django.contrib.auth import authenticate
+
 from backends.filesync import services, errors
 from backends.filesync.models import STATUS_LIVE, StorageObject
+
+
+class FailedAuthentication(Exception):
+    """Generic error for auth problems."""
 
 
 class DAL(object):
@@ -36,6 +42,18 @@ class DAL(object):
     def ping(self):
         """Used for a simple liveness check."""
         return dict(response="pong")
+
+    def get_userid_from_token(self, auth_parameters):
+        """Get the user_id for the token."""
+        username = auth_parameters.get('username')
+        password = auth_parameters.get('password')
+        user = authenticate(username=username, password=password)
+
+        if user is None:
+            raise FailedAuthentication(
+                "Bad parameters: %s" % repr(auth_parameters))
+
+        return dict(user_id=user.id)
 
     def unlink_node(self, user_id, volume_id, node_id, session_id=None):
         """Unlink a node."""
@@ -57,7 +75,7 @@ class DAL(object):
         root_info = dict(root_id=root.root_id, generation=root.generation)
 
         # quota
-        free_bytes = user.get_quota().free_bytes
+        free_bytes = user.free_bytes
 
         # shares
         shares = []
@@ -67,10 +85,7 @@ class DAL(object):
                         shared_by_username=suser.username,
                         shared_by_visible_name=suser.visible_name,
                         accepted=share.accepted, access=share.access)
-
-            info = services.get_user_info(suser.id)
-            resp['free_bytes'] = info.free_bytes
-
+            resp['free_bytes'] = suser.free_bytes
             resp['generation'] = share.get_generation()
             shares.append(resp)
 
@@ -217,10 +232,9 @@ class DAL(object):
     def get_user_quota(self, user_id):
         """Get the quota info for an user."""
         user = self._get_user(user_id)
-        quota = user.get_quota()
-        d = dict(max_storage_bytes=quota.max_storage_bytes,
-                 used_storage_bytes=quota.used_storage_bytes,
-                 free_bytes=quota.free_bytes)
+        d = dict(max_storage_bytes=user.max_storage_bytes,
+                 used_storage_bytes=user.used_storage_bytes,
+                 free_bytes=user.free_bytes)
         return d
 
     def get_share(self, user_id, share_id):

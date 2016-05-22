@@ -39,9 +39,7 @@ from zope.interface.verify import verifyObject
 from ubuntuone.devtools.handlers import MementoHandler
 
 from backends.db import errors
-from backends.db.store import get_filesync_store
 from backends.db.dbtransaction import (
-    _check_stores_and_invalidate,
     retryable_transaction,
     get_storm_commit,
     get_storm_readonly,
@@ -54,11 +52,7 @@ from backends.db.dbtransaction import (
     timer,
     StorageTimeoutTracer,
     on_timeout,
-    filesync_zstorm,
 )
-from backends.filesync.models import StorageObject
-from backends.filesync.services import make_storage_user
-from backends.testing import testcase
 
 storm_commit = get_storm_commit(transaction)
 storm_readonly = get_storm_readonly(transaction)
@@ -747,33 +741,3 @@ class TestOnTimeout(unittest.TestCase):
 
         self.assertTrue(called)
         self.assertTrue(raised)
-
-
-class TestCheckStoresAndInvalidate(testcase.DatabaseResourceTestCase):
-    """Test _check_stores_and_invalidate."""
-
-    def setUp(self):
-        self._sto = None
-
-    def tearDown(self):
-        if self._sto is not None:
-            filesync_zstorm.remove(self._sto)
-
-    def test__check_stores_and_invalidate(self):
-        """Test _check_stores_and_invalidate invalidate case."""
-        logger = logging.getLogger('storage.server.noninv')
-
-        h = MementoHandler()
-        logger.addHandler(h)
-
-        make_storage_user(1, 'foo', 'foo', 10000)
-        store = get_filesync_store()
-        self._sto = store  # for later cleanup
-        obj = StorageObject(1, 'foo', StorageObject.FILE)
-        store.add(obj)
-        store.flush()
-        self.assertFalse(obj.__storm_object_info__.get("invalidated", False))
-        _check_stores_and_invalidate(filesync_zstorm)
-        self.assertTrue(obj.__storm_object_info__.get("invalidated", False))
-        self.assertEqual(1, len(h.records))
-        self.assertEqual((obj,), h.records[0].args)

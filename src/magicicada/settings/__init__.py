@@ -31,29 +31,8 @@ from __future__ import unicode_literals
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 import os
-import urllib
 
 from psycopg2.extensions import ISOLATION_LEVEL_REPEATABLE_READ
-
-
-def get_postgres_uri(store_settings):
-    """Return a postgres connection uri."""
-    db_name = store_settings['NAME']
-    host = urllib.quote(store_settings['HOST'], safe='')
-    port = store_settings['PORT']
-    username = store_settings['USER']
-    password = store_settings.get('PASSWORD', '')
-    options = store_settings.get('OPTIONS')
-    if password:
-        password = ':' + password
-    uri = 'postgres://'
-    if username:
-        uri += '%s%s@' % (username, password)
-    uri += '%s:%s/%s' % (host, port, db_name)
-    if options:
-        uri += '?%s' % urllib.urlencode(options)
-    return uri
-
 
 BASE_DIR = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.dirname(
@@ -82,6 +61,8 @@ INSTALLED_APPS = (
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.sites',
+    'backends.filesync',
+    'backends.txlog',
 )
 
 MIDDLEWARE_CLASSES = (
@@ -130,27 +111,7 @@ DATABASES = {
             'isolation_level': ISOLATION_LEVEL_REPEATABLE_READ,
         },
     },
-    'filesync': {
-        'ENGINE': 'storm.django.backend',
-        'NAME': 'filesync',
-        'HOST': PG_HOST,
-        'PORT': 5432,
-        'USER': 'postgres',
-        'OPTIONS': {'isolation': 'repeatable-read'},
-    },
 }
-
-DATABASE_ENGINE = DATABASES['default']['ENGINE']
-DATABASE_NAME = DATABASES['default']['NAME']
-DATABASE_USER = ''
-DATABASE_PASSWORD = ''
-DATABASE_HOST = ''
-DATABASE_PORT = ''
-
-STORM_STORES = {
-    'filesync': get_postgres_uri(DATABASES['filesync']),
-}
-
 
 # Internationalization
 # https://docs.djangoproject.com/en/1.8/topics/i18n/
@@ -171,6 +132,7 @@ USE_TZ = False
 
 STATIC_URL = '/static/'
 
+AUTH_USER_MODEL = 'filesync.StorageUser'
 
 # Custom settings
 

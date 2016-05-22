@@ -60,9 +60,7 @@ class TestBasic(TestWithDatabase):
     def test_disconnect_with_user_locked(self):
         """Create a simple client that just connects."""
         # lock the user:
-        usr = self.store.get(StorageUser, self.usr0.id)
-        usr.locked = True
-        self.store.commit()
+        StorageUser.objects.filter(id=self.usr0.id).update(locked=True)
         # add the log handler
         logger = logging.getLogger('storage.server')
         hdlr = MementoHandler()
@@ -111,9 +109,7 @@ class TestBasic(TestWithDatabase):
             yield client.dummy_authenticate("open sesame")
             root_id = yield client.get_root()
             # lock the user:
-            usr = self.store.get(StorageUser, self.usr0.id)
-            usr.locked = True
-            self.store.commit()
+            StorageUser.objects.filter(id=self.usr0.id).update(locked=True)
             client.make_dir(request.ROOT, root_id, u"open sesame")
             yield d
             # check we logged a warning about this.

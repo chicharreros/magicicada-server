@@ -91,9 +91,9 @@ client could reach it (open the whole it in your firewall config, etc).
 
 Finally, create all the users you want::
 
-    dev-scripts/user-mgr.py create testuser John Doe jdoe@gmail.com testpass
+    make manage ARGS="user_mgr create testuser John Doe jdoe@gmail.com testpass"
 
-(with this script you'll be able to also retrieve and update user data,
+(with this django command you'll be able to also retrieve and update user data,
 and delete users)
 
 

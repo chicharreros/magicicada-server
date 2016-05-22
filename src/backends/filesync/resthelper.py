@@ -89,15 +89,15 @@ class ResourceMapper(object):
         return self.mapping["FILE_CONTENT"] % dict(volume_path=volume_path,
                                                    node_path=node_path)
 
-    def user_repr(self, user, quota, udfs=None):
+    def user_repr(self, user, udfs=None):
         """Return a serializable representation of a user."""
         udfs = [] if udfs is None else udfs
         return dict(
             resource_path=self.user(),
             user_id=user.id,
             visible_name=user.visible_name,
-            used_bytes=quota.used_storage_bytes,
-            max_bytes=quota.max_storage_bytes,
+            used_bytes=user.used_storage_bytes,
+            max_bytes=user.max_storage_bytes,
             root_node_path=self.node(settings.ROOT_USERVOLUME_PATH, ''),
             user_node_paths=[self.node(u.path) for u in udfs])
 
@@ -167,11 +167,9 @@ class RestHelper(object):
 
     def get_user(self, user):
         """GET User Representation"""
-        self.log_dal("get_quota", user)
-        quota = user.get_quota()
         self.log_dal("get_udfs", user)
         udfs = user.get_udfs()
-        return self.map.user_repr(user, quota, udfs)
+        return self.map.user_repr(user, udfs)
 
     def get_volumes(self, user):
         """GET Volume Representation for all volumes."""

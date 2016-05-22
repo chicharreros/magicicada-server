@@ -19,33 +19,15 @@
 """Some generic utilities."""
 
 from __future__ import unicode_literals
-from django.contrib.auth.models import User
 
 from backends.filesync import services
 
 
 def create_test_user(
         username='fred', email='fred@bedrock.com', first_name='Fredrick',
-        last_name='Flintsone', password=None,
-        id=None, max_storage_bytes=2 ** 20):
+        last_name='Flintsone', password=None, max_storage_bytes=2 ** 20):
     """Create a user used for testing."""
-    try:
-        user = User.objects.get(username=username)
-    except User.DoesNotExist:
-        user = User(id=id, username=unicode(username), email=unicode(email),
-                    is_staff=False, is_active=True, is_superuser=False)
-        user.set_password(password)
-        user.save()
-    user.first_name = unicode(first_name)
-    user.last_name = unicode(last_name)
-    user.save()
-
-    # refresh the user object to ensure permissions caches are reloaded
-    account_user = User.objects.get(username=username)
-
-    # create also the storage user
-    visible_name = "%s %s" % (user.first_name, user.last_name)
-    storage_user = services.make_storage_user(
-        account_user.id, username, visible_name, max_storage_bytes)
-
-    return storage_user
+    return services.make_storage_user(
+        username, max_storage_bytes=max_storage_bytes, password=password,
+        email=email, first_name=first_name, last_name=last_name,
+        is_staff=False, is_active=True, is_superuser=False)

@@ -37,8 +37,8 @@ from twisted.internet.protocol import connectionDone
 from twisted.python.failure import Failure
 from twisted.trial.unittest import TestCase as TwistedTestCase
 
-from backends.filesync.tests.testcase import StorageDALTestCase
-from backends.utils import create_test_user
+from backends.filesync import services
+from backends.testing.testcase import BaseTestCase
 from magicicada import settings
 from metrics import METER_UTILITY
 from ubuntuone.storage.server.auth import DummyAuthProvider
@@ -164,8 +164,8 @@ class BaseProtocolTestCase(TwistedTestCase):
 
     def make_user(self, username=None, **kwargs):
         if username is None:
-            username = self.factory.get_unique_unicode()
-        return create_test_user(username=username, **kwargs)
+            username = self.factory.get_unique_string()
+        return services.make_storage_user(username=username, **kwargs)
 
 
 class ClientTestHelper(object):
@@ -320,7 +320,7 @@ class FactoryHelper(object):
         return getattr(self.factory, name)
 
 
-class ProtocolTestCase(BaseProtocolTestCase):
+class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
     """Setup the storage server on a random port.
 
     Keeps the port number on self.port so children classes can just write
@@ -401,10 +401,6 @@ class ProtocolTestCase(BaseProtocolTestCase):
     def buildFactory(self, *args, **kwargs):
         """build self.factory with the specified args and kwargs"""
         return self.factory_class(*args, **kwargs)
-
-
-class TestWithDatabase(ProtocolTestCase, StorageDALTestCase):
-    """A protocol test case that uses the database."""
 
     @defer.inlineCallbacks
     def setUp(self):

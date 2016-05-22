@@ -22,8 +22,8 @@ from twisted.internet import defer
 
 from ubuntuone.storageprotocol import request
 from ubuntuone.storage.server.testing.testcase import TestWithDatabase
-from backends.filesync import dbmanager, services
-from backends.filesync.models import StorageUserInfo
+from backends.filesync import services
+from backends.filesync.models import StorageUser
 
 
 class QuotaTest(TestWithDatabase):
@@ -31,23 +31,20 @@ class QuotaTest(TestWithDatabase):
 
     def test_quota(self):
         """Test quota info."""
-        self.usr0.update(max_storage_bytes=2 ** 16)
-        usr2 = services.make_storage_user(1, u"otheruser",
-                                          u"Other User", 2 ** 17)
+        usr2 = services.make_storage_user(
+            u"otheruser", visible_name=u"Other User",
+            max_storage_bytes=self.usr0.max_storage_bytes * 10)
         share = usr2.root.share(self.usr0.id, u"a share", readonly=True)
 
         @defer.inlineCallbacks
         def do_test(client):
             """Do the actual test."""
-            usr1 = self.usr0
-            quota = usr1.get_quota()
             yield client.dummy_authenticate("open sesame")
             result = yield client.get_free_space(request.ROOT)
-            self.assertEqual(quota.free_bytes, result.free_bytes)
+            self.assertEqual(self.usr0.free_bytes, result.free_bytes)
             self.assertEqual(request.ROOT, result.share_id)
             result = yield client.get_free_space(str(share.id))
-            quota = usr2.get_quota()
-            self.assertEqual(quota.free_bytes, result.free_bytes)
+            self.assertEqual(usr2.free_bytes, result.free_bytes)
             self.assertEqual(str(share.id), result.share_id)
         return self.callback_test(do_test,
                                   add_default_callbacks=True)
@@ -55,12 +52,11 @@ class QuotaTest(TestWithDatabase):
     def test_over_quota(self):
         """Test that 0 bytes free (versus a negative number) is reported
         when over quota."""
-        self.usr0.update(max_storage_bytes=2 ** 16)
+        f = self.factory.make_file(
+            owner=StorageUser.objects.get(id=self.usr0.id))
         # need to do something that just can't happen normally
-        store = dbmanager.get_filesync_store()
-        info = store.get(StorageUserInfo, self.usr0.id)
-        info.used_storage_bytes = 2 ** 17
-        store.commit()
+        StorageUser.objects.filter(id=self.usr0.id).update(
+            max_storage_bytes=f.content.size - 1)
 
         @defer.inlineCallbacks
         def do_test(client):
@@ -74,14 +70,12 @@ class QuotaTest(TestWithDatabase):
 
     def test_account_info(self):
         """Test account info."""
-        usr1 = self.usr0
-        usr1.update(max_storage_bytes=2 ** 16)
 
         @defer.inlineCallbacks
         def do_test(client):
             """Do the actual test."""
             yield client.dummy_authenticate("open sesame")
             result = yield client.get_account_info()
-            quota = usr1.get_quota()
-            self.assertEqual(quota.max_storage_bytes, result.purchased_bytes)
+            self.assertEqual(
+                self.usr0.max_storage_bytes, result.purchased_bytes)
         return self.callback_test(do_test, add_default_callbacks=True)

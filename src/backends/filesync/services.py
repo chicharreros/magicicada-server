@@ -35,38 +35,32 @@ from functools import wraps
 from weakref import WeakValueDictionary
 
 from django.conf import settings
+from django.db import connection, models
 from django.utils.timezone import now
-from storm.locals import SQL
-from storm.expr import Or, LeftJoin, Desc, And
-from storm.info import ClassAlias
 
 from metrics.metricsconnector import MetricsConnector
-from backends.db.dbtransaction import db_timeout, TRANSACTION_MAX_TIME
 from backends.filesync import errors, utils
 from backends.filesync.dbmanager import (
     fsync_readonly,
     fsync_readonly_slave,
     fsync_commit,
-    get_filesync_store,
+    get_object_or_none,
     retryable_transaction,
 )
 from backends.filesync.models import (
-    ROOT_PARENTID,
+    DEFAULT_QUOTA_BYTES,
+    ROOT_PARENT,
     STATUS_LIVE,
     STATUS_DEAD,
     ContentBlob,
     Download,
     MoveFromShare,
-    PublicNode,
     Share,
     ShareVolumeDelta,
     StorageObject,
     StorageUser,
-    StorageUserInfo,
     UploadJob,
     UserVolume,
-    get_path_startswith,
-    undelete_volume,
 )
 from backends.filesync.notifier.notifier import get_notifier
 
@@ -110,27 +104,6 @@ class DAOBase(object):
         return self
 
 
-class UserInfo(DAOBase):
-    """A wrapper class to hold user info."""
-
-    def __init__(self, user_info, gateway=None):
-        super(UserInfo, self).__init__(gateway)
-        self.id = user_info.id
-        self.max_storage_bytes = user_info.max_storage_bytes
-        self.used_storage_bytes = user_info.used_storage_bytes
-
-    @property
-    def free_bytes(self):
-        """Return the free bytes."""
-        return max(0, self.max_storage_bytes - self.used_storage_bytes)
-
-    def _load(self):
-        """Load this storage user from the database."""
-        i = self._gateway.get_quota()
-        self._copy(i)
-        return self
-
-
 class DAOStorageUser(DAOBase):
     """A Storage User DAO.
 
@@ -143,17 +116,23 @@ class DAOStorageUser(DAOBase):
         super(DAOStorageUser, self).__init__()
         self.id = user.id
         self.username = user.username
-        self.visible_name = user.visible_name
-        self._status = user.status
-        self._subscription_status = user.subscription_status
-        self.root_volume_id = user.root_volume_id
+        self.first_name = user.first_name
+        self.last_name = user.last_name
+        self.visible_name = user.get_full_name()
+        self.is_active = user.is_active
+        self.root_node = user.root_node
+        self.root_volume = self.root_node.volume
+        self.root_volume_id = self.root_volume.id
         self._volumes = WeakValueDictionary()
+        self.max_storage_bytes = user.max_storage_bytes
+        self.used_storage_bytes = user.used_bytes
+        self._user = user
 
     @property
-    def is_active(self):
-        """True if the user is active."""
-        return (self._status == STATUS_LIVE and
-                self._subscription_status == STATUS_LIVE)
+    def free_bytes(self):
+        """Return the free bytes."""
+        self._load()
+        return max(0, self.max_storage_bytes - self.used_storage_bytes)
 
     def _load(self):
         """Load this storage user from the database."""
@@ -161,17 +140,9 @@ class DAOStorageUser(DAOBase):
         self._copy(u)
         return self
 
-    @fsync_readonly
-    def get_quota(self):
-        """Get the user's quota information."""
-        return self._gateway.get_quota()
-
-    @retryable_transaction()
-    @fsync_commit
-    def update(self, max_storage_bytes=None, subscription=None):
+    def update(self, max_storage_bytes=None):
         """Update the storage user information."""
-        u = self._gateway.update(max_storage_bytes=max_storage_bytes,
-                                 subscription=subscription)
+        u = self._gateway.update(max_storage_bytes=max_storage_bytes)
         self._copy(u)
 
     @retryable_transaction()
@@ -457,7 +428,6 @@ class StorageNode(VolumeObjectBase):
         self.name = None
         self.content_hash = None
         self.volume_id = None
-        self.public_id = None
         self.public_uuid = None
         self.can_delete = None
         self.can_write = None
@@ -491,8 +461,8 @@ class StorageNode(VolumeObjectBase):
                 'Invalid kind %s when creating a StorageNode' % node.kind)
         o = klass(node.id, gateway=gateway)
         o.kind = node.kind
-        o.parent_id = node.parent_id
-        o.owner_id = node.owner_id
+        o.parent_id = node.parent and node.parent.id or None
+        o.owner_id = node.volume.owner.id
         o.path = node.path
         o.full_path = node.full_path
         o.name = node.name
@@ -509,8 +479,7 @@ class StorageNode(VolumeObjectBase):
                 o.path = node.path[len(gateway.root_path_mask)::]
                 o.path = o.path if o.path else '/'
                 o.full_path = pypath.join(o.path, o.name)
-        o.volume_id = node.volume_id
-        o.public_id = node.publicfile_id
+        o.volume_id = node.volume.id
         o.public_uuid = node.public_uuid
         o.status = node.status
         o.when_created = node.when_created
@@ -537,18 +506,9 @@ class StorageNode(VolumeObjectBase):
         self.can_read = permissions["can_read"] if permissions else False
 
     @property
-    def publicfile_id(self):
-        """An alias to .public_id.
-
-        This is to keep compatibility with StorageObject so that we can
-        pass instances of either class to functions like get_public_file_url().
-        """
-        return self.public_id
-
-    @property
     def public_url(self):
         """Return the public URL of the file."""
-        if self.public_id is not None and self.kind == StorageObject.FILE:
+        if self.public_uuid is not None and self.kind == StorageObject.FILE:
             return utils.get_public_file_url(self)
 
     @property
@@ -569,7 +529,7 @@ class StorageNode(VolumeObjectBase):
     @property
     def is_public(self):
         """True if the file has a public id."""
-        return self.public_id is not None
+        return self.public_uuid is not None
 
     @property
     def nodekey(self):
@@ -750,11 +710,14 @@ class FileNodeContent(object):
     """A ContentBlob for a File."""
 
     def __init__(self, contentblob):
-        self.hash = contentblob.hash
+        self.hash = bytes(contentblob.hash)
         self.crc32 = contentblob.crc32
         self.size = contentblob.size
         self.status = contentblob.status
-        self.magic_hash = contentblob.magic_hash
+        if contentblob.magic_hash:
+            self.magic_hash = bytes(contentblob.magic_hash)
+        else:
+            self.magic_hash = None
         if contentblob.size == 0:
             self.deflated_size = 0
             self.storage_key = None
@@ -770,8 +733,9 @@ class DAOUploadJob(VolumeObjectBase):
     def __init__(self, upload, file=None, gateway=None, volume=None):
         """Create DAO from storm model"""
         super(DAOUploadJob, self).__init__(volume, gateway)
-        self.id = upload.uploadjob_id
-        self.storage_object_id = upload.storage_object_id
+        self.id = upload.id
+        self.node = upload.node
+        self.storage_object_id = upload.node.id
         self.chunk_count = upload.chunk_count
         self.hash_hint = upload.hash_hint
         self.crc32_hint = upload.crc32_hint
@@ -831,7 +795,7 @@ class SharedDirectory(DAOBase):
         super(SharedDirectory, self).__init__()
         self.id = share.id
         self.name = share.name
-        self.root_id = share.subtree
+        self.root_id = share.subtree.id
         self.accepted = share.accepted
         self.access = share.access
         self.read_only = share.access == Share.VIEW
@@ -839,8 +803,8 @@ class SharedDirectory(DAOBase):
         self.when_last_changed = share.when_last_changed
         self.status = share.status
         self.offered_to_email = share.email
-        self.shared_by_id = share.shared_by
-        self.shared_to_id = share.shared_to
+        self.shared_by_id = share.shared_by.id
+        self.shared_to_id = share.shared_to and share.shared_to.id or None
         self._shared_by = by_user
         self._shared_to = to_user
 
@@ -904,8 +868,8 @@ class DAOUserVolume(object):
     def __init__(self, vol, owner):
         super(DAOUserVolume, self).__init__()
         self.id = vol.id
-        self.root_id = vol.root_id
-        self.owner_id = vol.owner_id
+        self.root_id = vol.root_node.id
+        self.owner_id = vol.owner.id
         self.status = vol.status
         self.path = vol.path
         self.when_created = vol.when_created
@@ -996,11 +960,6 @@ class VolumeProxy(object):
         return self.gateway.get_uploadjob(uploadjob_id)
 
     @fsync_readonly
-    def get_quota(self):
-        """Get the UserInfo (quota) for this volume."""
-        return self.gateway.get_quota()
-
-    @fsync_readonly
     def get_volume(self):
         """Get the UserVolume for this volume."""
         return self.gateway.get_user_volume()
@@ -1049,13 +1008,12 @@ class VolumeProxy(object):
 
         The return value is a tuple of (generation, free_bytes, [nodes])
         """
-        quota = self.gateway.get_quota()
         volume = self.gateway.get_user_volume()
         if volume.generation <= generation:
-            return (volume.generation, quota.free_bytes, [])
+            return (volume.generation, self.user.free_bytes, [])
         delta_nodes = list(self.gateway.get_generation_delta(generation,
                                                              limit))
-        return (volume.generation, quota.free_bytes, delta_nodes)
+        return (volume.generation, self.user.free_bytes, delta_nodes)
 
     @fsync_readonly
     def get_from_scratch(self, start_from_path=None, limit=None,
@@ -1064,12 +1022,11 @@ class VolumeProxy(object):
 
         The return value is a tuple of (generation, free_bytes, [nodes])
         """
-        quota = self.gateway.get_quota()
         volume = self.gateway.get_user_volume()
         nodes = self.gateway.get_all_nodes(start_from_path=start_from_path,
                                            limit=limit,
                                            max_generation=max_generation)
-        return (volume.generation, quota.free_bytes, nodes)
+        return (volume.generation, self.user.free_bytes, nodes)
 
     @retryable_transaction()
     @fsync_commit
@@ -1089,14 +1046,14 @@ class DAODownload(object):
     def __init__(self, download):
         super(DAODownload, self).__init__()
         self.id = download.id
-        self.owner_id = download.owner_id
-        self.volume_id = download.volume_id
+        self.owner_id = download.volume.owner.id
+        self.volume_id = download.volume.id
         self.file_path = download.file_path
         self.download_url = download.download_url
         self.download_key = download.download_key
         self.status = download.status
         self.status_change_date = download.status_change_date
-        self.node_id = download.node_id
+        self.node_id = download.node.id if download.node else None
         self.error_message = download.error_message
 
 
@@ -1203,10 +1160,9 @@ class GatewayBase(object):
         """All gateways are going to need to get a user."""
         self.session_id = session_id
         if user_id is not None:
-            user = self.store.get(StorageUser, user_id)
+            user = get_object_or_none(StorageUser, id=user_id)
         elif username is not None:
-            user = self.store.find(
-                StorageUser, StorageUser.username == username).one()
+            user = get_object_or_none(StorageUser, username=username)
         else:
             raise errors.StorageError("Invalid call to get_user,"
                                       " user_id or username must be provided.")
@@ -1219,55 +1175,46 @@ class GatewayBase(object):
                                                    session_id=session_id)
             return user_dao
 
-    @property
-    def store(self):
-        """The main storage store."""
-        return get_filesync_store()
-
 
 class SystemGateway(GatewayBase):
     """Used when there is no authenticated user or used by external systems."""
 
-    def create_or_update_user(self, user_id, username, visible_name,
-                              max_storage_bytes):
+    def create_or_update_user(self, username, max_storage_bytes, **kwargs):
         """Create or update a StorageUser and related data."""
-        user = self.store.get(StorageUser, user_id)
-        if user is None:
-            user = StorageUser.new(
-                self.store, user_id, username, visible_name)
-        else:
-            user.username = username
-            user.visible_name = visible_name
-            user.status = STATUS_LIVE
-            user.subscription_status = STATUS_LIVE
-        # initialize the user's data
-        store = get_filesync_store()
-        # create or update the user info table
-        user_info = store.get(StorageUserInfo, user_id)
-        if user_info is None:
-            user_info = StorageUserInfo(user_id, max_storage_bytes)
-            store.add(user_info)
-        else:
-            user_info.max_storage_bytes = max_storage_bytes
+        user, created = StorageUser.objects.get_or_create(username=username)
+        user.is_active = True
+        user.max_storage_bytes = max_storage_bytes
+
+        # special handling for password in plaintext
+        password = kwargs.pop('password', None)
+        if password is not None:
+            user.set_password(password)
+
+        # special handling for visible_name, overrides first/last name
+        visible_name = kwargs.pop('visible_name', None)
+        if visible_name:
+            first_name, sep, last_name = visible_name.rpartition(' ')
+            kwargs.update(dict(first_name=first_name, last_name=last_name))
+        for k, v in kwargs.items():
+            setattr(user, k, v)
+
+        user.save()
 
         # create the user's root volume if necessary
-        vol = UserVolume.get_root(store, user_id)
-        if vol is None:
-            vol = UserVolume.make_root(store, user_id)
-        user.root_volume_id = vol.id
+        UserVolume.objects.get_or_create_root(user)
         user_dao = DAOStorageUser(user)
         user_dao._gateway = StorageUserGateway(user_dao, self.session_id)
         return user_dao
 
     def _get_shareoffer(self, shareoffer_id):
         """Get a shareoffer and who shared it."""
-        result = self.store.find(
-            (Share, StorageUser), Share.shared_by == StorageUser.id,
-            Share.id == shareoffer_id, Share.status == STATUS_LIVE).one()
+        result = Share.objects.filter(
+            id=shareoffer_id, status=STATUS_LIVE).select_related('shared_by')
         share = None
         user = None
-        if result:
-            share, user = result
+        if result.exists():
+            share = result.get()
+            user = share.shared_by
             if share.accepted or share.shared_to is not None:
                 raise errors.ShareAlreadyAccepted(
                     "This share offer has been accepted.")
@@ -1289,15 +1236,18 @@ class SystemGateway(GatewayBase):
         if share is None or byuser.id == user_id:
             raise errors.DoesNotExist(self.shareoffer_dne_error)
 
-        user = self.get_user(user_id)
+        user = get_object_or_none(StorageUser, id=user_id)
         if user is None:
             gw = SystemGateway()
-            user = gw.create_or_update_user(user_id, username, visible_name, 0)
-            self.store.commit()
+            user = gw.create_or_update_user(
+                username, visible_name=visible_name, max_storage_bytes=0,
+                is_active=False)
             # they are not subscribed!
-            user._gateway.update(subscription=False)
+            user._gateway.update()
+        else:
+            user = DAOStorageUser(user)
 
-        share.claim_share(self.store, user.id)
+        share.claim_share(StorageUser.objects.get(id=user_id))
         share_dao = SharedDirectory(share, by_user=byuser, to_user=user)
         self.queue_share_accepted(share_dao)
         return share_dao
@@ -1311,15 +1261,14 @@ class SystemGateway(GatewayBase):
         except utils.Base62Error:
             raise errors.DoesNotExist(self.publicfile_dne_error)
 
-        public_id = uuid.UUID(int=public_id)
-        publicnode = self.store.find(
-            PublicNode, PublicNode.public_uuid == public_id).one()
-        if publicnode is None:
+        public_uuid = uuid.UUID(int=public_id)
+        node = get_object_or_none(StorageObject, public_uuid=public_uuid)
+        if node is None:
             raise errors.DoesNotExist(self.publicfile_dne_error)
 
-        user = self.get_user(publicnode.owner_id, ignore_lock=True)
+        user = self.get_user(node.volume.owner.id, ignore_lock=True)
         gw = ReadWriteVolumeGateway(user)
-        node = gw.get_node(publicnode.node_id, with_content=True)
+        node = gw.get_node(node.id, with_content=True)
         if not node.is_public:
             # We raise DoesNotExist instead of NoPermission here,
             # since it reveals information to the user that we don't
@@ -1349,30 +1298,27 @@ class SystemGateway(GatewayBase):
                       download_key=None):
         """Make a new download object."""
         self.get_user(user_id)
-        store = get_filesync_store()
-        download = Download(
-            user_id, volume_id, file_path, download_url, download_key)
-        store.add(download)
+        volume = UserVolume.objects.get(owner__id=user_id, id=volume_id)
+        download = Download.objects.create(
+            volume=volume, file_path=file_path, download_url=download_url,
+            download_key=download_key)
         return DAODownload(download)
 
     def _get_download(self, user_id, download_id):
         """Internal function to get the download and owner."""
         user = self.get_user(user_id)
-        store = get_filesync_store()
-        download = store.get(Download, download_id)
+        download = get_object_or_none(Download, id=download_id)
         return user, download
 
     def get_download(self, user_id, udf_id, file_path, download_url,
                      download_key=None):
         """Get a download by its UDF, file path and download key."""
         self.get_user(user_id)
-        store = get_filesync_store()
-        download = store.find(
-            Download, Download.owner_id == user_id,
-            Download.volume_id == udf_id, Download.file_path == file_path,
-            Or(Download.download_key == unicode(repr(download_key)),
-               Download.download_url == download_url),
-        ).order_by(Download.status_change_date).last()
+        download = Download.objects.filter(
+            models.Q(download_key=unicode(repr(download_key))) |
+            models.Q(download_url=download_url),
+            volume__owner__id=user_id, volume__id=udf_id, file_path=file_path,
+        ).order_by('status_change_date').last()
         if download is None:
             raise errors.DoesNotExist(self.download_dne_error)
         return DAODownload(download)
@@ -1396,6 +1342,7 @@ class SystemGateway(GatewayBase):
             download.node_id = node_id
         if error_message is not None:
             download.error_message = error_message
+        download.save()
         return DAODownload(download)
 
     def download_complete(self, user_id, download_id, hash, crc32, size,
@@ -1417,49 +1364,34 @@ class SystemGateway(GatewayBase):
             size, deflated_size, storage_key, mimetype, enforce_quota=False)
         download.node_id = fnode.id
         download.status = Download.STATUS_COMPLETE
+        download.save()
         return DAODownload(download)
 
     def get_failed_downloads(self, start_date, end_date):
         """Get failed downloads."""
-        store = get_filesync_store()
-        result = store.find(
-            Download, Download._status == Download.STATUS_ERROR,
-            Download.status_change_date >= start_date,
-            Download.status_change_date <= end_date)
+        result = Download.objects.filter(
+            status=Download.STATUS_ERROR,
+            status_change_date__range=[start_date, end_date])
         for dl in result:
             yield DAODownload(dl)
 
     def get_node(self, node_id):
         """Get a node for the specified node_id."""
-        store = get_filesync_store()
-        node = store.find(
-            StorageObject, StorageObject.status == STATUS_LIVE,
-            StorageObject.id == node_id).one()
+        node = get_object_or_none(
+            StorageObject, status=STATUS_LIVE, id=node_id)
         if node is None:
             raise errors.DoesNotExist(self.node_dne_error)
         return StorageNode.factory(None, node, permissions={})
 
-    def get_user_info(self, user_id):
-        """Get the UserInfo DAO for user_id"""
-        store = get_filesync_store()
-        user_info = store.get(StorageUserInfo, user_id)
-        if user_info is None:
-            raise errors.DoesNotExist(self.user_dne_error)
-        return UserInfo(user_info)
-
     def cleanup_uploadjobs(self, uploadjobs):
         """Delete uploadjobs."""
         uploadjob_ids = [job.id for job in uploadjobs]
-        store = get_filesync_store()
-        store.find(UploadJob,
-                   UploadJob.uploadjob_id.is_in(uploadjob_ids)).remove()
+        UploadJob.objects.filter(id__in=uploadjob_ids).delete()
 
     def get_abandoned_uploadjobs(self, last_active, limit=1000):
         """Get uploadjobs that are older than last_active."""
-        store = get_filesync_store()
-        jobs = store.find(
-            UploadJob, UploadJob.when_last_active < last_active)[:limit]
-        return [DAOUploadJob(job) for job in jobs]
+        jobs = UploadJob.objects.filter(when_last_active__lte=last_active)
+        return [DAOUploadJob(job) for job in jobs[:limit]]
 
 
 class StorageUserGateway(GatewayBase):
@@ -1476,29 +1408,12 @@ class StorageUserGateway(GatewayBase):
         self.owner = self.user = user
 
     @timing_metric
-    def update(self, max_storage_bytes=None, subscription=None):
-        """Update a user's max_storage_bytes or subscription_status.
-
-        This typically only happens when a user's subscription changes.
-        """
-        user = self.store.get(StorageUser, self.user.id)
-        store = get_filesync_store()
-
-        # update the subscription in the user
-        if subscription is not None:
-            if subscription:
-                user.subscription_status = STATUS_LIVE
-            else:
-                user.subscription_status = STATUS_DEAD
-
-        # update the user info
+    def update(self, max_storage_bytes=None):
+        """Update a user's max_storage_bytes."""
+        user = StorageUser.objects.get(id=self.user.id)
         if max_storage_bytes is not None:
-            user_info = store.get(StorageUserInfo, self.user.id)
-            if user_info is None:
-                user_info = StorageUserInfo(self.user.id, max_storage_bytes)
-                store.add(user_info)
-            else:
-                user_info.max_storage_bytes = max_storage_bytes
+            user.max_storage_bytes = max_storage_bytes
+            user.save(update_fields=['max_storage_bytes'])
 
         # save all back
         user_dao = DAOStorageUser(user)
@@ -1506,19 +1421,11 @@ class StorageUserGateway(GatewayBase):
         return user_dao
 
     @timing_metric
-    def get_quota(self):
-        """Get the user's quota information."""
-        store = get_filesync_store()
-        info = store.get(StorageUserInfo, self.user.id)
-        return UserInfo(info, gateway=self)
-
-    @timing_metric
     def recalculate_quota(self):
         """Recalculate a user's quota."""
-        store = get_filesync_store()
-        info = store.get(StorageUserInfo, self.user.id)
-        info.recalculate_used_bytes()
-        return UserInfo(info, gateway=self)
+        user = StorageUser.objects.get(id=self.user.id)
+        user.recalculate_used_bytes()
+        return user
 
     def get_root_gateway(self):
         """Get the volume gateway for the user's root folder."""
@@ -1530,27 +1437,22 @@ class StorageUserGateway(GatewayBase):
         if not self.user.is_active:
             raise errors.NoPermission(self.inactive_user_error)
         # sanity check
-        store = get_filesync_store()
-        udf = store.find(
-            UserVolume, UserVolume.owner_id == self.user.id,
-            UserVolume.id == udf_id, UserVolume.status == STATUS_LIVE).one()
+        udf = get_object_or_none(
+            UserVolume, owner__id=self.user.id, id=udf_id, status=STATUS_LIVE)
         if udf:
-            return self.get_volume_gateway(
-                udf=DAOUserVolume(udf, self.user))
+            return self.get_volume_gateway(udf=DAOUserVolume(udf, self.user))
 
     @timing_metric
     def get_share_gateway(self, share_id):
         """Get the volume gateway for a folder shared to this user."""
         if not self.user.is_active:
             raise errors.NoPermission(self.inactive_user_error)
-        share = self.store.find(
-            Share, Share.shared_to == self.user.id,
-            Share.shared_by == StorageUser.id,
-            StorageUser.subscription_status == STATUS_LIVE,
-            Share.id == share_id, Share.status == STATUS_LIVE,
-            Share.accepted == True).one()  # NOQA
+        share = get_object_or_none(
+            Share.objects.select_related('shared_by'),
+            shared_to=self.user.id, id=share_id, status=STATUS_LIVE,
+            accepted=True)
         if share:
-            by_user = self.get_user(share.shared_by)
+            by_user = self.get_user(share.shared_by.id)
             return self.get_volume_gateway(
                 share=SharedDirectory(share, by_user=by_user))
 
@@ -1568,24 +1470,20 @@ class StorageUserGateway(GatewayBase):
         """Get a specific share shared by or shared_to this user."""
         if not self.user.is_active:
             raise errors.NoPermission(self.inactive_user_error)
-        ToUser = ClassAlias(StorageUser)
-        FromUser = ClassAlias(StorageUser)
-        join1 = LeftJoin(Share, FromUser,
-                         Share.shared_by == FromUser.id)
-        joins = LeftJoin(join1, ToUser, Share.shared_to == ToUser.id)
-        conditions = [Share.id == share_id,
-                      Or(Share.shared_to == self.user.id,
-                         Share.shared_by == self.user.id)]
+        shares = Share.objects.select_related('shared_to', 'shared_by').filter(
+            models.Q(shared_to__id=self.user.id) |
+            models.Q(shared_by__id=self.user.id), id=share_id)
         if accepted_only:
-            conditions.append(Share.accepted == True)  # NOQA
+            shares = shares.filter(accepted=True)
         if live_only:
-            conditions.append(Share.status == STATUS_LIVE)
-        result = self.store.using(joins).find(
-            (Share, FromUser, ToUser),
-            *conditions).one()
-        if result is None:
+            shares = shares.filter(status=STATUS_LIVE)
+        try:
+            share = shares.get()
+        except Share.DoesNotExist:
             raise errors.DoesNotExist(self.share_dne_error)
-        share, byuser, touser = result
+
+        byuser = share.shared_by
+        touser = share.shared_to
         if touser:
             touser = DAOStorageUser(touser)
         share_dao = SharedDirectory(
@@ -1601,18 +1499,15 @@ class StorageUserGateway(GatewayBase):
         """
         if not self.user.is_active:
             raise errors.NoPermission(self.inactive_user_error)
-        joins = LeftJoin(Share, StorageUser,
-                         Share.shared_to == StorageUser.id)
-        conditions = [Share.shared_by == self.user.id,
-                      Share.status == STATUS_LIVE]
+        shares = Share.objects.select_related('shared_to').filter(
+            shared_by__id=self.user.id, status=STATUS_LIVE)
         if accepted is not None:
-            conditions.append(Share.accepted == accepted)
+            shares = shares.filter(accepted=accepted)
         if node_id:
-            conditions.append(Share.subtree == node_id)
+            shares = shares.filter(subtree__id=node_id)
 
-        shares = self.store.using(joins).find(
-            (Share, StorageUser), *conditions)
-        for share, user in shares:
+        for share in shares:
+            user = share.shared_to
             if user:
                 user = DAOStorageUser(user)
             share_dao = SharedDirectory(share, to_user=user, by_user=self.user)
@@ -1625,18 +1520,15 @@ class StorageUserGateway(GatewayBase):
         """Get accepted shares for nodes in node_ids."""
         if not self.user.is_active:
             raise errors.NoPermission(self.inactive_user_error)
-        joins = LeftJoin(Share, StorageUser,
-                         Share.shared_to == StorageUser.id)
-        conditions = [Share.shared_by == self.user.id,
-                      Share.subtree.is_in(node_ids)]
+        shares = Share.objects.select_related('shared_to').filter(
+            shared_by__id=self.user.id, subtree__id__in=node_ids)
         if accepted_only:
-            conditions.append(Share.accepted == True)  # NOQA
+            shares = shares.filter(accepted=True)
         if live_only:
-            conditions.append(Share.status == STATUS_LIVE)
+            shares = shares.filter(status=STATUS_LIVE)
 
-        shares = self.store.using(joins).find(
-            (Share, StorageUser), *conditions)
-        for share, user in shares:
+        for share in shares:
+            user = share.shared_to
             if user:
                 user = DAOStorageUser(user)
             share_dao = SharedDirectory(share, to_user=user, by_user=self.user)
@@ -1652,18 +1544,15 @@ class StorageUserGateway(GatewayBase):
         """
         if not self.user.is_active:
             raise errors.NoPermission(self.inactive_user_error)
-        conditions = [Share.shared_by == StorageUser.id,
-                      Share.shared_to == self.user.id,
-                      StorageUser.subscription_status == STATUS_LIVE,
-                      Share.status == STATUS_LIVE]
+        shares = Share.objects.select_related('shared_by').filter(
+            shared_to__id=self.user.id, status=STATUS_LIVE)
         if accepted is not None:
-            conditions.append(Share.accepted == accepted)
+            shares = shares.filter(accepted=accepted)
 
-        shares = self.store.find(
-            (Share, StorageUser), *conditions)
-        for share, user in shares:
-            share_dao = SharedDirectory(
-                share, by_user=DAOStorageUser(user), to_user=self.user)
+        for share in shares:
+            user = DAOStorageUser(share.shared_by)
+            user._gateway = self
+            share_dao = SharedDirectory(share, by_user=user, to_user=self.user)
             share_dao._gateway = self
             yield share_dao
 
@@ -1672,11 +1561,9 @@ class StorageUserGateway(GatewayBase):
         """Accept a share offer"""
         if not self.user.is_active:
             raise errors.NoPermission(self.inactive_user_error)
-        share = self.store.find(
-            Share, Share.id == share_id,
-            Share.shared_to == self.user.id,
-            Share.status == STATUS_LIVE,
-            Share.accepted == False).one()  # NOQA
+        share = get_object_or_none(
+            Share, id=share_id, shared_to__id=self.user.id,
+            status=STATUS_LIVE, accepted=False)
         if share is None:
             raise errors.DoesNotExist(self.share_dne_error)
         share.accept()
@@ -1690,14 +1577,12 @@ class StorageUserGateway(GatewayBase):
         """Decline a share offer"""
         if not self.user.is_active:
             raise errors.NoPermission(self.inactive_user_error)
-        share = self.store.find(
-            Share, Share.id == share_id,
-            Share.shared_to == self.user.id,
-            Share.status == STATUS_LIVE).one()
+        share = get_object_or_none(
+            Share, id=share_id, shared_to__id=self.user.id,
+            status=STATUS_LIVE)
         if share is None:
             raise errors.DoesNotExist(self.share_dne_error)
-        share.accepted = False
-        share.delete()
+        share.decline()
         share_dao = SharedDirectory(share)
         self.queue_share_declined(share_dao)
         self.queue_share_deleted(share_dao)
@@ -1708,14 +1593,14 @@ class StorageUserGateway(GatewayBase):
         """Delete a share shared by or to this user."""
         if not self.user.is_active:
             raise errors.NoPermission(self.inactive_user_error)
-        share = self.store.find(
-            Share, Share.id == share_id,
-            Or(Share.shared_by == self.user.id,
-               Share.shared_to == self.user.id),
-            Share.status == STATUS_LIVE).one()
+        share = get_object_or_none(
+            Share,
+            models.Q(shared_by__id=self.user.id) |
+            models.Q(shared_to__id=self.user.id),
+            id=share_id, status=STATUS_LIVE)
         if share is None:
             raise errors.DoesNotExist(self.share_dne_error)
-        share.delete()
+        share.kill()
         share_dao = SharedDirectory(share)
         self.queue_share_deleted(share_dao)
         return share_dao
@@ -1723,12 +1608,13 @@ class StorageUserGateway(GatewayBase):
     @timing_metric
     def set_share_access(self, share_id, readonly):
         """Change the readonly access of this share."""
-        share = self.store.find(
-            Share, Share.id == share_id, Share.status == STATUS_LIVE,
-            Share.shared_by == self.user.id).one()
-        if share is None:
-            raise errors.DoesNotExist(self.share_dne_error)
-        share.access = Share.VIEW if readonly else Share.MODIFY
+        share = get_object_or_none(
+            Share, id=share_id, shared_by__id=self.user.id,
+            status=STATUS_LIVE)
+        if readonly:
+            share.make_ro()
+        else:
+            share.make_rw()
         share_dao = SharedDirectory(share)
         share_dao._gateway = self
         return share_dao
@@ -1739,7 +1625,7 @@ class StorageUserGateway(GatewayBase):
 
         @param node: A StorageNode this user owns
         """
-        if node.owner_id != self.user.id:
+        if node.volume.owner.id != self.user.id:
             msg = "User does not own the node, shares can not be deleted."
             raise errors.NoPermission(msg)
         # since we're using only the ids, use the inner function of the vgw
@@ -1755,27 +1641,27 @@ class StorageUserGateway(GatewayBase):
             self.delete_share(share.id)
 
     @timing_metric
+    @fsync_commit
     def make_udf(self, path):
         """Create a UDF."""
         if not self.user.is_active:
             raise errors.NoPermission(self.inactive_user_error)
-        store = get_filesync_store()
         # need a lock here.
-        info = store.get(StorageUserInfo, self.user.id)
-        info.lock_for_update()
-        path_like = path + u'/'
+        StorageUser.objects.select_for_update(nowait=True).get(
+            id=self.user.id)
+        path_like = path + '/'
         # make sure this UDF wont be the existing UDF of be the parent of
         # and existing UDF
-        prev_udfs = store.find(
-            UserVolume, UserVolume.owner_id == self.user.id,
-            UserVolume.status == STATUS_LIVE)
+        prev_udfs = UserVolume.objects.filter(
+            owner__id=self.user.id, status=STATUS_LIVE)
         for prev_udf in prev_udfs:
             if prev_udf.path == path:
                 return DAOUserVolume(prev_udf, self.user)
             prvpath = prev_udf.path + "/"
             if prvpath.startswith(path_like) or path_like.startswith(prvpath):
                 raise errors.NoPermission("UDFs can not be nested.")
-        udf = UserVolume.create(store, self.user.id, path)
+        udf = UserVolume.objects.create(
+            owner=StorageUser.objects.get(id=self.user.id), path=path)
         udf_dao = DAOUserVolume(udf, self.user)
         self.queue_udf_create(udf_dao)
         return udf_dao
@@ -1785,43 +1671,37 @@ class StorageUserGateway(GatewayBase):
         """Get a UDF by the path parts."""
         if not self.user.is_active:
             raise errors.NoPermission(self.inactive_user_error)
-        store = get_filesync_store()
         path = path.rstrip('/')
         if from_full_path:
-            udfs = store.find(
-                UserVolume, UserVolume.owner_id == self.user.id,
-                UserVolume.status == STATUS_LIVE)
+            udfs = UserVolume.objects.filter(
+                owner__id=self.user.id, status=STATUS_LIVE)
             udfs = [u for u in udfs
                     if u.path == path or path.startswith(u.path + '/')]
             udf = udfs[0] if len(udfs) == 1 else None
         else:
-            udf = store.find(
-                UserVolume, UserVolume.path == path,
-                UserVolume.owner_id == self.user.id,
-                UserVolume.status == STATUS_LIVE).one()
+            udf = get_object_or_none(
+                UserVolume, path=path, owner__id=self.user.id,
+                status=STATUS_LIVE)
         if udf is None:
             raise errors.DoesNotExist(self.udf_dne_error)
         udf_dao = DAOUserVolume(udf, self.user)
         return udf_dao
 
     @timing_metric
+    @fsync_commit
     def delete_udf(self, udf_id):
         """Delete a UDF."""
         if not self.user.is_active:
             raise errors.NoPermission(self.inactive_user_error)
-        store = get_filesync_store()
-        udf = store.find(
-            UserVolume, UserVolume.id == udf_id,
-            UserVolume.owner_id == self.user.id,
-            UserVolume.status == STATUS_LIVE).one()
+        udf = get_object_or_none(
+            UserVolume, id=udf_id, owner__id=self.user.id, status=STATUS_LIVE)
         if udf is None:
             raise errors.DoesNotExist(self.udf_dne_error)
-        info = store.get(StorageUserInfo, self.user.id)
-        info.lock_for_update()
-        node = store.get(StorageObject, udf.root_id)
+        StorageUser.objects.select_for_update(nowait=True).get(
+            id=self.owner.id)
+        node = StorageObject.objects.get(id=udf.root_node.id)
         self.delete_related_shares(node)
-        udf.delete()
-        udf.status = STATUS_DEAD
+        udf.kill()
         udf_dao = DAOUserVolume(udf, self.user)
         self.queue_udf_delete(udf_dao)
         return udf_dao
@@ -1831,11 +1711,8 @@ class StorageUserGateway(GatewayBase):
         """Get a UDF."""
         if not self.user.is_active:
             raise errors.NoPermission(self.inactive_user_error)
-        store = get_filesync_store()
-        udf = store.find(
-            UserVolume, UserVolume.id == udf_id,
-            UserVolume.owner_id == self.user.id,
-            UserVolume.status == STATUS_LIVE).one()
+        udf = get_object_or_none(
+            UserVolume, id=udf_id, owner__id=self.user.id, status=STATUS_LIVE)
         if udf is None:
             raise errors.DoesNotExist(self.udf_dne_error)
         udf_dao = DAOUserVolume(udf, self.user)
@@ -1846,11 +1723,9 @@ class StorageUserGateway(GatewayBase):
         """Return Live UDFs."""
         if not self.user.is_active:
             raise errors.NoPermission(self.inactive_user_error)
-        store = get_filesync_store()
-        udfs = store.find(
-            UserVolume, UserVolume.owner_id == self.user.id,
-            UserVolume.path != settings.ROOT_USERVOLUME_PATH,
-            UserVolume.status == STATUS_LIVE)
+        udfs = UserVolume.objects.filter(
+            owner__id=self.user.id, status=STATUS_LIVE).exclude(
+                path=settings.ROOT_USERVOLUME_PATH)
         for udf in udfs:
             udf_dao = DAOUserVolume(udf, self.user)
             yield udf_dao
@@ -1858,35 +1733,25 @@ class StorageUserGateway(GatewayBase):
     @timing_metric
     def get_downloads(self):
         """Get all downloads for a user."""
-        store = get_filesync_store()
-        return [DAODownload(download)
-                for download in store.find(
-                    Download, Download.owner_id == self.user.id)]
+        return [DAODownload(download) for download in
+                Download.objects.filter(volume__owner__id=self.user.id)]
 
     @timing_metric
     def get_public_files(self):
         """Get all public files for a user."""
-        store = get_filesync_store()
-        nodes = store.find(
-            StorageObject, StorageObject.status == STATUS_LIVE,
-            StorageObject.kind == StorageObject.FILE,
-            StorageObject.volume_id == UserVolume.id,
-            UserVolume.status == STATUS_LIVE,
-            StorageObject._publicfile_id != None,  # NOQA
-            UserVolume.owner_id == self.user.id)
+        nodes = StorageObject.objects.filter(
+            status=STATUS_LIVE, kind=StorageObject.FILE,
+            volume__status=STATUS_LIVE, volume__owner__id=self.user.id,
+            public_uuid__isnull=False)
         return self._get_dao_nodes(nodes)
 
     @timing_metric
     def get_public_folders(self):
         """Get all public folders for a user."""
-        store = get_filesync_store()
-        nodes = store.find(
-            StorageObject, StorageObject.status == STATUS_LIVE,
-            StorageObject.kind == StorageObject.DIRECTORY,
-            StorageObject.volume_id == UserVolume.id,
-            UserVolume.status == STATUS_LIVE,
-            StorageObject._publicfile_id != None,  # NOQA
-            UserVolume.owner_id == self.user.id)
+        nodes = StorageObject.objects.filter(
+            status=STATUS_LIVE, kind=StorageObject.DIRECTORY,
+            volume__status=STATUS_LIVE, volume__owner__id=self.user.id,
+            public_uuid__isnull=False)
         return self._get_dao_nodes(nodes)
 
     def _get_dao_nodes(self, nodes):
@@ -1906,11 +1771,8 @@ class StorageUserGateway(GatewayBase):
     @timing_metric
     def get_share_generation(self, share):
         """Get the generation of the speficied share."""
-        store = get_filesync_store()
-        vol = store.find(
-            UserVolume, UserVolume.id == StorageObject.volume_id,
-            StorageObject.id == share.root_id).one()
-        return vol.generation or 0
+        volume = UserVolume.objects.get(storageobject__id=share.root_id)
+        return volume.generation
 
     @timing_metric
     def get_photo_directories(self):
@@ -1921,33 +1783,36 @@ class StorageUserGateway(GatewayBase):
 
         sql = """
             WITH RECURSIVE t AS (
-            SELECT min(CAST(o.parent_id As varchar(50))) AS parent_id
-            FROM object o
-            WHERE o.owner_id = %(owner_id)s AND
-            o.status = E'Live'  AND
-            o.content_hash != E'sha1:da39a3ee5e6b4b0d3255bfef95601890afd80709'
+            SELECT min(CAST(o.parent_id AS varchar(50))) AS parent_id
+            FROM filesync_storageobject o, filesync_uservolume u
+            WHERE u.owner_id = %s AND o.status = %s AND o.content_blob_id != %s
+            AND o.volume_id = u.id
             AND o.mimetype IN (E'image/jpeg', E'image/jpg')
             UNION ALL
             SELECT (
-                SELECT min(CAST(o.parent_id As varchar(50)))
-                FROM object o
-                WHERE CAST(o.parent_id As varchar(50)) > t.parent_id AND
-                o.owner_id = %(owner_id)s AND
-                o.status = E'Live'  AND
-                o.content_hash !=
-                    E'sha1:da39a3ee5e6b4b0d3255bfef95601890afd80709' AND
+                SELECT min(CAST(o.parent_id AS varchar(50)))
+                FROM filesync_storageobject o, filesync_uservolume u
+                WHERE CAST(o.parent_id AS varchar(50)) > t.parent_id AND
+                u.owner_id = %s AND o.status = %s AND
+                o.content_blob_id != %s AND o.volume_id = u.id AND
                 o.mimetype IN (E'image/jpeg', E'image/jpg')
             ) FROM t WHERE t.parent_id IS NOT NULL)
             SELECT o.id, o.volume_id, o.generation, o.generation_created,
-                   o.kind, o.name, o.owner_id, o.parent_id, o.path,
+                   o.kind, o.name, u.owner_id, o.parent_id, o.path,
                    o.public_uuid, o.status, o.when_created,
-                   o.when_last_modified FROM Object o, t, userdefinedfolder u
+                   o.when_last_modified
+            FROM filesync_storageobject o, t, filesync_uservolume u
             WHERE o.id = t.parent_id::UUID AND
-                  o.volume_id=u.id AND u.status = E'Live' ;
-            """ % dict(owner_id=self.user.id)
-        store = get_filesync_store()
-        nodes = store.execute(SQL(sql))
+                  o.volume_id=u.id AND u.status = %s ;
+            """
+        empty_hash = 'sha1:da39a3ee5e6b4b0d3255bfef95601890afd80709'
+        params = (self.user.id, STATUS_LIVE, empty_hash, self.user.id,
+                  STATUS_LIVE, empty_hash, STATUS_LIVE)
         gws = {}
+
+        with connection.cursor() as cursor:
+            cursor.execute(sql, params)
+            nodes = cursor.fetchall()
         for n in nodes:
             (node_id, volume_id, generation, generation_created, kind, name,
                 owner_id, parent_id, path, public_uuid, status, when_created,
@@ -1984,25 +1849,26 @@ class StorageUserGateway(GatewayBase):
 
     def _get_reusable_content(self, hash_value, magic_hash):
         """Get a contentblob for reusable content."""
-        store = get_filesync_store()
 
         # check to see if we have the content blob for that hash
-        contentblob = store.find(
-            ContentBlob, ContentBlob.hash == hash_value).one()
+        try:
+            contentblob = ContentBlob.objects.get(hash=hash_value)
+        except ContentBlob.DoesNotExist:
+            contentblob = None
 
         # if content is not there, is not reusable
         if not contentblob:
             return False, None
 
         # if we have content have the same magic hash is reusable!
-        if magic_hash is not None and contentblob.magic_hash == magic_hash:
+        if (magic_hash is not None and contentblob.magic_hash is not None and
+                bytes(contentblob.magic_hash) == bytes(magic_hash)):
             return True, contentblob
 
         # if not, but the user owns the blob, still can be reusable
-        empty = store.find(
-            StorageObject, StorageObject._content_hash == hash_value,
-            StorageObject.owner_id == self.user.id).is_empty()
-        if not empty:
+        nodes = StorageObject.objects.filter(
+            content_blob__hash=hash_value, volume__owner__id=self.user.id)
+        if nodes.exists():
             return True, contentblob
 
         # exists, but it's not reusable
@@ -2025,12 +1891,14 @@ def with_notifications(f):
     @wraps(f)
     def wrapper(self, *args, **kwargs):
         """Wrapper method."""
-        # quota notification handling
-        UserVolume.lock_volume(self.store, self.volume_id)
-        quota = self._get_quota()
-        quota.lock_for_update()
-        # call the wrapped method
-        result = f(self, *args, **kwargs)
+        with fsync_commit():
+            # quota notification handling
+            UserVolume.objects.select_for_update(nowait=True).get(
+                id=self.volume_id)
+            StorageUser.objects.select_for_update(nowait=True).get(
+                id=self.owner.id)
+            # call the wrapped method
+            result = f(self, *args, **kwargs)
         return result
     return wrapper
 
@@ -2106,11 +1974,6 @@ class ReadOnlyVolumeGateway(GatewayBase):
                 self._volume_id = self._get_user_volume().id
         return self._volume_id
 
-    @property
-    def store(self):
-        """The storm store to use."""
-        return get_filesync_store()
-
     def _get_root_node(self):
         """Get the root node for this volume."""
         if self.share:
@@ -2118,45 +1981,36 @@ class ReadOnlyVolumeGateway(GatewayBase):
             # since all share access has to get the root node, this will work.
             self._check_share()
 
-        cond = [StorageObject.volume_id == UserVolume.id,
-                StorageObject.status == STATUS_LIVE,
-                UserVolume.owner_id == self.owner.id,
-                UserVolume.status == STATUS_LIVE]
+        nodes = StorageObject.objects.filter(
+            status=STATUS_LIVE, volume__owner__id=self.owner.id,
+            volume__status=STATUS_LIVE)
         if self.root_id:
-            cond.append(StorageObject.id == self.root_id)
+            nodes = nodes.filter(id=self.root_id)
             # if this is a UDF, we can make sure it's a valid UDF by joining it
             if self.udf:
-                cond.extend([
-                    UserVolume.id == self.udf.id,
-                    StorageObject.id == UserVolume.root_id])
+                nodes = nodes.filter(volume__id=self.udf.id)
         else:
-            cond.extend([
-                UserVolume.id == self.owner.root_volume_id,
-                StorageObject.id == UserVolume.root_id])
+            nodes = nodes.filter(
+                volume__id=self.owner.root_volume_id, parent=None)
 
-        node = self.store.find(StorageObject, *cond).one()
-        if node is None:
+        if nodes.count() == 0:
             raise errors.DoesNotExist("Could not locate root for the volume.")
+
+        node = nodes.get()
         if self.share:
             self.root_path_mask = node.full_path
         self.root_id = node.id
-        self._volume_id = node.volume_id
+        self._volume_id = node.volume.id
         return node
 
     def _check_share(self):
         """Make sure the share is still good."""
         if self.share:
             # if this is a share, make sure it's still valid
-            store = get_filesync_store()
-            share = store.find(
-                Share, Share.id == self.share.id,
-                Share.subtree == self.share.root_id,
-                Share.shared_to == self.user.id,
-                Share.shared_by == self.owner.id,
-                Share.shared_by == StorageUser.id,
-                StorageUser.subscription_status == STATUS_LIVE,
-                Share.accepted == True,  # NOQA
-                Share.status == STATUS_LIVE).one()
+            share = get_object_or_none(
+                Share, id=self.share.id, subtree__id=self.share.root_id,
+                shared_to__id=self.user.id, shared_by__id=self.owner.id,
+                accepted=True, status=STATUS_LIVE)
             if not share:
                 raise errors.DoesNotExist(self.share_dne_error)
 
@@ -2170,20 +2024,15 @@ class ReadOnlyVolumeGateway(GatewayBase):
     def _get_user_volume(self):
         """Return the UserVolume for this ReadWriteVolumeGateway."""
         if self.share:
-            vol = self.store.find(
-                UserVolume, UserVolume.id == StorageObject.volume_id,
-                StorageObject.status == STATUS_LIVE,
-                StorageObject.id == self.share.root_id,
-                UserVolume.status == STATUS_LIVE).one()
-
+            vol = get_object_or_none(
+                UserVolume, storageobject__status=STATUS_LIVE,
+                storageobject__id=self.share.root_id, status=STATUS_LIVE)
         elif self.udf:
-            vol = self.store.find(
-                UserVolume, UserVolume.id == self.udf.id,
-                UserVolume.status == STATUS_LIVE).one()
+            vol = get_object_or_none(
+                UserVolume, id=self.udf.id, status=STATUS_LIVE)
         else:
-            vol = self.store.find(
-                UserVolume, UserVolume.id == self.owner.root_volume_id,
-                UserVolume.status == STATUS_LIVE).one()
+            vol = get_object_or_none(
+                UserVolume, id=self.owner.root_volume_id, status=STATUS_LIVE)
         if vol is None:
             raise errors.DoesNotExist(self.udf_dne_error)
         return vol
@@ -2218,7 +2067,7 @@ class ReadOnlyVolumeGateway(GatewayBase):
         permissions['can_read'] = True
         permissions['can_write'] = not self.read_only
         permissions['can_delete'] = not (
-            self.read_only or node.parent_id == ROOT_PARENTID or
+            self.read_only or node.parent == ROOT_PARENT or
             node.id == self.root_id)
         return permissions
 
@@ -2228,133 +2077,78 @@ class ReadOnlyVolumeGateway(GatewayBase):
         if not perms["can_write"]:
             raise errors.NoPermission(self.cannot_write_error)
 
-    def _is_on_volume_conditions(self):
+    def _is_on_volume(self, qs):
         """Conditions to only get children of nodes on this volume."""
-        conditions = []
         if self.share:
             root = self._get_root_node()
-            path_like = get_path_startswith(root)
-            conditions.extend([
-                StorageObject.volume_id == self.volume_id,
-                Or(StorageObject.id == root.id,
-                   StorageObject.parent_id == root.id,
-                   StorageObject.path.startswith(path_like))])
+            qs = qs.filter(
+                models.Q(id=root.id) | models.Q(parent__id=root.id) |
+                models.Q(path__startswith=root.absolute_path),
+                volume__id=self.volume_id)
         elif self.udf:
-            conditions.append(
-                StorageObject.volume_id == self.udf.id)
-        return conditions
-
-    def _get_left_joins(self, with_content, with_parent, with_volume=False):
-        """Get the joins for storm queries."""
-        included_tables = [StorageObject]
-        origin = [StorageObject]
-        if with_content:
-            origin.append(LeftJoin(
-                ContentBlob, ContentBlob.hash == StorageObject._content_hash))
-            included_tables.append(ContentBlob)
-        if with_parent:
-            Parent = ClassAlias(StorageObject)
-            origin.append(LeftJoin(
-                Parent,
-                Parent.id == StorageObject.parent_id))
-            included_tables.append(Parent)
-        if with_volume:
-            origin.append(LeftJoin(
-                UserVolume, UserVolume.id == StorageObject.volume_id))
-            included_tables.append(UserVolume)
-        return tuple(included_tables), origin
+            qs = qs.filter(volume__id=self.udf.id)
+        return qs
 
     def _get_node_simple(self, id, live_only=True, with_content=False,
                          with_parent=False, with_volume=False):
         """Just get a StorageObject on this volume."""
-
-        tables, origin = self._get_left_joins(
-            with_content, with_parent, with_volume)
-        # XXX: Do we need the filter by owner_id here even though
-        # StorageObject.id is unique?
-        conditions = [StorageObject.id == id,
-                      StorageObject.owner_id == self.owner.id]
+        nodes = StorageObject.objects.filter(
+            id=id, volume__owner__id=self.owner.id)
+        if with_content:
+            nodes = nodes.select_related('content_blob')
+        if with_parent:
+            nodes = nodes.select_related('parent')
+        if with_volume:
+            nodes = nodes.select_related('volume')
+        nodes = self._is_on_volume(nodes)
         if live_only:
-            conditions.append(StorageObject.status == STATUS_LIVE)
-        conditions.extend(self._is_on_volume_conditions())
-        result = self.store.using(*origin).find(
-            tables, *conditions).one()
-        if result is not None:
-            result = result[0]
+            nodes = nodes.filter(status=STATUS_LIVE)
+        if nodes.count() == 1:
+            result = nodes.get()
+        else:
+            result = None
         return result
-
-    def _split_result(self, result):
-        """When a result typle comes back with content.
-
-        Results will always return in the order of: StorageObject, ContentBlob
-        """
-        object = None
-        content = None
-        parent = None
-        if result:
-            object = result[0]
-            for r in result[1:]:
-                if isinstance(r, ContentBlob):
-                    content = r
-                elif isinstance(r, StorageObject):
-                    parent = r
-        return object, content, parent
 
     def _get_node_from_result(self, result):
         """Get a dao.StorageNode from the result."""
-        node, content, parent = self._split_result(result)
+        if result.count() == 1:
+            return self._get_storage_node(result.get())
+
+    def _get_storage_node(self, node):
+        """Get a dao.StorageNode from the result."""
         if node:
+            content = node.content_blob
             if content:
                 content = FileNodeContent(content)
             return StorageNode.factory(
                 self, node, owner=self.owner,
-                permissions=self._get_node_perms(node),
-                content=content)
+                permissions=self._get_node_perms(node), content=content)
 
-    def _node_finder(self, extra_conditions, with_content, with_parent=False):
-        """Find nodes based on joins and conditions all in one query."""
-        conditions = [StorageObject.owner_id == self.owner.id,
-                      StorageObject.status == STATUS_LIVE]
-        conditions.extend(self._is_on_volume_conditions())
-        conditions.extend(extra_conditions)
-        tables, origin = self._get_left_joins(
-            with_content, with_parent=with_parent)
-        store = self.store.using(*origin)
-        return store.find(tables, *conditions)
+    def _node_finder(self, nodes, with_content=False, with_parent=False):
+        """Filter by owner and prefect content and parent, all in one query."""
+        if with_content:
+            nodes = nodes.select_related('content_blob')
+        if with_parent:
+            nodes = nodes.select_related('parent')
+        nodes = nodes.filter(
+            volume__owner__id=self.owner.id, status=STATUS_LIVE)
+        return self._is_on_volume(nodes)
 
-    def _get_kind_conditions(self, kind):
+    def _get_kind(self, nodes, kind):
         """Get conditions for finding files by kind."""
         if kind is None:
-            return []
+            return nodes
         if kind in [StorageObject.DIRECTORY, StorageObject.FILE]:
-            return [StorageObject.kind == kind]
+            return nodes.filter(kind=kind)
         raise errors.StorageError("Invalid Kind specified")
-
-    def _get_node(self, id, kind=None, with_content=False, with_parent=False):
-        """A common function used to get a node.
-
-        Can optionally get related objects at the same time.
-        """
-        conditions = [StorageObject.id == id]
-        conditions.extend(self._get_kind_conditions(kind))
-        result = self._node_finder(conditions, with_content, with_parent)
-        return result.one()
 
     def _get_children(self, id, kind=None, with_content=False, mimetypes=None):
         """A common function used to get the children of a node."""
-        conditions = [StorageObject.parent_id == id]
-        conditions.extend(self._get_kind_conditions(kind))
+        nodes = StorageObject.objects.filter(parent__id=id)
+        nodes = self._get_kind(nodes, kind)
         if mimetypes:
-            conditions.append(StorageObject.mimetype.is_in(mimetypes))
-        return self._node_finder(conditions, with_content)
-
-    def _get_quota(self):
-        """Return the storm model quota info object for this volume"""
-        return self.store.get(StorageUserInfo, self.owner.id)
-
-    def get_quota(self):
-        """Return the dao.UserInfo for this volume."""
-        return UserInfo(self._get_quota())
+            nodes = nodes.filter(mimetype__in=mimetypes)
+        return self._node_finder(nodes, with_content)
 
     @timing_metric
     def get_generation_delta(self, generation, limit=None):
@@ -2362,50 +2156,34 @@ class ReadOnlyVolumeGateway(GatewayBase):
         if self.share:
             root = self._get_root_node()
             # if this is a share, get the delta from ShareVolumeDelta
-            # ShareVolumeDelta is a Union of Objects and MoveFromShares
+            # ShareVolumeDelta is a Union of StorageObjects and MoveFromShares
 
-            # first get_left_joins for ShareVolumeDelta
-            tables = (ShareVolumeDelta, ContentBlob)
-            joins = LeftJoin(ShareVolumeDelta, *(
-                ContentBlob,
-                ShareVolumeDelta._content_hash == ContentBlob.hash
-            ))
-            store = self.store.using(joins)
-            # Must have the same owner id
-            conditions = [
-                ShareVolumeDelta.owner_id == self.owner.id,
-                # Must not return the root node
-                ShareVolumeDelta.id != root.id,
-                ShareVolumeDelta.generation > generation,
+            # Must not return the root node
+            nodes = ShareVolumeDelta.objects.exclude(id=root.id)
+            nodes = nodes.filter(
                 # The union includes a share_id but only
                 # MovesFromShare have a share_id this will include the rows
                 # from both that meet all other criteria
-                Or(ShareVolumeDelta.share_id == None,  # NOQA
-                   ShareVolumeDelta.share_id == self.share.id)]
+                models.Q(share_id=None) | models.Q(share_id=self.share.id))
             # we only want to get nodes within the path of the shared node
-            path_like = get_path_startswith(root)
-            conditions.extend([
-                ShareVolumeDelta.volume_id == self.volume_id,
+            path_like = root.absolute_path.rstrip('/')
+            nodes = nodes.filter(
                 # The path_like will be path.like('/path/with/closing/slash/%')
                 # which not match the path of children directly in the root
                 # so parent_id == root.id must be also be included.
-                Or(ShareVolumeDelta.parent_id == root.id,
-                   ShareVolumeDelta.path.startswith(path_like))])
-            children = store.find(tables, *conditions).order_by(
-                ShareVolumeDelta.generation)
+                models.Q(parent__id=root.id) |
+                models.Q(path__startswith=path_like),
+            )
         else:
-            tables, origin = self._get_left_joins(
-                with_content=True, with_parent=False)
-            store = self.store.using(*origin)
-            conditions = [
-                StorageObject.owner_id == self.owner.id,
-                StorageObject.parent_id != None,  # NOQA
-                StorageObject.volume_id == self.volume_id,
-                StorageObject.generation > generation]
-            conditions.extend(self._is_on_volume_conditions())
-            children = store.find(tables, *conditions).order_by(
-                StorageObject.generation)
-        for node, content in children[:limit]:
+            nodes = StorageObject.objects.filter(parent__isnull=False)
+            nodes = self._is_on_volume(nodes)
+
+        nodes = nodes.select_related('content_blob').filter(
+            # Must have the same owner id
+            volume__id=self.volume_id, volume__owner__id=self.owner.id,
+            generation__gt=generation).order_by('generation')
+        for node in nodes[:limit]:
+            content = node.content_blob
             if content:
                 content = FileNodeContent(content)
             yield StorageNode.factory(
@@ -2417,8 +2195,9 @@ class ReadOnlyVolumeGateway(GatewayBase):
         """Get one of the user's nodes."""
         if id == 'root':
             id = self._get_root_node().id
-        result = self._get_node(id, with_content=with_content)
-        node = self._get_node_from_result(result)
+        nodes = StorageObject.objects.filter(id=id)
+        nodes = self._node_finder(nodes, with_content=with_content)
+        node = self._get_node_from_result(nodes)
         if node is None:
             raise errors.DoesNotExist(self.node_dne_error)
         if verify_hash and node.content_hash != verify_hash:
@@ -2441,15 +2220,15 @@ class ReadOnlyVolumeGateway(GatewayBase):
         root_path = self._get_root_path()
         full_path = os.path.join(root_path, full_path.strip('/'))
         path, name = os.path.split(full_path)
-        conditions = [StorageObject.path == path,
-                      StorageObject.name == name]
-        conditions.extend(self._get_kind_conditions(kind))
+
         # this is a little different that typical finds. Since paths can be
         # duplicated across udfs and root, we need to make sure that if
         # this is a root volume, it doesnt' collide with udfs.
-        conditions.append(StorageObject.volume_id == self.volume_id)
-        result = self._node_finder(conditions, with_content)
-        node = self._get_node_from_result(result.one())
+        nodes = StorageObject.objects.filter(
+            path=path, name=name, volume__id=self.volume_id)
+        nodes = self._get_kind(nodes, kind)
+        result = self._node_finder(nodes, with_content)
+        node = self._get_node_from_result(result)
         if node is None:
             raise errors.DoesNotExist(self.node_dne_error)
         return node
@@ -2458,40 +2237,38 @@ class ReadOnlyVolumeGateway(GatewayBase):
     def get_all_nodes(self, mimetypes=None, kind=None, with_content=False,
                       start_from_path=None, limit=None, max_generation=None):
         """Get all nodes from this volume."""
-        conditions = self._get_kind_conditions(kind)
+        nodes = self._get_kind(StorageObject.objects.all(), kind)
         if mimetypes:
-            conditions.append(StorageObject.mimetype.is_in(mimetypes))
+            nodes = nodes.filter(mimetype__in=mimetypes)
         # A temporary hack, because we don't want this crossing volumes
         if self.is_root_volume:
-            conditions.append(
-                StorageObject.volume_id == self.owner.root_volume_id)
+            nodes = nodes.filter(volume__id=self.owner.root_volume_id)
         if max_generation:
-            conditions.append(StorageObject.generation <= max_generation)
+            nodes = nodes.filter(generation__lte=max_generation)
         if start_from_path:
             # special case for shares, as the "root" isn't "/" and we need to
             # get the root path+name
             if self.share:
                 root = self._get_root_node()
-                real_path = get_path_startswith(root)
+                real_path = root.absolute_path
                 # only strip the rightmost "/" if isn't the root of the sharer
                 # volume.
                 if real_path != '/':
-                    real_path = get_path_startswith(root).rstrip("/")
+                    real_path = root.absolute_path.rstrip("/")
                 if start_from_path[0] != '/':
                     real_path = pypath.join(real_path,
                                             start_from_path[0].lstrip("/"))
                 start_from_path = (real_path, start_from_path[1])
             # same path AND greater name OR greater path
-            same_path = And(StorageObject.path == start_from_path[0],
-                            StorageObject.name > start_from_path[1])
-            conditions.append(Or(same_path,
-                              StorageObject.path > start_from_path[0]))
-        results = self._node_finder(conditions, with_content).order_by(
-            StorageObject.path, StorageObject.name)
+            same_path = models.Q(
+                path=start_from_path[0], name__gt=start_from_path[1])
+            nodes = nodes.filter(
+                same_path | models.Q(path__gt=start_from_path[0]))
+        results = self._node_finder(nodes, with_content).order_by(
+            'path', 'name')
         if limit:
             results = results[:limit]
-        with db_timeout(TRANSACTION_MAX_TIME, force=True):
-            return list(self._get_node_from_result(n) for n in results)
+        return list(self._get_storage_node(n) for n in results)
 
     @timing_metric
     def get_deleted_files(self, start=0, limit=100):
@@ -2499,17 +2276,11 @@ class ReadOnlyVolumeGateway(GatewayBase):
 
         Files will be returned in descending order by date, path, name
         """
-        conditions = self._is_on_volume_conditions()
-        conditions.extend([StorageObject.status == STATUS_DEAD,
-                           StorageObject.kind == StorageObject.FILE,
-                           StorageObject.owner_id == self.owner.id])
-        nodes = self.store.find(
-            StorageObject, *conditions
-        ).order_by(
-            Desc(StorageObject.when_last_modified),
-            StorageObject.path,
-            StorageObject.name)
-        nodes.config(offset=start, limit=limit)
+        nodes = StorageObject.objects.filter(
+            status=STATUS_DEAD, kind=StorageObject.FILE,
+            volume__owner__id=self.owner.id)
+        nodes = self._is_on_volume(nodes).order_by(
+            '-when_last_modified', 'path', 'name')[start:start+limit]
         return [StorageNode.factory(self, n, owner=self.owner,
                                     permissions=self._get_node_perms(n))
                 for n in nodes]
@@ -2518,39 +2289,34 @@ class ReadOnlyVolumeGateway(GatewayBase):
     def get_children(self, id, kind=None, with_content=False, mimetypes=None):
         """Get all the nodes children."""
         children = self._get_children(
-            id, kind=kind, with_content=with_content,
-            mimetypes=mimetypes)
-        for child in children.order_by(StorageObject.name):
-            yield self._get_node_from_result(child)
+            id, kind=kind, with_content=with_content, mimetypes=mimetypes)
+        for child in children.order_by('name'):
+            yield self._get_storage_node(child)
 
     @timing_metric
     def get_child_by_name(self, id, name, with_content=False):
         """Get a Child by Name returning a StorageNode."""
         children = self._get_children(id, with_content=with_content)
-        node = children.find(StorageObject.name == name).one()
+        nodes = children.filter(name=name)
+        node = self._get_node_from_result(nodes)
         if node is None:
             raise errors.DoesNotExist(self.node_dne_error)
-        return self._get_node_from_result(node)
+        return node
 
     @timing_metric
     def get_content(self, content_hash):
         """Get the ContentBlob."""
-        content = self.store.find(
-            ContentBlob,
-            ContentBlob.hash == content_hash,
-            ContentBlob.status == STATUS_LIVE).one()
+        content = get_object_or_none(
+            ContentBlob, hash=content_hash, status=STATUS_LIVE)
         if content is None:
             raise errors.DoesNotExist(self.contentblob_dne_error)
         return FileNodeContent(content)
 
     def _get_uploadjob(self, id):
         """Get a UploadJob belonging to this owner."""
-        job = self.store.find(
-            UploadJob,
-            UploadJob.uploadjob_id == id,
-            UploadJob.status == STATUS_LIVE,
-            UploadJob.storage_object_id == StorageObject.id,
-            StorageObject.owner_id == self.owner.id).one()
+        job = get_object_or_none(
+            UploadJob, id=id, status=STATUS_LIVE,
+            node__volume__owner__id=self.owner.id)
         if job is None:
             raise errors.DoesNotExist(self.uploadjob_dne_error)
         return job
@@ -2564,67 +2330,54 @@ class ReadOnlyVolumeGateway(GatewayBase):
     @timing_metric
     def get_user_uploadjobs(self, node_id=None):
         """Get an uploadjob."""
-        conditions = [
-            UploadJob.status == STATUS_LIVE,
-            UploadJob.storage_object_id == StorageObject.id,
-            StorageObject.owner_id == self.owner.id]
+        jobs = UploadJob.objects.filter(
+            status=STATUS_LIVE, node__volume__owner__id=self.owner.id)
         if node_id is not None:
-            conditions.append(UploadJob.storage_object_id == node_id)
-        for job in self.store.find(UploadJob, *conditions):
+            jobs = jobs.filter(node__id=node_id)
+        for job in jobs:
             yield DAOUploadJob(job, gateway=self)
 
     @timing_metric
     def get_user_multipart_uploadjob(self, node_id, upload_id, hash_hint=None,
                                      crc32_hint=None):
         """Get multipart uploadjob."""
-        conditions = [
-            UploadJob.status == STATUS_LIVE,
-            UploadJob.multipart_key == upload_id,
-            UploadJob.storage_object_id == StorageObject.id,
-            StorageObject.owner_id == self.owner.id,
-            StorageObject.id == node_id]
+        jobs = UploadJob.objects.filter(
+            status=STATUS_LIVE, multipart_key=upload_id,
+            node__volume__owner__id=self.owner.id, node__id=node_id)
         node = self._get_node_simple(node_id)
         self._check_can_write_node(node)
         if hash_hint is not None:
-            conditions.append(UploadJob.hash_hint == hash_hint)
+            jobs = jobs.filter(hash_hint=hash_hint)
         if crc32_hint is not None:
-            conditions.append(UploadJob.crc32_hint == crc32_hint)
-        job = self.store.find(UploadJob, *conditions).one()
-        if job is None:
+            jobs = jobs.filter(crc32_hint=crc32_hint)
+        if jobs.count() == 0:
             raise errors.DoesNotExist(self.uploadjob_dne_error)
         # load the requested content using the hash_hint
-        new_content = self.store.find(
-            ContentBlob, ContentBlob.hash == hash_hint,
-            ContentBlob.status == STATUS_LIVE).one()
-        if new_content:
+        new_content = get_object_or_none(
+            ContentBlob, hash=hash_hint, status=STATUS_LIVE)
+        if new_content is not None:
             new_content = FileNodeContent(new_content)
         fnode = StorageNode.factory(
             self, node, content=new_content, permissions={})
-        return DAOUploadJob(job, file=fnode, gateway=self)
+        return DAOUploadJob(jobs.get(), file=fnode, gateway=self)
 
     @timing_metric
     def get_directories_with_mimetypes(self, mimetypes):
         """Get directories that have files with mimetype in mimetypes."""
-        ParentObject = ClassAlias(StorageObject)
-        conditions = [
-            ParentObject.id == StorageObject.parent_id,
-            StorageObject.owner_id == self.owner.id,
-            StorageObject.status == STATUS_LIVE,
-            StorageObject._content != None,  # NOQA
-            StorageObject.mimetype.is_in(mimetypes)]
+        files = StorageObject.objects.filter(
+            volume__owner__id=self.owner.id, status=STATUS_LIVE,
+            mimetype__in=mimetypes, content_blob__isnull=False)
+        nodes = files.select_related('parent')
         if self.is_root_volume:
-            conditions.append(
-                StorageObject.volume_id == self.owner.root_volume_id)
-        conditions.extend(self._is_on_volume_conditions())
-        result = self.store.find(
-            ParentObject, *conditions).config(distinct=True)
-        return [StorageNode.factory(
-                self, d, owner=self.owner) for d in result]
+            nodes = nodes.filter(volume__id=self.owner.root_volume_id)
+        result = self._is_on_volume(nodes).distinct('parent')
+        return [StorageNode.factory(self, d.parent, owner=self.owner)
+                for d in result]
 
     @timing_metric
     def check_has_children(self, id, kind):
         """Find out if the node has children with kind == kind."""
-        return not self._get_children(id, kind=kind).is_empty()
+        return self._get_children(id, kind=kind).exists()
 
 
 class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
@@ -2652,17 +2405,10 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
     def _make_content(self, hash, crc32, size, deflated_size,
                       storage_key, magic_hash):
         """Make a content blob."""
-        content = ContentBlob()
-        content.hash = hash
-        content.magic_hash = magic_hash
-        content.crc32 = crc32
-        content.size = size
-        content.deflated_size = deflated_size
-        content.status = STATUS_LIVE
-        if storage_key:
-            content.storage_key = storage_key
-        self.store.add(content)
-        self.store.flush()
+        content = ContentBlob.objects.create(
+            hash=hash, magic_hash=magic_hash, crc32=crc32, size=size,
+            deflated_size=deflated_size, status=STATUS_LIVE,
+            storage_key=storage_key)
         return content
 
     def _get_directory_node(self, id, for_write=True):
@@ -2670,13 +2416,12 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
         if self.read_only and for_write:
             raise errors.NoPermission(self.cannot_write_error)
 
-        conditions = [StorageObject.owner_id == self.owner.id,
-                      StorageObject.status == STATUS_LIVE,
-                      StorageObject.id == id]
-        conditions.extend(self._is_on_volume_conditions())
-        node = self.store.find(StorageObject, *conditions).one()
-        if node is None:
+        nodes = StorageObject.objects.filter(
+            volume__owner__id=self.owner.id, status=STATUS_LIVE, id=id)
+        nodes = self._is_on_volume(nodes)
+        if nodes.count() == 0:
             raise errors.DoesNotExist(self.node_dne_error)
+        node = nodes.get()
         if node.kind != StorageObject.DIRECTORY:
             raise errors.NotADirectory(self.not_a_directory_error)
         if for_write:
@@ -2705,19 +2450,24 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
             if mime[0] is not None:
                 mime = unicode(mime[0])
                 newfile.mimetype = mime
+                newfile.save()
         elif newfile.kind != StorageObject.FILE:
             raise errors.AlreadyExists(
                 "Node already exists but is not a File.")
+        result = None
         if blob:
             # if there's content we'll update the content. This will also
             # trigger the notifications
-            self._update_node_content(newfile, blob, make_new, True)
+            result = self._update_node_content(
+                fnode=newfile, content=blob, new=make_new, enforce_quota=True)
         elif make_new:
             # if we make a new file, we need to queue a node change
             self.handle_node_change(parent)
-        return StorageNode.factory(
-            self, newfile, owner=self.owner,
-            permissions=self._get_node_perms(newfile))
+        if result is None:
+            result = StorageNode.factory(
+                self, newfile, owner=self.owner,
+                permissions=self._get_node_perms(newfile))
+        return result
 
     @with_notifications
     @timing_metric
@@ -2750,22 +2500,24 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
             permissions=self._get_node_perms(newdir))
 
     @timing_metric
-    def make_share(self, node_id, name, user_id=None, email=None,
+    def make_share(self, node_id, name, user_id=None, email='',
                    readonly=True):
         """Create a direct share or a share offer."""
         assert user_id is not None or email, "user_id or an email required"
         if self.share:
             raise errors.NoPermission("Shares can not be nested.")
-        to_user = None
+        to_user = to_db_user = None
         if user_id:
             to_user = self.get_user(user_id)
             if to_user is None or not to_user.is_active:
                 raise errors.DoesNotExist(self.user_dne_error)
+            to_db_user = StorageUser.objects.get(id=to_user.id)
+
         node = self._get_directory_node(node_id, for_write=False)
         access_level = Share.VIEW if readonly else Share.MODIFY
-        share = Share(
-            self.user.id, node.id, user_id, name, access_level, email=email)
-        self.store.add(share)
+        share = Share.objects.create(
+            shared_by=StorageUser.objects.get(id=self.user.id), subtree=node,
+            shared_to=to_db_user, name=name, access=access_level, email=email)
         share_dao = SharedDirectory(
             share, by_user=self.user, to_user=to_user)
         share_dao._gateway = self.user._gateway
@@ -2806,7 +2558,7 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
 
     def _delete_directory_node(self, node, cascade=False):
         """Internal function to delete a directory node."""
-        parent = self.store.get(StorageObject, node.parent_id)
+        parent = StorageObject.objects.get(id=node.parent.id)
         self.owner_gateway.delete_related_shares(node)
         if cascade:
             node.unlink_tree()
@@ -2842,19 +2594,13 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
             return
         # get the shared paths:
         shared_node_ids = share_info.keys()
-        nodes = self.store.find(
-            StorageObject,
-            UserVolume.id == StorageObject.volume_id,
-            UserVolume.status == STATUS_LIVE,
-            StorageObject.status == STATUS_LIVE,
-            StorageObject.id.is_in(shared_node_ids)
-        ).values(StorageObject.id,
-                 StorageObject.path,
-                 StorageObject.name)
+        nodes = StorageObject.objects.filter(
+            volume__status=STATUS_LIVE, status=STATUS_LIVE,
+            id__in=shared_node_ids).values('id', 'path', 'name')
         shared_paths = {}
-        for id, path, name in nodes:
-            shares = share_info[id]
-            shared_paths[pypath.join(path, name)] = shares
+        for info in nodes:
+            shares = share_info[info['id']]
+            shared_paths[pypath.join(info['path'], info['name'])] = shares
         # make sure we have live nodes from these shares:
         if not shared_paths:
             return
@@ -2868,17 +2614,15 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
                 see_after.extend(share_ids)
         # first delete any MoveFromShare where the share is going to see it
         # after the move
-        self.store.find(
-            MoveFromShare, MoveFromShare.id == node.id,
-            MoveFromShare.share_id.is_in(see_after)).remove()
+        MoveFromShare.objects.filter(
+            node_id=node.id, share_id__in=see_after).delete()
         if see_now:
             # create a MoveFromShare for all the nodes shares that will
             # no longer see it
             for share_id in set(see_now).difference(set(see_after)):
-                m = MoveFromShare.from_move(node, share_id)
-                m.parent_id = old_parent.id
-                m.name = old_name
-                self.store.add(m)
+                MoveFromShare.objects.from_move(
+                    node=node, share_id=share_id, old_parent=old_parent,
+                    name=old_name)
 
     @with_notifications
     @timing_metric
@@ -2903,38 +2647,41 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
                     new_parent.full_path.startswith(node.full_path + '/')):
                 raise errors.NoPermission("Can't move a directory to a child.")
 
-        with db_timeout(TRANSACTION_MAX_TIME, force=True):
-            # make room for the move, delete children with the same name
-            conflicting_node = new_parent.get_child_by_name(new_name)
-            if conflicting_node:
-                self._delete_node(conflicting_node.id, cascade=True)
+        # make room for the move, delete children with the same name
+        conflicting_node = new_parent.get_child_by_name(new_name)
+        if conflicting_node:
+            self._delete_node(conflicting_node.id, cascade=True)
 
-            old_name = node.name
-            node.move(parent_id, new_name)
-            if node.kind == StorageObject.FILE:
-                mime = mimetypes.guess_type(node.name)[0]
-                node.mimetype = unicode(mime) if mime else None
-            if is_move:
-                self._make_moves_from_shares(node, old_name,
-                                             old_parent, new_parent)
-            self.handle_node_change(new_parent)
+        old_name = node.name
+        node.move(StorageObject.objects.get(id=parent_id), new_name)
+        if node.kind == StorageObject.FILE:
+            mime = mimetypes.guess_type(node.name)[0]
+            node.mimetype = unicode(mime) if mime else None
+        if is_move:
+            self._make_moves_from_shares(node, old_name,
+                                         old_parent, new_parent)
+        self.handle_node_change(new_parent)
         return StorageNode.factory(
             self, node, owner=self.owner,
             permissions=self._get_node_perms(node))
 
-    def _update_node_content(self, fnode, content, new, enforce):
+    def _update_node_content(self, fnode, content, new, enforce_quota):
         """Reusable function for updating file content."""
+        # reload node from DB
+        fnode = StorageObject.objects.get(id=fnode.id)
         old_content = fnode.content
-        if fnode.content_hash == content.hash:
+        if fnode.content_hash == bytes(content.hash):
             return StorageNode.factory(
                 self, fnode, content=FileNodeContent(old_content),
                 owner=self.owner, permissions=self._get_node_perms(fnode))
-        quota = self._get_quota()
         existing_size = old_content.size if old_content else 0
-        if enforce and (content.size - existing_size > quota.free_bytes):
-            raise errors.QuotaExceeded("Upload will exceed quota.",
-                                       self.vol_id, quota.free_bytes)
-        fnode.content = content
+        needed_size = content.size - existing_size
+        if enforce_quota and (needed_size > self.owner.free_bytes):
+            raise errors.QuotaExceeded(
+                "Upload will exceed quota (needed size %s, free bytes %s)." %
+                (needed_size, self.owner.free_bytes),
+                self.vol_id, self.owner.free_bytes)
+        fnode.set_content(content, enforce_quota=enforce_quota)
         content = FileNodeContent(content)
         if new:
             self.handle_node_change(fnode.parent)
@@ -2958,33 +2705,29 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
                 "Uploading Directories is not supported.")
         self._check_can_write_node(node)
         # has file changed?
-        if node.content_hash != node_hash and node.content_hash != new_hash:
+        db_node_hash = node.content_hash
+        if db_node_hash != node_hash and db_node_hash != new_hash:
             raise errors.HashMismatch("The file has changed.")
 
-        old_content = self.store.find(
-            ContentBlob, ContentBlob.hash == node.content_hash,
-            ContentBlob.status == STATUS_LIVE).one()
+        old_content = get_object_or_none(
+            ContentBlob, hash=db_node_hash, status=STATUS_LIVE)
         existing_size = old_content.size if old_content else 0
 
         # reload the owner to get the latest quota
-        quota = self._get_quota()
-        if enforce_quota and \
-           (inflated_size - existing_size > quota.free_bytes):
+        if (enforce_quota and
+                inflated_size - existing_size > self.owner.free_bytes):
             raise errors.QuotaExceeded("Upload will exceed quota.",
-                                       self.vol_id, quota.free_bytes)
+                                       self.vol_id, self.owner.free_bytes)
 
+        kwargs = dict(node=node, hash_hint=new_hash, crc32_hint=crc32)
         # if we have multipart_key defined it's multipart
         if multipart_key:
-            upload = UploadJob.new_multipart_uploadjob(
-                self.store, node.id, multipart_key)
-        else:
-            upload = UploadJob.new_uploadjob(self.store, node.id)
-        upload.hash_hint = new_hash
-        upload.crc32_hint = crc32
-        self.store.flush()
-        new_content = self.store.find(
-            ContentBlob, ContentBlob.hash == new_hash,
-            ContentBlob.status == STATUS_LIVE).one()
+            kwargs['multipart_key'] = multipart_key
+
+        upload = UploadJob.objects.create(**kwargs)
+
+        new_content = get_object_or_none(
+            ContentBlob, hash=new_hash, status=STATUS_LIVE)
         if new_content:
             new_content = FileNodeContent(new_content)
         fnode = StorageNode.factory(
@@ -3013,17 +2756,14 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
         is_new = False
         if fnode is None:
             is_new = True
-            fnode = parent.make_file(name)
+            fnode = parent.make_file(name, mimetype=mimetype)
         elif fnode.kind != StorageObject.FILE:
             raise errors.AlreadyExists(
                 "Node already exists but is not a File.")
         elif previous_hash and fnode.content_hash != previous_hash:
             raise errors.HashMismatch("File hash has changed.")
 
-        if mimetype:
-            fnode.mimetype = mimetype
-
-        content = self.store.get(ContentBlob, hash)
+        content = get_object_or_none(ContentBlob, hash=hash)
         if content is None:
             content = self._make_content(hash, crc32, size, deflated_size,
                                          storage_key, magic_hash)
@@ -3031,15 +2771,17 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
             if content.magic_hash is None:
                 # update magic hash now that we have it!
                 content.magic_hash = magic_hash
+                content.save()
         if is_public:
-            self._make_public(fnode)
+            fnode.make_public()
         # do we even need to do this?
         if fnode.content_hash == hash:
             return StorageNode.factory(
                 self, fnode, content=FileNodeContent(fnode.content),
                 owner=self.owner, permissions=self._get_node_perms(fnode))
 
-        return self._update_node_content(fnode, content, is_new, enforce_quota)
+        return self._update_node_content(
+            fnode, content, new=is_new, enforce_quota=enforce_quota)
 
     @with_notifications
     @timing_metric
@@ -3056,7 +2798,7 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
         if fnode.content_hash != original_hash:
             raise errors.HashMismatch("The file's hash has changed.")
         self._check_can_write_node(fnode)
-        content = self.store.get(ContentBlob, hash_hint)
+        content = get_object_or_none(ContentBlob, hash=hash_hint)
         if content is None:
             if storage_key is None:
                 # we must have content since we have no storage_key
@@ -3068,13 +2810,15 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
             if content.magic_hash is None:
                 # update magic hash now that we have it!
                 content.magic_hash = magic_hash
-        return self._update_node_content(fnode, content, False, True)
+                content.save()
+        return self._update_node_content(
+            fnode, content, new=False, enforce_quota=True)
 
     @timing_metric
     def delete_uploadjob(self, id):
         """Delete an upload job."""
         job = self._get_uploadjob(id)
-        self.store.remove(job)
+        job.delete()
         upload_dao = DAOUploadJob(job, gateway=self)
         return upload_dao
 
@@ -3090,24 +2834,8 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
         """Set when_last_active to timestamp."""
         job = self._get_uploadjob(job_id)
         job.when_last_active = timestamp
+        job.save()
         return DAOUploadJob(job, gateway=self)
-
-    def _make_public(self, fnode):
-        """Internal function to make a file public."""
-        if fnode.publicfile_id is None:
-            # Create a public file ID, if one does not already exist.
-            publicfile = self.store.find(
-                PublicNode, node_id=fnode.id).one()
-            if publicfile is None:
-                publicfile = self.store.add(
-                    PublicNode(fnode.id, fnode.owner_id))
-                # Flush the store to ensure the new PublicNode has
-                # a database ID.
-                self.store.flush()
-            if fnode.public_uuid is None:
-                fnode.public_uuid = uuid.uuid4()
-                publicfile.public_uuid = fnode.public_uuid
-            fnode.publicfile_id = publicfile.id
 
     @with_notifications
     @timing_metric
@@ -3123,11 +2851,11 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
         if fnode.kind != StorageObject.FILE and allow_directory is False:
             raise errors.NoPermission("Only files can be made public.")
 
-        if (fnode.publicfile_id is not None) != is_public:
+        if fnode.is_public != is_public:
             if is_public:
-                self._make_public(fnode)
+                fnode.make_public()
             else:
-                fnode.publicfile_id = None
+                fnode.make_private()
             self.handle_node_change(fnode)
         return StorageNode.factory(
             self, fnode, owner=self.owner,
@@ -3155,51 +2883,42 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
             parent = None
         if parent is None:
             parent = root.make_subdirectory(name)
-        undelete_volume(
-            self.store, self.owner.id, self.volume_id, parent,
-            limit=limit)
+        StorageUser.objects.get(id=self.owner.id).undelete_volume(
+            self.volume_id, parent, limit=limit)
         return StorageNode.factory(self, parent, owner=self.owner)
 
 
-def fix_udfs_with_generation_out_of_sync(store, user_ids, logger):
+def fix_udfs_with_generation_out_of_sync(user_ids, logger):
     """Find the UDFs that have an object whose generation is higher than the
     UDF's and update the UDF's generation to be the same as the Object's.
 
     Only UDFs owned by the given users are considered.
     """
-    results = store.find(
-        (UserVolume, StorageObject),
-        UserVolume.id == StorageObject.volume_id,
-        StorageObject.generation > UserVolume.generation,
-        UserVolume.owner_id.is_in(user_ids))
-    for udf, obj in results:
+    results = StorageObject.objects.select_related('volume').filter(
+        generation__gt=models.F('volume__generation'),
+        volume__owner__id__in=user_ids)
+    for obj in results:
         # The query above will return all of a UDF's objects that have a higher
         # generation than the UDF itself, so we have this if block here to
         # make sure the UDF ends up with the highest generation of them all.
+        udf = obj.volume
         if obj.generation > udf.generation:
             logger.info("Updating the generation of %s from %s to %s" % (
                 udf.id, udf.generation, obj.generation))
             udf.generation = obj.generation
+            udf.save()
 
 
-def fix_all_udfs_with_generation_out_of_sync(
-        logger, sleep=0, dry_run=False, batch_size=500):
-    if dry_run:
-        logger.info("Dry-run enabled; not committing any changes.")
-    store = get_filesync_store()
-    query = "SELECT id FROM StorageUser"
-    user_ids = [row[0] for row in store.execute(query)]
+@fsync_commit
+def fix_all_udfs_with_generation_out_of_sync(logger, sleep=0, batch_size=500):
+    user_ids = StorageUser.objects.all().values_list('id', flat=True)
     start = time.time()
     total_users = len(user_ids)
     total_done = 0
     while user_ids:
         batch = user_ids[:batch_size]
         user_ids = user_ids[batch_size:]
-        fix_udfs_with_generation_out_of_sync(store, batch, logger)
-        if dry_run:
-            store.rollback()
-        else:
-            store.commit()
+        fix_udfs_with_generation_out_of_sync(batch, logger)
         total_time = time.time() - start
         total_done += len(batch)
         fraction_done = total_done / float(total_users)
@@ -3215,11 +2934,12 @@ def fix_all_udfs_with_generation_out_of_sync(
 
 @retryable_transaction()
 @fsync_commit
-def make_storage_user(user_id, username, visible_name, max_storage_bytes):
+def make_storage_user(
+        username, max_storage_bytes=DEFAULT_QUOTA_BYTES, **kwargs):
     """Create or update a StorageUser."""
-    gw = SystemGateway()
-    return gw.create_or_update_user(
-        user_id, username, visible_name, max_storage_bytes)
+    session_id = kwargs.pop('session_id', None)
+    gw = SystemGateway(session_id=session_id)
+    return gw.create_or_update_user(username, max_storage_bytes, **kwargs)
 
 
 @fsync_readonly
@@ -3248,13 +2968,7 @@ def get_shareoffer(shareoffer_id):
 @retryable_transaction()
 @fsync_commit
 def claim_shareoffer(user_id, username, visible_name, share_offer_id):
-    """Claim a shared folder offer sent to an email.
-
-    Used when a user has been offered a shared folder, but has not
-    subscribed yet and they are not a storageuser. This will create a
-    storageuser in an inactive state so they will have the share once they
-    subscribe.
-    """
+    """Claim a shared folder offer sent to an email."""
     gw = SystemGateway()
     return gw.claim_shareoffer(user_id, username, visible_name, share_offer_id)
 
@@ -3284,10 +2998,10 @@ def get_node(node_id):
 
 
 @fsync_readonly
-def get_user_info(user_id):
+def get_user(user_id):
     """Get the UserInfo dao (read only) for the user_id."""
     gw = SystemGateway()
-    return gw.get_user_info(user_id)
+    return gw.get_user(user_id)
 
 
 @fsync_readonly

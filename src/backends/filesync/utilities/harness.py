@@ -34,8 +34,10 @@ OH HAI HACKERS
 This sets up an environment making it easy to play with the data access layer.
 
 try this out:
-bob = services.make_storage_user(101, 'bob', 'Bob the Builder', 30*(2**30))
-tim = services.make_storage_user(102, 'tim', 'Tim the Enchanter', 30*(2**30))
+bob = services.make_storage_user(
+    'bob', visible_name='Bob the Builder', max_storage_bytes=30*(2**30))
+tim = services.make_storage_user(
+    'tim', visible_name='Tim the Enchanter', max_storage_bytes=30*(2**30))
 
 udf = bob.make_udf("~/Documents")
 dir = bob.volume(udf.id).root.make_subdirectory("Junk")

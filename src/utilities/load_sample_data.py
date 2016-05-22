@@ -30,6 +30,7 @@ from utilities.userutils import (
     delete_all_data,
 )
 
+
 django.setup()
 SAMPLE_USERS = [
     {'username': "hola", 'password': "23456789",
@@ -49,7 +50,7 @@ SAMPLE_USERS = [
 
 def main():
     """Preload the website with some data."""
-    from ubuntuone.storage.server.testing.testcase import create_test_user
+    from backends.filesync import services
     # clear out existing data
     delete_all_data()
     for user_data in SAMPLE_USERS:
@@ -57,7 +58,8 @@ def main():
         password = user_data['password']
         email = user_data['email']
         first_name, last_name = user_data['full_name'].split()
-        create_test_user(username, email, first_name, last_name,
-                         password=password)
+        services.make_storage_user(
+            username=username, email=email, first_name=first_name,
+            last_name=last_name, password=password)
         auth_info = dict(username=username, password=password)
         add_auth_info_to_keyfile(username, auth_info)

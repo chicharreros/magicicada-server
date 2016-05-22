@@ -23,7 +23,7 @@ import logging
 from twisted.internet import defer
 
 from backends.filesync.errors import DoesNotExist
-from ubuntuone.storage.rpcdb import auth_backend
+from ubuntuone.storage.rpcdb import backend
 
 
 logger = logging.getLogger("storage.server")
@@ -91,11 +91,10 @@ class SimpleAuthProvider(AuthenticationProvider):
     @defer.inlineCallbacks
     def authenticate(self, auth_parameters, protocol):
         """See `AuthenticationProvider`"""
-        rpc_client = self.factory.rpcauth_client
         try:
-            resp = yield rpc_client.call('get_userid_from_token',
-                                         auth_parameters=auth_parameters)
-        except auth_backend.FailedAuthentication, exc:
+            resp = yield self.factory.rpc_dal.call(
+                'get_userid_from_token', auth_parameters=auth_parameters)
+        except backend.FailedAuthentication, exc:
             logger.info("Failed auth: %s", exc)
             return
 

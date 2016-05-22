@@ -20,14 +20,58 @@
 
 from __future__ import unicode_literals
 
-from backends.db.store import get_filesync_store  # NOQA
-from backends.db.dbtransaction import (
-    get_storm_commit,
-    get_storm_readonly,
-    filesync_tm,
-)
+from django.core.exceptions import ObjectDoesNotExist
+from django.db import transaction
+
 from backends.db.dbtransaction import retryable_transaction  # NOQA
 
-fsync_commit = get_storm_commit(filesync_tm)
-fsync_readonly = get_storm_readonly(filesync_tm)
-fsync_readonly_slave = get_storm_readonly(filesync_tm, use_ro_store=True)
+
+_run_on_rollback = []
+
+
+def on_rollback(func):
+    _run_on_rollback.append(func)
+
+
+class Atomic(transaction.Atomic):
+
+    def run_and_clear_rollback_hooks(self):
+        global _run_on_rollback
+        try:
+            while True:
+                func = _run_on_rollback.pop(0)
+                func()
+        except IndexError:
+            pass
+        finally:
+            _run_on_rollback = []
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        result = super(Atomic, self).__exit__(exc_type, exc_value, traceback)
+        if exc_type is not None:
+            self.run_and_clear_rollback_hooks()
+        return result
+
+
+def atomic(using=None, savepoint=True):
+    # Bare decorator: @atomic -- although the first argument is called
+    # `using`, it's actually the function being decorated.
+    if callable(using):
+        return Atomic(transaction.DEFAULT_DB_ALIAS, savepoint)(using)
+    # Decorator: @atomic(...) or context manager: with atomic(...): ...
+    else:
+        return Atomic(using, savepoint)
+
+
+fsync_commit = atomic
+fsync_readonly = atomic
+fsync_readonly_slave = atomic
+
+
+def get_object_or_none(qs, *args, **kwargs):
+    qs = getattr(qs, 'objects', qs)
+    try:
+        result = qs.get(*args, **kwargs)
+    except ObjectDoesNotExist:
+        result = None
+    return result

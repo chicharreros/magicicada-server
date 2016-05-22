@@ -25,6 +25,7 @@ from twisted.internet import defer
 from ubuntuone.devtools.handlers import MementoHandler
 
 from backends.filesync.errors import DoesNotExist
+from backends.filesync.models import StorageUser
 from ubuntuone.storage.server.auth import (
     DummyAuthProvider,
     SimpleAuthProvider,
@@ -240,7 +241,7 @@ class ClientDummyAuthTests(AuthenticationBaseTestCase):
 
             # cancel user subscription, so it needs
             # to get it again from the DB
-            self.usr0.update(subscription=False)
+            StorageUser.objects.filter(id=self.usr0.id).update(is_active=False)
 
             # create second file, should NOT be ok
             try:

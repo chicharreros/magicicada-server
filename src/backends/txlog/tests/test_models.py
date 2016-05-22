@@ -20,48 +20,24 @@
 
 from __future__ import unicode_literals
 
-from django.conf import settings
-from mock import patch
-
-from backends.filesync.dbmanager import get_filesync_store
+from backends.filesync.services import SystemGateway
 from backends.filesync.models import (
     STATUS_LIVE,
     STATUS_DEAD,
-    StorageObject,
-    StorageUser,
-    UserVolume,
 )
-from backends.filesync.services import SystemGateway
-from backends.filesync.tests.testcase import ORMTestCase
-from backends.filesync.utils import get_public_file_url
-
-from backends.txlog.models import (
-    get_epoch_secs,
-    TransactionLog,
-)
+from backends.testing.testcase import BaseTestCase
+from backends.txlog.models import get_epoch_secs, TransactionLog
 
 
-class BaseTransactionLogTestCase(ORMTestCase):
-
-    def setUp(self):
-        super(BaseTransactionLogTestCase, self).setUp()
-        self._orig_make_user = self.factory.make_user
-        # Overwrite .factory.make_user() with a custom version that
-        # doesn't create TransactionLogs as that would pollute our tests.
-        p = patch.object(self.factory, 'make_user')
-        self.addCleanup(p.stop)
-        mock_make_user = p.start()
-        mock_make_user.side_effect = self._make_user_without_txlog
-
-        self.clear_txlogs()
+class BaseTransactionLogTestCase(BaseTestCase):
 
     def clear_txlogs(self):
         # clear current transaction logs
-        self.store.find(TransactionLog).remove()
+        TransactionLog.objects.all().delete()
 
-    def _make_user_without_txlog(self, *args, **kwargs):
+    def make_user_without_txlog(self, **kwargs):
         """Custom make_user function that does not create TransactionLogs."""
-        user = self._orig_make_user(*args, **kwargs)
+        user = self.factory.make_user(**kwargs)
         self.clear_txlogs()
         return user
 
@@ -85,31 +61,29 @@ class TestTransactionLog(BaseTransactionLogTestCase):
 
     def test_create(self):
         self.factory.make_transaction_log()
-        self.store.commit()
 
     def test_txlog_when_creating_udf(self):
-        udf = self.factory.make_udf()
+        udf = self.factory.make_user_volume()
 
-        txlog = self.store.find(TransactionLog).one()
+        txlog = TransactionLog.objects.get(
+            volume_id=udf.id, op_type=TransactionLog.OP_UDF_CREATED)
         self.assertTxLogDetailsMatchesUserVolumeDetails(
             txlog, udf, TransactionLog.OP_UDF_CREATED)
 
     def test_txlog_when_deleting_empty_udf(self):
         """When we delete an empty UDF there will be a single txlog."""
-        udf = self.factory.make_udf()
+        udf = self.factory.make_user_volume()
         self.clear_txlogs()
 
-        udf.delete()
+        udf.kill()
 
-        expected_rows = {
-            # Our key here is None because OP_UDF_DELETED txlogs have no
-            # node_id.
-            None: self._get_dict_with_txlog_attrs_from_udf(
+        expected_rows = [
+            self._get_dict_with_txlog_attrs_from_udf(
                 udf, TransactionLog.OP_UDF_DELETED),
-            udf.root_node.id: self._get_dict_with_txlog_attrs_from(
+            self._get_dict_with_txlog_attrs_from(
                 udf.root_node, TransactionLog.OP_DELETE,
-                extra=dict(generation=udf.generation))}
-        self.assertStoredTransactionLogsMatch(expected_rows)
+                generation=udf.generation)]
+        self.assertTransactionLogsMatch(expected_rows)
 
     def test_txlogs_when_deleting_udf_with_files(self):
         """Check that deleting a UDF creates correct transaction logs.
@@ -118,76 +92,60 @@ class TestTransactionLog(BaseTransactionLogTestCase):
         which are either directories or files whose mimetype is in
         TransactionLog.INTERESTING_MIMETYPES.
         """
-        udf = self.factory.make_udf()
-        self.clear_txlogs()
-
-        expected_rows = {
-            # Our key here is None because OP_UDF_DELETED txlogs have no
-            # node_id.
-            None: self._get_dict_with_txlog_attrs_from_udf(
-                udf, TransactionLog.OP_UDF_DELETED),
-            udf.root_node.id: self._get_dict_with_txlog_attrs_from(
-                udf.root_node, TransactionLog.OP_DELETE)}
-
-        for i in range(0, 5):
+        udf = self.factory.make_user_volume()
+        expected_rows = []
+        for i in range(5):
             f = self.factory.make_file(
                 parent=udf.root_node, mimetype=self.mimetype)
-            expected_rows[f.id] = self._get_dict_with_txlog_attrs_from(
-                f, TransactionLog.OP_DELETE,
-                extra=dict(generation=udf.generation))
+            expected_rows.append(self._get_dict_with_txlog_attrs_from(
+                f, TransactionLog.OP_DELETE, generation=udf.generation))
         self.clear_txlogs()
 
-        udf.delete()
+        udf.kill()
 
-        # All TransactionLog entries created will have the UDF's generation
-        # because when a UDF is deleted we only update the UDF's generation
-        # and not the generation of its descendants.
-        for row in expected_rows.values():
-            row['generation'] = udf.generation
-        self.assertStoredTransactionLogsMatch(expected_rows)
+        expected_rows += [
+            self._get_dict_with_txlog_attrs_from_udf(
+                udf, TransactionLog.OP_UDF_DELETED),
+            self._get_dict_with_txlog_attrs_from(
+                udf.root_node, TransactionLog.OP_DELETE,
+                generation=udf.generation),
+        ]
+        self.assertTransactionLogsMatch(expected_rows)
 
     def test_txlogs_when_user_signs_up(self):
-        """Check that when a user signs up we get a txlog for the new user and
-        one for their root UDF.
-        """
-        user_id = self.factory.get_unique_integer()
-        name = self.factory.get_unique_unicode()
+        """When user signs up, txlogs for new user and root UDF are created."""
         user = SystemGateway().create_or_update_user(
-            user_id, name, name, max_storage_bytes=user_id)
-        udf = self.store.find(UserVolume, owner_id=user.id).one()
+            username='pepe', max_storage_bytes=1234)
 
-        udf_txlog = self.store.find(
-            TransactionLog, op_type=TransactionLog.OP_UDF_CREATED).one()
+        udf_txlog = TransactionLog.objects.get(
+            op_type=TransactionLog.OP_UDF_CREATED)
         self.assertTxLogDetailsMatchesUserVolumeDetails(
-            udf_txlog, udf, TransactionLog.OP_UDF_CREATED)
+            udf_txlog, user.root_volume, TransactionLog.OP_UDF_CREATED)
 
-        user_txlog = self.store.find(
-            TransactionLog, op_type=TransactionLog.OP_USER_CREATED).one()
+        user_txlog = TransactionLog.objects.get(
+            op_type=TransactionLog.OP_USER_CREATED)
         self.assertTxLogDetailsMatchesUserDetails(user, user_txlog)
 
     def test_txlog_when_unlinking_file(self):
-        """Check that we store a TransactionLog with the file attributes.
-        """
+        """Check that we store a TransactionLog with the file attributes."""
         node = self.factory.make_file(mimetype=self.mimetype)
         self.clear_txlogs()
 
         node.unlink()
-        expected = self._get_dict_with_txlog_attrs_from(
-            node, TransactionLog.OP_DELETE,
-            extra=dict(extra_data_dict={
-                'kind': StorageObject.FILE,
-                'volume_path': settings.ROOT_USERVOLUME_PATH}))
-        self.assertStoredTransactionLogsMatch({node.id: expected})
+        expected = [
+            self._get_dict_with_txlog_attrs_from(
+                node, TransactionLog.OP_DELETE)
+        ]
+        self.assertTransactionLogsMatch(expected)
 
     def test_txlog_when_unlinking_empty_directory(self):
         node = self.factory.make_directory()
+        self.clear_txlogs()
+
         node.unlink()
         expected = self._get_dict_with_txlog_attrs_from(
-            node, TransactionLog.OP_DELETE,
-            extra=dict(extra_data_dict={
-                'kind': StorageObject.DIRECTORY,
-                'volume_path': settings.ROOT_USERVOLUME_PATH}))
-        self.assertStoredTransactionLogsMatch({node.id: expected})
+            node, TransactionLog.OP_DELETE)
+        self.assertTransactionLogsMatch([expected])
 
     def test_txlogs_when_unlinking_tree(self):
         """Check that unlink_tree() creates correct transaction logs.
@@ -197,30 +155,19 @@ class TestTransactionLog(BaseTransactionLogTestCase):
         """
         # Create a directory with 5 files.
         directory = self.factory.make_directory()
-        expected_rows = {
-            directory.id: self._get_dict_with_txlog_attrs_from(
-                directory, TransactionLog.OP_DELETE,
-                extra=dict(extra_data_dict={
-                    'kind': StorageObject.DIRECTORY,
-                    'volume_path': settings.ROOT_USERVOLUME_PATH}))}
-
-        for i in range(0, 5):
+        expected_rows = []
+        for i in range(5):
             f = self.factory.make_file(
                 parent=directory, mimetype=self.mimetype)
-            expected_rows[f.id] = self._get_dict_with_txlog_attrs_from(
-                f, TransactionLog.OP_DELETE,
-                extra=dict(extra_data_dict={
-                    'kind': f.kind,
-                    'volume_path': settings.ROOT_USERVOLUME_PATH}))
+            e = self._get_dict_with_txlog_attrs_from(
+                f, TransactionLog.OP_DELETE)
+            expected_rows.append(e)
         self.clear_txlogs()
         directory.unlink_tree()
 
-        # All TransactionLog entries created will have the directory's
-        # generation because in unlink_tree() we only update the directory's
-        # generation and not the generation of its descendants.
-        for row in expected_rows.values():
-            row['generation'] = directory.generation
-        self.assertStoredTransactionLogsMatch(expected_rows)
+        expected_rows.append(self._get_dict_with_txlog_attrs_from(
+            directory, TransactionLog.OP_DELETE))
+        self.assertTransactionLogsMatch(expected_rows)
 
     def test_txlogs_when_unlinking_multi_level_tree(self):
         """Test that unlink_tree() creates TransactionLog entries for indirect
@@ -235,69 +182,63 @@ class TestTransactionLog(BaseTransactionLogTestCase):
         # The TransactionLog entry created will have the directory's
         # generation because in unlink_tree() we only update the directory's
         # generation and not the generation of its descendants.
-        expected = {}
-        for node in [root, subdir, f]:
-            expected[node.id] = self._get_dict_with_txlog_attrs_from(
-                node, TransactionLog.OP_DELETE,
-                extra=dict(generation=root.generation))
-        self.assertStoredTransactionLogsMatch(expected)
+        expected = [
+            self._get_dict_with_txlog_attrs_from(
+                node, TransactionLog.OP_DELETE) for node in [root, subdir, f]
+        ]
+        self.assertTransactionLogsMatch(expected)
 
     def test_txlog_when_moving_file(self):
         user = self.factory.make_user()
-        dir1 = self.factory.make_directory(user=user)
-        dir2 = self.factory.make_directory(user=user)
+        dir1 = self.factory.make_directory(owner=user)
+        dir2 = self.factory.make_directory(owner=user)
         f = self.factory.make_file(parent=dir1, mimetype=self.mimetype)
         orig_path = f.full_path
         self.clear_txlogs()
 
-        f.move(dir2.id, f.name)
+        f.move(dir2, f.name)
 
         expected_attrs = self._get_dict_with_txlog_attrs_from(
-            f, TransactionLog.OP_MOVE, extra=dict(old_path=orig_path))
-        self.assertStoredTransactionLogsMatch({f.id: expected_attrs})
+            f, TransactionLog.OP_MOVE, old_path=orig_path,
+            extra_data_dict=TransactionLog.extra_data_new_node(f))
+        self.assertTransactionLogsMatch([expected_attrs])
 
-    def test__get_extra_data_for_new_node(self):
-        """Check that _get_extra_data_for_new_node includes all we need."""
+    def test_extra_data_new_node(self):
+        """Check that extra_data_new_node includes all we need."""
         f = self.factory.make_file()
         f_extra_data = dict(
             size=f.content.size, storage_key=unicode(f.content.storage_key),
-            publicfile_id=None, public_uuid=None, content_hash=f.content_hash,
+            public_uuid=None, content_hash=f.content_hash,
             when_created=get_epoch_secs(f.when_created),
             last_modified=get_epoch_secs(f.when_last_modified),
             kind=f.kind, volume_path=f.volume.path)
-        expected = TransactionLog._get_extra_data_for_new_node(
-            f, f.volume.path)
+        expected = TransactionLog.extra_data_new_node(f)
         self.assertEqual(expected, f_extra_data)
 
     def test_record_move_for_directory(self):
         user = self.factory.make_user()
-        new_parent = self.factory.make_directory(
-            user=user, name='new-parent')
-        current_parent = self.factory.make_directory(
-            user=user, name='current-parent')
-        dir1 = self.factory.make_directory(
-            name='dir1', parent=current_parent)
+        new_parent = self.factory.make_directory(owner=user, name='new-parent')
+        current = self.factory.make_directory(owner=user, name='current')
+        dir1 = self.factory.make_directory(name='dir1', parent=current)
         f = self.factory.make_file(
             name='f.jpg', parent=dir1, mimetype=self.mimetype)
         f_orig_path = f.full_path
         dir_orig_path = dir1.full_path
         self.clear_txlogs()
 
-        dir1.move(new_parent.id, dir1.name)
-        f_extra_data = TransactionLog._get_extra_data_for_new_node(
-            f, f.volume.path)
+        dir1.move(new_parent, dir1.name)
+        f_extra_data = TransactionLog.extra_data_new_node(f)
         # All TransactionLog entries created will have the moved directory's
         # generation because in a move() we only update the directory's
         # generation and not the generation of its descendants.
         f_expected_attrs = self._get_dict_with_txlog_attrs_from(
-            f, TransactionLog.OP_MOVE,
-            extra=dict(old_path=f_orig_path, generation=dir1.generation,
-                       extra_data_dict=f_extra_data))
+            f, TransactionLog.OP_MOVE, old_path=f_orig_path,
+            generation=dir1.generation, extra_data_dict=f_extra_data)
         dir_expected_attrs = self._get_dict_with_txlog_attrs_from(
             dir1, TransactionLog.OP_MOVE,
-            extra=dict(old_path=dir_orig_path, generation=dir1.generation))
-        self.assertStoredTransactionLogsMatch(
-            {f.id: f_expected_attrs, dir1.id: dir_expected_attrs})
+            old_path=dir_orig_path, generation=dir1.generation,
+            extra_data_dict=TransactionLog.extra_data_new_node(dir1))
+        self.assertTransactionLogsMatch([f_expected_attrs, dir_expected_attrs])
 
     def test_record_move_for_directory_with_indirect_children(self):
         # Create the following file structure:
@@ -309,8 +250,7 @@ class TestTransactionLog(BaseTransactionLogTestCase):
         #         |-- dir1.1
         #             |-- f11.jpg
         user = self.factory.make_user()
-        parent = self.factory.make_directory(
-            user=user, name='current-parent')
+        parent = self.factory.make_directory(owner=user, name='current-parent')
         dir1 = self.factory.make_directory(name='dir1', parent=parent)
         dir11 = self.factory.make_directory(name='dir1.1', parent=dir1)
         f1 = self.factory.make_file(
@@ -321,163 +261,142 @@ class TestTransactionLog(BaseTransactionLogTestCase):
                  (f1, f1.full_path), (f11, f11.full_path)]
 
         # Now move dir1 to new_parent.
-        new_parent = self.factory.make_directory(user=user, name='new-parent')
+        new_parent = self.factory.make_directory(owner=user, name='new-parent')
         self.clear_txlogs()
 
-        dir1.move(new_parent.id, dir1.name)
+        dir1.move(new_parent, dir1.name)
 
-        expected = {}
-        for node, old_path in nodes:
-            extra = dict(old_path=old_path,
-                         generation=dir1.generation)
-            expected[node.id] = self._get_dict_with_txlog_attrs_from(
-                node, TransactionLog.OP_MOVE, extra=extra)
-        # And now ensure there are four TransactionLog entries stored (for
-        # dir1, dir11, f1.jpg and f11.jpg) and the attributes there match the
-        # current state of the nodes plus their old path (from before the
-        # move). Notice that the generation is the same in all of them and is
-        # equal to dir1.generation.
-        self.assertStoredTransactionLogsMatch(expected)
+        expected = [
+            self._get_dict_with_txlog_attrs_from(
+                node, TransactionLog.OP_MOVE,
+                old_path=old_path, generation=dir1.generation,
+                extra_data_dict=TransactionLog.extra_data_new_node(node))
+            for node, old_path in nodes]
+        self.assertTransactionLogsMatch(expected)
 
     def test_txlog_when_renaming_a_directory(self):
         user = self.factory.make_user()
         current_parent = self.factory.make_directory(
-            user=user, name='current-parent')
-        dir1 = self.factory.make_directory(
-            name='dir1', parent=current_parent)
+            owner=user, name='current-parent')
+        dir1 = self.factory.make_directory(name='dir1', parent=current_parent)
         f = self.factory.make_file(
             name='f.jpg', parent=dir1, mimetype=self.mimetype)
         self.clear_txlogs()
         dir1_orig_path = dir1.full_path
         f_orig_path = f.full_path
-        dir1.move(dir1.parent.id, 'new-name')
+        dir1.move(dir1.parent, 'new-name')
 
         # All TransactionLog entries created will have the moved directory's
         # generation because in a move() we only update the directory's
         # generation and not the generation of its descendants.
         f_expected_attrs = self._get_dict_with_txlog_attrs_from(
-            f, TransactionLog.OP_MOVE,
-            extra=dict(old_path=f_orig_path, generation=dir1.generation))
+            f, TransactionLog.OP_MOVE, old_path=f_orig_path,
+            generation=dir1.generation,
+            extra_data_dict=TransactionLog.extra_data_new_node(f))
         dir_expected_attrs = self._get_dict_with_txlog_attrs_from(
-            dir1, TransactionLog.OP_MOVE,
-            extra=dict(old_path=dir1_orig_path, generation=dir1.generation))
-        self.assertStoredTransactionLogsMatch(
-            {f.id: f_expected_attrs, dir1.id: dir_expected_attrs})
+            dir1, TransactionLog.OP_MOVE, old_path=dir1_orig_path,
+            extra_data_dict=TransactionLog.extra_data_new_node(dir1))
+        self.assertTransactionLogsMatch(
+            [f_expected_attrs, dir_expected_attrs])
 
     def test_txlog_for_move_with_same_parent_and_name(self):
         root = self.factory.make_directory()
         f = self.factory.make_file(parent=root, mimetype=self.mimetype)
 
         self.assertRaises(
-            ValueError, TransactionLog.record_move, f, f.name, f.parent)
+            ValueError, TransactionLog.record_move, f, f.name, f.parent, [])
 
     def test_txlog_for_share_accepted(self):
-        share = self.factory.make_share()
-        self._test_share_accepted_or_deleted(
-            share, TransactionLog.OP_SHARE_ACCEPTED)
+        share = self.factory.make_share(shared_to=self.factory.make_user())
+        self.clear_txlogs()
 
-    def test_txlog_for_share_deleted(self):
-        share = self.factory.make_share()
-        self._test_share_accepted_or_deleted(
-            share, TransactionLog.OP_SHARE_DELETED)
-
-    def _test_share_accepted_or_deleted(self, share, op_type):
-        node = self.store.get(StorageObject, share.subtree)
-        if op_type == TransactionLog.OP_SHARE_DELETED:
-            share.delete()
-        elif op_type == TransactionLog.OP_SHARE_ACCEPTED:
-            share.accept()
-        else:
-            raise AssertionError("Unexpected operation type: %s" % op_type)
+        share.accept()
 
         expected_attrs = self._get_dict_with_txlog_attrs_from_share(
-            share, node, op_type)
-        self.assertStoredTransactionLogsMatch({node.id: expected_attrs})
+            share, TransactionLog.OP_SHARE_ACCEPTED)
+        self.assertTransactionLogsMatch([expected_attrs])
+
+    def test_txlog_for_share_deleted(self):
+        share = self.factory.make_share(accepted=True)
+        self.clear_txlogs()
+
+        share.kill()
+
+        expected_attrs = self._get_dict_with_txlog_attrs_from_share(
+            share, TransactionLog.OP_SHARE_DELETED)
+        self.assertTransactionLogsMatch([expected_attrs])
 
     def test_txlog_for_content_change(self):
         node = self.factory.make_file(mimetype=self.mimetype)
-        new_content = self.factory.make_content()
+        new_content = self.factory.make_content_blob()
         self.clear_txlogs()
 
         node.content = new_content
 
-        extra_data = TransactionLog._get_extra_data_for_new_node(
-            node, node.volume.path)
+        extra_data = TransactionLog.extra_data_new_node(node)
         expected_attrs = self._get_dict_with_txlog_attrs_from(
-            node, TransactionLog.OP_PUT_CONTENT,
-            extra=dict(extra_data_dict=extra_data))
-        self.assertStoredTransactionLogsMatch({node.id: expected_attrs})
+            node, TransactionLog.OP_PUT_CONTENT, extra_data_dict=extra_data)
+        self.assertTransactionLogsMatch([expected_attrs])
 
     def test_txlog_when_publishing_directory(self):
-        directory = self.factory.make_directory(public=True)
-        assert directory.public_uuid is not None
+        directory = self.factory.make_directory()
+        self.clear_txlogs()
 
-        public_url = get_public_file_url(directory)
+        directory.make_public()
+
+        public_url = directory.public_url
         self.assertIsNotNone(public_url)
-        extra_data = TransactionLog._get_extra_data_for_new_node(
-            directory, directory.volume.path)
+        extra_data = TransactionLog.extra_data_new_node(directory)
         expected_attrs = self._get_dict_with_txlog_attrs_from(
             directory, TransactionLog.OP_PUBLIC_ACCESS_CHANGED,
-            extra=dict(extra_data_dict=extra_data))
-        self.assertStoredTransactionLogsMatch({directory.id: expected_attrs})
+            extra_data_dict=extra_data)
+        self.assertTransactionLogsMatch([expected_attrs])
 
     def test_txlog_when_unpublishing_directory(self):
-        directory = self.factory.make_directory()
-        # Change _publicfile_id directly because if we go via the public API
-        # (.publicfile_id) it'll generate a TransactionLog and that will
-        # complicate the actual test.
-        directory._publicfile_id = self.factory.get_unique_integer()
-        self.assertIsNotNone(directory.publicfile_id)
+        directory = self.factory.make_directory(public=True)
+        self.assertIsNotNone(directory.public_uuid)
         self.assertTrue(directory.is_public)
+        self.clear_txlogs()
 
-        directory.publicfile_id = None
+        directory.make_private()
 
-        extra_data = TransactionLog._get_extra_data_for_new_node(
-            directory, directory.volume.path)
+        extra_data = TransactionLog.extra_data_new_node(directory)
         expected_attrs = self._get_dict_with_txlog_attrs_from(
             directory, TransactionLog.OP_PUBLIC_ACCESS_CHANGED,
-            extra=dict(extra_data_dict=extra_data))
-        self.assertStoredTransactionLogsMatch({directory.id: expected_attrs})
+            extra_data_dict=extra_data)
+        self.assertTransactionLogsMatch([expected_attrs])
 
     def test_txlog_for_public_access_change_on_interesting_file(self):
         node = self.factory.make_file(mimetype=self.mimetype)
-        publicnode = self.factory.make_public_node(node)
         self.clear_txlogs()
 
-        node.public_uuid = publicnode.public_uuid
-        node.publicfile_id = publicnode.id
+        node.make_public()
 
-        public_url = get_public_file_url(node)
+        public_url = node.public_url
         self.assertIsNotNone(public_url)
-        extra_data = TransactionLog._get_extra_data_for_new_node(
-            node, node.volume.path)
+        extra_data = TransactionLog.extra_data_new_node(node)
         expected_attrs = self._get_dict_with_txlog_attrs_from(
             node, TransactionLog.OP_PUBLIC_ACCESS_CHANGED,
-            extra=dict(extra_data_dict=extra_data))
-        self.assertStoredTransactionLogsMatch({node.id: expected_attrs})
+            extra_data_dict=extra_data)
+        self.assertTransactionLogsMatch([expected_attrs])
 
     def test_txlog_for_new_storageuser(self):
-        user_id = self.factory.get_unique_integer()
-        name = self.factory.get_unique_unicode()
-        visible_name = self.factory.get_unique_unicode()
+        user = self.factory.make_user()
 
-        user = StorageUser.new(self.store, user_id, name, visible_name)
-
-        store = get_filesync_store()
-        txlog = store.find(TransactionLog, owner_id=user.id).one()
+        txlog = TransactionLog.objects.get(
+            owner_id=user.id, op_type=TransactionLog.OP_USER_CREATED)
         self.assertTxLogDetailsMatchesUserDetails(user, txlog)
 
     def test_bootstrap_picks_up_only_files_owned_by_the_given_user(self):
-        user = self.factory.make_user(user_id=1)
+        user = self.factory.make_user()
         photos = self._create_files_for_user(user, 'image/jpeg')
         # These files do not belong to the user we're bootstrapping now, so
         # they won't show up on the TXLog.
-        self._create_files_for_user(
-            self.factory.make_user(user_id=2), 'image/jpeg')
+        self._create_files_for_user(self.factory.make_user(), 'image/jpeg')
 
         TransactionLog.bootstrap(user)
 
-        self.assertBootstrappingPickedUpFiles(photos)
+        self.assertBootstrappingPickedUpFiles(user, photos)
 
     def test_bootstrap_picks_up_only_live_files(self):
         user = self.factory.make_user()
@@ -488,95 +407,84 @@ class TestTransactionLog(BaseTransactionLogTestCase):
 
         TransactionLog.bootstrap(user)
 
-        self.assertBootstrappingPickedUpFiles(photos)
+        self.assertBootstrappingPickedUpFiles(user, photos)
 
     def test_bootstrap_picks_up_only_files_in_live_udfs(self):
         user = self.factory.make_user()
-        root_udf = UserVolume.get_root(self.store, user.id)
         photo_in_root = self.factory.make_file(
-            user, root_udf.root_node, 'foo.jpg', 'image/jpeg')
-        dead_udf = self.factory.make_udf(user=user)
+            owner=user, parent=user.root_node, name='foo.jpg',
+            mimetype='image/jpeg')
+        dead_udf = self.factory.make_user_volume(owner=user)
         self.factory.make_file(
-            user, dead_udf.root_node, 'foo-in-dead-udf.jpg',
-            'image/jpeg')
-        dead_udf.delete()
+            owner=user, parent=dead_udf.root_node,
+            name='foo-in-dead-udf.jpg', mimetype='image/jpeg')
+        dead_udf.kill()
         self.clear_txlogs()
 
         TransactionLog.bootstrap(user)
 
-        self.assertBootstrappingPickedUpFiles([photo_in_root])
+        self.assertBootstrappingPickedUpFiles(user, [photo_in_root])
 
     def test_bootstrap_picks_up_only_folders_in_live_udfs(self):
         user = self.factory.make_user()
-        root_udf = UserVolume.get_root(self.store, user.id)
         folder_in_root = self.factory.make_directory(
-            user, root_udf.root_node, 'folder1', public=True)
-        dead_udf = self.factory.make_udf(user=user)
+            owner=user, parent=user.root_node, name='folder1', public=True)
+        dead_udf = self.factory.make_user_volume(owner=user)
         self.factory.make_directory(
-            user, dead_udf.root_node, 'folder2', public=True)
-        dead_udf.delete()
+            owner=user, parent=dead_udf.root_node, name='folder2', public=True)
+        dead_udf.kill()
         self.clear_txlogs()
 
         TransactionLog.bootstrap(user)
 
-        self.assertBootstrappingPickedUpFolders([folder_in_root])
+        self.assertBootstrappingPickedUpFolders(user, [folder_in_root])
 
     def test_bootstrap_picks_up_only_live_udfs(self):
         user = self.factory.make_user()
-        root_udf = UserVolume.get_root(self.store, user.id)
-        live_udf = self.factory.make_udf(user=user)
-        live_udf2 = self.factory.make_udf(user=user)
-        self.factory.make_udf(user=user, status=STATUS_DEAD)
+        live_udf = self.factory.make_user_volume(owner=user)
+        live_udf2 = self.factory.make_user_volume(owner=user)
+        self.factory.make_user_volume(owner=user, status=STATUS_DEAD)
         self.clear_txlogs()
 
         TransactionLog.bootstrap(user)
 
-        self.assertBootstrappingPickedUpUDFs([root_udf, live_udf, live_udf2])
+        self.assertBootstrappingPickedUpUDFs(
+            user, [user.root_node.volume, live_udf, live_udf2])
 
     def test_bootstrap_picks_up_public_folders(self):
         user = self.factory.make_user()
         public_dir = self.factory.make_directory(user, public=True)
         self.factory.make_directory(user)
         self.clear_txlogs()
-        public_url = get_public_file_url(public_dir)
+        public_url = public_dir.public_url
         self.assertIsNotNone(public_url)
 
         TransactionLog.bootstrap(user)
 
-        self.assertBootstrappingPickedUpFolders([public_dir])
+        self.assertBootstrappingPickedUpFolders(user, [public_dir])
 
     def test_bootstrap_picks_up_user(self):
-        user = self.factory.make_user()
+        user = self.make_user_without_txlog()
 
         TransactionLog.bootstrap(user)
 
-        txlog = get_filesync_store().find(
-            TransactionLog, op_type=TransactionLog.OP_USER_CREATED).one()
+        txlog = TransactionLog.objects.get(
+            op_type=TransactionLog.OP_USER_CREATED)
         self.assertTxLogDetailsMatchesUserDetails(user, txlog)
 
     def test_bootstrap_picks_up_shares(self):
         user = self.factory.make_user()
         directory = self.factory.make_directory(user)
-        share = self.factory.make_share(directory)
-        self.store.commit()
+        share = self.factory.make_share(subtree=directory)
+        self.clear_txlogs()
 
         TransactionLog.bootstrap(user)
 
-        txlog = get_filesync_store().find(
-            TransactionLog, op_type=TransactionLog.OP_SHARE_ACCEPTED).one()
+        txlog = TransactionLog.objects.get(
+            op_type=TransactionLog.OP_SHARE_ACCEPTED)
         expected_attrs = self._get_dict_with_txlog_attrs_from_share(
-            share, directory, TransactionLog.OP_SHARE_ACCEPTED)
+            share, TransactionLog.OP_SHARE_ACCEPTED)
         self.assert_txlog_correct(txlog, expected_attrs)
-
-    def _get_dict_with_txlog_attrs_from_udf(self, udf, op_type):
-        extra_data = None
-        if op_type == TransactionLog.OP_UDF_CREATED:
-            when_created = get_epoch_secs(udf.when_created)
-            extra_data = dict(when_created=when_created)
-        return dict(
-            node_id=None, volume_id=udf.id, owner_id=udf.owner_id,
-            op_type=op_type, extra_data_dict=extra_data,
-            generation=udf.generation, path=udf.path)
 
     def assertTxLogDetailsMatchesUserVolumeDetails(
             self, txlog, volume, op_type):
@@ -588,7 +496,8 @@ class TestTransactionLog(BaseTransactionLogTestCase):
 
     def assertTxLogDetailsMatchesUserDetails(self, user, txlog):
         """Check the given TXLog represents the creation of the given user."""
-        extra_data = dict(name=user.username, visible_name=user.visible_name)
+        extra_data = dict(name=user.username, first_name=user.first_name,
+                          last_name=user.last_name)
         expected_attrs = dict(
             owner_id=user.id, op_type=TransactionLog.OP_USER_CREATED,
             extra_data_dict=extra_data, node_id=None, volume_id=None,
@@ -596,13 +505,13 @@ class TestTransactionLog(BaseTransactionLogTestCase):
         self.assertIsNotNone(txlog)
         self.assert_txlog_correct(txlog, expected_attrs)
 
-    def assertBootstrappingPickedUpUDFs(self, udfs):
-        txlogs = self.store.find(
-            TransactionLog, op_type=TransactionLog.OP_UDF_CREATED)
+    def assertBootstrappingPickedUpUDFs(self, user, udfs):
+        txlogs = TransactionLog.objects.filter(
+            owner_id=user.id, op_type=TransactionLog.OP_UDF_CREATED)
         expected = {}
         self.assertEqual(len(udfs), txlogs.count())
         for udf in udfs:
-            udf_txlog = txlogs.find(volume_id=udf.id).one()
+            udf_txlog = txlogs.get(volume_id=udf.id)
             when_created = get_epoch_secs(udf.when_created)
             expected = dict(
                 node_id=None, volume_id=udf.id, generation=udf.generation,
@@ -611,67 +520,79 @@ class TestTransactionLog(BaseTransactionLogTestCase):
                 op_type=TransactionLog.OP_UDF_CREATED)
             self.assert_txlog_correct(udf_txlog, expected)
 
-    def assertBootstrappingPickedUpFiles(self, files):
+    def assertBootstrappingPickedUpFiles(self, user, files):
         """Check there are TXLog bootstrapping entries for the given files."""
-        file_txlogs = self.store.find(
-            TransactionLog, op_type=TransactionLog.OP_PUT_CONTENT)
-        expected = {}
+        file_txlogs = TransactionLog.objects.filter(
+            owner_id=user.id, op_type=TransactionLog.OP_PUT_CONTENT)
+        expected = []
         for node in files:
-            extra_data = TransactionLog._get_extra_data_for_new_node(
-                node, node.volume.path)
-            expected[node.id] = self._get_dict_with_txlog_attrs_from(
-                node, TransactionLog.OP_PUT_CONTENT,
-                extra=dict(generation=node.generation,
-                           extra_data_dict=extra_data))
-        self.assertTransactionLogsMatch(file_txlogs, expected)
+            extra_data = TransactionLog.extra_data_new_node(node)
+            expected.append(
+                self._get_dict_with_txlog_attrs_from(
+                    node, TransactionLog.OP_PUT_CONTENT,
+                    generation=node.generation, extra_data_dict=extra_data))
+        self.assertTransactionLogsMatch(expected, txlogs=file_txlogs)
 
-    def assertBootstrappingPickedUpFolders(self, folders):
+    def assertBootstrappingPickedUpFolders(self, user, folders):
         """Check there are TXLog entries for the given folders."""
-        folder_txlogs = self.store.find(
-            TransactionLog,
-            op_type=TransactionLog.OP_PUBLIC_ACCESS_CHANGED)
-        expected = {}
+        folder_txlogs = TransactionLog.objects.filter(
+            owner_id=user.id, op_type=TransactionLog.OP_PUBLIC_ACCESS_CHANGED)
+        expected = []
         for folder in folders:
-            extra_data = TransactionLog._get_extra_data_for_new_node(
-                folder, folder.volume.path)
-            expected[folder.id] = self._get_dict_with_txlog_attrs_from(
-                folder, TransactionLog.OP_PUBLIC_ACCESS_CHANGED,
-                extra=dict(extra_data_dict=extra_data))
-        self.assertTransactionLogsMatch(folder_txlogs, expected)
+            extra_data = TransactionLog.extra_data_new_node(folder)
+            expected.append(
+                self._get_dict_with_txlog_attrs_from(
+                    folder, TransactionLog.OP_PUBLIC_ACCESS_CHANGED,
+                    extra_data_dict=extra_data))
+        self.assertTransactionLogsMatch(expected, txlogs=folder_txlogs)
 
     def assertNoTransactionLogEntriesExist(self):
-        self.assertEqual([], list(self.store.find(TransactionLog)))
+        self.assertEqual([], list(TransactionLog.objects.all()))
 
-    def _get_dict_with_txlog_attrs_from_share(self, share, node, op_type):
+    def _get_dict_with_txlog_attrs_from_udf(self, udf, op_type):
+        extra_data = None
+        if op_type == TransactionLog.OP_UDF_CREATED:
+            when_created = get_epoch_secs(udf.when_created)
+            extra_data = dict(when_created=when_created)
+        return dict(
+            node_id=None, volume_id=udf.id, owner_id=udf.owner_id,
+            op_type=op_type, path=udf.path, generation=udf.generation,
+            mimetype=None, old_path=None, extra_data_dict=extra_data)
+
+    def _get_dict_with_txlog_attrs_from_share(self, share, op_type):
         when_last_changed = share.when_last_changed
         extra_data = dict(
-            shared_to=share.shared_to, share_id=str(share.id),
-            share_name=share.name, access_level=share.access,
+            shared_to=share.shared_to.id if share.shared_to else share.email,
+            share_id=str(share.id), share_name=share.name,
+            access_level=share.access,
             when_shared=get_epoch_secs(share.when_shared),
             when_last_changed=get_epoch_secs(when_last_changed))
         return self._get_dict_with_txlog_attrs_from(
-            node, op_type, omit_generation=True,
-            extra=dict(extra_data_dict=extra_data))
+            share.subtree, op_type, omit_generation=True,
+            extra_data_dict=extra_data)
 
-    def _get_dict_with_txlog_attrs_from(self, node, op_type,
-                                        omit_generation=False, extra=None):
+    def _get_dict_with_txlog_attrs_from(
+            self, node, op_type, omit_generation=False, **kwargs):
         """Return a dictionary containing the attributes of the given node
         that would be stored in a TransactionLog entry.
 
         @param extra: A dictionary with values to be included in the returned
             dictionary.
         """
+        node.refresh_from_db()
         generation = None
         if not omit_generation:
             generation = node.generation
         d = dict(
-            node_id=node.id, owner_id=node.owner_id, path=node.full_path,
-            generation=generation, mimetype=node.mimetype)
-        if extra is not None:
-            d.update(extra)
+            node_id=node.id, volume_id=node.volume.id, op_type=op_type,
+            owner_id=node.volume.owner.id, path=node.full_path, old_path=None,
+            generation=generation, mimetype=node.mimetype or None,
+            extra_data_dict={'kind': node.kind,
+                             'volume_path': node.volume.path})
+        d.update(kwargs)
         return d
 
-    def assertTransactionLogsMatch(self, txlogs, expected):
+    def assertTransactionLogsMatch(self, expected, txlogs=None):
         """Assert that the given TransactionLogs match the expected values.
 
         @param txlogs: A sequence of TransactionLog objects.
@@ -679,22 +600,23 @@ class TestTransactionLog(BaseTransactionLogTestCase):
             TransactionLogs as keys and dictionaries with all the attributes
             of the TransactionLog as values.
         """
-        self.assertEqual(len(expected), txlogs.count())
-        for txlog in txlogs:
-            individual_attrs = expected[txlog.node_id]
-            self.assert_txlog_correct(txlog, individual_attrs)
+        if txlogs is None:
+            txlogs = TransactionLog.objects.all()
+        actual = []
+        for t in txlogs:
+            td = t.as_dict()
+            td.pop('txn_id')
+            td.pop('timestamp')
+            td.pop('extra_data')
+            td['extra_data_dict'] = t.extra_data_dict
+            actual.append(td)
 
-    def assertStoredTransactionLogsMatch(self, expected):
-        """Check that the TransactionLogs we have in the DB are what we expect.
+        def sort_dicts(ll):
+            import collections
+            return [collections.OrderedDict(sorted(i for i in d.items()))
+                    for d in ll]
 
-        @param expected: A dict mapping node IDs to TransactionLog attributes.
-
-        We will assert that the number of TransactionLog rows we have in the
-        DB is the same as the number of items in `expected` and then assert
-        that every row has the attributes we expect them to have.
-        """
-        txlogs = self.store.find(TransactionLog)
-        self.assertTransactionLogsMatch(txlogs, expected)
+        self.assertItemsEqual(sort_dicts(expected), sort_dicts(actual))
 
     def _create_files_for_user(self, user, mimetype, status=STATUS_LIVE):
         """Create 5 files with the given mimetype for the given user."""
@@ -702,8 +624,7 @@ class TestTransactionLog(BaseTransactionLogTestCase):
         for i in range(0, 5):
             public = bool(i % 2)
             f = self.factory.make_file(
-                user=user, mimetype=mimetype, public=public)
-            f.status = status
+                owner=user, mimetype=mimetype, public=public, status=status)
             files.append(f)
         self.clear_txlogs()
         return files

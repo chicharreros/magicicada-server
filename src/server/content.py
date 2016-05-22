@@ -545,7 +545,7 @@ class User(object):
         self.username = username
         self.visible_name = visible_name
         self.protocols = []
-        self.rpc_dal = self.manager.rpcdal_client
+        self.rpc_dal = self.manager.rpc_dal
 
     def register_protocol(self, protocol):
         """Register protocol as a connection authenticated for this user.
@@ -942,8 +942,8 @@ class ContentManager(object):
         """
         user = self.users.get(user_id, None)
         if user is None and required:
-            r = yield self.rpcdal_client.call('get_user_data', user_id=user_id,
-                                              session_id=session_id)
+            r = yield self.rpc_dal.call(
+                'get_user_data', user_id=user_id, session_id=session_id)
             # Another task may have already updated the cache, so check again
             user = self.users.get(user_id, None)
             if user is None:

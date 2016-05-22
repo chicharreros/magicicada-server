@@ -49,7 +49,7 @@ class TestStats(TestWithDatabase):
     def setUp(self):
         """Setup the test."""
         yield super(TestStats, self).setUp()
-        self.factory.make_user(999, u'test user999', u'', 2 ** 20)
+        self.make_user(u'test user999', max_storage_bytes=2 ** 20)
         self.metrics = FakeMetrics()
         MetricsConnector.register_metrics("root", instance=self.metrics)
         self.service.stats_worker.stop()

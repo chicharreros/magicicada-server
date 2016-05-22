@@ -37,11 +37,6 @@ from twisted.python.failure import Failure
 
 import u1sync.client
 
-from backends.filesync.models import (
-    STATUS_LIVE,
-    ContentBlob,
-    StorageObject,
-)
 from u1sync.main import do_diff, do_init, do_sync
 from ubuntuone.storage.server import server
 from ubuntuone.storageprotocol import client as protocol_client
@@ -285,23 +280,16 @@ class TestBrokenNode(TestSync):
         #   - set the content_hash to None
         #   - increase the generation
         user = self.storage_users['jack']
-        root = StorageObject.get_root(self.store, user.id)
+        root = user.root_node
         afile = root.get_child_by_name(u"test_file")
         # create a "invalid" content blob
-        content = ContentBlob()
-        content.hash = ""
-        content.magic_hash = ""
-        content.storage_key = uuid.uuid4()
-        content.crc32 = 1
-        content.size = 1
-        content.deflated_size = 1
-        content.status = STATUS_LIVE
-        self.store.add(content)
-        self.store.flush()
+        content = self.factory.make_content_blob(
+            hash="", magic_hash="", storage_key=uuid.uuid4(), crc32=1, size=1,
+            deflated_size=1)
+
         # change the node
-        afile._content_hash = ""
-        afile.update_generation()
-        self.store.commit()
+        afile.set_content(content)
+
         # reconnect the client and wait it to sync
         d = self.wait_for('SYS_SERVER_RESCAN_DONE')
         self.eq.push('SYS_NET_DISCONNECTED')
@@ -1716,7 +1704,7 @@ class TestConflictOnServerSideDelete(TestServerBase):
     def unlink_dir_tree(self, _):
         """Remove the tree below foo/ directly on server."""
         u = self.storage_users['jack']
-        root = StorageObject.get_root(self.store, u.id)
+        root = u.root_node
         dir_tree = root.get_child_by_name(self.dir_name)
 
         # foo/bar.txt exists on local FS
@@ -1726,7 +1714,6 @@ class TestConflictOnServerSideDelete(TestServerBase):
         # unlinkig the foo/ tree directly on the server database
         # does not propagate the removal to the client
         dir_tree.unlink_tree()
-        self.store.commit()
 
     def update_state(self, _):
         """Update the local state by triggering a Query to the server."""

@@ -24,7 +24,6 @@ setup-db:
 start-db:
 	$(MAKE) setup-db
 	$(MAKE) migrate
-	./lib/backends/db/scripts/schema --all
 
 stop-db:
 	PGHOST=$(PGHOST) dropdb $(PGNAME); $(PGCTL) stop -w -D $(DATA_DIR) -m smart; rm -rf $(PGHOST)

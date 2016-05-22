@@ -25,8 +25,6 @@ from __future__ import unicode_literals
 import os
 import json
 
-import _pythonpath  # NOQA
-
 from optparse import OptionParser
 
 if __name__ == "__main__":
@@ -53,8 +51,8 @@ if __name__ == "__main__":
         user = userutils.create_user(userinfo)
         # create the storage account
         make_storage_user(
-            user.id, user.username,
-            "%s %s" % (user.first_name, user.last_name), 2 * (2 ** 30))
+            user.username, max_storage_bytes=2 * (2 ** 30),
+            first_name=user.first_name, last_name=user.last_name)
         # get an oauth token
         token = userutils.make_oauth_token(user)
         token_data[username] = (user.id, str(token))

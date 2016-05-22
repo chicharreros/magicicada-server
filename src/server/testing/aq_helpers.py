@@ -36,7 +36,7 @@ from twisted.names import dns
 from twisted.names.common import ResolverBase
 from twisted.python.failure import Failure
 
-from backends.filesync.tests.testcase import StorageDALTestCase
+from backends.testing.testcase import BaseTestCase
 from magicicada import settings
 from ubuntuone import platform
 from ubuntuone.storage.server import ssl_proxy
@@ -289,8 +289,8 @@ class FakeNetworkManager(dbus.service.Object):
             error_handler(e)
 
 
-class TestWithDatabase(BaseProtocolTestCase, StorageDALTestCase):
-    """Hook up Trial, ORMTestCase, and our very own storage servers.
+class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
+    """Hook up Trial, BaseTestCase, and our very own storage servers.
 
     Large chunks have been copy-pasted from
     server.testing.testcase.TestWithDatabase, hence the name.

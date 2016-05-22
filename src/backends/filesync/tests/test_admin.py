@@ -21,17 +21,18 @@
 from __future__ import unicode_literals
 
 from backends.filesync import admin, services
-from backends.filesync.tests.testcase import StorageDALTestCase
+from backends.testing.testcase import BaseTestCase
 
 
-class AdminServicesTestCase(StorageDALTestCase):
+class AdminServicesTestCase(BaseTestCase):
     """Tests the admin module features."""
 
     def _make_users(self):
         """Create users for tests."""
         usernames = ['bob', 'bobby', 'inez', 'juan', 'tim']
-        for i, name in zip(range(5), usernames):
-            services.make_storage_user(i, name, name, 2 ** 30)
+        for name in usernames:
+            services.make_storage_user(
+                username=name, max_storage_bytes=2 ** 30)
 
     def test_StorageUserFinder(self):
         """Test the StorageUserFinder."""

@@ -73,7 +73,7 @@ class TestGetDelta(GenerationsTestCase):
             yield client.dummy_authenticate("open sesame")
             req = yield client.get_delta(request.ROOT, 0)
             self.assertEqual(req.response, [])
-            self.assertEqual(req.free_bytes, self.usr0.get_quota().free_bytes)
+            self.assertEqual(req.free_bytes, self.usr0.free_bytes)
 
         return self.callback_test(auth, add_default_callbacks=True)
 
@@ -91,7 +91,7 @@ class TestGetDelta(GenerationsTestCase):
             self.assertEqual(len(req.response), len(nodes))
             self.assertTrue(req.full)
             self.assertEqual(req.end_generation, 10)
-            self.assertEqual(req.free_bytes, self.usr0.get_quota().free_bytes)
+            self.assertEqual(req.free_bytes, self.usr0.free_bytes)
 
         return self.callback_test(auth, add_default_callbacks=True)
 
@@ -110,7 +110,7 @@ class TestGetDelta(GenerationsTestCase):
             self.assertEqual(len(req.response), len(nodes[6:]))
             self.assertTrue(req.full)
             self.assertEqual(req.end_generation, 10)
-            self.assertEqual(req.free_bytes, self.usr0.get_quota().free_bytes)
+            self.assertEqual(req.free_bytes, self.usr0.free_bytes)
 
         return self.callback_test(auth, add_default_callbacks=True)
 
@@ -127,7 +127,7 @@ class TestGetDelta(GenerationsTestCase):
             self.assertEqual(len(req.response), 0)
             self.assertTrue(req.full)
             self.assertEqual(req.end_generation, 5)
-            self.assertEqual(req.free_bytes, self.usr0.get_quota().free_bytes)
+            self.assertEqual(req.free_bytes, self.usr0.free_bytes)
 
         return self.callback_test(auth, add_default_callbacks=True)
 
@@ -146,7 +146,7 @@ class TestGetDelta(GenerationsTestCase):
             self.assertEqual(len(req.response), limit)
             self.assertFalse(req.full)
             self.assertEqual(req.end_generation, 15)
-            self.assertEqual(req.free_bytes, self.usr0.get_quota().free_bytes)
+            self.assertEqual(req.free_bytes, self.usr0.free_bytes)
 
         return self.callback_test(auth, add_default_callbacks=True)
 
@@ -169,7 +169,7 @@ class TestGetDelta(GenerationsTestCase):
             self.assertEqual(len(req.response), 2)
             self.assertTrue(req.full)
             self.assertEqual(req.end_generation, 2)
-            self.assertEqual(req.free_bytes, self.usr0.get_quota().free_bytes)
+            self.assertEqual(req.free_bytes, self.usr0.free_bytes)
             self.assertEqualNode(req.response[0], nodes[0])
             self.assertEqualNode(req.response[1], nodes[1])
 
@@ -189,7 +189,7 @@ class TestGetDelta(GenerationsTestCase):
             self.assertEqual(len(req.response), 15)
             self.assertTrue(req.full)
             self.assertEqual(req.end_generation, 20)
-            self.assertEqual(req.free_bytes, self.usr0.get_quota().free_bytes)
+            self.assertEqual(req.free_bytes, self.usr0.free_bytes)
 
         return self.callback_test(auth, add_default_callbacks=True)
 
@@ -208,7 +208,7 @@ class TestRescanFromScratch(GenerationsTestCase):
             self.assertEqual(len(req.response), 1)  # the root
             self.assertTrue(req.full)
             self.assertEqual(req.end_generation, 0)
-            self.assertEqual(req.free_bytes, self.usr0.get_quota().free_bytes)
+            self.assertEqual(req.free_bytes, self.usr0.free_bytes)
             self.assertEqualNode(req.response[0], root)
 
         return self.callback_test(auth, add_default_callbacks=True)
@@ -235,7 +235,7 @@ class TestRescanFromScratch(GenerationsTestCase):
             self.assertEqual(len(req.response), len(nodes))
             self.assertTrue(req.full)
             self.assertEqual(req.end_generation, 30)
-            self.assertEqual(req.free_bytes, self.usr0.get_quota().free_bytes)
+            self.assertEqual(req.free_bytes, self.usr0.free_bytes)
             for delta_info, node in zip(req.response, nodes):
                 self.assertEqualNode(delta_info, node)
 
@@ -255,6 +255,6 @@ class TestRescanFromScratch(GenerationsTestCase):
             self.assertEqual(len(req.response), 15)
             self.assertTrue(req.full)
             self.assertEqual(req.end_generation, 20)
-            self.assertEqual(req.free_bytes, self.usr0.get_quota().free_bytes)
+            self.assertEqual(req.free_bytes, self.usr0.free_bytes)
 
         return self.callback_test(auth, add_default_callbacks=True)

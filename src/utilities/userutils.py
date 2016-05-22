@@ -23,21 +23,20 @@ from __future__ import unicode_literals
 import json
 import os
 
-from backends.filesync.dbmanager import fsync_commit
-from backends.db.store import get_filesync_store
-from backends.db.schemas.storage import create_schema as storage
+import django
 
+from django.core.management import call_command
 from utilities import utils
 
+django.setup()
 TMP_DIR = os.path.join(utils.get_rootdir(), 'tmp')
 AUTH_TOKENFILE = os.path.join(TMP_DIR, 'authkeys.json')
 
 
-@fsync_commit
 def delete_all_data():
     """Delete all data from the database."""
     # they must be reversed to avoid dependency issues
-    storage().delete(get_filesync_store())
+    call_command('flush', '--noinput')
 
 
 def add_auth_info_to_keyfile(username, auth_info, filename=AUTH_TOKENFILE):

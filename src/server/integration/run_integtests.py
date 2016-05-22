@@ -40,9 +40,9 @@ from django.conf import settings
 from utilities import utils, dev_launcher
 from twisted.internet import reactor, defer
 
+from backends.filesync import services
 from ubuntuone.platform.linux import tools
 from ubuntuone.storage.server.integration.helpers import debug, retryable
-from ubuntuone.storage.server.testing.testcase import create_test_user
 
 # to make dbus work
 dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
@@ -406,7 +406,7 @@ def main(test_filter, repeat=False):
     user1 = "integtest" + timestamp
     user2 = "integotro" + timestamp
     for u in (user1, user2):
-        create_test_user(u)
+        services.make_storage_user(username=u)
         debug(prefix, 'User created:', u)
 
     debug(prefix, 'Content blobs created')

@@ -24,20 +24,26 @@ import calendar
 import json
 import os
 
-from storm.expr import Join, LeftJoin
-from storm.locals import Int, DateTime, Enum, Store, Unicode
-from storm.store import AutoReload
+from django.db import models
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+from django.utils.timezone import now
 
-from backends.filesync.dbmanager import get_filesync_store
 from backends.filesync.models import (
+    STATUS_DEAD,
     STATUS_LIVE,
     Share,
     StorageObject,
     StorageUser,
     UserVolume,
-    get_path_startswith,
 )
-from backends.tools.properties import StormUUID
+from backends.filesync.signals import (
+    content_changed,
+    node_moved,
+    post_unlink_tree,
+    post_kill,
+    public_access_changed,
+)
 
 
 def get_epoch_secs(dt):
@@ -45,7 +51,7 @@ def get_epoch_secs(dt):
     return calendar.timegm(dt.timetuple())
 
 
-class TransactionLog(object):
+class TransactionLog(models.Model):
     """The log of an operation performed on a node."""
 
     # Constants; may want to move somewhere else.
@@ -58,130 +64,69 @@ class TransactionLog(object):
     OP_USER_CREATED = 'user_created'
     OP_UDF_CREATED = 'udf_created'
     OP_UDF_DELETED = 'udf_deleted'
-    OPERATIONS_MAP = {
-        OP_DELETE: 0,
-        OP_MOVE: 1,
-        OP_PUT_CONTENT: 2,
-        OP_SHARE_ACCEPTED: 3,
-        OP_SHARE_DELETED: 4,
-        OP_PUBLIC_ACCESS_CHANGED: 5,
-        OP_USER_CREATED: 6,
-        OP_UDF_CREATED: 7,
-        OP_UDF_DELETED: 8,
-    }
-    OPERATIONS_REVERSED_MAP = dict(
-        [tuple(reversed(item)) for item in OPERATIONS_MAP.items()])
+    OPERATIONS = [
+        OP_USER_CREATED, OP_DELETE, OP_MOVE, OP_PUT_CONTENT,
+        OP_SHARE_ACCEPTED, OP_SHARE_DELETED, OP_PUBLIC_ACCESS_CHANGED,
+        OP_UDF_CREATED, OP_UDF_DELETED]
 
-    __storm_table__ = "txlog_transaction_log"
-
-    id = Int(primary=True)
     # Most operations we care about are on nodes, but this can be None for
     # things like OP_USER_CREATED.
-    node_id = StormUUID()
+    node_id = models.UUIDField(null=True)
     # The volume where the node is; can also be None in some cases.
-    volume_id = StormUUID()
+    volume_id = models.UUIDField(null=True)
     # The ID of the node's owner if this is an operation on a Node, or the ID
     # of the newly created user if it's a OP_USER_CREATED.
-    owner_id = Int(allow_none=False)
-    op_type = Enum(map=OPERATIONS_MAP, allow_none=False)
-    path = Unicode()
-    generation = Int()
-    timestamp = DateTime(allow_none=False, default=AutoReload)
-    mimetype = Unicode()
-    extra_data = Unicode()
+    owner_id = models.BigIntegerField()
+    op_type = models.CharField(
+        max_length=256, choices=[(i, i) for i in OPERATIONS])
+    path = models.TextField(null=True)
+    generation = models.BigIntegerField(null=True)
+    timestamp = models.DateTimeField(default=now)
+    mimetype = models.TextField(null=True)
+    extra_data = models.TextField(null=True)
     # Only used when representing a move.
-    old_path = Unicode()
+    old_path = models.TextField(null=True)
 
-    def __init__(self, node_id, owner_id, volume_id, op_type, path, mimetype,
-                 generation=None, old_path=None, extra_data=None):
-        self.node_id = node_id
-        self.owner_id = owner_id
-        self.volume_id = volume_id
-        self.op_type = op_type
-        self.path = path
-        self.generation = generation
-        self.mimetype = mimetype
-        self.old_path = old_path
-        self.extra_data = extra_data
+    def __unicode__(self):
+        return 'TransactionLog: owner_id %r volume_id %r op_type %r' % (
+            self.owner_id, self.volume_id, self.op_type)
 
     @property
     def extra_data_dict(self):
-        """A dictionary obtained by json.load()ing self.extra_data, or None if
-        self.extra_data is None.
-        """
+        """A dictionary obtained by json.loading self.extra_data."""
         if self.extra_data is None:
             return self.extra_data
         return json.loads(self.extra_data)
 
     @classmethod
     def bootstrap(cls, user):
-        store = get_filesync_store()
         cls.record_user_created(user)
         # Number of TransactionLog rows we inserted.
         rows = 1
 
-        for udf in store.find(UserVolume, owner_id=user.id,
-                              status=STATUS_LIVE):
+        for udf in UserVolume.objects.filter(owner=user, status=STATUS_LIVE):
             cls.record_udf_created(udf)
             rows += 1
+            # If this becomes a problem it can be done as a single INSERT, but
+            # we'd need to duplicate the get_absolute_url() in plpython.
+            for directory in udf.storageobject_set.filter(
+                    kind=StorageObject.DIRECTORY, status=STATUS_LIVE,
+                    public_uuid__isnull=False):
+                cls.record_public_access_change(directory)
+                rows += 1
 
-        # If this becomes a problem it can be done as a single INSERT, but
-        # we'd need to duplicate the get_public_file_url() in plpython.
-        udf_join = Join(
-            StorageObject,
-            UserVolume, StorageObject.volume_id == UserVolume.id)
-        conditions = [StorageObject.kind == StorageObject.DIRECTORY,
-                      StorageObject.owner_id == user.id,
-                      StorageObject.status == STATUS_LIVE,
-                      StorageObject._publicfile_id != None,  # NOQA
-                      UserVolume.status == STATUS_LIVE]
-        dirs = store.using(udf_join).find(StorageObject, *conditions)
-        for directory in dirs:
-            cls.record_public_access_change(directory)
+        nodes = StorageObject.objects.exclude(
+            kind=StorageObject.DIRECTORY).filter(
+                status=STATUS_LIVE, volume__status=STATUS_LIVE,
+                volume__owner__id=user.id)
+        for node in nodes:
+            cls.record_put_content(node)
             rows += 1
-
-        # XXX: If this takes too long it will get killed by the transaction
-        # watcher. Need to check what's the limit we could have here.
-        # Things to check:
-        #  * If it still takes too long, we could find out the IDs of the
-        #    people who have a lot of music/photos, run it just for them with
-        #    the transaction watcher disabled and then run it for everybody
-        #    else afterwards.
-        query = """
-            INSERT INTO txlog_transaction_log (
-                node_id, owner_id, volume_id, op_type, path, generation,
-                mimetype, extra_data)
-            SELECT O.id, O.owner_id, O.volume_id, ?,
-                   txlog_path_join(O.path, O.name), O.generation, O.mimetype,
-                   txlog_get_extra_data_to_recreate_file_1(
-                        kind, size, storage_key, publicfile_id,
-                        public_uuid, content_hash,
-                        extract(epoch from O.when_created at time zone 'UTC'),
-                        extract(epoch
-                                from O.when_last_modified at time zone 'UTC'),
-                        UserDefinedFolder.path
-                    ) as extra_data
-            FROM Object as O
-            JOIN UserDefinedFolder on UserDefinedFolder.id = O.volume_id
-            LEFT JOIN ContentBlob on ContentBlob.hash = O.content_hash
-            WHERE
-                O.kind != 'Directory'
-                AND O.owner_id = ?
-                AND O.status = 'Live'
-                AND UserDefinedFolder.status = 'Live'
-            """
-        params = (cls.OPERATIONS_MAP[cls.OP_PUT_CONTENT], user.id)
-        rows += store.execute(query, params=params).rowcount
 
         # Cannot create TransactionLogs for Shares in a single INSERT like
         # above because TransactionLogs and Shares live in separate databases.
-        share_join = LeftJoin(
-            Share, StorageUser, Share.shared_to == StorageUser.id)
-        conditions = [Share.shared_by == user.id,
-                      Share.status == STATUS_LIVE,
-                      Share.accepted == True]  # NOQA
-        shares = get_filesync_store().using(share_join).find(
-            Share, *conditions)
+        shares = Share.objects.filter(
+            shared_by=user, status=STATUS_LIVE, accepted=True)
         for share in shares:
             cls.record_share_accepted(share)
             rows += 1
@@ -193,11 +138,11 @@ class TransactionLog(object):
         """Create a TransactionLog representing a new UserVolume."""
         when_created = get_epoch_secs(udf.when_created)
         extra_data = json.dumps(dict(when_created=when_created))
-        txlog = cls(
-            None, udf.owner_id, udf.id, cls.OP_UDF_CREATED,
-            udf.path, mimetype=None, generation=udf.generation,
-            extra_data=extra_data.decode('ascii'))
-        return Store.of(udf).add(txlog)
+        txlog = cls.objects.create(
+            node_id=None, owner_id=udf.owner.id, volume_id=udf.id,
+            op_type=cls.OP_UDF_CREATED, path=udf.path,
+            generation=udf.generation, extra_data=extra_data)
+        return txlog
 
     @classmethod
     def record_udf_deleted(cls, udf):
@@ -214,9 +159,10 @@ class TransactionLog(object):
         generation in all TransactionLogs created.
         """
         rows = 1
-        Store.of(udf).add(cls(
-            None, udf.owner_id, udf.id, cls.OP_UDF_DELETED,
-            udf.path, mimetype=None, generation=udf.generation))
+        cls.objects.create(
+            node_id=None, owner_id=udf.owner.id, volume_id=udf.id,
+            op_type=cls.OP_UDF_DELETED, path=udf.path,
+            generation=udf.generation)
         rows += cls._record_unlink_tree(udf.root_node, udf.generation)
         return rows
 
@@ -233,12 +179,12 @@ class TransactionLog(object):
         the ID of the newly created user.
         """
         extra_data = json.dumps(dict(
-            name=user.username, visible_name=user.visible_name))
-        txlog = cls(
-            None, user.id, None, cls.OP_USER_CREATED, None, None,
-            extra_data=extra_data.decode('ascii'))
-        store = get_filesync_store()
-        return store.add(txlog)
+            name=user.username, first_name=user.first_name,
+            last_name=user.last_name))
+        txlog = cls.objects.create(
+            node_id=None, owner_id=user.id, volume_id=None, path=None,
+            op_type=cls.OP_USER_CREATED, extra_data=extra_data)
+        return txlog
 
     @classmethod
     def record_public_access_change(cls, node):
@@ -252,13 +198,13 @@ class TransactionLog(object):
         @param node: The StorageObject that was made public/private.
         @return: The newly created TransactionLog.
         """
-        extra_data = json.dumps(
-            cls._get_extra_data_for_new_node(node, node.volume.path))
-        txlog = cls(
-            node.id, node.owner_id, node.volume_id,
-            cls.OP_PUBLIC_ACCESS_CHANGED, node.full_path, node.mimetype,
-            generation=node.generation, extra_data=extra_data.decode('ascii'))
-        return Store.of(node).add(txlog)
+        extra_data = cls.extra_data_new_node(node)
+        txlog = cls.objects.create(
+            node_id=node.id, owner_id=node.volume.owner.id,
+            volume_id=node.volume.id, op_type=cls.OP_PUBLIC_ACCESS_CHANGED,
+            path=node.full_path, mimetype=node.mimetype or None,
+            generation=node.generation, extra_data=json.dumps(extra_data))
+        return txlog
 
     @classmethod
     def record_put_content(cls, node):
@@ -267,22 +213,21 @@ class TransactionLog(object):
         @param node: The StorageObject which points to the content uploaded.
         @return: The newly created TransactionLog.
         """
-        extra_data = json.dumps(
-            cls._get_extra_data_for_new_node(node, node.volume.path))
-        txlog = cls(
-            node.id, node.owner_id, node.volume_id, cls.OP_PUT_CONTENT,
-            node.full_path, node.mimetype, generation=node.generation,
-            extra_data=extra_data.decode('ascii'))
-        return Store.of(node).add(txlog)
+        extra_data = cls.extra_data_new_node(node)
+        txlog = cls.objects.create(
+            node_id=node.id, owner_id=node.volume.owner.id,
+            volume_id=node.volume.id, op_type=cls.OP_PUT_CONTENT,
+            path=node.full_path, mimetype=node.mimetype or None,
+            generation=node.generation, extra_data=json.dumps(extra_data))
+        return txlog
 
     @classmethod
-    def _get_extra_data_for_new_node(cls, node, volume_path):
+    def extra_data_new_node(cls, node):
         """A dict containing the extra data needed to re-create this node.
 
-        @param node: Could be a StorageObject or a StorageNode(DAO)
-        @param volume_path: the path of the node's volume
+        @param node: StorageObject
 
-        This includes the kind, size, storage_key, publicfile_id, public_uuid,
+        This includes the kind, size, storage_key, public_uuid,
         content_hash and creation date of the given node.
 
         It is supposed to be included in the extra_data of all TransactionLogs
@@ -300,17 +245,15 @@ class TransactionLog(object):
             public_uuid = unicode(public_uuid)
         when_created = get_epoch_secs(node.when_created)
         last_modified = get_epoch_secs(node.when_last_modified)
-        d = dict(publicfile_id=node.publicfile_id, public_uuid=public_uuid,
-                 when_created=when_created,
+        d = dict(public_uuid=public_uuid, when_created=when_created,
                  last_modified=last_modified, kind=node.kind,
-                 volume_path=volume_path)
+                 volume_path=node.volume.path)
         if node.kind == StorageObject.FILE:
-            d['content_hash'] = node.content_hash
-            d['size'] = getattr(node.content, 'size', None)
-            storage_key = getattr(node.content, 'storage_key', None)
-            if storage_key is not None:
-                storage_key = unicode(storage_key)
-            d['storage_key'] = storage_key
+            d['content_hash'] = (
+                bytes(node.content_blob.hash) if node.content_blob else None)
+            d['size'] = getattr(node.content_blob, 'size', None)
+            storage_key = getattr(node.content_blob, 'storage_key', None)
+            d['storage_key'] = unicode(storage_key) if storage_key else None
         return d
 
     @classmethod
@@ -333,19 +276,20 @@ class TransactionLog(object):
 
     @classmethod
     def _record_share_accepted_or_deleted(cls, share, op_type):
-        store = get_filesync_store()
-        node = store.get(StorageObject, share.subtree)
+        node = share.subtree
         when_last_changed = share.when_last_changed
+        shared_to = share.shared_to.id if share.shared_to else share.email
         extra_data = dict(
-            shared_to=share.shared_to, share_id=str(share.id),
+            shared_to=shared_to, share_id=str(share.id),
             share_name=share.name, access_level=share.access,
             when_shared=get_epoch_secs(share.when_shared),
             when_last_changed=get_epoch_secs(when_last_changed))
-        txlog = cls(
-            node.id, node.owner_id, node.volume_id, op_type, node.full_path,
-            node.mimetype, generation=None,
-            extra_data=json.dumps(extra_data).decode('ascii'))
-        return Store.of(node).add(txlog)
+        txlog = cls.objects.create(
+            node_id=node.id, owner_id=node.volume.owner.id,
+            volume_id=node.volume.id, op_type=op_type, path=node.full_path,
+            mimetype=node.mimetype or None, generation=None,
+            extra_data=json.dumps(extra_data))
+        return txlog
 
     @classmethod
     def record_unlink(cls, node):
@@ -365,21 +309,21 @@ class TransactionLog(object):
         @return: The newly created TransactionLog or None.
         """
         extra_data = json.dumps({
-            'kind': node.kind,
-            'volume_path': node.volume.path}).decode('ascii')
-        txlog = cls(
-            node.id, node.owner_id, node.volume_id, cls.OP_DELETE,
-            node.full_path, node.mimetype, generation=generation,
-            extra_data=extra_data)
-        return Store.of(node).add(txlog)
+            'kind': node.kind, 'volume_path': node.volume.path})
+        txlog = cls.objects.create(
+            node_id=node.id, owner_id=node.volume.owner.id,
+            volume_id=node.volume.id, op_type=cls.OP_DELETE,
+            path=node.full_path, mimetype=node.mimetype or None,
+            generation=generation, extra_data=extra_data)
+        return txlog
 
     @classmethod
-    def record_unlink_tree(cls, directory):
+    def record_unlink_tree(cls, directory, descendants):
         """See _record_unlink_tree."""
-        cls._record_unlink_tree(directory, directory.generation)
+        cls._record_unlink_tree(directory, directory.generation, descendants)
 
     @classmethod
-    def _record_unlink_tree(cls, directory, generation):
+    def _record_unlink_tree(cls, directory, generation, descendants=None):
         """Create TransactionLog entries representing an unlink_tree operation.
 
         We create one TransactionLog entry for the given directory and each of
@@ -395,118 +339,149 @@ class TransactionLog(object):
         assert directory.kind == StorageObject.DIRECTORY, (
             "The given node is not a directory.")
         cls._record_unlink(directory, generation)
-        where_clause, extra_params = (
-            cls._get_interesting_descendants_where_clause(directory))
+        if descendants is None:
+            descendants = directory.descendants
+        # We use this code to explode UDF operations and in those cases we
+        # will delete the root of a UDF, so we add this extra clause to
+        # avoid the query above picking up the root folder as a descendant
+        # of itself.
+        if directory.path == '/':
+            assert directory.id not in [d.id for d in descendants]
         # Here we construct the extra_data json manually because it's trivial
         # enough and the alternative would be to use a stored procedure, which
         # requires a DB patch.
-        sql = """
-            INSERT INTO txlog_transaction_log (
-                node_id, owner_id, volume_id, op_type, path, generation,
-                mimetype, extra_data)
-            SELECT Object.id, Object.owner_id, Object.volume_id, ?,
-                   txlog_path_join(Object.path, Object.name),
-                   ?, Object.mimetype,
-                  '{"kind": "' || Object.kind || '",
-                  "volume_path": "' || UserDefinedFolder.path || '"}'
-            FROM Object, UserDefinedFolder
-            WHERE Object.volume_id = UserDefinedFolder.id AND
-            """ + where_clause
-        params = (cls.OPERATIONS_MAP[cls.OP_DELETE], generation)
-        result = Store.of(directory).execute(
-            sql, params=params + extra_params)
-        # TODO: Store the rowcount in our metrics.
-        return result.rowcount
+        for node in descendants:
+            extra_data = json.dumps(
+                {'kind': node.kind, 'volume_path': node.volume.path})
+            cls.objects.create(
+                node_id=node.id, owner_id=node.volume.owner.id,
+                volume_id=node.volume.id, op_type=cls.OP_DELETE,
+                path=node.full_path, generation=node.generation,
+                mimetype=node.mimetype or None, extra_data=extra_data)
+
+        return len(descendants)
 
     @classmethod
-    def record_move(cls, node, old_name, old_parent):
+    def record_move(cls, node, old_name, old_parent, descendants):
         """Create TransactionLog entries representing a move operation.
 
-        This must be called after the actual move is performed because we
-        assume the attributes of the given node and its descendants have
-        already been updated.
+        The 'descendants' list is the list of descendants from node before
+        the moving that were affected by path rename.
+
         """
         if node.parent == old_parent and node.name == old_name:
             raise ValueError(
                 "The old name and parent are the same as the current ones.")
 
-        old_path = os.path.join(old_parent.full_path, old_name)
+        old_parent_path = os.path.join(old_parent.full_path, old_name)
+        new_parent_path = node.full_path
         rowcount = 0
 
         # First, create a TransactionLog for the actual file/directory
         # being moved.
-        extra_data = json.dumps(cls._get_extra_data_for_new_node(
-            node, node.volume.path))
-        txlog = cls(
-            node.id, node.owner_id, node.volume_id, cls.OP_MOVE,
-            node.full_path, node.mimetype, generation=node.generation,
-            old_path=old_path, extra_data=extra_data.decode('ascii'))
-        Store.of(node).add(txlog)
+        extra_data = cls.extra_data_new_node(node)
+        cls.objects.create(
+            node_id=node.id, owner_id=node.volume.owner.id,
+            volume_id=node.volume.id, op_type=cls.OP_MOVE,
+            path=new_parent_path, old_path=old_parent_path,
+            mimetype=node.mimetype or None, generation=node.generation,
+            extra_data=json.dumps(extra_data))
         rowcount += 1
 
-        if node.kind == StorageObject.DIRECTORY:
+        if node.is_dir:
             # Now we generate a TransactionLog for every interesting
             # descendant of the directory that is being moved.
-            old_path_base = os.path.join(old_parent.full_path, old_name)
-            where_clause, extra_params = (
-                cls._get_interesting_descendants_where_clause(node))
-            sql = """
-                INSERT INTO txlog_transaction_log (
-                    node_id, owner_id, volume_id, op_type, path, generation,
-                    mimetype, old_path, extra_data)
-                SELECT Object.id, Object.owner_id, Object.volume_id, ?,
-                   Object.path || '/' || Object.name, ?, Object.mimetype,
-                   ? || substring(Object.path from ?) || '/' || Object.name,
-                   txlog_get_extra_data_to_recreate_file_1(
-                       Object.kind,
-                       ContentBlob.size,
-                       ContentBlob.storage_key,
-                       Object.publicfile_id,
-                       Object.public_uuid,
-                       Object.content_hash,
-                       extract(epoch from Object.when_created
-                               at time zone 'UTC'),
-                       extract(epoch from Object.when_last_modified
-                               at time zone 'UTC'),
-                       UserDefinedFolder.path
-                    ) as extra_data
-                FROM Object
-                JOIN UserDefinedFolder
-                    on UserDefinedFolder.id = Object.volume_id
-                LEFT JOIN ContentBlob on ContentBlob.hash = Object.content_hash
-                WHERE Object.volume_id = UserDefinedFolder.id AND
-                """ + where_clause
-            params = (
-                cls.OPERATIONS_MAP[cls.OP_MOVE], node.generation,
-                old_path_base, len(node.full_path) + 1)
-            result = Store.of(node).execute(sql, params=params + extra_params)
-            rowcount += result.rowcount
-        # TODO: Store the rowcount in our metrics.
+            # We use this code to explode UDF operations and in those cases we
+            # will delete the root of a UDF, so we add this extra clause to
+            # avoid the query above picking up the root folder as a descendant
+            # of itself.
+            if node.path == '/':
+                assert node.id not in [d.id for d in descendants]
+
+            for n in descendants:
+                old_path = n.full_path
+                new_path = old_path.replace(old_parent_path, new_parent_path)
+                extra_data = cls.extra_data_new_node(n)
+                cls.objects.create(
+                    node_id=n.id, owner_id=n.volume.owner.id,
+                    volume_id=n.volume.id, op_type=cls.OP_MOVE,
+                    path=new_path, generation=node.generation,
+                    mimetype=n.mimetype or None,
+                    extra_data=json.dumps(extra_data), old_path=old_path)
+
+                rowcount += 1
+
         return rowcount
 
-    @classmethod
-    def _get_interesting_descendants_where_clause(cls, node):
-        """Return the WHERE clause to get the interesting descendants of node.
+    def as_dict(self):
+        result = dict(
+            txn_id=self.id, node_id=self.node_id, volume_id=self.volume_id,
+            owner_id=self.owner_id, op_type=self.op_type, path=self.path,
+            generation=self.generation, timestamp=self.timestamp,
+            mimetype=self.mimetype, old_path=self.old_path,
+            extra_data=self.extra_data)
+        return result
 
-        @return: A two-tuple containing the SQL clauses and the params to be
-            interpolated. They are suitable to be used with Storm's
-            store.execute() API.
-        """
-        sql = """
-            Object.volume_id = ?
-            -- See comment on StorageObject.get_descendants() as to why we
-            -- need to OR the two clauses below.
-            AND (Object.parent_id = ?
-                 OR Object.path LIKE ? || '%%')
-            AND Object.status = 'Live'
-            """
-        base_path = get_path_startswith(node)
-        params = (node.volume_id, node.id, base_path)
-        # We use this code to explode UDF operations and in those cases we
-        # will delete the root of a UDF, so we add this extra clause to avoid
-        # the query above picking up the root folder as a descendant of
-        # itself.
-        if node.path == '/':
-            sql += " AND Object.id != ?"
-            params = params + (node.id,)
-        return sql, params
+
+class DBWorkerLastRow(models.Model):
+
+    txlog = models.ForeignKey(TransactionLog, null=True)
+    worker_id = models.TextField()
+
+
+class DBWorkerUnseen(models.Model):
+
+    worker_id = models.TextField()
+    created = models.DateTimeField(default=now)
+
+
+@receiver(content_changed, sender=StorageObject)
+def storage_object_content_changed(sender, instance, content_added, **kwargs):
+    if content_added:
+        TransactionLog.record_put_content(instance)
+
+
+@receiver(node_moved, sender=StorageObject)
+def storage_object_node_moved(
+        sender, instance, old_name, old_parent, descendants, **kwargs):
+    TransactionLog.record_move(instance, old_name, old_parent, descendants)
+
+
+@receiver(post_save, sender=Share)
+def share_post_save_handler(sender, instance, **kwargs):
+    if instance.status == STATUS_DEAD:
+        TransactionLog.record_share_deleted(instance)
+    elif instance.accepted:
+        TransactionLog.record_share_accepted(instance)
+
+
+@receiver(post_save, sender=StorageUser)
+def user_post_save_handler(sender, instance, created, **kwargs):
+    if created:
+        TransactionLog.record_user_created(instance)
+
+
+@receiver(post_save, sender=UserVolume)
+def user_volume_post_save_handler(sender, instance, created, **kwargs):
+    if created:
+        TransactionLog.record_udf_created(instance)
+
+
+@receiver(post_unlink_tree, sender=StorageObject)
+def storage_object_post_unlink_tree(sender, instance, descendants, **kwargs):
+    TransactionLog.record_unlink_tree(instance, descendants)
+
+
+@receiver(post_kill, sender=UserVolume)
+def user_volume_post_kill_handler(sender, instance, **kwargs):
+    TransactionLog.record_udf_deleted(instance)
+
+
+@receiver(post_kill, sender=StorageObject)
+def storage_object_post_kill(sender, instance, **kwargs):
+    TransactionLog.record_unlink(instance)
+
+
+@receiver(public_access_changed, sender=StorageObject)
+def storage_object_public_access_changed(sender, instance, public, **kwargs):
+    TransactionLog.record_public_access_change(instance)

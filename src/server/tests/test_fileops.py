@@ -23,7 +23,6 @@ from StringIO import StringIO
 from twisted.internet import threads, defer
 
 from backends.filesync import errors
-from backends.filesync.dbmanager import fsync_readonly
 from backends.filesync.models import STATUS_LIVE, STATUS_DEAD
 from ubuntuone.storageprotocol import request
 from ubuntuone.storageprotocol import errors as protocol_errors
@@ -154,7 +153,7 @@ class TestUnlink(TestWithDatabase):
     def test_unlink(self):
         """Test unlinking a file."""
         def auth(client):
-            @fsync_readonly
+
             def get_file_status():
                 file_id = self._state.file
                 try:
@@ -194,7 +193,7 @@ class TestUnlink(TestWithDatabase):
     def test_unlink_dir(self):
         """Test unlinking a dir."""
         def auth(client):
-            @fsync_readonly
+
             def get_dir_status():
                 file_id = self._state.file
                 try:

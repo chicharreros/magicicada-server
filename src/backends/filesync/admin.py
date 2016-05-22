@@ -20,8 +20,10 @@
 
 from __future__ import unicode_literals
 
+from django.contrib import admin
+
 from backends.filesync import services
-from backends.filesync.dbmanager import fsync_readonly, get_filesync_store
+from backends.filesync.dbmanager import fsync_readonly
 from backends.filesync.models import StorageUser
 
 
@@ -37,14 +39,11 @@ class StorageUserFinder(object):
 
     def _find_users(self):
         """Perform query based on current filter."""
-        store = get_filesync_store()
-        conditions = []
         if self.filter is not None:
-            filter = unicode("%" + self.filter + "%")
-            conditions.append(
-                StorageUser.username.like(filter, case_sensitive=False))
-        return store.find(StorageUser, *conditions).order_by(
-            StorageUser.username)
+            users = StorageUser.objects.filter(username__icontains=self.filter)
+        else:
+            users = StorageUser.objects.all()
+        return users.order_by('username')
 
     def _get_dao_from_result(self, result):
         """Convert the result to a StorageUser DAO."""
@@ -68,7 +67,7 @@ class StorageUserFinder(object):
     @fsync_readonly
     def is_empty(self):
         """Return True if there are no results."""
-        return self._find_users().is_empty()
+        return not self._find_users().exists()
 
     @fsync_readonly
     def __getitem__(self, index):
@@ -78,3 +77,6 @@ class StorageUserFinder(object):
         if isinstance(result, StorageUser):
             return self._get_dao_from_result(result)
         return [self._get_dao_from_result(r) for r in result]
+
+
+admin.site.register(StorageUser)

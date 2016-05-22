@@ -46,7 +46,7 @@ class TestListVolumes(TestWithDatabase):
             self.assertEqual(root.volume_id, None)
             self.assertEqual(str(root.node_id), root_node_id)
             self.assertEqual(root.generation, 0)
-            self.assertEqual(root.free_bytes, self.usr0.get_quota().free_bytes)
+            self.assertEqual(root.free_bytes, self.usr0.free_bytes)
         return self.callback_test(auth, add_default_callbacks=True)
 
     def test_root_only_with_generation(self):
@@ -64,7 +64,7 @@ class TestListVolumes(TestWithDatabase):
             self.assertEqual(root.volume_id, None)
             self.assertEqual(str(root.node_id), root_node_id)
             self.assertEqual(root.generation, 1)
-            self.assertEqual(root.free_bytes, self.usr0.get_quota().free_bytes)
+            self.assertEqual(root.free_bytes, self.usr0.free_bytes)
         return self.callback_test(auth, add_default_callbacks=True)
 
     def test_one_share_offered(self):
@@ -155,7 +155,7 @@ class TestListVolumes(TestWithDatabase):
             self.assertEqual(root.volume_id, None)
             self.assertEqual(str(root.node_id), client_root)
             self.assertEqual(root.generation, 1)
-            self.assertEqual(root.free_bytes, self.usr0.get_quota().free_bytes)
+            self.assertEqual(root.free_bytes, self.usr0.free_bytes)
             # test share
             share = [v for v in req.volumes if isinstance(v, ShareVolume)][0]
             self.assertEqual(share.volume_id, _share.id)
@@ -165,8 +165,7 @@ class TestListVolumes(TestWithDatabase):
             self.assertEqual(share.other_username, self.usr1.username)
             self.assertEqual(share.accepted, True)
             self.assertEqual(share.access_level, Share.VIEW)
-            self.assertEqual(share.free_bytes,
-                             self.usr1.get_quota().free_bytes)
+            self.assertEqual(share.free_bytes, self.usr1.free_bytes)
 
         return self.callback_test(auth, add_default_callbacks=True)
 
@@ -192,7 +191,7 @@ class TestListVolumes(TestWithDatabase):
             self.assertEqual(root.volume_id, None)
             self.assertEqual(str(root.node_id), client_root)
             self.assertEqual(root.generation, 1)
-            self.assertEqual(root.free_bytes, self.usr0.get_quota().free_bytes)
+            self.assertEqual(root.free_bytes, self.usr0.free_bytes)
             # test share
             share = [v for v in req.volumes if isinstance(v, ShareVolume)][0]
             self.assertEqual(share.volume_id, _share.id)
@@ -202,8 +201,7 @@ class TestListVolumes(TestWithDatabase):
             self.assertEqual(share.other_username, self.usr1.username)
             self.assertEqual(share.accepted, True)
             self.assertEqual(share.access_level, Share.VIEW)
-            self.assertEqual(share.free_bytes,
-                             self.usr1.get_quota().free_bytes)
+            self.assertEqual(share.free_bytes, self.usr1.free_bytes)
             self.assertEqual(share.generation, 1)
 
         return self.callback_test(auth, add_default_callbacks=True)
@@ -231,14 +229,14 @@ class TestListVolumes(TestWithDatabase):
             self.assertEqual(root.volume_id, None)
             self.assertEqual(str(root.node_id), client_root)
             self.assertEqual(root.generation, 1)
-            self.assertEqual(root.free_bytes, self.usr0.get_quota().free_bytes)
+            self.assertEqual(root.free_bytes, self.usr0.free_bytes)
             # test udf
             udf = [v for v in req.volumes if isinstance(v, UDFVolume)][0]
             self.assertEqual(str(udf.volume_id), client_udf.volume_id)
             self.assertEqual(str(udf.node_id), client_udf.node_id)
             self.assertEqual(udf.suggested_path, u"~/ñ/foo")
             self.assertEqual(udf.generation, 1)
-            self.assertEqual(udf.free_bytes, self.usr0.get_quota().free_bytes)
+            self.assertEqual(udf.free_bytes, self.usr0.free_bytes)
 
         return self.callback_test(auth, add_default_callbacks=True)
 
@@ -312,7 +310,7 @@ class TestListVolumes(TestWithDatabase):
             self.assertEqual(str(udf.volume_id), self._state.udf.volume_id)
             self.assertEqual(str(udf.node_id), self._state.udf.node_id)
             self.assertEqual(udf.suggested_path, u"~/ñ/foo")
-            self.assertEqual(udf.free_bytes, self.usr0.get_quota().free_bytes)
+            self.assertEqual(udf.free_bytes, self.usr0.free_bytes)
 
             # test share
             share = [v for v in req.volumes if isinstance(v, ShareVolume)][0]
@@ -323,8 +321,7 @@ class TestListVolumes(TestWithDatabase):
             self.assertEqual(share.other_username, self.usr2.username)
             self.assertEqual(share.accepted, True)
             self.assertEqual(share.access_level, Share.VIEW)
-            self.assertEqual(share.free_bytes,
-                             self.usr1.get_quota().free_bytes)
+            self.assertEqual(share.free_bytes, self.usr1.free_bytes)
 
         @defer.inlineCallbacks
         def auth(client):

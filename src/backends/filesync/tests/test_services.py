@@ -30,18 +30,18 @@ from backends.filesync.services import (
     DAOStorageUser,
     get_abandoned_uploadjobs,
     get_node,
-    get_user_info,
     get_public_file,
     get_public_directory,
     get_storage_user,
     make_storage_user,
 )
-from backends.filesync.tests.testcase import StorageDALTestCase
+from backends.testing.testcase import BaseTestCase
+
 
 MAX_STORAGE_BYTES = 10 * 23
 
 
-class DataServicesTestCase(StorageDALTestCase):
+class DataServicesTestCase(BaseTestCase):
     """Test the DataServices.
 
     Since all the logic is in lower level tests, these tests are kept
@@ -49,34 +49,27 @@ class DataServicesTestCase(StorageDALTestCase):
     """
 
     def assert_storage_user(
-            self, storage_user, user_id, visible_name, max_storage_bytes):
+            self, storage_user, max_storage_bytes, visible_name):
         self.assertIsInstance(storage_user, DAOStorageUser)
-        self.assertEqual(storage_user.id, user_id)
         self.assertEqual(storage_user.visible_name, visible_name)
-        quota = storage_user.get_quota()
-        self.assertEqual(quota.max_storage_bytes, max_storage_bytes)
+        self.assertEqual(storage_user.max_storage_bytes, max_storage_bytes)
 
     def test_make_storage_user(self):
         """Test the make_storage_user function."""
         storage_user = make_storage_user(
-            1, "Cool UserName", "Visible Name", MAX_STORAGE_BYTES)
+            username="Cool UserName", max_storage_bytes=MAX_STORAGE_BYTES,
+            visible_name="Visible Name")
         self.assert_storage_user(
-            storage_user, 1, "Visible Name", MAX_STORAGE_BYTES)
+            storage_user, MAX_STORAGE_BYTES, visible_name='Visible Name')
 
     def test_get_storage_user(self):
         """Test the get_storage_user function."""
         user = make_storage_user(
-            1, "Cool UserName", "Visible Name", MAX_STORAGE_BYTES)
-        user = get_storage_user(1)
+            "Cool UserName", MAX_STORAGE_BYTES, visible_name='Visible Name')
+        user = get_storage_user(user.id)
         self.assertTrue(isinstance(user, DAOStorageUser))
-        user.update(subscription=False)
-        self.assertRaises(errors.DoesNotExist, get_storage_user, 1)
-        user = get_storage_user(1, active_only=False)
-        user.update(subscription=True)
         # now check a locked user.
-        suser = self.store.get(StorageUser, user.id)
-        suser.locked = True
-        self.store.commit()
+        StorageUser.objects.filter(id=user.id).update(locked=True)
         self.assertRaises(errors.LockedUserError, get_storage_user, user.id)
         # and ignore the lock too
         user = get_storage_user(user.id, readonly=True)
@@ -84,26 +77,13 @@ class DataServicesTestCase(StorageDALTestCase):
 
     def test_get_node(self):
         """Test the get_node function."""
-        user1 = self.factory.make_user(
-            1, "User 1", "User 1", MAX_STORAGE_BYTES)
+        user1 = make_storage_user("User 1", MAX_STORAGE_BYTES)
         node = user1.volume().root.make_file("test file")
         new_node = get_node(node.id)
         self.assertEqual(node.id, new_node.id)
         self.assertEqual(node.parent_id, new_node.parent_id)
         self.assertEqual(node.name, new_node.name)
         self.assertEqual(node.path, new_node.path)
-
-    def test_get_user_info(self):
-        """Test the get_user_info function."""
-        user = self.factory.make_user(
-            1, "User 1", "User 1", MAX_STORAGE_BYTES)
-        user_info = get_user_info(user.id)
-        quota = user.get_quota()
-        self.assertEqual(quota.max_storage_bytes, user_info.max_storage_bytes)
-        self.assertEqual(
-            quota.used_storage_bytes, user_info.used_storage_bytes)
-        self.assertEqual(quota.free_bytes, user_info.free_bytes)
-        self.assertRaises(errors.DoesNotExist, get_user_info, 41)
 
     def test_get_abandoned_uploadjobs(self):
         """Test the get_abandoned_uploadjobs function."""
@@ -113,8 +93,7 @@ class DataServicesTestCase(StorageDALTestCase):
 
     def test_get_public_file(self):
         """Test the get_public_file function."""
-        user = self.factory.make_user(
-            1, "Cool UserName", "Visible Name", 10)
+        user = make_storage_user("Cool UserName", 10)
         a_file = user.volume().root.make_file_with_content(
             "file.txt", self.factory.get_fake_hash(), 123, 1, 1, uuid.uuid4())
         a_file.change_public_access(True)
@@ -126,8 +105,7 @@ class DataServicesTestCase(StorageDALTestCase):
 
     def test_get_public_directory(self):
         """Test the get_public_directory function."""
-        user = self.factory.make_user(
-            1, "Cool UserName", "Visible Name", 10)
+        user = make_storage_user("Cool UserName", 10)
         a_dir = user.volume().root.make_subdirectory('test_dir')
         a_dir.make_file_with_content(
             "file.txt", self.factory.get_fake_hash(), 123, 1, 1, uuid.uuid4())
@@ -141,8 +119,7 @@ class DataServicesTestCase(StorageDALTestCase):
 
     def test_get_public_file_public_uuid(self):
         """Test the get_public_file function."""
-        user = self.factory.make_user(
-            1, "Cool UserName", "Visible Name", 10)
+        user = make_storage_user("Cool UserName", 10)
         a_file = user.volume().root.make_file_with_content(
             "file.txt", self.factory.get_fake_hash(), 123, 1, 1, uuid.uuid4())
         a_file.change_public_access(True)

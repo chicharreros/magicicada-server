@@ -23,10 +23,11 @@ import zlib
 
 from StringIO import StringIO
 
+from django.db import transaction
 from twisted.internet import threads, defer
 from twisted.internet.protocol import connectionDone
 
-from backends.filesync.dbmanager import get_filesync_store, filesync_tm
+from backends.filesync import services
 from backends.filesync.models import ContentBlob
 from ubuntuone.storageprotocol import request, client
 from ubuntuone.storageprotocol.content_hash import content_hash_factory, crc32
@@ -148,16 +149,13 @@ class TestThrottling(TestWithDatabase):
 
             def check_file(result):
 
+                @transaction.atomic
                 def _check_file():
-                    filesync_tm.begin()
-                    try:
-                        store = get_filesync_store()
-                        content_blob = store.get(ContentBlob, hash_value)
-                        if not content_blob:
-                            raise ValueError("content blob is not there")
-                    finally:
+                    content_blob = services.get_object_or_none(
+                        ContentBlob, hash=hash_value)
+                    if not content_blob:
+                        raise ValueError("content blob is not there")
 
-                        filesync_tm.abort()
                 d = threads.deferToThread(_check_file)
                 return d
 
@@ -199,15 +197,12 @@ class TestThrottling(TestWithDatabase):
 
             def check_file(result):
 
+                @transaction.atomic
                 def _check_file():
-                    filesync_tm.begin()
-                    try:
-                        store = get_filesync_store()
-                        content_blob = store.get(ContentBlob, hash_value)
-                        if not content_blob:
-                            raise ValueError("content blob is not there")
-                    finally:
-                        filesync_tm.abort()
+                    content_blob = services.get_object_or_none(
+                        ContentBlob, hash=hash_value)
+                    if not content_blob:
+                        raise ValueError("content blob is not there")
 
                 d = threads.deferToThread(_check_file)
                 return d

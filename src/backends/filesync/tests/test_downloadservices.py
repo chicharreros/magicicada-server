@@ -22,17 +22,17 @@ from __future__ import unicode_literals
 
 import uuid
 
-from backends.filesync import downloadservices
+from backends.filesync import downloadservices, services
 from backends.filesync.models import Download
-from backends.filesync.tests.testcase import StorageDALTestCase
+from backends.testing.testcase import BaseTestCase
 
 
-class DownloadServicesTestCase(StorageDALTestCase):
+class DownloadServicesTestCase(BaseTestCase):
     """Test DownloadServices."""
 
     def setUp(self):
         super(DownloadServicesTestCase, self).setUp()
-        self.user = self.factory.make_user(1, "username", "", 1000)
+        self.user = services.make_storage_user("username", 1000)
         self.volume_id = self.user.root_volume_id
         self.fpath = "/a/b/c/d/e/file.txt"
         self.dl_url = "http://downloadme"
@@ -51,7 +51,7 @@ class DownloadServicesTestCase(StorageDALTestCase):
             self.user.id, udf1.id, "path/file", "http://example.com")
         downloadservices.download_error(
             self.user.id, d1.id, "download failed")
-        user2 = self.factory.make_user(2, "User 2", "User 2", 10 * 23)
+        user2 = services.make_storage_user("user2", 10 * 23)
         udf2 = user2.make_udf("~/path/name")
         d2 = downloadservices.make_download(
             user2.id, udf2.id, "path/file", "http://example.com")

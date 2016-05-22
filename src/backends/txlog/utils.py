@@ -20,11 +20,15 @@
 
 from __future__ import unicode_literals
 
-from itertools import imap
+from django.db import transaction
+from django.db.models import Q
+from django.utils.timezone import now, timedelta
 
-from backends.filesync import dbmanager
-
-from backends.txlog.models import TransactionLog
+from backends.txlog.models import (
+    DBWorkerLastRow,
+    DBWorkerUnseen,
+    TransactionLog,
+)
 
 
 NEW_WORKER_LAST_ROW = (0, None)
@@ -33,38 +37,31 @@ UNSEEN_EXPIRES = 24 * 60 * 60
 
 
 def get_last_row(worker_name):
-    """Try to get the id and timestamp of the last processed row for the
-    specific worker name.
+    """Return (id, timestamp) of the last processed row for the 'worker_name'.
 
     If not found, get from the oldest possible row from the table.
 
     If still not found, return a default tuple for new workers.
 
-    Use the store name, rather than a store reference, to sidestep potential
-    thread safety problems.
-
     Transaction management should be performed by the caller.  Since this
     function is read-only, it may be called from code decorated with
     fsync_readonly, or as part of a block of operations decorated with
     fsync_commit.
-    """
-    worker_name = unicode(worker_name)
-    store = dbmanager.get_filesync_store()
 
-    last_row = store.execute("""SELECT row_id, timestamp
-        FROM txlog_db_worker_last_row
-        WHERE worker_id=?""", (worker_name,)).get_one()
-    if not last_row:
-        last_row = store.execute("""SELECT row_id, timestamp
-            FROM txlog_db_worker_last_row
-            ORDER BY row_id LIMIT 1""").get_one()
-    if not last_row:
+    """
+    if DBWorkerLastRow.objects.exists():
+        try:
+            last_row = DBWorkerLastRow.objects.get(worker_id=worker_name)
+        except DBWorkerLastRow.DoesNotExist:
+            last_row = DBWorkerLastRow.objects.all().order_by('txlog__id')[0]
+        last_row = (last_row.txlog.id, last_row.txlog.timestamp)
+    else:
         last_row = NEW_WORKER_LAST_ROW
 
     return last_row
 
 
-def update_last_row(worker_name, row_id, timestamp):
+def update_last_row(worker_name, txlog):
     """Update the id and timestamp of the most recently processed transation
     log entry for a given worker.
 
@@ -75,31 +72,20 @@ def update_last_row(worker_name, row_id, timestamp):
     function writes to the database, it should be called from code blocks
     decorated with fsync_commit.
     """
-    worker_name = unicode(worker_name)
-    store = dbmanager.get_filesync_store()
-    result = store.execute("""UPDATE txlog_db_worker_last_row
-        SET row_id=?, timestamp=?
-        WHERE worker_id=?""", (row_id, timestamp, worker_name))
-    if result.rowcount == 0:
-        result = store.execute(
-            """INSERT INTO txlog_db_worker_last_row
-            (worker_id, row_id, timestamp) VALUES (?, ?, ?)""",
-            (worker_name, row_id, timestamp))
-        if result.rowcount == 0:
-            raise RuntimeError(
-                'Failed to update or insert last row id for worker %s' %
-                worker_name)
+    last_row, created = DBWorkerLastRow.objects.get_or_create(
+        worker_id=worker_name, defaults={'txlog': txlog})
+    if not created:
+        last_row.txlog = txlog
+        last_row.save()
 
 
 def get_txn_recs(num_recs, last_id=0,
                  worker_id=None, expire_secs=None,
                  num_partitions=None, partition_id=None):
-    """Attempt to read num_recs records from the transaction log, starting from
-    the row after last_id, plus any records whose ID is in the db_worker_unseen
-    table.
+    """Attempt to read num_recs records from the transaction log.
 
-    Use the store name, rather than a store reference, to sidestep potential
-    thread safety problems.
+    Start from the row after last_id, plus any records whose ID is in the
+    db_worker_unseen table.
 
     Return a list of up to num_rec dicts representing records from the
     transaction log, starting from the row after last_id, or the beginning of
@@ -109,75 +95,39 @@ def get_txn_recs(num_recs, last_id=0,
 
     Transaction management should be performed by the caller.  Since this
     function is read-only, it may be called from code decorated with
-    fsync_readonly, or as part of a block of operations decorated with
-    fsync_commit.
+    transaction.atomic.
+
     """
     if expire_secs is None:
         expire_secs = UNSEEN_EXPIRES
-    store = dbmanager.get_filesync_store()
-    parameters = (last_id, )
-    select = """
-        SELECT txlog.id, owner_id, node_id, volume_id, op_type, path,
-               generation, timestamp, mimetype, old_path, extra_data
-        FROM txlog_transaction_log AS txlog"""
-    condition = "WHERE id > ?"
-    order_limit = "ORDER BY id LIMIT {}".format(num_recs)
+    txlogs = TransactionLog.objects.filter(id__gt=last_id)
 
     if num_partitions is not None and partition_id is not None:
         unfilter_op_types = (
-            TransactionLog.OP_SHARE_ACCEPTED,
-            TransactionLog.OP_SHARE_DELETED,
+            TransactionLog.OP_SHARE_ACCEPTED, TransactionLog.OP_SHARE_DELETED,
         )
-        unfilter_op_ids = (str(TransactionLog.OPERATIONS_MAP[id])
-                           for id in unfilter_op_types)
-        condition += " AND (MOD(owner_id, ?) = ? OR op_type in ({}))".format(
-            ','.join(unfilter_op_ids)
+        txlogs = txlogs.extra(
+            where=['(MOD(owner_id, %s) = %s OR op_type IN %s)'],
+            params=(num_partitions, partition_id, unfilter_op_types)
         )
-        parameters = parameters + (num_partitions, partition_id)
 
-    query = "({} {} {})".format(select, condition, order_limit)
+    txlogs = txlogs.order_by('id')[:num_recs]
 
     if worker_id is not None and expire_secs:
-        worker_id = unicode(worker_id)
-        join = ("NATURAL JOIN txlog_db_worker_unseen as unseen "
-                "WHERE unseen.worker_id = ? "
-                "AND unseen.created > "
-                "TIMEZONE('UTC'::text, NOW()) - INTERVAL '{} seconds'".format(
-                    expire_secs))
-        query += " UNION ({} {} {}) {};".format(
-            select, join, order_limit, order_limit
-        )
-        parameters = parameters + (worker_id,)
-
-    records = store.execute(query, parameters)
+        threshold = now() - timedelta(seconds=expire_secs)
+        DBWorkerUnseen.objects.filter(
+            worker_id=worker_id, created__gt=threshold)
+        # XXX Unsure how these unseen relate to the txlogs gathered above
 
     result = []
-    for record in records:
-        (row_id, owner_id, node_id, volume_id, op_type, path, generation,
-         timestamp, mimetype, old_path, extra_data) = record
-        op_type = TransactionLog.OPERATIONS_REVERSED_MAP[op_type]
+    for record in txlogs:
         result.append(
-            dict(txn_id=row_id, node_id=node_id, owner_id=owner_id,
-                 volume_id=volume_id, op_type=op_type, path=path,
-                 generation=generation, timestamp=timestamp,
-                 mimetype=mimetype, old_path=old_path, extra_data=extra_data))
-
-    # Now insert unseen directly into db_worker_unseen, avoiding duplicates by
-    # joining again with db_worker_unseen.
-    if result and result[-1]["txn_id"] > last_id and worker_id is not None:
-        insert = ("INSERT INTO txlog_db_worker_unseen (id, worker_id) "
-                  "SELECT gs.id, ? FROM ("
-                  "SELECT gs.id "
-                  "FROM generate_series(?, ?) AS gs(id) "
-                  "LEFT OUTER JOIN txlog_transaction_log AS txlog "
-                  "ON gs.id = txlog.id "
-                  "WHERE txlog.id IS NULL) AS gs "
-                  "LEFT OUTER JOIN txlog_db_worker_unseen AS unseen "
-                  "ON gs.id = unseen.id "
-                  "AND unseen.worker_id = ? "
-                  "WHERE unseen.id IS NULL;")
-        store.execute(insert, (worker_id, last_id,
-                               result[-1]["txn_id"], worker_id))
+            dict(txn_id=record.id, node_id=record.node_id,
+                 owner_id=record.owner_id, volume_id=record.volume_id,
+                 op_type=record.op_type, path=record.path,
+                 generation=record.generation, timestamp=record.timestamp,
+                 mimetype=record.mimetype, old_path=record.old_path,
+                 extra_data=record.extra_data))
 
     return result
 
@@ -197,33 +147,15 @@ def delete_expired_unseen(worker_id, unseen_ids=None,
     """
     if expire_secs is None:
         expire_secs = UNSEEN_EXPIRES
-    worker_id = unicode(worker_id)
-    store = dbmanager.get_filesync_store()
-    deleted = 0
-    condition = ("created < TIMEZONE('UTC'::text, NOW()) "
-                 "     - INTERVAL '{} seconds'".format(expire_secs))
-    query = ("DELETE FROM txlog_db_worker_unseen "
-             "WHERE worker_id = ? ")
-    if unseen_ids is not None:
-        fmt = "({})".format
-        if getattr(unseen_ids, "next", None) is None:
-            unseen_ids = iter(unseen_ids)
-        while True:
-            unseen_args = ",".join(imap(fmt, ichunk(unseen_ids, CHUNK_SIZE)))
-            if not unseen_args:
-                break
-            result = store.execute(
-                query + "AND ({} OR id = ANY(VALUES {}));".format(
-                    condition, unseen_args), (worker_id,))
-            deleted += result.rowcount
-    else:
-        query += "AND {};".format(condition)
-        result = store.execute(query, (worker_id,))
-        deleted = result.rowcount
+    threshold = now() - timedelta(seconds=expire_secs)
+    unseen = DBWorkerUnseen.objects.filter(
+        Q(worker_id=worker_id, created__lt=threshold) | Q(id__in=unseen_ids))
+    deleted = unseen.count()
+    unseen.delete()
     return deleted
 
 
-@dbmanager.fsync_commit
+@transaction.atomic
 def delete_old_txlogs(timestamp_limit, quantity_limit=None):
     """Deletes the old transaction logs.
 
@@ -237,60 +169,45 @@ def delete_old_txlogs(timestamp_limit, quantity_limit=None):
     be deleted.
     """
 
-    store = dbmanager.get_filesync_store()
-    parameters = [timestamp_limit]
-    inner_select = "SELECT id FROM txlog_transaction_log WHERE timestamp <= ?"
-
-    if quantity_limit is not None:
-        inner_select += " LIMIT ?"
-        parameters.append(quantity_limit)
-
-    basic_query = ("DELETE FROM txlog_transaction_log WHERE id IN (%s);"
-                   % inner_select)
-    result = store.execute(basic_query, parameters)
-
-    return result.rowcount
+    txlogs = TransactionLog.objects.filter(timestamp__lte=timestamp_limit)
+    result = txlogs.count()
+    if quantity_limit is not None and result > quantity_limit:
+        txlogs = TransactionLog.objects.filter(
+            pk__in=txlogs.values_list('pk')[:quantity_limit])
+        result = quantity_limit
+    txlogs.delete()
+    return result
 
 
-@dbmanager.fsync_commit
+@transaction.atomic
 def delete_txlogs_slice(date, quantity_limit):
     """Deletes txlogs from a certain slice, by date and quantity limit.
 
     Almost the same as delete_old_txlogs, except that it deletes txlogs
     precisely from the provided date (a datetime.date object). Also, the
     quantity_limit parameter is mandatory."""
-
-    store = dbmanager.get_filesync_store()
-    parameters = [date, quantity_limit]
-    inner_select = ("SELECT id FROM txlog_transaction_log "
-                    "WHERE timestamp::date = ? LIMIT ?")
-
-    basic_query = ("DELETE FROM txlog_transaction_log WHERE id IN (%s);"
-                   % inner_select)
-    result = store.execute(basic_query, parameters)
-
-    return result.rowcount
+    txlogs = TransactionLog.objects.filter(
+        timestamp__range=(date, date + timedelta(days=1))).order_by('id')
+    result = txlogs.count()
+    if result > quantity_limit:
+        txlogs = TransactionLog.objects.filter(
+            pk__in=txlogs.values_list('pk')[:quantity_limit])
+        result = quantity_limit
+    txlogs.delete()
+    return result
 
 
 def get_row_by_time(timestamp):
     """Return the smaller txlog row id in that timestamp (or greater)."""
-    store = dbmanager.get_filesync_store()
-    query = """
-        SELECT id, timestamp FROM txlog_transaction_log
-        WHERE timestamp >= ? ORDER BY id LIMIT 1;
-    """
-    result = store.execute(query, (timestamp,)).get_one()
-    if result is None:
+    txlog = TransactionLog.objects.filter(
+        timestamp__gte=timestamp).order_by('id')[:1]
+    if txlog.count() == 0:
         txid, tstamp = None, None
     else:
-        txid, tstamp = result
+        txid, tstamp = txlog[0].id, txlog[0].timestamp
     return txid, tstamp
 
 
 def keep_last_rows_for_worker_names(worker_names):
-    """Clean rows from txlog_db_worker_last_row that don't match the given
-    worker names."""
-    store = dbmanager.get_filesync_store()
-    query = ("DELETE FROM txlog_db_worker_last_row "
-             "WHERE worker_id NOT IN ?;")
-    store.execute(query, (tuple(worker_names), ))
+    """Clean DBWorkerLastRow that don't match the given worker names."""
+    DBWorkerLastRow.objects.exclude(worker_id__in=worker_names).delete()

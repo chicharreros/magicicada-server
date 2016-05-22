@@ -70,7 +70,7 @@ class TestMakeFile(TestWithDatabase):
         return test_mkfile_mime_type
 
     test_mkfile_mime1 = build_mime_test("image.png", "image/png")
-    test_mkfile_mime2 = build_mime_test("noextension", None)
+    test_mkfile_mime2 = build_mime_test("noextension", '')
     test_mkfile_mime3 = build_mime_test("music.mp3", "audio/mpeg")
     test_mkfile_mime4 = build_mime_test("document.doc", "application/msword")
     test_mkfile_mime5 = build_mime_test("test.txt", "text/plain")

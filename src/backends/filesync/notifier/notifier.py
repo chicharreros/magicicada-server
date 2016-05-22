@@ -24,11 +24,10 @@ import itertools
 import re
 import threading
 
-from weakref import WeakKeyDictionary
-
+from django.db import transaction
 from twisted.internet import reactor
 
-from backends.filesync.dbmanager import filesync_tm
+from backends.filesync.dbmanager import on_rollback
 
 
 class EventTypeDescriptor(object):
@@ -201,8 +200,8 @@ class PendingNotifications(object):
 class EventNotifier(object):
     """Notifies different events."""
 
-    def __init__(self, tx_manager=filesync_tm):
-        self.tx_manager = tx_manager
+    def __init__(self):
+        super(EventNotifier, self).__init__()
         self.per_thread = threading.local()
         self._event_callbacks = {}
 
@@ -230,19 +229,28 @@ class EventNotifier(object):
         per_transaction = getattr(self.per_thread,
                                   'notifications_by_transaction', None)
         if per_transaction is None:
-            per_transaction = WeakKeyDictionary()
+            per_transaction = {}
             self.per_thread.notifications_by_transaction = per_transaction
 
-        transaction = self.tx_manager.get()
-
-        notifications = per_transaction.get(transaction, None)
+        # get a thread ID
+        thread_id = threading.current_thread().ident
+        notifications = per_transaction.get(thread_id, None)
         if notifications is None:
             # create an object to collect pending notifications and
             # register it with the transaction
             notifications = PendingNotifications(self)
-            per_transaction[transaction] = notifications
-            transaction.addAfterCommitHook(self.__broadcast_after_commit,
-                                           (notifications,))
+            per_transaction[thread_id] = notifications
+
+            def on_commit():
+                """Send all pending notifications from this thread."""
+                per_transaction.pop(thread_id).send()
+
+            def _on_rollback():
+                """Abort all pending notifications from this thread."""
+                per_transaction.pop(thread_id, None)
+
+            transaction.on_commit(on_commit)
+            on_rollback(_on_rollback)
 
         notifications.add_events(events)
 
@@ -259,11 +267,6 @@ class EventNotifier(object):
 
         method.__doc__ = "Queue %s event." % (event_class.__name__,)
         setattr(cls, method_name, method)
-
-    def __broadcast_after_commit(self, success, notifications):
-        """Post-commit hook which sends notifications on successful commit."""
-        if success:
-            notifications.send()
 
 
 # build EventNotifier.queue_* methods

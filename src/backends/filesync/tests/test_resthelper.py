@@ -32,7 +32,7 @@ from django.utils.timezone import now
 from metrics.tests import FakeMetrics
 from backends.filesync import errors
 from backends.filesync.models import STATUS_LIVE, StorageObject
-from backends.filesync.tests.testcase import StorageDALTestCase
+from backends.testing.testcase import BaseTestCase
 from backends.filesync.resthelper import (
     CannotPublishDirectory,
     FileNodeHasNoChildren,
@@ -41,6 +41,7 @@ from backends.filesync.resthelper import (
     RestHelper,
     date_formatter,
 )
+from backends.filesync.services import make_storage_user
 from ubuntuone.devtools.handlers import MementoHandler
 
 
@@ -48,10 +49,6 @@ class MockUser(object):
     """Fake user for testing."""
     id = 0
     visible_name = "Bob Smith"
-
-
-class MockQuota(object):
-    """Fake quota for testing."""
     used_storage_bytes = 10
     free_bytes = 2 ** 8
     max_storage_bytes = 2 ** 10
@@ -120,13 +117,12 @@ class ResourceMapperTestCase(unittest.TestCase):
     def test_user_repr(self):
         """Test Rest conversion of a user."""
         user = MockUser()
-        quota = MockQuota()
         udf = MockVolume()
-        info = self.mapper.user_repr(user, quota, [udf])
+        info = self.mapper.user_repr(user, [udf])
         self.assertEqual(info['user_id'], user.id)
         self.assertEqual(info['visible_name'], user.visible_name)
-        self.assertEqual(info['used_bytes'], quota.used_storage_bytes)
-        self.assertEqual(info['max_bytes'], quota.max_storage_bytes)
+        self.assertEqual(info['used_bytes'], user.used_storage_bytes)
+        self.assertEqual(info['max_bytes'], user.max_storage_bytes)
         self.assertEqual(
             info['root_node_path'],
             self.mapper.node(settings.ROOT_USERVOLUME_PATH))
@@ -259,14 +255,15 @@ class ResourceMapperTestCase(unittest.TestCase):
         self.assertEqual(info['is_live'], True)
 
 
-class RestHelperTestCase(StorageDALTestCase):
+class RestHelperTestCase(BaseTestCase):
     """Test the resthelper."""
 
     def setUp(self):
         super(RestHelperTestCase, self).setUp()
         self.handler = MementoHandler()
-        self.user = self.factory.make_user(
-            1, "bob", "bobby boo", 2 * (2 ** 30))
+        self.user = make_storage_user(
+            username="bob", visible_name="bobby boo",
+            max_storage_bytes=2 * (2 ** 30))
         self.mapper = ResourceMapper()
         logger = logging.getLogger("test")
         logger.addHandler(self.handler)
@@ -277,19 +274,15 @@ class RestHelperTestCase(StorageDALTestCase):
     def test_GET_user(self):
         """Test for dao to REST conversion of user"""
         info = self.helper.get_user(self.user)
-        self.assertEqual(
-            info, self.mapper.user_repr(self.user, self.user.get_quota()))
+        self.assertEqual(info, self.mapper.user_repr(self.user))
         user_id = repr(self.user.id)
-        self.assertTrue(self.handler.check_info("get_quota", user_id))
         self.assertTrue(self.handler.check_info("get_udfs", user_id))
 
     def test_GET_user_with_udf(self):
         """Test get_user with udf."""
         udf = self.user.make_udf("~/Documents")
         info = self.helper.get_user(self.user)
-        self.assertEqual(
-            info,
-            self.mapper.user_repr(self.user, self.user.get_quota(), [udf]))
+        self.assertEqual(info, self.mapper.user_repr(self.user, [udf]))
 
     def test_GET_volume(self):
         """Test get_volume."""
@@ -603,10 +596,8 @@ class RestHelperTestCase(StorageDALTestCase):
 
     def test_PUT_node_new_file_magic(self):
         """Test put_node to make a new file with content."""
-        cb = self.factory.get_test_contentblob("FakeContent")
-        cb.magic_hash = b'magic'
-        self.store.add(cb)
-        self.store.commit()
+        cb = self.factory.make_content_blob(
+            content="FakeContent", magic_hash=b'magic')
         new_file_path = settings.ROOT_USERVOLUME_PATH + "/a/b/c/file.txt"
         info = self.helper.put_node(
             self.user, new_file_path,
@@ -618,18 +609,14 @@ class RestHelperTestCase(StorageDALTestCase):
 
     def test_PUT_node_update_file_magic(self):
         """Test put_node to make a new file with content."""
-        cb = self.factory.get_test_contentblob("FakeContent")
-        cb.magic_hash = b'magic'
-        self.store.add(cb)
-        self.store.commit()
+        cb = self.factory.make_content_blob(
+            content="FakeContent", magic_hash=b'magic')
         new_file_path = settings.ROOT_USERVOLUME_PATH + "/a/b/c/file.txt"
         info = self.helper.put_node(
             self.user, new_file_path,
             {'kind': 'file', 'hash': cb.hash, 'magic_hash': 'magic'})
-        cb = self.factory.get_test_contentblob("NewFakeContent")
-        cb.magic_hash = b'magic2'
-        self.store.add(cb)
-        self.store.commit()
+        cb = self.factory.make_content_blob(
+            content="NewFakeContent", magic_hash=b'magic2')
         info = self.helper.put_node(
             self.user, new_file_path,
             {'kind': 'file', 'hash': cb.hash, 'magic_hash': 'magic2'})

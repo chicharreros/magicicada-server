@@ -32,7 +32,7 @@ from twisted.trial.unittest import TestCase
 from twisted.test.proto_helpers import StringTransport
 
 from backends.filesync import errors
-from backends.filesync.models import StorageObject
+from backends.filesync.models import StorageObject, StorageUser
 from magicicada import settings
 from ubuntuone.devtools.handlers import MementoHandler
 from ubuntuone.storage.server import server, content, diskstorage
@@ -574,7 +574,8 @@ class TestPutContent(TestWithDatabase):
         hash_value = hash_object.content_hash()
         crc32_value = crc32(data)
         deflated_size = len(deflated_data)
-        self.usr0.update(max_storage_bytes=size * 2)
+        StorageUser.objects.filter(id=self.usr0.id).update(
+            max_storage_bytes=size * 2)
 
         def auth(client):
 
@@ -966,7 +967,7 @@ class TestPutContent(TestWithDatabase):
             def check_used_bytes(result):
 
                 def _check_file():
-                    quota = self.usr0.get_quota()
+                    quota = StorageUser.objects.get(id=self.usr0.id)
                     self.assertEqual(size, quota.used_storage_bytes)
 
                 d = threads.deferToThread(_check_file)
@@ -991,7 +992,7 @@ class TestPutContent(TestWithDatabase):
     @defer.inlineCallbacks
     def test_putcontent_quota_exceeded(self):
         """Test the QuotaExceeded handling."""
-        self.usr0.update(max_storage_bytes=1)
+        StorageUser.objects.filter(id=self.usr0.id).update(max_storage_bytes=1)
         try:
             yield self.test_putcontent()
         except protoerrors.QuotaExceededError as e:
@@ -1663,7 +1664,8 @@ class TestMultipartPutContent(TestWithDatabase):
         """Test that the client can resume a putcontent request."""
         self.patch(settings.api_server, 'STORAGE_CHUNK_SIZE', 1024 * 64)
         size = 2 * 1024 * 512
-        self.usr0.update(max_storage_bytes=size * 2)
+        StorageUser.objects.filter(id=self.usr0.id).update(
+            max_storage_bytes=size * 2)
         data = os.urandom(size)
         deflated_data = zlib.compress(data)
         hash_object = content_hash_factory()
@@ -1789,7 +1791,8 @@ class TestMultipartPutContent(TestWithDatabase):
         """
         self.patch(settings.api_server, 'STORAGE_CHUNK_SIZE', 1024 * 32)
         size = 2 * 1024 * 128
-        self.usr0.update(max_storage_bytes=size * 2)
+        StorageUser.objects.filter(id=self.usr0.id).update(
+            max_storage_bytes=size * 2)
         data = os.urandom(size)
         deflated_data = zlib.compress(data)
         hash_object = content_hash_factory()
@@ -1858,7 +1861,8 @@ class TestMultipartPutContent(TestWithDatabase):
         """Put content on a file with corrupt data."""
         self.patch(settings.api_server, 'STORAGE_CHUNK_SIZE', 1024 * 64)
         size = 2 * 1024 * 512
-        self.usr0.update(max_storage_bytes=size * 2)
+        StorageUser.objects.filter(id=self.usr0.id).update(
+            max_storage_bytes=size * 2)
         data = os.urandom(size)
         deflated_data = zlib.compress(data)
         hash_object = content_hash_factory()
@@ -2112,7 +2116,8 @@ class TestChunkedContent(TestWithDatabase):
         def auth(client):
 
             def raise_quota(_):
-                self.usr0.update(max_storage_bytes=size * 2)
+                StorageUser.objects.filter(id=self.usr0.id).update(
+                    max_storage_bytes=size * 2)
 
             def check_content(content):
                 self.assertEqual(content.data, deflated_data)
@@ -2188,19 +2193,20 @@ class TestChunkedContent(TestWithDatabase):
         deflated_size = len(deflated_data)
 
         recorded_calls = []
-        orig_call = self.service.rpcdal_client.call
+        orig_call = self.service.rpc_dal.call
 
         def recording_call(method, **parameters):
             if method == 'add_part_to_uploadjob':
                 recorded_calls.append(parameters)
             return orig_call(method, **parameters)
 
-        self.service.rpcdal_client.call = recording_call
+        self.service.rpc_dal.call = recording_call
 
         @defer.inlineCallbacks
         def test(client):
             yield client.dummy_authenticate("open sesame")
-            yield self.usr0.update(max_storage_bytes=size * 2)
+            StorageUser.objects.filter(id=self.usr0.id).update(
+                max_storage_bytes=size * 2)
             root = yield client.get_root()
             mkfile_req = yield client.make_file(request.ROOT, root, "hola")
             putcontent_req = yield client.put_content_request(
@@ -2287,7 +2293,8 @@ class UserTest(TestWithDatabase):
     @defer.inlineCallbacks
     def test_get_free_bytes_root(self):
         """Get the user free bytes, normal case."""
-        self.suser.update(max_storage_bytes=1000)
+        StorageUser.objects.filter(id=self.suser.id).update(
+            max_storage_bytes=1000)
         fb = yield self.user.get_free_bytes()
         self.assertEqual(fb, 1000)
 
@@ -2296,7 +2303,8 @@ class UserTest(TestWithDatabase):
         """Get the user free bytes asking for same user's share."""
         other_user = self.make_user(username=u'user2')
         share = self.suser.root.share(other_user.id, u"sharename")
-        self.suser.update(max_storage_bytes=1000)
+        StorageUser.objects.filter(id=self.suser.id).update(
+            max_storage_bytes=1000)
         fb = yield self.user.get_free_bytes(share.id)
         self.assertEqual(fb, 1000)
 
@@ -2313,7 +2321,7 @@ class UserTest(TestWithDatabase):
         """Get the user free bytes for a share of a user that is not valid."""
         other_user = self.make_user(username=u'user2', max_storage_bytes=500)
         share = other_user.root.share(self.suser.id, u"sharename")
-        other_user.update(subscription=False)
+        StorageUser.objects.filter(id=other_user.id).update(is_active=False)
         d = self.user.get_free_bytes(share.id)
         yield self.assertFailure(d, errors.DoesNotExist)
 
@@ -2361,8 +2369,7 @@ class TestUploadJob(TestWithDatabase):
         deflated_size = len(deflated_data)
         root, _ = yield self.content_user.get_root()
         c_user = self.content_user
-        rpcdal = self.service.factory.content.rpcdal_client
-        r = yield rpcdal.call(
+        r = yield self.service.factory.content.rpc_dal.call(
             'make_file_with_content',
             user_id=c_user.id, volume_id=self.user.root_volume_id,
             parent_id=root, name=u"A new file",
@@ -2711,8 +2718,7 @@ class TestNode(TestWithDatabase):
         crc32_value = crc32(data)
         deflated_size = len(deflated_data)
         root, _ = yield content_user.get_root()
-        rpcdal = self.service.factory.content.rpcdal_client
-        r = yield rpcdal.call(
+        r = yield self.service.factory.content.rpc_dal.call(
             'make_file_with_content', user_id=content_user.id,
             volume_id=self.user.root_volume_id, parent_id=root,
             name=u"A new file", node_hash=EMPTY_HASH, crc32=0,
@@ -2788,7 +2794,7 @@ class TestGenerations(TestWithDatabase):
     def test_get_delta_empty(self):
         """Test that User.get_delta works as expected."""
         delta = yield self.user.get_delta(None, 0)
-        free_bytes = self.suser.get_quota().free_bytes
+        free_bytes = self.suser.free_bytes
         self.assertEqual(delta, ([], 0, free_bytes))
 
     @defer.inlineCallbacks
@@ -2798,7 +2804,7 @@ class TestGenerations(TestWithDatabase):
         delta, end_gen, free_bytes = yield self.user.get_delta(None, 0)
         self.assertEqual(len(delta), len(nodes))
         self.assertEqual(end_gen, nodes[-1].generation)
-        self.assertEqual(free_bytes, self.suser.get_quota().free_bytes)
+        self.assertEqual(free_bytes, self.suser.free_bytes)
 
     @defer.inlineCallbacks
     def test_get_delta_from_middle(self):
@@ -2812,7 +2818,7 @@ class TestGenerations(TestWithDatabase):
                                                                from_generation)
         self.assertEqual(len(delta), len(nodes[6:]))
         self.assertEqual(end_gen, nodes[-1].generation)
-        self.assertEqual(free_bytes, self.suser.get_quota().free_bytes)
+        self.assertEqual(free_bytes, self.suser.free_bytes)
 
     @defer.inlineCallbacks
     def test_get_delta_from_last(self):
@@ -2826,7 +2832,7 @@ class TestGenerations(TestWithDatabase):
                                                                from_generation)
         self.assertEqual(len(delta), 0)
         self.assertEqual(end_gen, nodes[-1].generation)
-        self.assertEqual(free_bytes, self.suser.get_quota().free_bytes)
+        self.assertEqual(free_bytes, self.suser.free_bytes)
 
     @defer.inlineCallbacks
     def test_get_delta_partial(self):
@@ -2866,7 +2872,7 @@ class TestContentManagerTests(TestWithDatabase):
         yield super(TestContentManagerTests, self).setUp()
         self.suser = self.make_user(max_storage_bytes=64 ** 2)
         self.cm = content.ContentManager(self.service.factory)
-        self.cm.rpcdal_client = self.service.rpcdal_client
+        self.cm.rpc_dal = self.service.rpc_dal
 
     @defer.inlineCallbacks
     def test_get_user_by_id(self):
@@ -2885,9 +2891,9 @@ class TestContentManagerTests(TestWithDatabase):
     @defer.inlineCallbacks
     def test_get_user_by_id_race_condition(self):
         """Two requests both try to fetch and cache the user."""
-        # Has to fire before first call to rpcdal client returns
+        # Has to fire before first call to rpc client returns
         d = defer.Deferred()
-        rpc_call = self.cm.rpcdal_client.call
+        rpc_call = self.cm.rpc_dal.call
 
         @defer.inlineCallbacks
         def delayed_rpc_call(funcname, **kwargs):
@@ -2896,7 +2902,7 @@ class TestContentManagerTests(TestWithDatabase):
             val = yield rpc_call(funcname, **kwargs)
             defer.returnValue(val)
 
-        self.cm.rpcdal_client.call = delayed_rpc_call
+        self.cm.rpc_dal.call = delayed_rpc_call
 
         # Start the first call
         u1_deferred = self.cm.get_user_by_id(self.suser.id, required=True)
@@ -3024,7 +3030,7 @@ class DBUploadJobTestCase(TestCase):
                 'hash_value', 'crc32')
         dbuj = yield content.DBUploadJob.get(*args)
 
-        # check it called rpcdal correctly
+        # check it called rpc dal correctly
         method, attribs = self.user.recorded
         self.assertEqual(method, 'get_uploadjob')
         should = dict(user_id='fake_user_id', volume_id='volume_id',
@@ -3051,7 +3057,7 @@ class DBUploadJobTestCase(TestCase):
         self.patch(uuid, 'uuid4', lambda: "test unique id")
         dbuj = yield content.DBUploadJob.make(*args)
 
-        # check it called rpcdal correctly
+        # check it called rpc dal correctly
         method, attribs = self.user.recorded
         self.assertEqual(method, 'make_uploadjob')
         should = dict(user_id='fake_user_id', volume_id='volume_id',
@@ -3085,7 +3091,7 @@ class DBUploadJobTestCase(TestCase):
         chunk_size = int(settings.api_server.STORAGE_CHUNK_SIZE) + 1
         yield dbuj.add_part(chunk_size)
 
-        # check it called rpcdal correctly
+        # check it called rpc dal correctly
         method, attribs = self.user.recorded
         self.assertEqual(method, 'add_part_to_uploadjob')
         should = dict(user_id='fake_user_id', uploadjob_id='uploadjob_id',
@@ -3098,7 +3104,7 @@ class DBUploadJobTestCase(TestCase):
         dbuj = yield self._make_uj()
         yield dbuj.delete()
 
-        # check it called rpcdal correctly
+        # check it called rpc dal correctly
         method, attribs = self.user.recorded
         self.assertEqual(method, 'delete_uploadjob')
         should = dict(user_id='fake_user_id', uploadjob_id='uploadjob_id',
@@ -3112,7 +3118,7 @@ class DBUploadJobTestCase(TestCase):
         self.user.to_return = dict(when_last_active='new_when_last_active')
         yield dbuj.touch()
 
-        # check it called rpcdal correctly
+        # check it called rpc dal correctly
         method, attribs = self.user.recorded
         self.assertEqual(method, 'touch_uploadjob')
         should = dict(user_id='fake_user_id', uploadjob_id='uploadjob_id',

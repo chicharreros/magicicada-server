@@ -18,6 +18,8 @@
 
 """Test server shutdown."""
 
+import os
+
 from twisted.trial.unittest import TestCase as TwistedTestCase
 from twisted.internet import reactor, defer, error
 
@@ -25,7 +27,7 @@ from txstatsd.metrics.countermetric import CounterMetric
 from txstatsd.metrics.metermetric import MeterMetric
 
 from backends.filesync.services import make_storage_user
-from backends.filesync.tests.testcase import StorageDALTestCase
+from backends.testing.testcase import BaseTestCase
 from ubuntuone.storage.server.auth import DummyAuthProvider
 from ubuntuone.storage.server.testing.testcase import StorageServerService
 from ubuntuone.storageprotocol import request
@@ -48,7 +50,7 @@ class TestClientFactory(StorageClientFactory):
     protocol = TestClient
 
 
-class TestShutdown(TwistedTestCase, StorageDALTestCase):
+class TestShutdown(TwistedTestCase, BaseTestCase):
     """Test the basic stuff."""
 
     @defer.inlineCallbacks
@@ -57,7 +59,7 @@ class TestShutdown(TwistedTestCase, StorageDALTestCase):
         # make sure we start with clean state
         yield super(TestShutdown, self).setUp()
         # since storageusers are not automatically created, we need to create
-        self.usr0 = make_storage_user(0, u"dummy", u"", 2 ** 20)
+        self.usr0 = make_storage_user(u"dummy", 2 ** 20)
 
     @defer.inlineCallbacks
     def create_service(self):
@@ -132,9 +134,9 @@ class TestShutdown(TwistedTestCase, StorageDALTestCase):
 
         def handle_conn_done(f):
             """Ignore ConnectionDone errors."""
-            if f.check(error.ConnectionDone):
-                return
-            return f
+            if not f.check(error.ConnectionDone):
+                return f
+
         for i in range(10):
             mk = client.make_file(request.ROOT, root_id, "hola_%s" % i)
             mk.addErrback(handle_conn_done)
@@ -143,4 +145,5 @@ class TestShutdown(TwistedTestCase, StorageDALTestCase):
             reactor.callLater(0.1, client.transport.loseConnection)
             yield defer.DeferredList(mk_deferreds)
         finally:
-            self.assertTrue(service.factory.protocols[0].requests)
+            if not os.environ.get('MAGICICADA_DEBUG'):
+                self.assertTrue(service.factory.protocols[0].requests)

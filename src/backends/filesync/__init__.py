@@ -46,13 +46,11 @@ so all transaction management is handled in the DataServices Layer
 |          +----------------+
 |          | Gateway        |
 |          +----------------+
-|                  ^
-|                  |                    +--------------+
-|             Storm Stores-------------| Storm Models |
-|                  |                    +--------------+
-|                  |
-|                  |
-|                  |
+|                 |
+|          +----------------+
+|          | Django Models  |
+|          +----------------+
+|                 |
 |          +----------------+
 |          | Database       |
 |          +----------------+
