@@ -31,7 +31,6 @@
 ./.sourcecode/oops-timeline               ~canonical-launchpad-branches/python-oops-timeline/trunk;revno=3
 ./.sourcecode/requests                    ~ubuntuone-pqm-team/requests/stable;revno=816
 ./.sourcecode/requests_oauthlib           ~ubuntuone-pqm-team/requests-oauthlib/stable;revno=16
-./.sourcecode/storm                       ~storm/storm/trunk;revno=475
 ./.sourcecode/timeline                    ~canonical-launchpad-branches/python-timeline/trunk;revno=10
 ./.sourcecode/txstatsd                    ~txstatsd-dev/txstatsd/trunk;revno=109
 ./.sourcecode/u1sync                      ~facundo/u1sync/opensourcing;revno=10

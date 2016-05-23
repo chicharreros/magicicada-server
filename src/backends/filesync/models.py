@@ -473,7 +473,7 @@ class BaseStorageObject(models.Model):
             child = StorageObject.objects.get(
                 parent=self, name=name, status=STATUS_LIVE)
         except DataError as e:
-            raise InvalidFilename('Name is not valid: %r (%s)' % (name, e))
+            raise InvalidFilename('Name is not valid: %r (%r)' % (name, e))
         except StorageObject.DoesNotExist:
             child = None
         return child

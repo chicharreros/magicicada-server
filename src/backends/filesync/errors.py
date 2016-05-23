@@ -20,8 +20,8 @@
 
 from __future__ import unicode_literals
 
-
-from backends.db.errors import RetryLimitReached, IntegrityError  # noqa
+from django.db import IntegrityError  # noqa
+from backends.filesync.dbmanager import RetryLimitReached  # noqa
 
 
 class StorageError(Exception):
