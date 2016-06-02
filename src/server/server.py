@@ -1,5 +1,5 @@
 # Copyright 2008-2015 Canonical
-# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
+# Copyright 2015-2016 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -42,6 +42,7 @@ import twisted.web.error
 import oops
 import oops_datedir_repo
 
+import metrics
 import metrics.services
 import timeline
 
@@ -52,8 +53,6 @@ from twisted.internet.protocol import Factory
 from twisted.internet import defer, reactor, error, task, stdio
 from twisted.python.failure import Failure
 
-from metrics import get_meter
-from metrics.metricsconnector import MetricsConnector
 from backends.filesync import errors as dataerror
 from backends.filesync.notifier import notifier
 from magicicada import settings
@@ -842,7 +841,7 @@ class StorageServerRequestResponse(BaseRequestResponse):
             # we shouldn't create an oops here since we just failed
             self.log.error(msg, failure, e, exc_info=sys.exc_info())
         else:
-            self.protocol.factory.sli_metrics.sli_error(class_name)
+            self.protocol.factory.sli_metrics.report('sli_error', class_name)
             if self.start_time is not None:
                 delta = time.time() - self.start_time
                 self.protocol.factory.metrics.timing(
@@ -881,9 +880,9 @@ class StorageServerRequestResponse(BaseRequestResponse):
                 # inform SLI metric here if operation has a valid length (some
                 # operations change it, default is 1 for other operations, and
                 # Put/GetContentResponse set it to None to not inform *here*)
-                if self.length is not None:
-                    self.protocol.factory.sli_metrics.sli(class_name, delta,
-                                                          self.length)
+                if self.length:
+                    self.protocol.factory.sli_metrics.timing(
+                        class_name, delta / self.length)
 
             if transferred is not None:
                 msg = '%s.transferred' % (class_name,)
@@ -893,7 +892,7 @@ class StorageServerRequestResponse(BaseRequestResponse):
             user_activity = getattr(self, 'user_activity', None)
             if user_activity is not None:
                 user_id = getattr(self.protocol.user, 'id', '')
-                factory.user_metrics.report(user_activity, str(user_id), 'd')
+                factory.user_metrics.report(user_activity, str(user_id))
 
     def sendMessage(self, message):
         """Send a message and trace it."""
@@ -1586,7 +1585,8 @@ class GetContentResponse(SimpleRequestResponse):
     def send(self, producer):
         """Send node to the client."""
         delta = time.time() - self.init_time
-        self.protocol.factory.sli_metrics.sli('GetContentResponseInit', delta)
+        self.protocol.factory.sli_metrics.timing(
+            'GetContentResponseInit', delta)
 
         message_producer = BytesMessageProducer(producer, self)
         self.message_producer = message_producer
@@ -1832,8 +1832,8 @@ class PutContentResponse(SimpleRequestResponse):
             return
 
         # when commit's done, send the ok
-        self.protocol.factory.sli_metrics.sli('PutContentResponseCommit',
-                                              time.time() - commit_time)
+        self.protocol.factory.sli_metrics.timing('PutContentResponseCommit',
+                                                 time.time() - commit_time)
         response = protocol_pb2.Message()
         response.type = protocol_pb2.Message.OK
         response.new_generation = new_generation
@@ -1895,7 +1895,8 @@ class PutContentResponse(SimpleRequestResponse):
     def _send_begin(self):
         """Notify the client that he can start sending data."""
         delta = time.time() - self.init_time
-        self.protocol.factory.sli_metrics.sli('PutContentResponseInit', delta)
+        self.protocol.factory.sli_metrics.timing(
+            'PutContentResponseInit', delta)
         upload_type = self.upload_job.__class__.__name__
         offset = self.upload_job.offset
         response = protocol_pb2.Message()
@@ -2369,9 +2370,9 @@ class StorageServerFactory(Factory):
         self.diskstorage = DiskStorage(settings.api_server.STORAGE_BASEDIR)
         self.logger = logging.getLogger('storage.server')
 
-        self.metrics = MetricsConnector.get_metrics('root')
-        self.user_metrics = MetricsConnector.get_metrics('user')
-        self.sli_metrics = MetricsConnector.get_metrics('sli')
+        self.metrics = metrics.get_meter('root')
+        self.user_metrics = metrics.get_meter('user')
+        self.sli_metrics = metrics.get_meter('sli')
 
         self.servername = servername
         self.reactor_inspector = reactor_inspector
@@ -2688,19 +2689,7 @@ class StorageServerService(OrderedMultiService):
             'protocol buffers implementation: %s',
             os.environ.get('PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION', 'None'))
 
-        namespace = settings.api_server.METRICS_NAMESPACE
-        # Register all server metrics components
-        MetricsConnector.register_metrics('root', namespace)
-        # Important:  User activity is in a global namespace!
-        environment = settings.ENVIRONMENT_NAME
-        user_namespace = environment + '.storage.user_activity'
-        MetricsConnector.register_metrics('user', user_namespace)
-        MetricsConnector.register_metrics('reactor_inspector',
-                                          namespace + '.reactor_inspector')
-        sli_metric_namespace = settings.api_server.SLI_METRIC_NAMESPACE
-        MetricsConnector.register_metrics('sli', sli_metric_namespace)
-
-        self.metrics = get_meter(scope='service')
+        self.metrics = metrics.get_meter('service')
 
         listeners = MultiService()
         listeners.setName('Listeners')
@@ -2721,11 +2710,6 @@ class StorageServerService(OrderedMultiService):
         # setup the status service
         self.status_service = stats.create_status_service(
             self, listeners, status_port)
-
-        self.next_log_loop = None
-        stats_log_interval = settings.api_server.STATS_LOG_INTERVAL
-        self.stats_worker = stats.StatsWorker(self, stats_log_interval,
-                                              self.servername)
 
     @property
     def port(self):
@@ -2750,7 +2734,6 @@ class StorageServerService(OrderedMultiService):
         yield defer.maybeDeferred(self.start_rpc_dal)
         self.factory.content.rpc_dal = self.rpc_dal
         self.factory.rpc_dal = self.rpc_dal
-        self.stats_worker.start()
         self.metrics.meter('server_start')
         self.metrics.increment('services_active')
         metrics.services.revno()
@@ -2766,25 +2749,14 @@ class StorageServerService(OrderedMultiService):
     def stopService(self):
         """Stop listening on both ports."""
         self.logger.info('- - - - - SERVER STOPPING')
-        yield self.stats_worker.stop()
         yield OrderedMultiService.stopService(self)
         yield self.factory.wait_for_shutdown()
         self.metrics.meter('server_stop')
         self.metrics.decrement('services_active')
-        if self.metrics.connection:
-            self.metrics.connection.disconnect()
-        if self.factory.metrics.connection:
-            self.factory.metrics.connection.disconnect()
-        if self.factory.user_metrics.connection:
-            self.factory.user_metrics.connection.disconnect()
         self._reactor_inspector.stop()
         if self.heartbeat_writer:
             self.heartbeat_writer.loseConnection()
             self.heartbeat_writer = None
-        for metrics_key in ['reactor_inspector', 'sli']:
-            metrics = MetricsConnector.get_metrics(metrics_key)
-            if metrics.connection:
-                metrics.connection.disconnect()
         self.logger.info('- - - - - SERVER STOPPED')
 
 

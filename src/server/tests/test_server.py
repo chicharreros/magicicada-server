@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright 2008-2015 Canonical
-# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
+# Copyright 2015-2016 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -28,16 +28,14 @@ import time
 import uuid
 import weakref
 
+import metrics
+
 from django.utils.timezone import now
-from metrics.metricsconnector import MetricsConnector
 from mocker import expect, Mocker, MockerTestCase, ARGS, KWARGS, ANY
 from twisted.python.failure import Failure
 from twisted.python import log
 from twisted.internet import defer, task, error as txerror
 from twisted.trial.unittest import TestCase as TwistedTestCase
-from txstatsd.metrics.extendedmetrics import ExtendedMetrics
-from txstatsd.metrics.gaugemetric import GaugeMetric
-from txstatsd.metrics.metermetric import MeterMetric
 
 from backends.filesync import errors as dataerror
 from backends.filesync.models import Share
@@ -96,7 +94,8 @@ class FakeUser(object):
 
 class FakeProducer(object):
     """A fake producer."""
-    def dummy(*s): return
+    def dummy(*s):
+        return
     resumeProducing = stopProducing = pauseProducing = startProducing = dummy
 
 
@@ -109,25 +108,6 @@ class FakedStats(object):
     def hit(self, *args):
         """Inform stats."""
         self.informed.append(args)
-
-
-class FakeStatsDClient(object):
-    """A faked StatsD client"""
-
-    def __init__(self):
-        self.data = None
-
-    def connect(self):
-        """Connect to the StatsD server."""
-        pass
-
-    def disconnect(self):
-        """Disconnect from the StatsD server."""
-        pass
-
-    def write(self, data):
-        """Send the metric to the StatsD server."""
-        self.data = data
 
 
 class FakedFactory(object):
@@ -143,10 +123,9 @@ class FakedFactory(object):
         self.oops_config.publishers = [publish]
 
         self.stats = FakedStats()
-        connection = FakeStatsDClient()
-        self.metrics = ExtendedMetrics(connection, "server.test")
-        self.user_metrics = ExtendedMetrics(connection, "server.test")
-        self.sli_metrics = ExtendedMetrics(connection, "server.test")
+        self.metrics = metrics.get_meter('metrics')
+        self.user_metrics = metrics.get_meter('user_metrics')
+        self.sli_metrics = metrics.get_meter('sli_metrics')
         self.servername = "fakeservername"
         self.trace_users = []
 
@@ -198,7 +177,6 @@ class BaseStorageServerTestCase(TwistedTestCase):
         self.server = None
         self.last_msg = None
         yield super(BaseStorageServerTestCase, self).tearDown()
-        MetricsConnector.unregister_metrics()
 
     @property
     def shutdown(self):
@@ -740,7 +718,7 @@ class SSRequestResponseSpecificTestCase(StorageServerRequestResponseTestCase):
 
         # execute and test
         self.response.done()
-        self.assertEqual(informed, ['test-activity', '42', 'd'])
+        self.assertEqual(informed, ['test-activity', '42'])
 
     def test_done_user_activity_no_activity(self):
         """Don't report the request's user activity, as there is no string."""
@@ -772,7 +750,7 @@ class SSRequestResponseSpecificTestCase(StorageServerRequestResponseTestCase):
 
         # execute and test
         self.response.done()
-        self.assertEqual(informed, ['test-activity', '', 'd'])
+        self.assertEqual(informed, ['test-activity', ''])
 
     def test_get_extension_valids(self):
         """Get a 2 chars extension."""
@@ -886,7 +864,7 @@ class SimpleRequestResponseTestCase(StorageServerRequestResponseTestCase):
     def test_send_protocol_error_try_again_is_metered(self):
         """_send_protocol_error sends metrics on TryAgain errors."""
         mocker = Mocker()
-        mock_metrics = mocker.mock(ExtendedMetrics)
+        mock_metrics = mocker.mock(metrics.FileBasedMeter)
         self.response.protocol.factory.metrics = mock_metrics
         mock_metrics.meter("TRY_AGAIN.ValueError", 1)
         with mocker:
@@ -896,7 +874,7 @@ class SimpleRequestResponseTestCase(StorageServerRequestResponseTestCase):
     def test_send_protocol_error_converted_try_again_is_metered(self):
         """_send_protocol_error sends metrics on convertd TryAgain errors."""
         mocker = Mocker()
-        mock_metrics = mocker.mock(ExtendedMetrics)
+        mock_metrics = mocker.mock(metrics.FileBasedMeter)
         self.response.protocol.factory.metrics = mock_metrics
         error = self.response.try_again_errors[0]
         mock_metrics.meter("TRY_AGAIN.%s" % error.__name__, 1)
@@ -1116,20 +1094,9 @@ class SimpleRequestResponseTestCase(StorageServerRequestResponseTestCase):
         """The SLI is informed when all ok."""
         mocker = Mocker()
         mock_metrics = mocker.patch(self.response.protocol.factory.sli_metrics)
-        expect(mock_metrics.sli(self.response_class.__name__, ANY, 1))
+        expect(mock_metrics.timing(self.response_class.__name__, ANY))
         self.response.start_time = time.time()
         with mocker:
-            self.response.done()
-
-    def test_sli_informed_on_done_zero_value(self):
-        """The SLI is informed when all ok."""
-        mocker = Mocker()
-        mock_metrics = mocker.patch(self.response.protocol.factory.sli_metrics)
-        op_length = 0
-        expect(mock_metrics.sli(self.response_class.__name__, ANY, op_length))
-        self.response.start_time = time.time()
-        with mocker:
-            self.response.length = op_length
             self.response.done()
 
     def test_sli_informed_on_done_some_value(self):
@@ -1137,7 +1104,7 @@ class SimpleRequestResponseTestCase(StorageServerRequestResponseTestCase):
         mocker = Mocker()
         mock_metrics = mocker.patch(self.response.protocol.factory.sli_metrics)
         op_length = 12345
-        expect(mock_metrics.sli(self.response_class.__name__, ANY, op_length))
+        expect(mock_metrics.timing(self.response_class.__name__, ANY))
         self.response.start_time = time.time()
         with mocker:
             self.response.length = op_length
@@ -1147,7 +1114,7 @@ class SimpleRequestResponseTestCase(StorageServerRequestResponseTestCase):
         """The SLI is informed after a problem."""
         mocker = Mocker()
         mock_metrics = mocker.patch(self.response.protocol.factory.sli_metrics)
-        expect(mock_metrics.sli_error(self.response_class.__name__))
+        expect(mock_metrics.report('sli_error', self.response_class.__name__))
         with mocker:
             self.response.error(ValueError())
 
@@ -1368,14 +1335,14 @@ class GetContentResponseTestCase(SimpleRequestResponseTestCase):
     def test_sli_informed_on_done_default(self):
         """The SLI is NOT informed when all ok."""
         self.patch(self.response.protocol.factory.sli_metrics,
-                   'sli', lambda *a: self.fail("Must not be called"))
+                   'timing', lambda *a: self.fail("Must not be called"))
         self.response.start_time = time.time()
         self.response.done()
 
     def test_sli_informed_on_done_some_value(self):
         """The SLI is informed when all ok."""
         self.patch(self.response.protocol.factory.sli_metrics,
-                   'sli', lambda *a: self.fail("Must not be called"))
+                   'timing', lambda *a: self.fail("Must not be called"))
         self.response.start_time = time.time()
         self.response.transferred = 12345
         self.response.done()
@@ -1383,7 +1350,7 @@ class GetContentResponseTestCase(SimpleRequestResponseTestCase):
     def test_sli_informed_on_done_zero_value(self):
         """The SLI is informed when all ok."""
         self.patch(self.response.protocol.factory.sli_metrics,
-                   'sli', lambda *a: self.fail("Must not be called"))
+                   'timing', lambda *a: self.fail("Must not be called"))
         self.response.start_time = time.time()
         self.response.transferred = 0
         self.response.done()
@@ -1412,7 +1379,7 @@ class GetContentResponseTestCase(SimpleRequestResponseTestCase):
 
         # the metric itself
         mock_metrics = mocker.patch(self.response.protocol.factory.sli_metrics)
-        expect(mock_metrics.sli('GetContentResponseInit', ANY))
+        expect(mock_metrics.timing('GetContentResponseInit', ANY))
 
         with mocker:
             self.response._start()
@@ -1508,14 +1475,14 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
     def test_sli_informed_on_done_default(self):
         """The SLI is informed when all ok."""
         self.patch(self.response.protocol.factory.sli_metrics,
-                   'sli', lambda *a: self.fail("Must not be called"))
+                   'timing', lambda *a: self.fail("Must not be called"))
         self.response.start_time = time.time()
         self.response.done()
 
     def test_sli_informed_on_done_some_value(self):
         """The SLI is informed when all ok."""
         self.patch(self.response.protocol.factory.sli_metrics,
-                   'sli', lambda *a: self.fail("Must not be called"))
+                   'timing', lambda *a: self.fail("Must not be called"))
         self.response.start_time = time.time()
         self.response.transferred = 12345
         self.response.done()
@@ -1523,7 +1490,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
     def test_sli_informed_on_done_zero_value(self):
         """The SLI is informed when all ok."""
         self.patch(self.response.protocol.factory.sli_metrics,
-                   'sli', lambda *a: self.fail("Must not be called"))
+                   'timing', lambda *a: self.fail("Must not be called"))
         self.response.start_time = time.time()
         self.response.transferred = 0
         self.response.done()
@@ -1548,7 +1515,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
 
         # the metric itself
         mock_metrics = mocker.patch(self.response.protocol.factory.sli_metrics)
-        expect(mock_metrics.sli('PutContentResponseInit', ANY))
+        expect(mock_metrics.timing('PutContentResponseInit', ANY))
 
         with mocker:
             yield self.response._start()
@@ -1562,7 +1529,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
 
         # the metric itself
         mock_metrics = mocker.patch(self.response.protocol.factory.sli_metrics)
-        expect(mock_metrics.sli('PutContentResponseCommit', ANY))
+        expect(mock_metrics.timing('PutContentResponseCommit', ANY))
 
         with mocker:
             yield self.response._commit_uploadjob('result')
@@ -2217,16 +2184,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
         self.assertEqual(self.last_msg.begin_content.offset, 10)
         self.assertEqual(self.last_msg.begin_content.upload_id, '12')
 
-        metrics = self.response.protocol.factory.metrics
         upload_type = self.response.upload_job.__class__.__name__
-        name = "%s.upload.begin" % (upload_type,)
-        name = metrics.fully_qualify_name(name)
-        self.assertTrue(isinstance(metrics._metrics[name],
-                        MeterMetric))
-        name = "%s.upload" % (upload_type,)
-        name = metrics.fully_qualify_name(name)
-        self.assertTrue(isinstance(metrics._metrics[name],
-                        GaugeMetric))
         self.assertTrue(self.handler.check_debug(
             upload_type, "begin content", "from offset 10", "fake storagekey"))
 
@@ -2675,18 +2633,11 @@ class StorageServerFactoryTests(TwistedTestCase):
         """Set up."""
         yield super(StorageServerFactoryTests, self).setUp()
 
-        MetricsConnector.register_metrics("root", instance=ExtendedMetrics())
-        MetricsConnector.register_metrics("user", instance=ExtendedMetrics())
-        MetricsConnector.register_metrics("sli", instance=ExtendedMetrics())
         self.factory = StorageServerFactory()
         self.handler = MementoHandler()
         self.handler.setLevel(logging.DEBUG)
         self.factory.logger.addHandler(self.handler)
         self.addCleanup(self.factory.logger.removeHandler, self.handler)
-
-    def tearDown(self):
-        """Tear down."""
-        MetricsConnector.unregister_metrics()
 
     def test_observer_added(self):
         """Test that the observer was added to Twisted logging."""
@@ -2784,18 +2735,12 @@ class TestLoggerSetup(testcase.TestWithDatabase):
 class TestMetricsSetup(testcase.TestWithDatabase):
     """Tests that metrics are setup from configs properly"""
 
-    @defer.inlineCallbacks
-    def tearDown(self):
-        """Unregister metrics that the server set up."""
-        yield super(TestMetricsSetup, self).tearDown()
-        MetricsConnector.unregister_metrics()
-
     def test_metrics_from_config(self):
         """Test that metrics names get set from the config properly"""
-        self.assertEqual("development.filesync.server",
-                         MetricsConnector.get_metrics("root").namespace)
-        self.assertEqual("development.storage.user_activity",
-                         MetricsConnector.get_metrics("user").namespace)
+        self.assertEqual("development.filesync.server.001.root",
+                         metrics.get_meter("root")._namespace)
+        self.assertEqual("development.filesync.server.001.user",
+                         metrics.get_meter("user")._namespace)
 
 
 class VersionInfoTestCase(TwistedTestCase):

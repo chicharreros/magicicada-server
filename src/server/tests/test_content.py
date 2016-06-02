@@ -1,5 +1,5 @@
 # Copyright 2008-2015 Canonical
-# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
+# Copyright 2015-2016 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -635,7 +635,7 @@ class TestPutContent(TestWithDatabase):
             yield client.dummy_authenticate("open sesame")
             root = yield client.get_root()
 
-            # hook to test stats (don't have graphite in dev)
+            # hook to test stats
             meter = []
             self.service.factory.metrics.meter = lambda *a: meter.append(a)
             gauge = []
@@ -1296,7 +1296,7 @@ class TestPutContent(TestWithDatabase):
                                        crc32_value, size, deflated_data, None)
         yield upload_req.deferred
 
-        # hook to test stats (don't have graphite in dev)
+        # hook to test stats
         meter = []
         self.service.factory.metrics.meter = lambda *a: meter.append(a)
         gauge = []
@@ -1362,7 +1362,7 @@ class TestPutContent(TestWithDatabase):
                        if m.type == protocol_pb2.Message.BEGIN_CONTENT][0]
             self.assertEqual(message.begin_content.offset, 0)
 
-            # hook to test stats (don't have graphite in dev)
+            # hook to test stats
             meter = []
             self.service.factory.metrics.meter = lambda *a: meter.append(a)
             gauge = []
@@ -1632,7 +1632,7 @@ class TestMultipartPutContent(TestWithDatabase):
             yield client.dummy_authenticate("open sesame")
             root = yield client.get_root()
 
-            # hook to test stats (don't have graphite in dev)
+            # hook to test stats
             meter = []
             self.service.factory.metrics.meter = lambda *a: meter.append(a)
             gauge = []
@@ -1682,7 +1682,7 @@ class TestMultipartPutContent(TestWithDatabase):
         client = yield connect_d
         yield client.dummy_authenticate("open sesame")
 
-        # hook to test stats (don't have graphite in dev)
+        # hook to test stats
         meter = []
         self.service.factory.metrics.meter = lambda *a: meter.append(a)
         gauge = []
@@ -1801,7 +1801,7 @@ class TestMultipartPutContent(TestWithDatabase):
         crc32_value = crc32(data)
         size = len(data)
         deflated_size = len(deflated_data)
-        # hook to test stats (don't have graphite in dev)
+        # hook to test stats
         meter = []
         self.service.factory.metrics.meter = lambda *a: meter.append(a)
         gauge = []

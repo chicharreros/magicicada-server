@@ -1,5 +1,5 @@
 # Copyright 2008-2015 Canonical
-# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
+# Copyright 2015-2016 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -31,8 +31,9 @@ from twisted.python import failure
 from twisted.web import client, error as web_error
 from twisted.trial.unittest import TestCase
 
+import metrics
+
 from magicicada import settings
-from metrics.metricsconnector import MetricsConnector
 from ubuntuone.devtools.handlers import MementoHandler
 from ubuntuone.storage.server.testing.testcase import TestWithDatabase
 from ubuntuone.storage.server import ssl_proxy
@@ -52,10 +53,7 @@ class SSLProxyServiceTest(TestWithDatabase):
         yield super(SSLProxyServiceTest, self).setUp()
         self.configure_logging()
         self.metrics = MetricReceiver()
-        namespace = settings.ssl_proxy.METRICS_NAMESPACE
-        instance = MetricsConnector.new_txmetrics(connection=self.metrics,
-                                                  namespace=namespace)
-        MetricsConnector.register_metrics("ssl-proxy", namespace, instance)
+        self.patch(metrics, 'get_meter', lambda n: self.metrics)
         self.patch(settings.ssl_proxy, 'HEARTBEAT_INTERVAL',
                    self.ssl_proxy_heartbeat_interval)
 
@@ -67,11 +65,6 @@ class SSLProxyServiceTest(TestWithDatabase):
         self.handler = MementoHandler()
         logger.addHandler(self.handler)
         self.addCleanup(logger.removeHandler, self.handler)
-
-    @defer.inlineCallbacks
-    def tearDown(self):
-        yield super(SSLProxyServiceTest, self).tearDown()
-        MetricsConnector.unregister_metrics()
 
     @defer.inlineCallbacks
     def test_start_stop(self):
@@ -101,10 +94,7 @@ class SSLProxyTestCase(TestWithDatabase):
                                                   "ssl-proxy-test", 0)
         # keep metrics in our MetricReceiver
         self.metrics = MetricReceiver()
-        namespace = settings.ssl_proxy.METRICS_NAMESPACE
-        instance = MetricsConnector.new_txmetrics(connection=self.metrics,
-                                                  namespace=namespace)
-        MetricsConnector.register_metrics("ssl-proxy", namespace, instance)
+        self.patch(metrics, 'get_meter', lambda n: self.metrics)
         self.patch(settings.ssl_proxy, 'HEARTBEAT_INTERVAL',
                    self.ssl_proxy_heartbeat_interval)
         yield self.ssl_service.startService()
@@ -122,7 +112,6 @@ class SSLProxyTestCase(TestWithDatabase):
     def tearDown(self):
         yield super(SSLProxyTestCase, self).tearDown()
         yield self.ssl_service.stopService()
-        MetricsConnector.unregister_metrics()
 
     @property
     def ssl_port(self):
@@ -252,7 +241,6 @@ class ProxyServerTest(TestCase):
     def tearDown(self):
         self.server = None
         yield super(ProxyServerTest, self).tearDown()
-        MetricsConnector.unregister_metrics()
 
     def test_connectionMade(self):
         """Test connectionMade with handshake done."""
@@ -286,31 +274,21 @@ class ProxyServerTest(TestCase):
             self.server.connectionLost()
 
 
-class MetricReceiver(object):
+class MetricReceiver(metrics.FileBasedMeter):
     """A receiver for metrics."""
 
     def __init__(self):
         """Initialize the received message list."""
-        self.received = []
+        super(MetricReceiver, self).__init__('namespace')
+        self.messages = []
+        self._write = lambda kind, msg, *a: self.messages.append(msg)
 
     def __contains__(self, pattern):
         regex = re.compile(pattern)
-        for message in self.received:
+        for message in self.messages:
             if any(regex.findall(message)):
                 return True
         return False
-
-    def connect(self, transport=None):
-        """Not implemented."""
-        pass
-
-    def disconnect(self):
-        """Not implemented."""
-        pass
-
-    def write(self, message):
-        """Store the received message and stack."""
-        self.received.append(message)
 
 
 class SSLProxyMetricsTestCase(SSLProxyTestCase):

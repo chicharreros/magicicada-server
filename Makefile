@@ -1,5 +1,5 @@
 # Copyright 2008-2015 Canonical
-# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
+# Copyright 2015-2016 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -144,10 +144,9 @@ start-oauth-heapy:
 	USE_HEAPY=1 $(MAKE) start-oauth
 
 start-base:
-	$(MAKE) start-db && $(MAKE) start-supervisor && $(MAKE) start-dbus && \
-	$(MAKE) start-statsd || ( $(MAKE) stop ; exit 1 )
+	$(MAKE) start-db && $(MAKE) start-supervisor && $(MAKE) start-dbus || ( $(MAKE) stop ; exit 1 )
 
-stop: stop-filesync-dummy-group stop-supervisor stop-db stop-statsd stop-dbus
+stop: stop-filesync-dummy-group stop-supervisor stop-db stop-dbus
 
 start-dbus:
 	dev-scripts/start-dbus.sh
@@ -158,18 +157,9 @@ stop-dbus:
 start-supervisor:
 	@python dev-scripts/supervisor-config-dev.py
 	-@$(START_SUPERVISORD) dev-scripts/supervisor-dev.conf.tpl \
-	dev-scripts/metrics-processors.conf.tpl
 
 stop-supervisor:
 	-@dev-scripts/supervisorctl-dev shutdown
-
-start-statsd:
-	-@dev-scripts/supervisorctl-dev start graphite
-	-@dev-scripts/supervisorctl-dev start statsd
-
-stop-statsd:
-	-@dev-scripts/supervisorctl-dev stop statsd
-	-@dev-scripts/supervisorctl-dev stop graphite
 
 start-%-group:
 	-@dev-scripts/supervisorctl-dev start $*:
@@ -205,5 +195,4 @@ admin:
 	build-for-deployment clean-sourcedeps tarball \
 	start stop load-sample-data publish-api-port \
 	start-supervisor stop-supervisor \
-	start-dbus stop-dbus \
-	start-oauth start-oauth-heapy start-statsd stop-statsd
+	start-dbus stop-dbus start-oauth start-oauth-heapy

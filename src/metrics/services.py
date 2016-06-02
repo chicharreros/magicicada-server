@@ -1,5 +1,5 @@
 # Copyright 2008-2015 Canonical
-# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
+# Copyright 2015-2016 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -26,10 +26,11 @@ try:
 except ImportError:
     version_info = {'revno': 'Undefined'}
 
+meter = get_meter('service')
+
 
 def oops_saved(report=None, context=None):
     """A service has OOPSed."""
-    meter = get_meter(scope='service')
     meter.meter('oops_saved')
     if report and 'id' in report:
         return [report['id']]
@@ -38,5 +39,4 @@ def oops_saved(report=None, context=None):
 
 def revno():
     """Trigger a service revision number update."""
-    meter = get_meter(scope='service')
     meter.gauge('revno', version_info['revno'])

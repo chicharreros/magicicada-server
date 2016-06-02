@@ -1,5 +1,5 @@
 # Copyright 2008-2015 Canonical
-# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
+# Copyright 2015-2016 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -51,6 +51,6 @@ if __name__ == '__main__':
     hostname = socket.gethostname()
     config_content = generate_server_config(
         hostname, services, config_spec, TEMPLATES, None,
-        with_heartbeat=False, with_stats_worker=False, with_header=False)
+        with_heartbeat=False, with_header=False)
     with open(os.path.join(TMPDIR, 'services-supervisor.conf'), 'w') as f:
         f.write(config_content)

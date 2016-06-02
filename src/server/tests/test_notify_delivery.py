@@ -1,5 +1,5 @@
 # Copyright 2008-2015 Canonical
-# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
+# Copyright 2015-2016 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -26,9 +26,7 @@ from twisted.internet import defer, reactor
 from twisted.python.failure import Failure
 from twisted.trial.unittest import TestCase as TwistedTestCase
 
-from metrics.metricsconnector import MetricsConnector
 from mocker import Mocker, expect
-from txstatsd.metrics.extendedmetrics import ExtendedMetrics
 
 import oops_timeline
 
@@ -81,9 +79,6 @@ class TestDelivery(TwistedTestCase):
         self.free_bytes = 0
         self.node_volume_id = uuid.uuid4()
         self.content_node = self.mocker.mock()
-        MetricsConnector.register_metrics("sli", instance=ExtendedMetrics())
-        MetricsConnector.register_metrics("root", instance=ExtendedMetrics())
-        MetricsConnector.register_metrics("user", instance=ExtendedMetrics())
         self.factory = StorageServerFactory(
             content_class=lambda _: self.content,
             reactor=self.fake_reactor)
@@ -91,7 +86,6 @@ class TestDelivery(TwistedTestCase):
     @inlineCallbacks
     def tearDown(self):
         """Tear down test."""
-        MetricsConnector.unregister_metrics()
         try:
             self.mocker.verify()
         finally:
@@ -381,12 +375,6 @@ class NotificationErrorsTestCase(testcase.TestWithDatabase):
         protocol.session_id = uuid.uuid4()
         self.patch(self.ssfactory.content, 'get_user_by_id',
                    lambda *a: Failure(self.induced_error("Test error")))
-
-    @defer.inlineCallbacks
-    def tearDown(self):
-        self.ssfactory.metrics.connection.disconnect()
-        self.ssfactory.user_metrics.connection.disconnect()
-        yield super(NotificationErrorsTestCase, self).tearDown()
 
     @defer.inlineCallbacks
     def check_event(self, event, **kwargs):

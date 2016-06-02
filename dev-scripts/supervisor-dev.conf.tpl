@@ -21,7 +21,7 @@ serverurl=http://localhost:%(inet_http_server_port)s
 port=%(inet_http_server_port)s
 
 [include]
-files=metrics-processors.conf services-supervisor.conf workers-supervisor.conf
+files=services-supervisor.conf workers-supervisor.conf
 
 [eventlistener:heartbeat]
 command=python %(basepath)s/lib/ubuntuone/supervisor/heartbeat_listener.py --interval=10 --timeout=20 --log_level=DEBUG --log_file=%(tmp_dir)s/heartbeat.log --groups=filesync-dummy,filesync-oauth
@@ -51,11 +51,6 @@ environment=PYTHONPATH="%(basepath)s/lib",DJANGO_SETTINGS_MODULE="magicicada.set
 stdout_capture_maxbytes=16384
 autostart=false
 stopsignal=INT
-
-[program:stats_worker]
-command=python %(basepath)s/lib/ubuntuone/monitoring/stats_worker.py --log_file=%(tmp_dir)s/stats_worker.log
-environment=PYTHONPATH="%(basepath)s/lib",DJANGO_SETTINGS_MODULE="magicicada.settings"
-autostart=false
 
 [group:filesync-dummy]
 programs=filesync-dummy-auth

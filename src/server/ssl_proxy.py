@@ -1,5 +1,5 @@
 # Copyright 2008-2015 Canonical
-# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
+# Copyright 2015-2016 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -30,10 +30,10 @@ from twisted.internet import defer, address, protocol, reactor, error, stdio
 from twisted.internet.interfaces import ITCPTransport
 from twisted.protocols import portforward, basic
 from twisted.web import server, resource
-from zope.component.interfaces import ComponentLookupError
+
+import metrics
 
 from magicicada import settings
-from metrics.metricsconnector import MetricsConnector
 from ubuntuone.storage.server.logger import configure_logger
 from ubuntuone.storage.server.server import get_service_port
 from ubuntuone.storage.server.ssl import disable_ssl_compression
@@ -140,19 +140,12 @@ class SSLProxyFactory(portforward.ProxyFactory):
         """Start any other stuff we need."""
         logger.info("listening on %d -> %s:%d",
                     self.listen_port, self.host, self.port)
-        try:
-            self.metrics = MetricsConnector.get_metrics("ssl-proxy")
-        except ComponentLookupError:
-            namespace = settings.ssl_proxy.METRICS_NAMESPACE
-            MetricsConnector.register_metrics("ssl-proxy", namespace)
-            self.metrics = MetricsConnector.get_metrics("ssl-proxy")
+        self.metrics = metrics.get_meter("ssl-proxy")
         self.metrics.meter("server_start", 1)
 
     def stopFactory(self):
         """Shutdown everything."""
         self.metrics.meter("server_stop", 1)
-        if self.metrics.connection:
-            self.metrics.connection.disconnect()
 
     def buildProtocol(self, *args, **kw):
         prot = portforward.ProxyFactory.buildProtocol(self, *args, **kw)

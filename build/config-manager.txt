@@ -1,5 +1,5 @@
 # Copyright 2008-2015 Canonical
-# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
+# Copyright 2015-2016 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -32,12 +32,8 @@
 ./.sourcecode/requests                    ~ubuntuone-pqm-team/requests/stable;revno=816
 ./.sourcecode/requests_oauthlib           ~ubuntuone-pqm-team/requests-oauthlib/stable;revno=16
 ./.sourcecode/timeline                    ~canonical-launchpad-branches/python-timeline/trunk;revno=10
-./.sourcecode/txstatsd                    ~txstatsd-dev/txstatsd/trunk;revno=109
 ./.sourcecode/u1sync                      ~facundo/u1sync/opensourcing;revno=10
 ./.sourcecode/ubuntu-sso-client           ~ubuntuone-control-tower/ubuntu-sso-client/trunk;revno=1030
 ./.sourcecode/ubuntuone-client            ~facundo/ubuntuone-client/opensourcing;revno=1406
 ./.sourcecode/ubuntuone-dev-tools         ~ubuntuone-control-tower/ubuntuone-dev-tools/trunk;revno=78
 ./.sourcecode/ubuntuone-storage-protocol  ~facundo/ubuntuone-storage-protocol/opensourcing;revno=165
-./.sourcecode/zope.component              ~ztk-steering-group/zope.component/trunk;revno=217
-./.sourcecode/zope.event                  ~ztk-steering-group/zope.event/trunk;revno=120
-./.sourcecode/zope.interface              ~ztk-steering-group/zope.interface/trunk;revno=252

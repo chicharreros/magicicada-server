@@ -1,5 +1,5 @@
 # Copyright 2008-2015 Canonical
-# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
+# Copyright 2015-2016 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -40,7 +40,6 @@ from twisted.trial.unittest import TestCase as TwistedTestCase
 from backends.filesync import services
 from backends.testing.testcase import BaseTestCase
 from magicicada import settings
-from metrics import METER_UTILITY
 from ubuntuone.storage.server.auth import DummyAuthProvider
 from ubuntuone.storage.server.server import (
     PREFERRED_CAP,
@@ -424,8 +423,6 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
 
         # tune the config for this tests
         self.patch(settings.api_server, 'STORAGE_CHUNK_SIZE', 1024 * 64)
-
-        self.addCleanup(setattr, METER_UTILITY, 'service_meter', None)
 
     def save_req(self, req, name):
         """Save a request for later use."""

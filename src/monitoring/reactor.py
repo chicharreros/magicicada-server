@@ -1,5 +1,5 @@
 # Copyright 2008-2015 Canonical
-# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
+# Copyright 2015-2016 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -27,6 +27,8 @@ import threading
 import traceback
 import Queue
 
+import metrics
+
 from ubuntuone.storage.server.logger import TRACE
 
 
@@ -34,15 +36,13 @@ class ReactorInspector(threading.Thread):
     """Log message with a time delta from the last call."""
 
     def __init__(self, logger, reactor_call, loop_time=3):
-        from metrics.metricsconnector import MetricsConnector
-
         self.logger = logger
         self.running = False
         self.stopped = False
         self.queue = Queue.Queue()
         self.reactor_call = reactor_call
         self.loop_time = loop_time
-        self.metrics = MetricsConnector.get_metrics("reactor_inspector")
+        self.metrics = metrics.get_meter("reactor_inspector")
         self.last_responsive_ts = 0
         self.reactor_thread = None
         super(ReactorInspector, self).__init__()

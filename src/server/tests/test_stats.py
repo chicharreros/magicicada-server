@@ -1,5 +1,5 @@
 # Copyright 2008-2015 Canonical
-# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
+# Copyright 2015-2016 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -18,9 +18,10 @@
 
 """Tests for the stats helpers."""
 
-from twisted.internet import defer, task
+from twisted.internet import defer
 
-from metrics.metricsconnector import MetricsConnector
+import metrics
+
 from ubuntuone.storage.server.stats import StatsWorker
 from ubuntuone.storage.server.testing.testcase import TestWithDatabase
 
@@ -51,29 +52,7 @@ class TestStats(TestWithDatabase):
         yield super(TestStats, self).setUp()
         self.make_user(u'test user999', max_storage_bytes=2 ** 20)
         self.metrics = FakeMetrics()
-        MetricsConnector.register_metrics("root", instance=self.metrics)
-        self.service.stats_worker.stop()
-
-    def tearDown(self):
-        """Tear down the test."""
-        # restore the original instance
-        MetricsConnector.register_metrics(
-            "root", instance=self.service.factory.metrics)
-        return super(TestStats, self).tearDown()
-
-    def test_stats_loop(self):
-        """Test that the StatsWorker loop works as expected."""
-        stats_worker = StatsWorker(self.service, 2)
-        clock = task.Clock()
-        stats_worker.callLater = clock.callLater
-        failure = defer.failure.Failure(ValueError('error!'))
-        stats_worker.deferToThread = lambda _: defer.fail(failure)
-        stats_worker.start()
-        clock.advance(1)
-        delayed_calls = clock.getDelayedCalls()
-        self.assertEqual(len(delayed_calls), 1)
-        self.assertIn(stats_worker.next_loop, delayed_calls)
-        stats_worker.stop()
+        self.patch(metrics, 'get_meter', lambda n: self.metrics)
 
     def test_runtime_info(self):
         """Make sure we add runtime info."""

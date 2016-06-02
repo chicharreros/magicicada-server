@@ -1,5 +1,5 @@
 # Copyright 2008-2015 Canonical
-# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
+# Copyright 2015-2016 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -23,107 +23,43 @@ from __future__ import unicode_literals
 from mock import patch
 from testtools import TestCase
 
-from metrics import METER_UTILITY, NamespaceMeter
+from metrics import get_meter
 from metrics.services import oops_saved, revno, version_info
 
 
 class ServicesTest(TestCase):
     """Tests for metric services."""
 
-    def test_meters_oops_by_service(self):
-        """The service is able to meter an oops scoped to services."""
-
-        service_meter = METER_UTILITY.get_service_meter()
-
-        with patch.object(METER_UTILITY, 'get_service_meter'):
-            METER_UTILITY.get_service_meter.return_value = service_meter
-
-            oops_saved()
-
-            self.assertTrue(METER_UTILITY.get_service_meter.called)
-
-    def test_meters_oops_with_normal_meter(self):
-        """The service is able to meter an oops by normal meter."""
-
-        service_meter = METER_UTILITY.get_service_meter()
-
-        with patch.object(service_meter, 'meter',
-                          spec=NamespaceMeter) as meter:
-            oops_saved()
-
-            meter.assert_called_with('oops_saved')
-
     def test_meters_oops_passing_a_report(self):
         """The service is able to meter an oops passing a report."""
-
-        service_meter = METER_UTILITY.get_service_meter()
-
-        with patch.object(service_meter, 'meter',
-                          spec=NamespaceMeter) as meter:
+        service_meter = get_meter('service')
+        with patch.object(service_meter, 'meter') as meter:
             oops_saved(report=dict())
-
             meter.assert_called_with('oops_saved')
 
     def test_meters_oops_passing_a_context(self):
         """The service is able to meter an oops passing a context."""
-
-        service_meter = METER_UTILITY.get_service_meter()
-
-        with patch.object(service_meter, 'meter',
-                          spec=NamespaceMeter) as meter:
+        service_meter = get_meter('service')
+        with patch.object(service_meter, 'meter') as meter:
             oops_saved(context='some oops context')
-
             meter.assert_called_with('oops_saved')
 
     def test_oops_saved_with_no_report(self):
         """oops_saved returns an empty list with no report."""
-
-        service_meter = METER_UTILITY.get_service_meter()
-
-        with patch.object(METER_UTILITY, 'get_service_meter'):
-            METER_UTILITY.get_service_meter.return_value = service_meter
-
-            self.assertEqual([], oops_saved())
+        self.assertEqual([], oops_saved())
 
     def test_oops_saved_with_report_with_no_id(self):
         """oops_saved returns an empty list with no id in the report."""
-
-        service_meter = METER_UTILITY.get_service_meter()
-
-        with patch.object(METER_UTILITY, 'get_service_meter'):
-            METER_UTILITY.get_service_meter.return_value = service_meter
-
-            self.assertEqual([], oops_saved(report=dict()))
+        self.assertEqual([], oops_saved(report=dict()))
 
     def test_oops_saved_with_report_with_id(self):
         """oops_saved returns a non-empty list with an id in the report."""
-
-        service_meter = METER_UTILITY.get_service_meter()
-
-        with patch.object(METER_UTILITY, 'get_service_meter'):
-            METER_UTILITY.get_service_meter.return_value = service_meter
-            the_id = 'an id'
-            self.assertEqual([the_id], oops_saved(report=dict(id=the_id)))
-
-    def test_meters_revision_by_service(self):
-        """The service is able to meter a revision scoped to services."""
-
-        service_meter = METER_UTILITY.get_service_meter()
-
-        with patch.object(METER_UTILITY, 'get_service_meter'):
-            METER_UTILITY.get_service_meter.return_value = service_meter
-
-            revno()
-
-            self.assertTrue(METER_UTILITY.get_service_meter.called)
+        the_id = 'an id'
+        self.assertEqual([the_id], oops_saved(report=dict(id=the_id)))
 
     def test_meters_revno_with_gauge_meter(self):
         """The service is able to meter a revision by gauge meter."""
-
-        service_meter = METER_UTILITY.get_service_meter()
-
-        with patch.object(service_meter, 'gauge',
-                          spec=NamespaceMeter) as gauge:
+        service_meter = get_meter('service')
+        with patch.object(service_meter, 'gauge') as gauge:
             revno()
-
             gauge.assert_called_with('revno', version_info['revno'])

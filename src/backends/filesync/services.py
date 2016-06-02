@@ -1,5 +1,5 @@
 # Copyright 2008-2015 Canonical
-# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
+# Copyright 2015-2016 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -34,11 +34,12 @@ import uuid
 from functools import wraps
 from weakref import WeakValueDictionary
 
+import metrics
+
 from django.conf import settings
 from django.db import connection, models
 from django.utils.timezone import now
 
-from metrics.metricsconnector import MetricsConnector
 from backends.filesync import errors, utils
 from backends.filesync.dbmanager import (
     fsync_readonly,
@@ -1065,7 +1066,7 @@ class TimingMetrics(object):
 
     def __init__(self):
         namespace = settings.ENVIRONMENT_NAME + ".magicicada.DAL"
-        self.reporter = MetricsConnector.new_metrics(namespace=namespace)
+        self.reporter = metrics.get_meter(namespace)
 
     def __call__(self, orig_func):
         """Decorator to issue metrics with the timing of the executed method.

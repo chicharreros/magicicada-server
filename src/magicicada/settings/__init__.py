@@ -1,5 +1,5 @@
 # Copyright 2008-2015 Canonical
-# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
+# Copyright 2015-2016 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -138,8 +138,6 @@ AUTH_USER_MODEL = 'filesync.StorageUser'
 
 APP_NAME = 'filesync'
 ENVIRONMENT_NAME = 'development'
-GRAPHITE_ADMIN_PASSWORD = 'pwadmin'
-GRAPHITE_ADMIN_USER = 'admin'
 INSTANCE_ID = 1
 LOG_FOLDER = os.path.join(BASE_DIR, 'tmp')
 LOG_FORMAT = '%(asctime)s %(levelname)-8s %(name)s[%(process)d]: %(message)s'
@@ -151,7 +149,6 @@ ROOT_USERVOLUME_NAME = 'Magicicada'
 ROOT_USERVOLUME_PATH = '~/' + ROOT_USERVOLUME_NAME
 SERVICE_GROUP = 'filesync'
 SERVICE_NAME = 'server'
-STATSD_SERVERS = 'localhost:8125'
 STORAGE_PROXY_PORT = None
 SYSLOG_FORMAT = (
     '%(processName)-13s %(levelname)-8s %(name)s[%(process)d]: %(message)s')

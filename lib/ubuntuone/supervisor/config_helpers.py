@@ -1,5 +1,5 @@
 # Copyright 2008-2015 Canonical
-# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
+# Copyright 2015-2016 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -39,11 +39,6 @@ HEARTBEAT_LISTENER_TEMPLATE = '\n'.join((
     "buffer_size=%(buffer_size)s",
 ))
 
-STATS_WORKER_TEMPLATE = '\n'.join((
-    "[program:stats-worker]",
-    "command=python %(basepath)s/lib/ubuntuone/monitoring/stats_worker.py --log_file=%(log_folder)s/stats_worker.log --metric_namespace_prefix=%(env)s.%(hostname)s",  # NOQA
-    'environment=PYTHONPATH="%(basepath)s:%(basepath)s/lib",DJANGO_SETTINGS_MODULE="magicicada.settings"',  # NOQA
-))
 
 CONFIG_TEMPLATE = """; supervisor config file
 [supervisord]
@@ -135,7 +130,7 @@ def get_sort_key(value):
 
 def generate_server_config(server_name, env_service_map, config_spec,
                            templates, service_group, with_heartbeat,
-                           with_stats_worker, with_header):
+                           with_header):
     """Generate the config for a specific server/machine."""
     # Generally we have only one env per machine, except when production and
     # edge are colocated. In which case we default everything that doesn't have
@@ -176,9 +171,6 @@ def generate_server_config(server_name, env_service_map, config_spec,
                 ','.join(procs_to_watch)
         output.append(HEARTBEAT_LISTENER_TEMPLATE % heartbeat_listener_spec)
 
-    if with_stats_worker:
-        output.append(STATS_WORKER_TEMPLATE % server_spec)
-
     for group, progs in sorted(groups.items(), key=get_sort_key):
         group_spec = {"group_name": group,
                       "programs": ",".join(progs)}
@@ -200,7 +192,7 @@ def generate_service_config(service_map, config_spec, service_group=None,
 
     config_spec = config_spec.copy()
     environ = config_spec["env"]
-    if not "hostname" in config_spec:
+    if "hostname" not in config_spec:
         config_spec["hostname"] = platform.node()
 
     for service_name, instances in sorted(service_map.items()):
@@ -266,7 +258,7 @@ def generate_service_config(service_map, config_spec, service_group=None,
 
 
 def main(instance_map, templates, service_group=None,
-         with_heartbeat=False, with_stats_worker=False, config_spec=None):
+         with_heartbeat=False, config_spec=None):
     """Entry point"""
     from optparse import OptionParser
 
@@ -279,7 +271,6 @@ def main(instance_map, templates, service_group=None,
         config_content = generate_server_config(server_name, env_service_map,
                                                 config_spec, templates,
                                                 service_group, with_heartbeat,
-                                                with_stats_worker,
                                                 with_header=True)
         if options.dry_run:
             print config_content

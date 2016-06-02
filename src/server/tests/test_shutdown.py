@@ -1,5 +1,5 @@
 # Copyright 2008-2015 Canonical
-# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
+# Copyright 2015-2016 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -22,9 +22,6 @@ import os
 
 from twisted.trial.unittest import TestCase as TwistedTestCase
 from twisted.internet import reactor, defer, error
-
-from txstatsd.metrics.countermetric import CounterMetric
-from txstatsd.metrics.metermetric import MeterMetric
 
 from backends.filesync.services import make_storage_user
 from backends.testing.testcase import BaseTestCase
@@ -107,20 +104,6 @@ class TestShutdown(TwistedTestCase, BaseTestCase):
 
         ujobs = self.usr0.get_uploadjobs(node_id=mkfile_req.new_id)
         self.assertEqual(ujobs, [])
-
-    @defer.inlineCallbacks
-    def test_shutdown_metrics(self):
-        """Stop and restart the server."""
-        service = yield self.create_service()
-
-        # ensure we employ the correct metric name.
-        name = service.metrics.fully_qualify_name('server_start')
-        self.assertIsInstance(
-            service.metrics._metrics[name], MeterMetric)
-        name = service.metrics.fully_qualify_name('services_active')
-        self.assertIsInstance(
-            service.metrics._metrics[name], CounterMetric)
-        self.assertEqual(service.metrics._metrics[name].count(), 1)
 
     @defer.inlineCallbacks
     def test_requests_leak(self):

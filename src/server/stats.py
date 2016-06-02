@@ -1,5 +1,5 @@
 # Copyright 2008-2015 Canonical
-# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
+# Copyright 2015-2016 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -21,16 +21,28 @@
 import logging
 import socket
 
+from functools import update_wrapper
+
 from twisted.application.internet import TCPServer, SSLServer
 from twisted.internet import defer, reactor
 from twisted.web import server, resource
 
-from metrics.metricsconnector import MetricsConnector
-from txstatsd.process import report_reactor_stats
+import metrics
+
 from ubuntuone.monitoring import dump
 
 logger = logging.getLogger("storage.server.stat")
 status_log = logging.getLogger("storage.server.status")
+
+
+def report_reactor_stats(prefix="reactor"):
+    """Report statistics about a twisted reactor."""
+    def report():
+        return {prefix + ".readers": len(reactor.getReaders()),
+                prefix + ".writers": len(reactor.getWriters())}
+
+    update_wrapper(report, report_reactor_stats)
+    return report
 
 
 class MeliaeResource(resource.Resource):
@@ -62,12 +74,8 @@ class StatsWorker(object):
             self.servername = servername
         self.interval = interval
         self.next_loop = None
-        self._get_reactor_stats = report_reactor_stats(reactor)
-
-    @property
-    def metrics(self):
-        """Return the metrics instance for self.service."""
-        return MetricsConnector.get_metrics("root")
+        self._get_reactor_stats = report_reactor_stats()
+        self.metrics = metrics.get_meter("stats")
 
     def callLater(self, seconds, func, *args, **kwargs):
         """Wrap reactor.callLater to simplify testing."""

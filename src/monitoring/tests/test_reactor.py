@@ -1,5 +1,5 @@
 # Copyright 2008-2015 Canonical
-# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
+# Copyright 2015-2016 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -27,7 +27,7 @@ import threading
 from twisted.trial.unittest import TestCase as TwistedTestCase
 from twisted.internet import reactor, defer
 
-from metrics.metricsconnector import MetricsConnector
+import metrics
 
 from ubuntuone.storage.server.logger import TRACE
 from ubuntuone.devtools.handlers import MementoHandler
@@ -79,9 +79,7 @@ class ReactorInspectorTestCase(TwistedTestCase):
         self.addCleanup(logger.removeHandler, self.handler)
         self.helper = Helper()
         self.fake_metrics = FakeMetrics()
-        MetricsConnector.register_metrics("reactor_inspector",
-                                          instance=self.fake_metrics)
-        self.addCleanup(MetricsConnector.unregister_metrics)
+        self.patch(metrics, 'get_meter', lambda n: self.fake_metrics)
         self.ri = ReactorInspector(logger, self.helper.call, loop_time=.1)
         self.helper.ri = self.ri
 
