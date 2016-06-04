@@ -26,7 +26,7 @@ import sys
 sys.path.insert(0, os.path.abspath('lib'))
 
 TESTDIRS = [
-    'src',
+    'magicicada',
 ]
 for td in TESTDIRS:
     sys.path.insert(0, os.path.abspath(td))

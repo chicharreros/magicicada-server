@@ -19,7 +19,7 @@
 DJANGO_SETTINGS_MODULE ?= magicicada.settings
 FLAKE8 = flake8
 PYTHON = python
-SRC_DIR = $(CURDIR)/src
+SRC_DIR = $(CURDIR)/magicicada
 LIB_DIR = $(CURDIR)/lib
 ENV = $(CURDIR)/env
 PYTHONPATH := $(SRC_DIR):$(LIB_DIR):$(CURDIR):$(PYTHONPATH)
@@ -122,16 +122,8 @@ clean:
 lint:
 	virtualenv $(ENV)
 	$(ENV)/bin/pip install flake8 rst2html5
-	$(ENV)/bin/flake8 --filename='*.py' --exclude='migrations' src
+	$(ENV)/bin/flake8 --filename='*.py' --exclude='migrations' $(SRC_DIR)
 	dev-scripts/check_readme.sh
-
-etags: sourcedeps
-	# Generate tags for emacs
-	ctags-exuberant -e -R --language-force=python -f tags lib src
-
-tags: sourcedeps
-	# Generate tags for vim
-	ctags-exuberant -R --language-force=python -f tags lib src
 
 version:
 	bzr version-info --format=python > lib/versioninfo.py || true

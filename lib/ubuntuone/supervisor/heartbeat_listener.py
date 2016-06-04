@@ -35,7 +35,7 @@ import xmlrpclib
 from supervisor import childutils, states
 from supervisor.events import EventTypes, getEventNameByType
 
-from ubuntuone.storage.server.logger import configure_logger
+from magicicada.server.logger import configure_logger
 
 
 PROCESS_COMMUNICATION_STDOUT = \

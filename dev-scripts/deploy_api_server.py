@@ -35,7 +35,7 @@ reactor.suggestThreadPoolSize(30)
 import _pythonpath  # NOQA
 
 from magicicada import settings
-from ubuntuone.storage.server import server
+from magicicada.server import server
 from utilities import utils
 
 tmp_dir = os.path.join(utils.get_rootdir(), 'tmp')

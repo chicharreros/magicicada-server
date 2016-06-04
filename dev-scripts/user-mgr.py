@@ -30,7 +30,7 @@ os.environ["DJANGO_SETTINGS_MODULE"] = "magicicada.settings"
 
 from django.contrib.auth.models import User
 
-from backends.filesync import services
+from magicicada.filesync import services
 
 
 def create(args):
