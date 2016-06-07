@@ -31,14 +31,14 @@ from twisted.python import failure
 from twisted.web import client, error as web_error
 from twisted.trial.unittest import TestCase
 
-import metrics
-
-from magicicada import settings
 from ubuntuone.devtools.handlers import MementoHandler
 from ubuntuone.storageprotocol.client import (
     StorageClientFactory, StorageClient)
 from ubuntuone.supervisor import utils as supervisor_utils
 
+import metrics
+
+from magicicada import settings
 from magicicada.server import ssl_proxy
 from magicicada.server.server import PREFERRED_CAP
 from magicicada.server.testing.testcase import TestWithDatabase

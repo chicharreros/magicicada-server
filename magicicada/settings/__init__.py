@@ -30,6 +30,7 @@ https://docs.djangoproject.com/en/1.8/ref/settings/
 from __future__ import unicode_literals
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
+import logging
 import os
 
 from psycopg2.extensions import ISOLATION_LEVEL_REPEATABLE_READ
@@ -132,6 +133,10 @@ USE_TZ = False
 STATIC_URL = '/static/'
 
 AUTH_USER_MODEL = 'filesync.StorageUser'
+
+# define the TRACE level
+TRACE = 5
+logging.addLevelName(TRACE, "TRACE")
 
 # Custom settings
 

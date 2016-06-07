@@ -41,13 +41,13 @@ from magicicada.filesync.notifier.notifier import (
     UDFDelete,
     VolumeNewGeneration,
 )
-from magicicada.filesync.notifier.testing.testcase import FakeNotifier
+from magicicada.filesync.notifier.tests.test_notifier import FakeNotifier
 from magicicada.server.server import (
     StorageServer,
     StorageServerFactory,
     configure_oops,
 )
-from magicicada.server.testing import testcase
+from magicicada.server.testing.testcase import FactoryHelper, TestWithDatabase
 
 
 class DummyReactor(object):
@@ -79,8 +79,7 @@ class TestDelivery(TwistedTestCase):
         self.node_volume_id = uuid.uuid4()
         self.content_node = self.mocker.mock()
         self.factory = StorageServerFactory(
-            content_class=lambda _: self.content,
-            reactor=self.fake_reactor)
+            content_class=lambda _: self.content, reactor=self.fake_reactor)
 
     @inlineCallbacks
     def tearDown(self):
@@ -257,7 +256,7 @@ class TestDelivery(TwistedTestCase):
         yield deferred_to
 
 
-class NotificationsTestCase(testcase.TestWithDatabase):
+class NotificationsTestCase(TestWithDatabase):
     """Notification tests."""
 
     def test_new_volume_generation(self):
@@ -302,8 +301,8 @@ class NotificationsTestCase(testcase.TestWithDatabase):
             d.addCallback(done_auth)
 
         # setup
-        factory = testcase.FactoryHelper(login1)
-        factory2 = testcase.FactoryHelper(login2)
+        factory = FactoryHelper(login1)
+        factory2 = FactoryHelper(login2)
         d1 = defer.Deferred()
         d2 = defer.Deferred()
         timeout = reactor.callLater(3, d1.errback, Exception("timeout"))
@@ -336,7 +335,7 @@ class NotificationsTestCase(testcase.TestWithDatabase):
         return d1
 
 
-class NotificationErrorsTestCase(testcase.TestWithDatabase):
+class NotificationErrorsTestCase(TestWithDatabase):
     """Test Notification error handling.
 
     These tests will throw notifications at the server that will raise

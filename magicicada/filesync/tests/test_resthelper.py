@@ -39,6 +39,7 @@ from magicicada.filesync.resthelper import (
     ResourceMapper,
     RestHelper,
     date_formatter,
+    logger,
 )
 from magicicada.filesync.services import make_storage_user
 from magicicada.testing.testcase import BaseTestCase
@@ -265,11 +266,10 @@ class RestHelperTestCase(BaseTestCase):
             username="bob", visible_name="bobby boo",
             max_storage_bytes=2 * (2 ** 30))
         self.mapper = ResourceMapper()
-        logger = logging.getLogger("test")
         logger.addHandler(self.handler)
         logger.setLevel(logging.INFO)
         logger.propagate = False
-        self.helper = RestHelper(self.mapper, logger=logger)
+        self.helper = RestHelper(self.mapper)
 
     def test_GET_user(self):
         """Test for dao to REST conversion of user"""

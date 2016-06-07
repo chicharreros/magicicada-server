@@ -20,14 +20,17 @@
 
 from __future__ import unicode_literals
 
+import logging
 import os
 
 from django.conf import settings
 
 from magicicada.filesync import errors
-from magicicada.filesync.logging import log_dal_function
 from magicicada.filesync.models import STATUS_LIVE, StorageObject
 from magicicada.filesync.services import VolumeProxy
+
+
+logger = logging.getLogger(__name__)
 
 
 def date_formatter(dt):
@@ -160,10 +163,17 @@ resourcemapper = ResourceMapper()
 class RestHelper(object):
     """A class to be used by a REST server."""
 
-    def __init__(self, mapper=resourcemapper, metrics=None, logger=None):
+    def __init__(self, mapper=resourcemapper, metrics=None):
         self.map = mapper
         self.metrics = metrics
-        self.log_dal = log_dal_function(logger)
+
+    def log_dal(self, operation, user=None, **kwargs):
+        """Log a dal operation, user_id, and optional other arguments."""
+        params = sorted(["%s=%r" % (k, v) for k, v in kwargs.iteritems()])
+        if user:
+            params.insert(0, 'user_id=%r' % user.id)
+        msg = "Performing dal operation: %s(%s)"
+        logger.info(msg, operation, ", ".join(params))
 
     def get_user(self, user):
         """GET User Representation"""

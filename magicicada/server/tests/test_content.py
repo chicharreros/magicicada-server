@@ -48,9 +48,9 @@ from magicicada.filesync import errors
 from magicicada.filesync.models import StorageObject, StorageUser
 from magicicada.server import server, content, diskstorage
 from magicicada.server.testing.testcase import (
-    TestWithDatabase,
     BufferedConsumer,
     FactoryHelper,
+    TestWithDatabase,
 )
 
 

@@ -157,9 +157,8 @@ class DumbVolumeManager(volume_manager.VolumeManager):
 
 
 class ReallyFakeMain(main.Main):
-    """
-    This main is so fake, it breaks nearly everything.
-    """
+    """This main is so fake, it breaks nearly everything."""
+
     def __init__(self, port, root_dir, data_dir, partials_dir,
                  dns_srv=None):
         self.root_dir = root_dir
@@ -588,15 +587,11 @@ class TestBase(TestWithDatabase):
         """Set up."""
         yield super(TestBase, self).setUp()
         yield self.connect()
+        self.addCleanup(self.aq.disconnect)
         self.client = self.aq.client
         self.assertFalse(self.client.factory.connector is None)
         self.root = yield self.client.get_root()
         yield self.wait_for_nirvana(.5)
-
-    def tearDown(self):
-        """Tear down."""
-        self.aq.disconnect()
-        return super(TestBase, self).tearDown()
 
     def assertEvent(self, event, msg=None):
         """Check if an event happened."""

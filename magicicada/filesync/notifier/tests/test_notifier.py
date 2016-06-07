@@ -36,8 +36,38 @@ from magicicada.filesync.notifier.notifier import (
     UDFCreate,
     UDFDelete,
     VolumeNewGeneration,
+    event_classes,
 )
 from magicicada.testing.testcase import BaseTestCase
+
+
+class FakeNotifier(object):
+    """A fake Event Notifier used for testing."""
+
+    def __init__(self, event_sent_deferred=None):
+        """Initializes an instance of the storage controller."""
+        self.event_sent_deferred = event_sent_deferred
+        self.notifications = []
+        self._event_callbacks = dict.fromkeys(cls.event_type
+                                              for cls in event_classes)
+
+    def on_event(self, event):
+        """Record notifications."""
+        self.notifications.append(event)
+
+    def set_event_callback(self, event, callback):
+        """Registers a callback for an event_type."""
+        self._event_callbacks[event.event_type] = callback
+
+    def send_event(self, event):
+        """Send an event to the appropriate callback."""
+        cback = self._event_callbacks[event.event_type]
+        if event.call_with_recipient:
+            cback(event, recipient_id='test')
+        else:
+            cback(event)
+        if self.event_sent_deferred is not None:
+            self.event_sent_deferred.callback(event)
 
 
 class FakeNode(object):
@@ -246,14 +276,6 @@ class TestPendingNotifications(unittest.TestCase):
 
     def setUp(self):
         super(TestPendingNotifications, self).setUp()
-
-        class FakeNotifier(object):
-            def __init__(self):
-                self.notifications = []
-
-            def on_event(self, event):
-                self.notifications.append(event)
-
         self.notifier = FakeNotifier()
         self.pending_notifications = PendingNotifications(self.notifier)
 

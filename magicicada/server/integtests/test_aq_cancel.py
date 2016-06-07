@@ -28,8 +28,8 @@ from ubuntuone.storageprotocol.content_hash import content_hash_factory, crc32
 from ubuntuone.syncdaemon.marker import MDMarker as Marker
 
 from magicicada.server.testing.aq_helpers import (
-    FakeGetContent,
     NO_CONTENT_HASH,
+    FakeGetContent,
     TestContentBase,
     aShareUUID,
     anEmptyShareList,

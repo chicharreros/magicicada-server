@@ -43,7 +43,7 @@ from ubuntuone.storageprotocol.client import (
 from magicicada import settings
 from magicicada.filesync import services
 from magicicada.server.auth import DummyAuthProvider
-from magicicada.server.logger import configure_logger, TRACE
+from magicicada.server.logger import configure_logger
 from magicicada.server.server import (
     PREFERRED_CAP,
     StorageServerService,
@@ -55,14 +55,14 @@ server_key = settings.api_server.KEY
 server_crt = settings.api_server.CRT
 server_crt_chain = settings.api_server.CRT_CHAIN
 
-log = logging.getLogger("fsyncsrvr.SyncDaemon.TEST")
+logger = logging.getLogger("fsyncsrvr.SyncDaemon.TEST")
 
 
 def configure_logging(debug_tests=True):
     """Configure logging for the tests."""
     logger = logging.getLogger(settings.api_server.LOGGER_NAME)
     if debug_tests:
-        level = TRACE
+        level = settings.TRACE
     else:
         level = logging.INFO
 
@@ -113,8 +113,7 @@ class BaseProtocolTestCase(TwistedTestCase):
         """Setup for testing."""
         # make sure we start with clean state
         yield super(BaseProtocolTestCase, self).setUp()
-        log.info("starting test %s.%s", self.__class__.__name__,
-                 self._testMethodName)
+        logger.info("starting test %s", self.id())
         self.ssl_cert = crypto.load_certificate(
             crypto.FILETYPE_PEM, server_crt)
         if server_crt_chain:
@@ -156,8 +155,7 @@ class BaseProtocolTestCase(TwistedTestCase):
     def tearDown(self):
         """Tear down after testing."""
         yield self.service.stopService()
-        log.info("finished test %s.%s", self.__class__.__name__,
-                 self._testMethodName)
+        logger.info("finished test %s", self.id())
         yield super(BaseProtocolTestCase, self).tearDown()
 
     def make_user(self, username=None, **kwargs):
@@ -231,7 +229,8 @@ class ClientTestHelper(object):
 
 class SimpleClient(StorageClient, ClientTestHelper):
     """Simple client that calls a callback on connection."""
-    log = log
+
+    log = logger
 
     def __init__(self, *args, **kwargs):
         """create the instance"""

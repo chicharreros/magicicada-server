@@ -31,7 +31,7 @@ from ubuntuone.devtools.handlers import MementoHandler
 import metrics
 
 from magicicada.monitoring.reactor import ReactorInspector
-from magicicada.server.logger import TRACE
+from magicicada.settings import TRACE
 
 
 class ReactorInspectorTestCase(TwistedTestCase):

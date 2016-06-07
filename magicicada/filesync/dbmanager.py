@@ -32,6 +32,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db import InternalError, transaction
 
 
+logger = logging.getLogger(__name__)
 _run_on_rollback = []
 
 
@@ -119,10 +120,9 @@ def retryable_transaction(max_time=4.0, max_retries=3, variance=0.5,
                     info = sys.exc_info()
                     try:
                         if isinstance(e, InternalError):
-                            logger = logging.getLogger('storage.server.txn')
-                            logger.exception("Got an InternalError, retrying. "
-                                             "(count: %s, max_retries: %s)",
-                                             str(count), str(max_retries))
+                            logger.exception(
+                                "Got an InternalError, retrying. (count: %s, "
+                                "max_retries: %s)", count, max_retries)
                         count += 1
                         if count >= max_retries:
                             # include the original error name in the new

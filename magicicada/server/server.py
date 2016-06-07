@@ -62,7 +62,7 @@ from magicicada.monitoring.reactor import ReactorInspector
 from magicicada.rpcdb import inthread
 from magicicada.server import auth, content, errors, stats
 from magicicada.server.diskstorage import DiskStorage
-from magicicada.server.logger import configure_logger, TRACE
+from magicicada.server.logger import configure_logger
 
 try:
     from versioninfo import version_info
@@ -179,7 +179,7 @@ class StorageLogger(object):
 
     def trace_message(self, text, message):
         """Log a message with some pre processing."""
-        if self.protocol.logger.isEnabledFor(TRACE):
+        if self.protocol.logger.isEnabledFor(settings.TRACE):
             if message.type != protocol_pb2.Message.BYTES:
                 self.trace(text + (str(message).replace('\n', ' ')))
 
@@ -188,7 +188,7 @@ class StorageLogger(object):
     warning = loglevel(logging.WARNING)
     info = loglevel(logging.INFO)
     debug = loglevel(logging.DEBUG)
-    trace = loglevel(TRACE)
+    trace = loglevel(settings.TRACE)
 
 
 class StorageServerLogger(StorageLogger):
@@ -2773,7 +2773,7 @@ def create_service(status_port=None,
 
     # set up the hacker's logger always in TRACE
     h_logger = logging.getLogger(settings.api_server.LOGGER_NAME + '.hackers')
-    h_logger.setLevel(TRACE)
+    h_logger.setLevel(settings.TRACE)
     h_logger.propagate = False
     h_logger.addHandler(handler)
 

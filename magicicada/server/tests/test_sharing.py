@@ -29,8 +29,7 @@ from ubuntuone.storageprotocol.content_hash import content_hash_factory, crc32
 
 from magicicada.filesync import errors
 from magicicada.filesync.models import STATUS_LIVE, Share
-from magicicada.server.testing.testcase import (
-    TestWithDatabase, FactoryHelper)
+from magicicada.server.testing.testcase import FactoryHelper, TestWithDatabase
 
 EMPTY_HASH = content_hash_factory().content_hash()
 NO_CONTENT_HASH = ""

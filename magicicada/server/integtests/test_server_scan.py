@@ -24,7 +24,6 @@ import zlib
 from cStringIO import StringIO
 
 from twisted.internet import defer
-
 from ubuntuone.storageprotocol import request
 from ubuntuone.storageprotocol.content_hash import content_hash_factory, crc32
 from ubuntuone.devtools.handlers import MementoHandler
