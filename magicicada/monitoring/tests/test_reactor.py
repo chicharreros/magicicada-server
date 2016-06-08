@@ -26,15 +26,15 @@ import threading
 
 from twisted.trial.unittest import TestCase as TwistedTestCase
 from twisted.internet import reactor, defer
-from ubuntuone.devtools.handlers import MementoHandler
 
 import metrics
 
 from magicicada.monitoring.reactor import ReactorInspector
 from magicicada.settings import TRACE
+from magicicada.testing.testcase import BaseTestCase
 
 
-class ReactorInspectorTestCase(TwistedTestCase):
+class ReactorInspectorTestCase(BaseTestCase, TwistedTestCase):
     """Test the ReactorInspector class."""
 
     def setUp(self):
@@ -71,12 +71,8 @@ class ReactorInspectorTestCase(TwistedTestCase):
                 self.calls.append(("gauge", name, val))
 
         logger = logging.getLogger("storage.server")
-        logger.propagate = False
-        logger.setLevel(TRACE)
-        self.handler = MementoHandler()
-        self.handler.setLevel(TRACE)
-        logger.addHandler(self.handler)
-        self.addCleanup(logger.removeHandler, self.handler)
+        self.handler = self.add_memento_handler(logger, level=TRACE)
+
         self.helper = Helper()
         self.fake_metrics = FakeMetrics()
         self.patch(metrics, 'get_meter', lambda n: self.fake_metrics)
@@ -141,16 +137,16 @@ class ReactorInspectorTestCase(TwistedTestCase):
         event.set()
 
         # check
-        self.assertFalse(self.handler.check_debug("dumping_function"))
-        self.assertTrue(self.handler.check_debug("Dumping Python frame",
-                                                 "waiting_function"))
-        self.assertTrue(self.handler.check_debug("Dumping Python frame",
-                                                 "reactor main thread"))
+        self.handler.assert_not_logged("dumping_function")
+        self.handler.assert_debug(
+            "Dumping Python frame", "waiting_function")
+        self.handler.assert_debug(
+            "Dumping Python frame", "reactor main thread")
 
     def test_reactor_ok(self):
         """Reactor working fast."""
         self.run_ri()
-        ok_line = self.handler.check(TRACE, "ReactorInspector: ok")
+        ok_line = self.handler.assert_trace("ReactorInspector: ok")
         self.assertTrue(ok_line)
         self.assertTrue(ok_line.args[-1] >= 0)  # Should be near zero delay
         # Check the metrics
@@ -165,8 +161,8 @@ class ReactorInspectorTestCase(TwistedTestCase):
         self.ri.dump_frames = lambda: dump_frames_called.callback(True)
         self.run_ri(0)
         yield dump_frames_called
-        log_line = self.handler.check(logging.CRITICAL, "ReactorInspector",
-                                      "detected unresponsive")
+        log_line = self.handler.assert_critical(
+            "ReactorInspector", "detected unresponsive")
         self.assertTrue(log_line)
         self.assertTrue(log_line.args[-1] >= .1)  # waited for entire loop time
         # Check the metrics
@@ -178,8 +174,8 @@ class ReactorInspectorTestCase(TwistedTestCase):
     def test_reactor_back_alive(self):
         """Reactor resurrects after some loops."""
         self.run_ri(3)
-        late_line = self.handler.check_warning("ReactorInspector: late",
-                                               "got: 0")
+        late_line = self.handler.assert_warning(
+                "ReactorInspector: late", "got: 0")
         self.assertTrue(late_line)
         self.assertTrue(late_line.args[-1] >= .2)  # At least 2 cycles of delay
         # Check the metrics

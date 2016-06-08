@@ -43,7 +43,6 @@ from magicicada.filesync.resthelper import (
 )
 from magicicada.filesync.services import make_storage_user
 from magicicada.testing.testcase import BaseTestCase
-from ubuntuone.devtools.handlers import MementoHandler
 
 
 class MockUser(object):
@@ -261,14 +260,11 @@ class RestHelperTestCase(BaseTestCase):
 
     def setUp(self):
         super(RestHelperTestCase, self).setUp()
-        self.handler = MementoHandler()
         self.user = make_storage_user(
             username="bob", visible_name="bobby boo",
             max_storage_bytes=2 * (2 ** 30))
         self.mapper = ResourceMapper()
-        logger.addHandler(self.handler)
-        logger.setLevel(logging.INFO)
-        logger.propagate = False
+        self.handler = self.add_memento_handler(logger, level=logging.INFO)
         self.helper = RestHelper(self.mapper)
 
     def test_GET_user(self):
@@ -276,7 +272,7 @@ class RestHelperTestCase(BaseTestCase):
         info = self.helper.get_user(self.user)
         self.assertEqual(info, self.mapper.user_repr(self.user))
         user_id = repr(self.user.id)
-        self.assertTrue(self.handler.check_info("get_udfs", user_id))
+        self.handler.assert_info("get_udfs", user_id)
 
     def test_GET_user_with_udf(self):
         """Test get_user with udf."""
@@ -292,7 +288,7 @@ class RestHelperTestCase(BaseTestCase):
                                       volume_path=volume_path)
         self.assertEqual(info, self.mapper.volume_repr(udf))
         ids = [repr(x) for x in [self.user.id, unicode(volume_path)]]
-        self.assertTrue(self.handler.check_info("get_udf_by_path", *ids))
+        self.handler.assert_info("get_udf_by_path", *ids)
 
     def test_GET_volume_with_delta0(self):
         """Test get_volume with delta, no nodes"""
@@ -306,9 +302,9 @@ class RestHelperTestCase(BaseTestCase):
             info,
             self.mapper.volume_repr(volume=udf, from_generation=0, nodes=[]))
         ids = [repr(x) for x in [self.user.id, unicode(volume_path)]]
-        self.assertTrue(self.handler.check_info("get_udf_by_path", *ids))
+        self.handler.assert_info("get_udf_by_path", *ids)
         ids = [repr(x) for x in [self.user.id, udf.id, 0]]
-        self.assertTrue(self.handler.check_info("get_delta", *ids))
+        self.handler.assert_info("get_delta", *ids)
 
     def test_GET_volume_with_delta1(self):
         """Test get_volume with delta, with nodes"""
@@ -337,7 +333,7 @@ class RestHelperTestCase(BaseTestCase):
         udf = self.user.get_udf_by_path(path)
         self.assertEqual(self.mapper.volume_repr(udf), info)
         ids = [repr(x) for x in [self.user.id, unicode(path)]]
-        self.assertTrue(self.handler.check_info("make_udf", *ids))
+        self.handler.assert_info("make_udf", *ids)
 
     def test_GET_node_directory(self):
         """Test for get_node a directory node."""
@@ -356,7 +352,7 @@ class RestHelperTestCase(BaseTestCase):
         info = self.helper.get_node(user=self.user, node_path=full_path)
         self.assertEqual(info, self.mapper.node_repr(f1))
         ids = [repr(x) for x in [self.user.id, full_path, True]]
-        self.assertTrue(self.handler.check_info("get_node_by_path", *ids))
+        self.handler.assert_info("get_node_by_path", *ids)
 
     def test_GET_volumes(self):
         """Test get_volume."""
@@ -368,10 +364,8 @@ class RestHelperTestCase(BaseTestCase):
         info = info.sort(key=operator.itemgetter('path'))
         expected_repr = expected_repr.sort(key=operator.itemgetter('path'))
         self.assertEqual(info, expected_repr)
-        self.assertTrue(self.handler.check_info("get_volume",
-                                                repr(self.user.id)))
-        self.assertTrue(self.handler.check_info(
-            "get_udfs", repr(self.user.id)))
+        self.handler.assert_info("get_volume", repr(self.user.id))
+        self.handler.assert_info("get_udfs", repr(self.user.id))
 
     def test_DELETE_volume(self):
         """Test delete_volume."""
@@ -380,9 +374,9 @@ class RestHelperTestCase(BaseTestCase):
         self.assertRaises(errors.DoesNotExist,
                           self.user.get_udf, udf.id)
         ids = [repr(x) for x in [self.user.id, udf.path]]
-        self.assertTrue(self.handler.check_info("get_udf_by_path", *ids))
+        self.handler.assert_info("get_udf_by_path", *ids)
         ids = [repr(x) for x in [self.user.id, udf.id]]
-        self.assertTrue(self.handler.check_info("delete_udf", *ids))
+        self.handler.assert_info("delete_udf", *ids)
 
     def test_GET_node0(self):
         """Test simple node info."""
@@ -432,9 +426,9 @@ class RestHelperTestCase(BaseTestCase):
         self.assertRaises(errors.DoesNotExist,
                           self.user.volume().get_node, f1.id)
         ids = [repr(x) for x in [self.user.id, full_path]]
-        self.assertTrue(self.handler.check_info("get_node_by_path", *ids))
+        self.handler.assert_info("get_node_by_path", *ids)
         ids = [repr(x) for x in [self.user.id, f1.id, True]]
-        self.assertTrue(self.handler.check_info("delete", *ids))
+        self.handler.assert_info("delete", *ids)
 
     def test_GET_node_children(self):
         """Test get_node_children."""
@@ -448,9 +442,9 @@ class RestHelperTestCase(BaseTestCase):
             self.user, full_path, include_children=True)
         self.assertEqual(info, expected)
         ids = [repr(x) for x in [self.user.id, full_path, True]]
-        self.assertTrue(self.handler.check_info("get_node", *ids))
+        self.handler.assert_info("get_node", *ids)
         ids = [repr(x) for x in [self.user.id, root.id, True]]
-        self.assertTrue(self.handler.check_info("get_children", *ids))
+        self.handler.assert_info("get_children", *ids)
 
     def test_GET_file_node_children(self):
         """Test get_node_children."""
@@ -471,9 +465,9 @@ class RestHelperTestCase(BaseTestCase):
         info = self.helper.put_node(self.user, new_file_path, node_rep)
 
         ids = [repr(x) for x in [self.user.id, new_file_path]]
-        self.assertTrue(self.handler.check_info("get_node_by_path", *ids))
+        self.handler.assert_info("get_node_by_path", *ids)
         ids = [repr(x) for x in [self.user.id, node.id, True]]
-        self.assertTrue(self.handler.check_info("change_public_access", *ids))
+        self.handler.assert_info("change_public_access", *ids)
 
         node.load()
         self.assertEqual(node.is_public, True)
@@ -497,8 +491,8 @@ class RestHelperTestCase(BaseTestCase):
         node_rep['is_public'] = True
         info = self.helper.put_node(self.user, new_file_path, node_rep)
         self.assertEqual(self.helper.get_public_files(self.user), [info])
-        self.assertTrue(self.handler.check_info("get_public_files",
-                                                repr(self.user.id)))
+        self.handler.assert_info(
+            "get_public_files", repr(self.user.id))
 
     def test_PUT_node_is_public_directory(self):
         """Test put node to make existing file public."""
@@ -523,12 +517,12 @@ class RestHelperTestCase(BaseTestCase):
         self.assertEqual(node.full_path, new_path)
         self.assertEqual(info, self.mapper.node_repr(node))
         ids = [repr(x) for x in [self.user.id, new_file_path]]
-        self.assertTrue(self.handler.check_info("get_node_by_path", *ids))
+        self.handler.assert_info("get_node_by_path", *ids)
         new_dir, new_name = os.path.split(new_path)
         ids = [repr(x) for x in [self.user.id, node.vol_id, unicode(new_dir)]]
-        self.assertTrue(self.handler.check_info("get_node_by_path", *ids))
+        self.handler.assert_info("get_node_by_path", *ids)
         ids = [repr(x) for x in [self.user.id, node.id, unicode(new_name)]]
-        self.assertTrue(self.handler.check_info("move", *ids))
+        self.handler.assert_info("move", *ids)
 
     def test_PUT_node_path_is_public(self):
         """Test put node with a new path and make it public."""

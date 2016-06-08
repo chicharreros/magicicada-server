@@ -44,13 +44,32 @@ from magicicada.filesync import errors as dataerror
 from magicicada.filesync.models import Share
 from magicicada.server import errors, server
 from magicicada.server.server import (
-    StorageServer, StorageServerRequestResponse, SimpleRequestResponse,
-    ListShares, ShareAccepted, CreateShare, DeleteShare, TRACE,
-    CreateUDF, DeleteVolume, ListVolumes, Unlink, BytesMessageProducer,
-    GetContentResponse, PutContentResponse, StorageServerFactory,
-    GetDeltaResponse, RescanFromScratchResponse, configure_oops,
-    QuerySetCapsResponse, MoveResponse, MakeResponse, FreeSpaceResponse,
-    AccountResponse, AuthenticateResponse, Action, LoopingPing,
+    AccountResponse,
+    Action,
+    AuthenticateResponse,
+    BytesMessageProducer,
+    CreateShare,
+    CreateUDF,
+    DeleteShare,
+    DeleteVolume,
+    FreeSpaceResponse,
+    GetContentResponse,
+    GetDeltaResponse,
+    ListShares,
+    ListVolumes,
+    LoopingPing,
+    MakeResponse,
+    MoveResponse,
+    PutContentResponse,
+    QuerySetCapsResponse,
+    RescanFromScratchResponse,
+    ShareAccepted,
+    SimpleRequestResponse,
+    StorageServer,
+    StorageServerFactory,
+    StorageServerRequestResponse,
+    Unlink,
+    configure_oops,
 )
 from magicicada.server.testing import testcase
 
@@ -167,7 +186,7 @@ class BaseStorageServerTestCase(TwistedTestCase):
         self.patch(self.server, 'transport', FakedTransport())
 
         self.handler = MementoHandler()
-        self.handler.setLevel(TRACE)
+        self.handler.setLevel(settings.TRACE)
         self.server.logger.addHandler(self.handler)
 
     @defer.inlineCallbacks
@@ -428,7 +447,7 @@ class StorageServerTestCase(BaseStorageServerTestCase):
         # check response and logging
         self.assertEqual(response[0].type, protocol_pb2.Message.PONG)
         self.handler.debug = True
-        self.assertTrue(self.handler.check(TRACE, "ping pong"))
+        self.assertTrue(self.handler.check(settings.TRACE, "ping pong"))
 
 
 class ActionTestCase(BaseStorageServerTestCase):
@@ -2688,7 +2707,7 @@ class BytesMessageProducerTests(TwistedTestCase):
 
         self.logger = logging.getLogger("storage.server")
         self.handler = MementoHandler()
-        self.handler.setLevel(TRACE)
+        self.handler.setLevel(settings.TRACE)
         self.logger.addHandler(self.handler)
 
     @defer.inlineCallbacks
@@ -2700,19 +2719,19 @@ class BytesMessageProducerTests(TwistedTestCase):
     def test_resume_log(self):
         """Log when resumed."""
         self.bmp.resumeProducing()
-        self.assertTrue(self.handler.check(TRACE,
+        self.assertTrue(self.handler.check(settings.TRACE,
                         "BytesMessageProducer resumed", str(self.producer)))
 
     def test_stop_log(self):
         """Log when stopped."""
         self.bmp.stopProducing()
-        self.assertTrue(self.handler.check(TRACE,
+        self.assertTrue(self.handler.check(settings.TRACE,
                         "BytesMessageProducer stopped", str(self.producer)))
 
     def test_pause_log(self):
         """Log when paused."""
         self.bmp.pauseProducing()
-        self.assertTrue(self.handler.check(TRACE,
+        self.assertTrue(self.handler.check(settings.TRACE,
                         "BytesMessageProducer paused", str(self.producer)))
 
     def test_transferred_counting(self):

@@ -29,7 +29,7 @@ import Queue
 
 import metrics
 
-from magicicada.server.logger import TRACE
+from magicicada.settings import TRACE
 
 
 class ReactorInspector(threading.Thread):
