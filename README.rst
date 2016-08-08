@@ -32,7 +32,7 @@ Now, generate a private key::
 
     openssl genrsa -out privkey.pem
 
-Then, then generate a self-signed certificate. Note that at some point it will
+Then generate a self-signed certificate. Note that at some point it will
 ask you to write the "Common Name (e.g. server FQDN or YOUR name)", I found
 that what you put there needs to match the '--host' parameter you pass to the
 client (see below, in the part where the client is started), so this host name
@@ -49,33 +49,30 @@ server config, please remove the file or move it to another location.
 Server setup
 ------------
 
-Start with a clean Ubuntu Precise environment (for example, in a VPS, or using
-an LXC). As example, if you want to create a precise LXC, you can use::
+Start with a clean Ubuntu Xenial environment (e.g., in a VPS, or using
+an LXC). As example, if you want to create a Xenial LXC, you can use::
 
-    sudo lxc-create -t ubuntu -n magicicada-precise -- -r precise \
+    sudo lxc-create -t ubuntu -n magicicada-xenial -- -r xenial \
         -a amd64 -b $USER
 
 Then you need to start the LXC instance and ssh into it::
 
-    sudo lxc-start -n magicicada-precise
-    ssh magicicada-precise
+    sudo lxc-start -n magicicada-xenial
+    ssh magicicada-xenial
 
-Add the Postgresql official apt rule following the instructions from (needed so
-the next step can install Postgresql 9.5 properly):
+Install ``make``, you'll need it for the rest of the process::
 
-http://wiki.postgresql.org/wiki/Apt
-
-(no need to actually install anything, the next item will take care of that)
-
-Install tools and dependencies (you will be prompted for your password for sudo
-access)::
-
-    make bootstrap
+    sudo apt-get install make
 
 Branch the project and get into that dir::
 
     cd ~/magicicada
     bzr branch lp:magicicada-server
+
+Install tools and dependencies (you will be prompted for your password for sudo
+access)::
+
+    make bootstrap
 
 Ensure the files 'privkey.pem' and 'cacert.pem' produced in the "Before server
 or client" section are copied into the ~/magicicada/magicicada-server/certs
@@ -101,17 +98,10 @@ Client setup
 ------------
 
 This is to be repeated in all places that you want the system to run.
-Instructions are for an Ubuntu Trusty environment, adapt as needed. It's
+Instructions are for an Ubuntu Xenial environment, adapt as needed. It's
 assuming you're starting from a clean machine (e.g.: a just installed one,
 or an LXC), if you're not you may have some of the needed parts
 already installed.
-
-First, install tools and dependencies::
-
-    sudo apt-get install python-twisted-bin python-twisted-core \
-        python-dirspec python-pyinotify python-configglue \
-        python-twisted-names python-ubuntu-sso-client \
-        python-distutils-extra protobuf-compiler python-protobuf
 
 Following the folder structure we started above, branch the client and the
 protocol so the final layout will be as follow:
@@ -120,7 +110,14 @@ protocol so the final layout will be as follow:
 - ~/magicicada/magicicada-client   <-- the proper magicicada client
 - ~/magicicada/certs   <-- where you'll store the SSL certs for the client
 
-So, branch and build the storage protocol::
+First branch the client and install all the needed tools and dependencies::
+
+    cd ~/magicicada
+    bzr branch lp:magicicada-client
+    cd magicicada-client
+    cat dependencies.txt | sudo xargs apt-get install -y --no-install-recommends
+
+Then, branch and build the storage protocol::
 
     cd ~/magicicada
     bzr branch lp:magicicada-protocol
@@ -128,7 +125,7 @@ So, branch and build the storage protocol::
     ./setup.py build
 
 Ensure the proper certificate is the right folder, for the client you only need
-`cacert.pem`::
+`cacert.pem` (be sure the `private.pem` file is NOT there)::
 
     ls ~/magicicada/certs
 
@@ -136,11 +133,9 @@ You should see something like::
 
     -rw-rw-r-- 1 user user 765 Aug 13 09:18 cacert.pem
 
-Also branch and build the client::
+Now go to the client, relate it to the storage-protocol, and build it::
 
-    cd ~/magicicada
-    bzr branch lp:magicicada-client
-    cd magicicada-client/ubuntuone
+    cd ~/magicicada/magicicada-client/ubuntuone
     ln -s ~/magicicada/magicicada-protocol/ubuntuone/storageprotocol .
     cd ..
     ./setup.py build
