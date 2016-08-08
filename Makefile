@@ -150,7 +150,7 @@ stop-dbus:
 
 start-supervisor:
 	@python dev-scripts/supervisor-config-dev.py
-	-@$(START_SUPERVISORD) dev-scripts/supervisor-dev.conf.tpl \
+	-@$(START_SUPERVISORD) dev-scripts/supervisor-dev.conf.tpl
 
 stop-supervisor:
 	-@dev-scripts/supervisorctl-dev shutdown

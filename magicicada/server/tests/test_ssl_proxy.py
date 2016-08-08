@@ -238,11 +238,6 @@ class ProxyServerTest(TestCase):
         self.peer = ssl_proxy.ProxyClient()
         self.peer.setPeer(self.server)
 
-    @defer.inlineCallbacks
-    def tearDown(self):
-        self.server = None
-        yield super(ProxyServerTest, self).tearDown()
-
     def test_connectionMade(self):
         """Test connectionMade with handshake done."""
         mocker = Mocker()
