@@ -119,7 +119,7 @@ ci-test:
 	$(MAKE) test TESTFLAGS="-1 $(TESTFLAGS)"
 
 clean:
-	rm -rf tmp/* _trial_temp
+	rm -rf tmp/* _trial_temp $(ENV)
 
 lint:
 	virtualenv $(ENV)

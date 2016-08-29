@@ -21,7 +21,6 @@
 from __future__ import unicode_literals
 
 import time
-import logging
 import threading
 
 from twisted.trial.unittest import TestCase as TwistedTestCase
@@ -29,7 +28,7 @@ from twisted.internet import reactor, defer
 
 import metrics
 
-from magicicada.monitoring.reactor import ReactorInspector
+from magicicada.monitoring.reactor import ReactorInspector, logger
 from magicicada.settings import TRACE
 from magicicada.testing.testcase import BaseTestCase
 
@@ -70,13 +69,12 @@ class ReactorInspectorTestCase(BaseTestCase, TwistedTestCase):
                 """Record call to gauge()."""
                 self.calls.append(("gauge", name, val))
 
-        logger = logging.getLogger("storage.server")
         self.handler = self.add_memento_handler(logger, level=TRACE)
 
         self.helper = Helper()
         self.fake_metrics = FakeMetrics()
         self.patch(metrics, 'get_meter', lambda n: self.fake_metrics)
-        self.ri = ReactorInspector(logger, self.helper.call, loop_time=.1)
+        self.ri = ReactorInspector(self.helper.call, loop_time=.1)
         self.helper.ri = self.ri
 
     def run_ri(self, call_count=None, join=True):
@@ -175,7 +173,7 @@ class ReactorInspectorTestCase(BaseTestCase, TwistedTestCase):
         """Reactor resurrects after some loops."""
         self.run_ri(3)
         late_line = self.handler.assert_warning(
-                "ReactorInspector: late", "got: 0")
+            "ReactorInspector: late", "got: 0")
         self.assertTrue(late_line)
         self.assertTrue(late_line.args[-1] >= .2)  # At least 2 cycles of delay
         # Check the metrics

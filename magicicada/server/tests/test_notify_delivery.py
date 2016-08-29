@@ -21,8 +21,6 @@
 import logging
 import uuid
 
-import oops_timeline
-
 from mocker import Mocker, expect
 from twisted.internet.defer import inlineCallbacks, succeed
 from twisted.internet import defer, reactor
@@ -45,7 +43,7 @@ from magicicada.filesync.notifier.tests.test_notifier import FakeNotifier
 from magicicada.server.server import (
     StorageServer,
     StorageServerFactory,
-    configure_oops,
+    logger,
 )
 from magicicada.server.testing.testcase import FactoryHelper, TestWithDatabase
 
@@ -339,90 +337,78 @@ class NotificationErrorsTestCase(TestWithDatabase):
     """Test Notification error handling.
 
     These tests will throw notifications at the server that will raise
-    exceptions and check the oops recorded. Some events don't trigger
-    exceptions in themselves, but an exception is created at broadcast.
+    exceptions. Some events don't trigger exceptions in themselves, but an
+    exception is created at broadcast.
+
     """
 
-    induced_error = ValueError
+    induced_error = Failure(ValueError("Test error"))
 
     @defer.inlineCallbacks
     def setUp(self):
         yield super(NotificationErrorsTestCase, self).setUp()
-
-        self.notifier = FakeNotifier()
+        self.event_sent = defer.Deferred()
+        self.notifier = FakeNotifier(event_sent_deferred=self.event_sent)
         self.patch(notifier, 'get_notifier', lambda: self.notifier)
         self.fake_reactor = DummyReactor()
-        self.oops_deferred = defer.Deferred()
 
-        def publish(report):
-            self.oops_deferred.callback(report)
-
-        oops_config = configure_oops()
-        # Should probably be an option to configure_oops?
-        oops_timeline.install_hooks(oops_config)
-        oops_config.publishers = [publish]
-
-        self.ssfactory = StorageServerFactory(
-            oops_config=oops_config,
-            reactor=self.fake_reactor)
+        self.ssfactory = StorageServerFactory(reactor=self.fake_reactor)
 
         protocol = StorageServer()
         protocol.factory = self.ssfactory
         protocol.working_caps = ["volumes", "generations"]
-        protocol.logger = logging.getLogger("storage.server")
         protocol.session_id = uuid.uuid4()
         self.patch(self.ssfactory.content, 'get_user_by_id',
-                   lambda *a: Failure(self.induced_error("Test error")))
+                   lambda *a: self.induced_error)
+        self.handler = self.add_memento_handler(logger)
 
     @defer.inlineCallbacks
     def check_event(self, event, **kwargs):
         """Test an error in node update."""
-        original_event = event
-        self.notifier.send_event(original_event)
-        oops_data = yield self.oops_deferred
-        tl = oops_data["timeline"]
-        _, _, category, detail, _ = tl[-1]
-        self.assertEqual("EVENT-%s" % original_event.event_type, category)
+        self.notifier.send_event(event)
+        yield self.event_sent
 
-        expected = "NOTIFY WITH %r (%s)" % (original_event, kwargs)
-        self.assertEqual(expected, detail)
-        self.assertEqual("Test error", oops_data["value"])
-        self.assertEqual("ValueError", oops_data["type"])
+        actual = self.handler.records_by_level[logging.ERROR]
+        self.assertEqual(len(actual), 1)
+        expected = '%s in notification %r while calling deliver_%s(**%r)' % (
+            self.induced_error.value, event, event.event_type, kwargs)
+        self.assertEqual(actual[0].getMessage(), expected)
 
     def test_share_created(self):
         """Test the share events."""
         event_args = (
             uuid.uuid4(), u"name", uuid.uuid4(), 1, 2, Share.VIEW, False)
-        self.check_event(ShareCreated(*event_args))
+        return self.check_event(ShareCreated(*event_args))
 
     def test_share_deleted(self):
         """Test the share events."""
         event_args = (
             uuid.uuid4(), u"name", uuid.uuid4(), 1, 2, Share.VIEW, False)
-        self.check_event(ShareDeleted(*event_args))
+        return self.check_event(ShareDeleted(*event_args))
 
     def test_share_declined(self):
         """Test the share events."""
         event_args = (
             uuid.uuid4(), u"name", uuid.uuid4(), 1, 2, Share.VIEW, False)
-        self.check_event(ShareDeclined(*event_args))
+        return self.check_event(ShareDeclined(*event_args))
 
     def test_share_accepted(self):
         """Test the share events."""
         event_args = (
             uuid.uuid4(), u"name", uuid.uuid4(), 1, 2, Share.VIEW, True)
-        self.check_event(ShareAccepted(*event_args), recipient_id=u'test')
+        return self.check_event(
+            ShareAccepted(*event_args), recipient_id=u'test')
 
     def test_udf_delete(self):
         """Test UDF Delete."""
-        self.check_event(UDFDelete(1, uuid.uuid4(), uuid.uuid4()))
+        return self.check_event(UDFDelete(1, uuid.uuid4(), uuid.uuid4()))
 
     def test_udf_create(self):
         """Test UDF Create."""
-        self.check_event(UDFCreate(1, uuid.uuid4(), uuid.uuid4(),
-                                   u"suggested path", uuid.uuid4()))
+        return self.check_event(
+            UDFCreate(1, uuid.uuid4(), uuid.uuid4(), u"path", uuid.uuid4()))
 
     def test_new_volume_gen(self):
         """Test the new gen for volume events."""
         event = VolumeNewGeneration(1, uuid.uuid4(), 77, uuid.uuid4())
-        self.check_event(event)
+        return self.check_event(event)

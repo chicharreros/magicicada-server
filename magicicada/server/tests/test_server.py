@@ -36,14 +36,14 @@ from twisted.python.failure import Failure
 from twisted.python import log
 from twisted.internet import defer, task, error as txerror
 from twisted.trial.unittest import TestCase as TwistedTestCase
-from ubuntuone.devtools.handlers import MementoHandler
 from ubuntuone.storageprotocol import protocol_pb2, request
 
 from magicicada import settings
 from magicicada.filesync import errors as dataerror
 from magicicada.filesync.models import Share
-from magicicada.server import errors, server
+from magicicada.server import errors
 from magicicada.server.server import (
+    PREFERRED_CAP,
     AccountResponse,
     Action,
     AuthenticateResponse,
@@ -69,9 +69,11 @@ from magicicada.server.server import (
     StorageServerFactory,
     StorageServerRequestResponse,
     Unlink,
-    configure_oops,
+    cancel_filter,
+    logger,
 )
 from magicicada.server.testing import testcase
+from magicicada.testing.testcase import BaseTestCase
 
 try:
     from versioninfo import version_info
@@ -132,15 +134,9 @@ class FakedStats(object):
 class FakedFactory(object):
     """A faked factory."""
 
+    auth_provider = None
+
     def __init__(self):
-        self.oops_config = configure_oops()
-        self.oopses = []
-
-        def publish(report):
-            self.oopses.append(report)
-
-        self.oops_config.publishers = [publish]
-
         self.stats = FakedStats()
         self.metrics = metrics.get_meter('metrics')
         self.user_metrics = metrics.get_meter('user_metrics')
@@ -167,11 +163,14 @@ class FakedTransport(object):
         self.getPeer = lambda *_: FakedPeer()
 
 
-class BaseStorageServerTestCase(TwistedTestCase):
+class BaseStorageServerTestCase(BaseTestCase, TwistedTestCase):
     """Test the StorageServer class.
 
     This is just a base class with a lot of functionality for other TestCases.
     """
+
+    maxDiff = None
+    session_id = '1234-567890'
 
     @defer.inlineCallbacks
     def setUp(self):
@@ -179,23 +178,13 @@ class BaseStorageServerTestCase(TwistedTestCase):
         yield super(BaseStorageServerTestCase, self).setUp()
         self.last_msg = None
         self.restore = {}
-        self.server = StorageServer()
+        self.server = StorageServer(session_id=self.session_id)
         self.patch(self.server, 'sendMessage',
                    lambda msg: setattr(self, 'last_msg', msg))
         self.patch(self.server, 'factory', FakedFactory())
         self.patch(self.server, 'transport', FakedTransport())
 
-        self.handler = MementoHandler()
-        self.handler.setLevel(settings.TRACE)
-        self.server.logger.addHandler(self.handler)
-
-    @defer.inlineCallbacks
-    def tearDown(self):
-        """Clean up."""
-        self.server.logger.removeHandler(self.handler)
-        self.server = None
-        self.last_msg = None
-        yield super(BaseStorageServerTestCase, self).tearDown()
+        self.handler = self.add_memento_handler(logger, level=settings.TRACE)
 
     @property
     def shutdown(self):
@@ -232,19 +221,13 @@ class BaseStorageServerTestCase(TwistedTestCase):
 
         return inner
 
-    def assert_oopsless(self):
-        """Make sure we have no oopses."""
-        self.assertTrue(len(self.server.factory.oopses) == 0,
-                        'Must not have any oops')
-
-    def assert_oopsing(self, failure):
-        """Check oopsing."""
-        if not isinstance(failure, Failure):
-            failure = Failure(failure)
-        oopses = self.server.factory.oopses
-        self.assertTrue(len(oopses) > 0, 'must have at least one oops')
-        self.assertTrue(str(failure.value) in oopses[-1]["value"])
-        self.assertTrue(str(failure.type.__name__) in oopses[-1]["type"])
+    def make_protocol_message(self, msg_type=None, msg_id=None):
+        message = protocol_pb2.Message()
+        if msg_type is not None:
+            message.type = getattr(protocol_pb2.Message, msg_type)
+        if msg_id is not None:
+            message.id = msg_id
+        return message
 
 
 class StorageServerTestCase(BaseStorageServerTestCase):
@@ -254,15 +237,13 @@ class StorageServerTestCase(BaseStorageServerTestCase):
     classes should not inherit this.
     """
 
-    def test_log_error_and_oops(self):
-        """Test server._log_error_and_oops."""
+    def test_log_error(self):
+        """Test server._log_error."""
         req = request.Request(protocol=None)
         failure = Failure(Exception(self.msg))
-        self.server._log_error_and_oops(failure, req.__class__)
+        self.server._log_error(failure, req.__class__)
 
-        self.assertTrue(self.handler.check_error(
-                        req.__class__.__name__, str(failure)))
-        self.assert_oopsing(failure)
+        self.handler.assert_error(req.__class__.__name__, str(failure))
 
     def test_schedule_request(self):
         """Test schedule_request adds a logging errback to the request."""
@@ -276,7 +257,7 @@ class StorageServerTestCase(BaseStorageServerTestCase):
         # assert proper errback was chained
         self.assertEqual(len(req.deferred.callbacks), 1)
         self.assertEqual(req.deferred.callbacks[0][1][0],
-                         self.server._log_error_and_oops,
+                         self.server._log_error,
                          'errback must be correct')
         self.assertEqual(req.deferred.callbacks[0][1][1],
                          (req.__class__,),
@@ -285,8 +266,7 @@ class StorageServerTestCase(BaseStorageServerTestCase):
         # the logging callback actually works!
         failure = Failure(Exception(self.msg))
         req.error(failure)
-        self.assertTrue(self.handler.check_error(
-                        str(failure), req.__class__.__name__))
+        self.handler.assert_error(str(failure), req.__class__.__name__)
 
     def test_schedule_request_head(self):
         """Test schedule_request to the left of the deque."""
@@ -308,8 +288,7 @@ class StorageServerTestCase(BaseStorageServerTestCase):
 
     def test_handle_PROTOCOL_VERSION_when_version_too_low(self):
         """handle_PROTOCOL_VERSION when unsupported version."""
-        message = protocol_pb2.Message()
-        message.type = protocol_pb2.Message.PROTOCOL_VERSION
+        message = self.make_protocol_message(msg_type='PROTOCOL_VERSION')
         message.protocol.version = self.server.VERSION_REQUIRED - 1
 
         self.server.handle_PROTOCOL_VERSION(message)
@@ -325,8 +304,7 @@ class StorageServerTestCase(BaseStorageServerTestCase):
 
     def test_handle_PROTOCOL_VERSION_when_version_too_high(self):
         """handle_PROTOCOL_VERSION when unsupported version."""
-        message = protocol_pb2.Message()
-        message.type = protocol_pb2.Message.PROTOCOL_VERSION
+        message = self.make_protocol_message(msg_type='PROTOCOL_VERSION')
         message.protocol.version = self.server.PROTOCOL_VERSION + 1
 
         self.server.handle_PROTOCOL_VERSION(message)
@@ -345,8 +323,7 @@ class StorageServerTestCase(BaseStorageServerTestCase):
         failure = Exception(self.msg)
         self.patch(self.server, 'buildMessage', self.fail_please(failure))
         self.server.dataReceived(data=None)
-        self.assertTrue(self.handler.check_exception(failure))
-        self.assert_oopsing(failure)
+        self.handler.assert_exception(failure)
 
     def test_execute_next_request(self):
         """Test error handling for execute_next_request."""
@@ -355,27 +332,23 @@ class StorageServerTestCase(BaseStorageServerTestCase):
         self.server.pending_requests = collections.deque([next_req])
         self.server.execute_next_request()
 
-        self.assertTrue(self.handler.check_exception(
-            failure,
-            next_req[0].__class__.__name__))
-        self.assert_oopsing(failure)
+        self.handler.assert_exception(failure, next_req[0].__class__.__name__)
 
-    def test_process_message_logs_and_oops_on_error(self):
+    def test_process_message_logs_on_error(self):
         """Test error handling for processMessage."""
         failure = Exception(self.msg)
         self.patch(request.RequestHandler, 'processMessage',
                    self.fail_please(failure))
-        self.server.processMessage(protocol_pb2.Message())
-        self.assertTrue(self.handler.check_exception(
-            failure, self.server.processMessage.__name__))
-        self.assert_oopsing(failure)
+        self.server.processMessage(self.make_protocol_message())
+        self.handler.assert_exception(
+            failure, self.server.processMessage.__name__)
 
     def test_protocol_ref_enabled(self):
         """Test that protocol weakref is disabled in tests."""
         self.patch(settings.api_server, 'PROTOCOL_WEAKREF', True)
         _server = StorageServer()
         response = StorageServerRequestResponse(
-            protocol=_server, message=protocol_pb2.Message())
+            protocol=_server, message=self.make_protocol_message())
         self.assertEqual(_server, response._protocol_ref())
         self.assertEqual(weakref.ref, type(response._protocol_ref))
 
@@ -384,12 +357,12 @@ class StorageServerTestCase(BaseStorageServerTestCase):
         self.patch(settings.api_server, 'PROTOCOL_WEAKREF', False)
         _server = StorageServer()
         response = StorageServerRequestResponse(
-            protocol=_server, message=protocol_pb2.Message())
+            protocol=_server, message=self.make_protocol_message())
         self.assertEqual(_server, response._protocol_ref)
 
     def test_looping_ping_enabled(self):
         """Test that the server instantiates the looping ping."""
-        self.assertTrue(isinstance(self.server.ping_loop, LoopingPing))
+        self.assertIsInstance(self.server.ping_loop, LoopingPing)
 
     def test_looping_ping_interval(self):
         """Test the looping ping interval set from the server."""
@@ -406,31 +379,6 @@ class StorageServerTestCase(BaseStorageServerTestCase):
         self.server.set_user(user)
         self.assertEqual(self.server.user, user)
 
-    def test_setuser_fix_logger_yes(self):
-        """If the user is special, fix the logger."""
-        # set up
-        user = FakeUser()
-        assert user.username == 'username'
-        standard_name = settings.api_server.LOGGER_NAME
-        assert self.server.logger.name == standard_name
-        self.server.factory.trace_users = ['username']
-
-        # call and check
-        self.server.set_user(user)
-        self.assertEqual(self.server.logger.name, standard_name + '.hackers')
-
-    def test_setuser_fix_logger_no(self):
-        """If the user is not special, fix the logger."""
-        # set up
-        user = FakeUser()
-        assert user.username == 'username'
-        previous_logger = self.server.logger
-        self.server.factory.trace_users = []
-
-        # call and check
-        self.server.set_user(user)
-        self.assertIdentical(self.server.logger, previous_logger)
-
     def test_handle_PING(self):
         """Handle PING."""
         # get the response
@@ -438,16 +386,14 @@ class StorageServerTestCase(BaseStorageServerTestCase):
         self.server.sendMessage = lambda r: response.append(r)
 
         # build the msg
-        message = protocol_pb2.Message()
-        message.type = protocol_pb2.Message.PING
+        message = self.make_protocol_message('PING')
 
         # try it
         self.server.handle_PING(message)
 
         # check response and logging
         self.assertEqual(response[0].type, protocol_pb2.Message.PONG)
-        self.handler.debug = True
-        self.assertTrue(self.handler.check(settings.TRACE, "ping pong"))
+        self.handler.assert_trace("ping pong")
 
 
 class ActionTestCase(BaseStorageServerTestCase):
@@ -459,7 +405,7 @@ class ActionTestCase(BaseStorageServerTestCase):
         yield super(ActionTestCase, self).setUp()
         # create a request-response to use in the tests.
         self.response = StorageServerRequestResponse(
-            protocol=self.server, message=protocol_pb2.Message())
+            protocol=self.server, message=self.make_protocol_message())
         self.response.id = 42
         self.response.protocol.requests[self.response.id] = self.response
         self.callable_deferred = defer.Deferred()
@@ -481,10 +427,10 @@ class ActionTestCase(BaseStorageServerTestCase):
         self.assertTrue(self.action.started)
         self.assertEqual(["action_instances." + Action.__name__],
                          self.increments)
-        self.assertTrue(self.handler.check_debug(
-            "Action being scheduled (%s)" % (self._callable,)))
-        self.assertTrue(self.handler.check_debug(
-            "Action being started, working on: %s" % (self._callable,)))
+        self.handler.assert_debug(
+            "Action being scheduled (%s)" % self._callable)
+        self.handler.assert_debug(
+            "Action being started, working on: %s" % self._callable)
 
     def test_start_tail(self):
         """Test the start method, scheduled in the tail."""
@@ -516,8 +462,8 @@ class ActionTestCase(BaseStorageServerTestCase):
         self.action.start()
         self.assertEqual(["action_instances." + Action.__name__],
                          self.increments)
-        self.assertTrue(self.handler.check_debug(
-            "Action being scheduled (%s)" % (self._callable,)))
+        self.handler.assert_debug(
+            "Action being scheduled (%s)" % self._callable)
 
     def test__start(self):
         """Test the _start method."""
@@ -544,8 +490,7 @@ class ActionTestCase(BaseStorageServerTestCase):
         """Test the done method."""
         self.action.start()
         self.callable_deferred.callback(None)
-        self.assertTrue(self.handler.check_debug("Action done (%s)" %
-                                                 (self._callable,)))
+        self.handler.assert_debug("Action done (%s)" % self._callable)
 
     def test_done_fails(self):
         """Test that error is called if done fails."""
@@ -565,8 +510,7 @@ class ActionTestCase(BaseStorageServerTestCase):
         self.patch(Action, 'error', error)
         self.action.start()
         self.callable_deferred.callback(None)
-        self.assertTrue(self.handler.check_debug("Action done (%s)" %
-                                                 (self._callable,)))
+        self.handler.assert_debug("Action done (%s)" % self._callable)
         # done was called, check if error too.
         self.assertEqual(1, len(called))
         self.assertEqual(exc, called[0].value)
@@ -610,8 +554,8 @@ class StorageServerRequestResponseTestCase(BaseStorageServerTestCase):
         self.patch(self.response_class, 'sendError', sendError)
         self.patch(self.response_class, 'sendMessage',
                    lambda s, m: setattr(self, 'last_msg', m))
-        self.response = self.response_class(protocol=self.server,
-                                            message=protocol_pb2.Message())
+        self.response = self.response_class(
+            protocol=self.server, message=self.make_protocol_message())
         self.response.id = 42
         self.response.protocol.requests[self.response.id] = self.response
         factory = self.response.protocol.factory
@@ -619,13 +563,6 @@ class StorageServerRequestResponseTestCase(BaseStorageServerTestCase):
         self.decrements = []
         self.patch(factory.metrics, 'increment', self.increments.append)
         self.patch(factory.metrics, 'decrement', self.decrements.append)
-
-    @defer.inlineCallbacks
-    def tearDown(self):
-        """Clean up."""
-        self.errors = None
-        self.last_msg = None
-        yield super(StorageServerRequestResponseTestCase, self).tearDown()
 
     @property
     def last_error(self):
@@ -648,8 +585,7 @@ class StorageServerRequestResponseTestCase(BaseStorageServerTestCase):
         failure = Exception(self.msg)
         self.patch(request.RequestResponse, 'error', self.fail_please(failure))
         self.response.error(failure=failure)
-        self.assertTrue(self.handler.check_error(
-                        str(failure), self.response.error.__name__))
+        self.handler.assert_error(str(failure), self.response.error.__name__)
 
     def test_process_message_returns_result_when_started(self):
         """Test response.processMessage erturns the result."""
@@ -658,11 +594,11 @@ class StorageServerRequestResponseTestCase(BaseStorageServerTestCase):
                    self.just_return(expected))
         # create a new response with the patched class
         response = self.response_class(protocol=self.server,
-                                       message=protocol_pb2.Message())
+                                       message=self.make_protocol_message())
         response.id = 43
         response.protocol.requests[self.response.id] = self.response
         # check
-        message = protocol_pb2.Message()
+        message = self.make_protocol_message()
         response.started = True
         actual = response.processMessage(message=message)
         self.assertEqual(expected, actual,
@@ -690,7 +626,7 @@ class StorageServerRequestResponseTestCase(BaseStorageServerTestCase):
     def test_request_logger_id_updated(self):
         """Test that StorageRequestLogger.request_id is updated."""
         response = self.response_class(protocol=self.server,
-                                       message=protocol_pb2.Message())
+                                       message=self.make_protocol_message())
         self.assertEqual(None, response.id)
         self.assertEqual(None, response.log.request_id)
         response.id = 42
@@ -714,8 +650,7 @@ class StorageServerRequestResponseTestCase(BaseStorageServerTestCase):
         assert not self.response.started
         self.response.stop()
         self.assertTrue(called)
-        self.assertTrue(self.handler.check_debug(
-                        "Request being released before start"))
+        self.handler.assert_debug("Request being released before start")
 
 
 class SSRequestResponseSpecificTestCase(StorageServerRequestResponseTestCase):
@@ -932,28 +867,26 @@ class SimpleRequestResponseTestCase(StorageServerRequestResponseTestCase):
         failure = Exception(self.msg)
         self.patch(request.RequestResponse, 'done', self.fail_please(failure))
         self.response.done()
-        self.assertTrue(self.response.deferred.called,
-                        'request.deferred was fired.')
-        # Commented see Bug LP:890246
-        # self.assertTrue(self.handler.check_exception(
-        #     failure, self.response.__class__.__name__))
-        self.assert_oopsing(failure)
+        self.assertTrue(
+            self.response.deferred.called, 'request.deferred was fired.')
+        self.handler.assert_exception(
+            failure, self.response.__class__.__name__)
 
     def test_get_node_info(self):
         """Test the correct info generation."""
-        self.response = self.response_class(protocol=self.server,
-                                            message=protocol_pb2.Message())
+        self.response = self.response_class(
+            protocol=self.server, message=self.make_protocol_message())
 
     def test_log_working_on_nothing(self):
         """Log working on without specifications."""
-        message = protocol_pb2.Message()
+        message = self.make_protocol_message()
         req = self.response_class(self.server, message)
         req.start()
-        self.assertTrue(self.handler.check_debug("Request being started"))
+        self.handler.assert_debug("Request being started")
 
     def test_request_instances_metric(self):
         """request_instances.<request> is updated."""
-        message = protocol_pb2.Message()
+        message = self.make_protocol_message()
         req = self.response_class(self.server, message)
         req.start()
         self.assertIn("request_instances." + self.response_class.__name__,
@@ -963,44 +896,45 @@ class SimpleRequestResponseTestCase(StorageServerRequestResponseTestCase):
 
     def test_log_working_on_something(self):
         """Log working on something."""
-        message = protocol_pb2.Message()
+        message = self.make_protocol_message()
         self.patch(self.response_class, '_get_node_info', lambda _: 'FOO')
         req = self.response_class(self.server, message)
         req.start()
-        self.assertTrue(self.handler.check_debug(
-                        "Request being started, working on: FOO"))
+        self.handler.assert_debug("Request being started, working on: FOO")
 
     def test_log_operation_data(self):
         """Log data operation."""
-        message = protocol_pb2.Message()
+        message = self.make_protocol_message()
         req = self.response_class(self.server, message)
         req.operation_data = "some=stuff bar=foo"
         req.done()
-        self.assertTrue(self.handler.check_info(
-            "Request done: some=stuff bar=foo"))
+        self.handler.assert_info("Request done: some=stuff bar=foo")
 
     def test_log_request_process(self):
         """Log correctly the life of a request."""
         # setup the message
-        message = protocol_pb2.Message()
-        message.id = 42
+        message = self.make_protocol_message(msg_id=42)
         self.patch(self.response_class, '_process', lambda _: None)
         req = self.response_class(self.server, message)
         req.start()
 
         # assert log order
-        msgs = [(r.levelno, r.msg) for r in self.handler.records]
+        msgs = [(r.levelname, r.msg) for r in self.handler.records
+                if r.levelno >= logging.DEBUG]
+        prefix = '%s localhost:0 - %s 42 - ' % (
+            self.session_id, self.response_class.__name__)
 
-        def index(level, text):
-            """Return the position of first message where text is included."""
-            for i, (msglevel, msgtext) in enumerate(msgs):
-                if text in msgtext and level == msglevel:
-                    return i
-            raise ValueError("msg not there!")
-        pos_sched = index(logging.INFO, '42 - Request being scheduled')
-        pos_start = index(logging.DEBUG, '42 - Request being started')
-        pos_done = index(logging.INFO, '42 - Request done')
-        self.assertTrue(pos_sched < pos_start < pos_done)
+        node = req._get_node_info()
+        if node is None:
+            working_on = ""
+        else:
+            working_on = ", working on: " + node
+        expected = [
+            ('INFO', prefix + 'Request being scheduled'),
+            ('DEBUG', prefix + "Request being started" + working_on),
+            ('INFO', prefix + 'Request done'),
+        ]
+        self.assertItemsEqual(msgs, expected)
 
     @defer.inlineCallbacks
     def test_internal_error(self):
@@ -1034,8 +968,7 @@ class SimpleRequestResponseTestCase(StorageServerRequestResponseTestCase):
 
     def test_cancel_filter(self):
         """Test the cancel_filter decorator."""
-        self.response_class.fakefunction = \
-            server.cancel_filter(lambda *a: 'hi')
+        self.response_class.fakefunction = cancel_filter(lambda *a: 'hi')
         self.assertEqual(self.response.fakefunction(self.response), "hi")
         self.response.cancelled = True
         self.assertRaises(request.RequestCancelledError,
@@ -1082,8 +1015,8 @@ class SimpleRequestResponseTestCase(StorageServerRequestResponseTestCase):
         self.patch(self.response_class, 'cleanup', fake_cleanup)
         self.patch(self.response_class, '_start', fake_start)
         for i in range(5):
-            response = self.response_class(protocol=self.server,
-                                           message=protocol_pb2.Message())
+            response = self.response_class(
+                protocol=self.server, message=self.make_protocol_message())
             response.source_message.id = i
             response.start()
         self.assertTrue(self.server.pending_requests)
@@ -1299,8 +1232,7 @@ class GetContentResponseTestCase(SimpleRequestResponseTestCase):
         self.response.cancel_message is not None.
 
         """
-        self.response.cancel_message = protocol_pb2.Message()
-        self.response.cancel_message.id = 1
+        self.response.cancel_message = self.make_protocol_message(msg_id=1)
         assert not self.response.cancelled
 
         failure = Failure(request.RequestCancelledError(self.msg))
@@ -1322,12 +1254,11 @@ class GetContentResponseTestCase(SimpleRequestResponseTestCase):
         self.assertTrue(self.last_error is None)
         self.assertTrue(self.last_msg is None)
 
-        self.assertTrue(self.handler.check_warning(
-                        str(failure), 'cancel_message is None'))
+        self.handler.assert_warning(str(failure), 'cancel_message is None')
 
     def test__init__(self):
         """Test __init__."""
-        message = protocol_pb2.Message()
+        message = self.make_protocol_message()
         response = GetContentResponse(self.server, message)
         self.assertEqual(response.cancel_message, None)
         self.assertEqual(response.message_producer, None)
@@ -1391,9 +1322,8 @@ class GetContentResponseTestCase(SimpleRequestResponseTestCase):
 
         # the user
         fake_user = mocker.mock()
-        expect(fake_user.get_node(None, '', '')
-               ).result(defer.succeed(node))
-        expect(fake_user.username).count(5).result('username')
+        expect(fake_user.get_node(None, '', '')).result(defer.succeed(node))
+        expect(fake_user.username).count(3).result('username')
         self.patch(self.response.protocol, 'user', fake_user)
 
         # the metric itself
@@ -1456,7 +1386,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
 
     def test__init__(self):
         """Test __init__."""
-        message = protocol_pb2.Message()
+        message = self.make_protocol_message()
         response = PutContentResponse(self.server, message)
         self.assertEqual(response.cancel_message, None)
         self.assertEqual(response.upload_job, None)
@@ -1466,8 +1396,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
 
     def test__get_node_info(self):
         """Test _get_node_info."""
-        message = protocol_pb2.Message()
-        message.type = protocol_pb2.Message.PUT_CONTENT
+        message = self.make_protocol_message(msg_type='PUT_CONTENT')
         message.put_content.node = 'abc'
         response = PutContentResponse(self.server, message)
         node_info = response._get_node_info()
@@ -1529,7 +1458,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
 
         # the user
         fake_user = mocker.mock()
-        expect(fake_user.username).count(7).result('username')
+        expect(fake_user.username).count(5).result('username')
         self.patch(self.response.protocol, 'user', fake_user)
 
         # the metric itself
@@ -1618,8 +1547,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
         self.assertTrue(before < response.last_good_state_ts <= after)
         time.sleep(.1)
 
-        bytes_msg = protocol_pb2.Message()
-        bytes_msg.type = protocol_pb2.Message.BYTES
+        bytes_msg = self.make_protocol_message('BYTES')
         bytes_msg.bytes.bytes = "123"
 
         response.processMessage(bytes_msg)
@@ -1631,9 +1559,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
     def test__cancel_uploadjob_cancelled(self):
         """Test cancel cancelling the upload_job."""
         self.response.state = PutContentResponse.states.canceling
-        cancel_message = protocol_pb2.Message()
-        cancel_message.id = 123
-        self.response.cancel_message = cancel_message
+        self.response.cancel_message = self.make_protocol_message(msg_id=123)
 
         mocker = Mocker()
         upload_job = mocker.mock()
@@ -1642,18 +1568,17 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
 
         with mocker:
             self.response._cancel()
-        self.assertTrue(self.handler.check_debug("Canceling the upload job"))
+        self.handler.assert_debug("Canceling the upload job")
 
     def test__cancel_uploadjob_cancel_None(self):
         """Test cancel not having an upload_job."""
         self.response.state = PutContentResponse.states.canceling
-        cancel_message = protocol_pb2.Message()
-        cancel_message.id = 123
-        self.response.cancel_message = cancel_message
+        self.response.cancel_message = self.make_protocol_message(msg_id=123)
 
         assert self.response.upload_job is None
         self.response._cancel()
-        self.assertFalse(self.handler.check_debug("Canceling the upload job"))
+
+        self.handler.assert_not_logged("Canceling the upload job")
 
     def test__cancel_uploadjob_stopped(self):
         """Test cancel cancelling the upload_job."""
@@ -1665,25 +1590,22 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
 
         with mocker:
             self.response._cancel()
-        self.assertTrue(self.handler.check_debug(
-                        "Stoping the upload job after a cancel"))
+        self.handler.assert_debug("Stoping the upload job after a cancel")
 
     def test__cancel_uploadjob_stop_None(self):
         """Test cancel not having an upload_job."""
         assert self.response.state != PutContentResponse.states.canceling
         assert self.response.upload_job is None
         self.response._cancel()
-        self.assertFalse(self.handler.check_debug(
-                         "Stoping the upload job after a cancel"))
+
+        self.handler.assert_not_logged("Stoping the upload job after a cancel")
 
     def test__cancel_answer_client_yes(self):
         """Test answer is sent to the client because canceling."""
         self.response.state = PutContentResponse.states.canceling
 
         # set up the original message
-        cancel_message = protocol_pb2.Message()
-        cancel_message.id = 123
-        self.response.cancel_message = cancel_message
+        self.response.cancel_message = self.make_protocol_message(msg_id=123)
 
         # be sure to close the request
         called = []
@@ -1730,7 +1652,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
         with mocker:
             self.response._cancel()
 
-        self.assertTrue(self.handler.check_debug("Request canceled (in INIT)"))
+        self.handler.assert_debug("Request canceled (in INIT)")
         self.assertEqual(len(called), 2)
         self.assertEqual(called[0], PutContentResponse.states.canceling)
         self.assertEqual(called[1], True)
@@ -1740,15 +1662,13 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
         """Generic error logs when called with an error."""
         assert self.response.state == PutContentResponse.states.init
         self.response._generic_error(NameError('foo'))
-        self.assertTrue(self.handler.check_warning("Error while in INIT",
-                                                   "NameError", "foo"))
+        self.handler.assert_warning("Error while in INIT", "NameError", "foo")
 
     def test_genericerror_log_failure(self):
         """Generic error logs when called with a failure."""
         assert self.response.state == PutContentResponse.states.init
         self.response._generic_error(Failure(NameError('foo')))
-        self.assertTrue(self.handler.check_warning("Error while in INIT",
-                                                   "NameError", "foo"))
+        self.handler.assert_warning("Error while in INIT", "NameError", "foo")
 
     def test_genericerror_already_in_error(self):
         """Just log if already in error."""
@@ -1757,8 +1677,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
         self.response._send_protocol_error = called.append
         self.response._generic_error(NameError('foo'))
         self.assertFalse(called)
-        self.assertTrue(self.handler.check_warning("Error while in ERROR",
-                                                   "NameError", "foo"))
+        self.handler.assert_warning("Error while in ERROR", "NameError", "foo")
 
     def test_genericerror_already_in_done(self):
         """Just log if already in done."""
@@ -1767,15 +1686,13 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
         self.response._send_protocol_error = called.append
         self.response._generic_error(NameError('foo'))
         self.assertFalse(called)
-        self.assertTrue(self.handler.check_warning("Error while in DONE",
-                                                   "NameError", "foo"))
+        self.handler.assert_warning("Error while in DONE", "NameError", "foo")
 
     def test_genericerror_no_uploadjob(self):
         """Don't stop the upload job if doesn't have one."""
         assert self.response.upload_job is None
         self.response._generic_error(NameError('foo'))
-        self.assertFalse(self.handler.check_debug(
-                         "Stoping the upload job after an error"))
+        self.handler.assert_not_logged("Stoping the upload job after an error")
 
     def test_genericerror_stop_uploadjob(self):
         """Stop the upload job if has one."""
@@ -1787,8 +1704,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
 
         with mocker:
             self.response._generic_error(NameError('foo'))
-        self.assertTrue(self.handler.check_debug(
-                        "Stoping the upload job after an error"))
+        self.handler.assert_debug("Stoping the upload job after an error")
 
     def test_try_again_handling(self):
         """Test how a TRY_AGAIN error is handled."""
@@ -1803,8 +1719,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
         # call and test
         with mocker:
             self.response._log_exception(errors.TryAgain(NameError('foo')))
-        self.assertTrue(self.handler.check_debug("TryAgain", "NameError",
-                                                 str(size_hint)))
+        self.handler.assert_debug("TryAgain", "NameError", str(size_hint))
 
     def test_genericerror_requestcancelled_canceling(self):
         """Test how a RequestCancelledError error is handled when canceling."""
@@ -1814,7 +1729,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
         self.response.done = called.append
         self.response._generic_error(request.RequestCancelledError('message'))
         self.assertFalse(called)
-        self.assertTrue(self.handler.check_debug("Request cancelled: message"))
+        self.handler.assert_debug("Request cancelled: message")
 
     def test_genericerror_requestcancelled_other(self):
         """Test how a RequestCancelledError error is handled in other state."""
@@ -1830,8 +1745,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
         self.mocker.replay()
         response._generic_error(failure)
         self.assertEqual(response.state, PutContentResponse.states.error)
-        self.assertTrue(self.handler.check_debug("RequestCancelledError",
-                                                 str(1000)))
+        self.handler.assert_debug("RequestCancelledError", str(1000))
 
     def test_genericerror_other_errors_ok(self):
         """Generic error handling."""
@@ -1846,7 +1760,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
         self.mocker.replay()
         response._generic_error(failure)
         self.assertEqual(response.state, PutContentResponse.states.error)
-        self.assertTrue(self.handler.check_debug("NameError", str(1000)))
+        self.handler.assert_debug("NameError", str(1000))
 
     def test_genericerror_other_errors_problem_sendprotocolerror(self):
         """Handle problems in the _send_protocol_error() call."""
@@ -1882,8 +1796,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
         """Test get_upload_job."""
         share_id = uuid.uuid4()
         upload_id = str(uuid.uuid4())
-        message = protocol_pb2.Message()
-        message.type = protocol_pb2.Message.PUT_CONTENT
+        message = self.make_protocol_message(msg_type='PUT_CONTENT')
         message.put_content.share = str(share_id)
         message.put_content.node = 'abc'
         message.put_content.previous_hash = 'p_hash'
@@ -1913,8 +1826,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
         # all message types
         all_msgs = []
         for mtype in "CANCEL_REQUEST EOF BYTES".split():
-            message = protocol_pb2.Message()
-            message.type = getattr(protocol_pb2.Message, mtype)
+            message = self.make_protocol_message(msg_type=mtype)
             expect(response._process_while_uploading(message))
             all_msgs.append(message)
 
@@ -1927,8 +1839,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
         self.response.state = PutContentResponse.states.uploading
         response = self.mocker.patch(self.response)
 
-        message = protocol_pb2.Message()
-        message.type = protocol_pb2.Message.BYTES
+        message = self.make_protocol_message(msg_type='BYTES')
         failure = Exception('foo')
         expect(response._process_while_uploading(message)).throw(failure)
         expect(response._generic_error(failure))
@@ -1939,17 +1850,15 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
     def test_processmessage_uploading_bad_message(self):
         """Process a bad message while uploading."""
         self.response.state = PutContentResponse.states.uploading
-        message = protocol_pb2.Message()
-        mtyp = protocol_pb2.Message.PUT_CONTENT
-        message.type = mtyp
+        message = self.make_protocol_message(msg_type='PUT_CONTENT')
         self.response._processMessage(message)
-        self.assertTrue(self.handler.check_error("unknown message", str(mtyp)))
+        self.handler.assert_error(
+            "unknown message", str(protocol_pb2.Message.PUT_CONTENT))
 
     def test_processmessage_init_cancel_ok(self):
         """Process a cancel request while in init, all ok."""
         self.response.state = PutContentResponse.states.init
-        message = protocol_pb2.Message()
-        message.type = protocol_pb2.Message.CANCEL_REQUEST
+        message = self.make_protocol_message(msg_type='CANCEL_REQUEST')
         response = self.mocker.patch(self.response)
         expect(response.cancel())
 
@@ -1961,8 +1870,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
     def test_processmessage_init_cancel_error(self):
         """Process a cancel request while in init, explodes."""
         self.response.state = PutContentResponse.states.init
-        message = protocol_pb2.Message()
-        message.type = protocol_pb2.Message.CANCEL_REQUEST
+        message = self.make_protocol_message(msg_type='CANCEL_REQUEST')
         response = self.mocker.patch(self.response)
         failure = Exception('foo')
         expect(response.cancel()).throw(failure)
@@ -1980,14 +1888,13 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
         # all message types except cancel
         all_msgs = []
         for mtype in "EOF BYTES".split():
-            message = protocol_pb2.Message()
-            message.type = getattr(protocol_pb2.Message, mtype)
+            message = self.make_protocol_message(msg_type=mtype)
             self.response._processMessage(message)
             all_msgs.append(message.type)
 
         for mtype in all_msgs:
-            self.assertTrue(self.handler.check_warning("Received out-of-order",
-                                                       "INIT", str(mtype)))
+            self.handler.assert_warning(
+                "Received out-of-order", "INIT", str(mtype))
         self.assertFalse(cancel_called)
 
     def test_processmessage_error(self):
@@ -1996,28 +1903,25 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
 
         # all message types
         for mtype in "CANCEL_REQUEST EOF BYTES".split():
-            message = protocol_pb2.Message()
-            message.type = getattr(protocol_pb2.Message, mtype)
+            message = self.make_protocol_message(msg_type=mtype)
             self.response._processMessage(message)
 
-        self.assertFalse(self.handler.check_warning("Received out-of-order"))
+        self.handler.assert_not_logged("Received out-of-order")
 
     def test_processmessage_otherstates(self):
         """Process all requests while in other states."""
         for state in "commiting canceling done".split():
             for mtype in "CANCEL_REQUEST EOF BYTES".split():
                 self.response.state = getattr(PutContentResponse.states, state)
-                message = protocol_pb2.Message()
-                message.type = getattr(protocol_pb2.Message, mtype)
+                message = self.make_protocol_message(msg_type=mtype)
                 self.response._processMessage(message)
                 chk = "Received out-of-order", state.upper(), str(message.type)
-                self.assertTrue(self.handler.check_warning(*chk))
+                self.handler.assert_warning(*chk)
 
     def test_processwhileuploading_cancel(self):
         """Got a cancel request while uploading."""
         self.response.state = PutContentResponse.states.uploading
-        message = protocol_pb2.Message()
-        message.type = protocol_pb2.Message.CANCEL_REQUEST
+        message = self.make_protocol_message(msg_type='CANCEL_REQUEST')
         cancel_called = []
         self.response.cancel = lambda: cancel_called.append(True)
 
@@ -2030,8 +1934,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
     def test_processwhileuploading_eof_ok(self):
         """Got an eof while uploading, all finished ok."""
         self.response.state = PutContentResponse.states.uploading
-        message = protocol_pb2.Message()
-        message.type = protocol_pb2.Message.EOF
+        message = self.make_protocol_message(msg_type='EOF')
         self.response.upload_job = self.FakeUploadJob()
 
         # check what is called
@@ -2048,8 +1951,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
     def test_processwhileuploading_eof_error_commiting(self):
         """Got an eof while uploading, got an error while commiting."""
         self.response.state = PutContentResponse.states.uploading
-        message = protocol_pb2.Message()
-        message.type = protocol_pb2.Message.EOF
+        message = self.make_protocol_message(msg_type='EOF')
         self.response.upload_job = self.FakeUploadJob()
 
         # check what is called
@@ -2068,8 +1970,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
     def test_processwhileuploading_bytes(self):
         """Got some bytes while uploading."""
         self.response.state = PutContentResponse.states.uploading
-        message = protocol_pb2.Message()
-        message.type = protocol_pb2.Message.BYTES
+        message = self.make_protocol_message(msg_type='BYTES')
         message.bytes.bytes = "foobar"
         self.response.upload_job = self.FakeUploadJob()
         prv_transferred = self.response.transferred
@@ -2083,11 +1984,10 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
     def test_processwhileuploading_strange(self):
         """Got other message while uploading."""
         self.response.state = PutContentResponse.states.uploading
-        message = protocol_pb2.Message()
-        message.type = protocol_pb2.Message.PUT_CONTENT
+        message = self.make_protocol_message(msg_type='PUT_CONTENT')
         self.response._process_while_uploading(message)
-        self.assertTrue(self.handler.check_error("Received unknown message",
-                                                 str(message.type)))
+        self.handler.assert_error(
+            "Received unknown message", str(message.type))
 
     def test_commituploadjob_not_commiting(self):
         """Assure we're still commiting when we reach this."""
@@ -2179,8 +2079,8 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
         upload_job = self.FakeUploadJob()
         d.callback(upload_job)
         self.assertEqual(upload_job.called, ['cancel'])   # not connect
-        self.assertTrue(self.handler.check_debug(
-                        "Manually canceling the upload job (in %s)" % state))
+        self.handler.assert_debug(
+            "Manually canceling the upload job (in %s)" % state)
 
     def test_startupload_done(self):
         """State changes to done while getting the upload job."""
@@ -2204,8 +2104,8 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
         self.assertEqual(self.last_msg.begin_content.upload_id, '12')
 
         upload_type = self.response.upload_job.__class__.__name__
-        self.assertTrue(self.handler.check_debug(
-            upload_type, "begin content", "from offset 10", "fake storagekey"))
+        self.handler.assert_debug(
+            upload_type, "begin content", "from offset 10", "fake storagekey")
 
     def test__send_begin_new_upload_id(self):
         """Test sendbegin when the upload_id received is invalid."""
@@ -2222,8 +2122,8 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
         self.assertEqual(self.last_msg.begin_content.upload_id, '12')
 
         upload_type = self.response.upload_job.__class__.__name__
-        self.assertTrue(self.handler.check_debug(
-            upload_type, "begin content", "from offset 0", "fake storagekey"))
+        self.handler.assert_debug(
+            upload_type, "begin content", "from offset 0", "fake storagekey")
 
     def test_putcontent_double_done(self):
         """Double call to self.done()."""
@@ -2244,7 +2144,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
         self.assertEqual(called, [])
         msg = ("runWithWarningsSuppressed -> test_method_wrapper -> "
                "test_putcontent_double_done: called done() finished=True")
-        self.assertTrue(self.handler.check_warning(msg))
+        self.handler.assert_warning(msg)
 
     def test_putcontent_done_after_error(self):
         """Double call to self.done()."""
@@ -2265,7 +2165,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
         self.assertEqual(called, [])
         msg = ("runWithWarningsSuppressed -> test_method_wrapper -> "
                "test_putcontent_done_after_error: called done() finished=True")
-        self.assertTrue(self.handler.check_warning(msg))
+        self.handler.assert_warning(msg)
 
 
 class QuerySetCapsResponseTestCase(SimpleRequestResponseTestCase):
@@ -2502,7 +2402,7 @@ class RescanFromScratchResponseTestCase(SimpleRequestResponseTestCase):
             node.last_modified = int(time.mktime(right_now.timetuple()))
             nodes.append(node)
         # set required caps
-        self.response.protocol.working_caps = server.PREFERRED_CAP
+        self.response.protocol.working_caps = PREFERRED_CAP
         mocker = Mocker()
         user = mocker.mock()
         self.patch(self.response, "send_delta_info", lambda *a: None)
@@ -2546,14 +2446,13 @@ class RescanFromScratchResponseTestCase(SimpleRequestResponseTestCase):
         self.assertEqual(self.response.length, 2)
 
 
-class NodeInfoLogsTests(BaseStorageServerTestCase):
+class NodeInfoLogsTestCase(BaseStorageServerTestCase):
     """Check that operations return correct node info."""
 
     def check(self, response, mes_type, klass=None, mes_name=None, **attrs):
         """Check that get_node_info returns correctly for the message."""
         # build the message
-        message = protocol_pb2.Message()
-        message.type = getattr(protocol_pb2.Message, mes_type)
+        message = self.make_protocol_message(msg_type=mes_type)
 
         # optionally, has content!
         if mes_name is not None:
@@ -2644,19 +2543,15 @@ class TestLoopingPing(BaseStorageServerTestCase):
         self.assertFalse(self.shutdown)
 
 
-class StorageServerFactoryTests(TwistedTestCase):
+class StorageServerFactoryTestCase(BaseTestCase, TwistedTestCase):
     """Test the StorageServerFactory class."""
 
     @defer.inlineCallbacks
     def setUp(self):
         """Set up."""
-        yield super(StorageServerFactoryTests, self).setUp()
-
+        yield super(StorageServerFactoryTestCase, self).setUp()
         self.factory = StorageServerFactory()
-        self.handler = MementoHandler()
-        self.handler.setLevel(logging.DEBUG)
-        self.factory.logger.addHandler(self.handler)
-        self.addCleanup(self.factory.logger.removeHandler, self.handler)
+        self.handler = self.add_memento_handler(logger, level=logging.DEBUG)
 
     def test_observer_added(self):
         """Test that the observer was added to Twisted logging."""
@@ -2666,22 +2561,20 @@ class StorageServerFactoryTests(TwistedTestCase):
     def test_noerror(self):
         """No error, no action."""
         self.factory._deferror_handler(dict(isError=False, message=''))
-        self.assertFalse(self.handler.check_error("error"))
+        self.handler.assert_not_logged("error")
 
     def test_message(self):
         """Just a message."""
         self.factory._deferror_handler(dict(isError=True, message="foobar"))
-        self.assertTrue(self.handler.check_error(
-            "Unhandled error in deferred", "foobar"))
+        self.handler.assert_error("Unhandled error in deferred", "foobar")
 
     def test_failure(self):
         """Received a full failure."""
         f = Failure(ValueError('foobar'))
         self.factory._deferror_handler(dict(isError=True,
                                             failure=f, message=''))
-        self.assertTrue(self.handler.check_error(
-                        "Unhandled error in deferred",
-                        "ValueError", "foobar"))
+        self.handler.assert_error(
+            "Unhandled error in deferred", "ValueError", "foobar")
 
     def test_trace_users(self):
         """Check trace users are correctly set."""
@@ -2691,64 +2584,42 @@ class StorageServerFactoryTests(TwistedTestCase):
         self.assertEqual(factory.trace_users, set(['foo', 'bar', 'baz']))
 
 
-class BytesMessageProducerTests(TwistedTestCase):
+class BytesMessageProducerTestCase(BaseStorageServerTestCase):
     """Test the BytesMessageProducer class."""
 
     @defer.inlineCallbacks
     def setUp(self):
         """Set up."""
-        yield super(BytesMessageProducerTests, self).setUp()
-        server = StorageServer()
-        req = GetContentResponse(protocol=server,
-                                 message=protocol_pb2.Message())
+        yield super(BytesMessageProducerTestCase, self).setUp()
+        req = GetContentResponse(protocol=self.server,
+                                 message=self.make_protocol_message())
         self.patch(GetContentResponse, 'sendMessage', lambda *a: None)
         self.producer = FakeProducer()
         self.bmp = BytesMessageProducer(self.producer, req)
 
-        self.logger = logging.getLogger("storage.server")
-        self.handler = MementoHandler()
-        self.handler.setLevel(settings.TRACE)
-        self.logger.addHandler(self.handler)
-
-    @defer.inlineCallbacks
-    def tearDown(self):
-        """Tear down."""
-        self.logger.removeHandler(self.handler)
-        yield super(BytesMessageProducerTests, self).tearDown()
-
     def test_resume_log(self):
         """Log when resumed."""
         self.bmp.resumeProducing()
-        self.assertTrue(self.handler.check(settings.TRACE,
-                        "BytesMessageProducer resumed", str(self.producer)))
+        self.handler.assert_trace(
+            "BytesMessageProducer resumed", str(self.producer))
 
     def test_stop_log(self):
         """Log when stopped."""
         self.bmp.stopProducing()
-        self.assertTrue(self.handler.check(settings.TRACE,
-                        "BytesMessageProducer stopped", str(self.producer)))
+        self.handler.assert_trace(
+            "BytesMessageProducer stopped", str(self.producer))
 
     def test_pause_log(self):
         """Log when paused."""
         self.bmp.pauseProducing()
-        self.assertTrue(self.handler.check(settings.TRACE,
-                        "BytesMessageProducer paused", str(self.producer)))
+        self.handler.assert_trace(
+            "BytesMessageProducer paused", str(self.producer))
 
     def test_transferred_counting(self):
         """Keep count of transferred data."""
         assert self.bmp.request.transferred == 0
         self.bmp.write("foobar")
         self.assertEqual(self.bmp.request.transferred, 6)
-
-
-class TestLoggerSetup(testcase.TestWithDatabase):
-    """Tests for the logging setup."""
-
-    def test_server_logger(self):
-        """Test the storage server logger."""
-        self.assertEqual(self.service.logger.name,
-                         "storage.server")
-        self.assertFalse(self.service.logger.propagate)
 
 
 class TestMetricsSetup(testcase.TestWithDatabase):

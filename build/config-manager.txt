@@ -26,13 +26,8 @@
 ./.sourcecode/django                      ~ubuntuone-pqm-team/django/stable;revno=17
 ./.sourcecode/mock                        ~ubuntuone-pqm-team/python-mock/stable;revno=1
 ./.sourcecode/oauthlib                    ~ubuntuone-pqm-team/oauthlib/stable;revno=209
-./.sourcecode/oops                        ~canonical-launchpad-branches/python-oops/trunk;revno=37
-./.sourcecode/oops-datedir-repo           ~canonical-launchpad-branches/python-oops-datedir-repo/trunk;revno=48
-./.sourcecode/oops-timeline               ~canonical-launchpad-branches/python-oops-timeline/trunk;revno=3
 ./.sourcecode/requests                    ~ubuntuone-pqm-team/requests/stable;revno=816
 ./.sourcecode/requests_oauthlib           ~ubuntuone-pqm-team/requests-oauthlib/stable;revno=16
-./.sourcecode/timeline                    ~canonical-launchpad-branches/python-timeline/trunk;revno=10
 ./.sourcecode/u1sync                      ~facundo/u1sync/opensourcing;revno=10
 ./.sourcecode/ubuntuone-client            ~chicharreros/magicicada-client/trunk
-./.sourcecode/ubuntuone-dev-tools         ~ubuntuone-control-tower/ubuntuone-dev-tools/trunk;revno=78
 ./.sourcecode/ubuntuone-storage-protocol  ~facundo/ubuntuone-storage-protocol/opensourcing;revno=165

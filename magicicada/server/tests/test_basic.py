@@ -32,14 +32,14 @@ from mocker import Mocker, ANY
 from twisted.internet import reactor, defer
 from twisted.internet.error import ConnectionDone
 from twisted.web import client, error
-
-import metrics
-import metrics.services
-from ubuntuone.devtools.handlers import MementoHandler
 from ubuntuone.storageprotocol import request
 from ubuntuone.supervisor import utils as supervisor_utils
 
+import metrics
+import metrics.services
+
 from magicicada.filesync.models import StorageUser
+from magicicada.server.server import logger
 from magicicada.server.testing.testcase import TestWithDatabase
 
 
@@ -63,10 +63,7 @@ class TestBasic(TestWithDatabase):
         # lock the user:
         StorageUser.objects.filter(id=self.usr0.id).update(locked=True)
         # add the log handler
-        logger = logging.getLogger('storage.server')
-        hdlr = MementoHandler()
-        hdlr.setLevel(logging.INFO)
-        logger.addHandler(hdlr)
+        handler = self.add_memento_handler(logger, level=logging.INFO)
         # define a connectionLostHandler to know when the client
         # gets disconnected.
         d = defer.Deferred()
@@ -83,17 +80,14 @@ class TestBasic(TestWithDatabase):
             client.dummy_authenticate("open sesame")
             yield d
             # check we logged a warning about this.
-            self.assertTrue(hdlr.check_warning(
-                "Shutting down protocol: user locked"))
+            handler.assert_warning("Shutting down protocol: user locked")
+
         return self.callback_test(dummy, add_default_callbacks=True)
 
     def test_disconnect_with_user_locked_after_auth(self):
         """Client gets disconnected if the user is locked after auth."""
         # add the log handler
-        logger = logging.getLogger('storage.server')
-        hdlr = MementoHandler()
-        hdlr.setLevel(logging.INFO)
-        logger.addHandler(hdlr)
+        handler = self.add_memento_handler(logger, level=logging.INFO)
         # define a connectionLostHandler to know when the client
         # gets disconnected.
         d = defer.Deferred()
@@ -114,8 +108,8 @@ class TestBasic(TestWithDatabase):
             client.make_dir(request.ROOT, root_id, u"open sesame")
             yield d
             # check we logged a warning about this.
-            self.assertTrue(hdlr.check_warning(
-                "Shutting down protocol: user locked"))
+            handler.assert_warning("Shutting down protocol: user locked")
+
         return self.callback_test(dummy, add_default_callbacks=True)
 
     @defer.inlineCallbacks
@@ -359,32 +353,23 @@ class ServerPingTest(TestWithDatabase):
     @defer.inlineCallbacks
     def test_disconnect_when_idle(self):
         """Test that the server disconnects idle clients."""
+        # add the log handler
+        handler = self.add_memento_handler(logger, level=logging.INFO)
+
         @defer.inlineCallbacks
         def auth(client):
 
             yield client.dummy_authenticate('open sesame')
             d = defer.Deferred()
             client.connectionLostHandler = d.callback
-            # add the log handler
-            logger = logging.getLogger('storage.server')
-            hdlr = MementoHandler()
-            hdlr.setLevel(logging.INFO)
-            logger.addHandler(hdlr)
             # patch the looping ping values
             server = self.service.factory.protocols[0]
             server.ping_loop.interval = 0.1
             server.ping_loop.idle_timeout = 0.3
             # reschedule the ping loop
             server.ping_loop.reset()
-            try:
-                yield d
-            except ConnectionDone:
-                msg = "Disconnecting - idle timeout"
-                self.assertTrue(hdlr.check_info(msg))
-            else:
-                self.fail("Should get disconnected.")
-            finally:
-                logger.removeHandler(hdlr)
+            yield self.assertFailure(d, ConnectionDone)
+            handler.assert_info("Disconnecting - idle timeout")
 
         yield self.callback_test(auth, add_default_callbacks=True)
 
@@ -497,11 +482,12 @@ class DumpTest(TestWithDatabase):
     @defer.inlineCallbacks
     def test_gc_dump_error_generic(self):
         """Something bad happens when dumping gc."""
-        def oops():
+
+        def fail():
             """Break it."""
             raise ValueError('foo')
 
-        self.patch(gc, 'get_count', oops)
+        self.patch(gc, 'get_count', fail)
         page = yield client.getPage("http://localhost:%i/+gc-stats" %
                                     (self.service.status_port,))
         self.assertIn("Error while trying to dump GC", page)

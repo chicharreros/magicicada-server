@@ -20,6 +20,8 @@
 
 from __future__ import unicode_literals
 
+from collections import OrderedDict
+
 from magicicada.filesync.models import (
     STATUS_LIVE,
     STATUS_DEAD,
@@ -612,9 +614,7 @@ class TestTransactionLog(BaseTransactionLogTestCase):
             actual.append(td)
 
         def sort_dicts(ll):
-            import collections
-            return [collections.OrderedDict(sorted(i for i in d.items()))
-                    for d in ll]
+            return [OrderedDict(sorted(i for i in d.items())) for d in ll]
 
         self.assertItemsEqual(sort_dicts(expected), sort_dicts(actual))
 

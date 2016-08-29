@@ -23,17 +23,10 @@ import os
 from twisted.application import service
 from twisted.internet import reactor
 
-import oops_timeline
-
 from magicicada import settings
 from magicicada.server import server, auth
 
-oops_config = server.configure_oops()
-# Should probably be an option to configure_oops?
-oops_timeline.install_hooks(oops_config)
-
 
 application = service.Application('StorageServer')
-storage = server.create_service(auth_provider_class=auth.SimpleAuthProvider,
-                                oops_config=oops_config)
+storage = server.create_service(auth_provider_class=auth.SimpleAuthProvider)
 storage.setServiceParent(service.IServiceCollection(application))

@@ -40,6 +40,7 @@ from magicicada.filesync.models import Share
 from magicicada.server import errors, upload
 
 ZERO_LENGTH_CONTENT_KEY = ""
+logger = logging.getLogger(__name__)
 
 
 class FalseProducer(object):
@@ -106,7 +107,6 @@ class Node(object):
 
         self.last_modified = calendar.timegm(last_modif.timetuple())
         self.node = node
-        self.logger = logging.getLogger('storage.server')
 
     def get_content(self, start=None, previous_hash=None, user=None):
         """Get the content for this node.
@@ -143,7 +143,7 @@ class Node(object):
     def _handle_errors(self, failure, user):
         """Transform storage backend errors into something more appropiate."""
         ctx = self._context_msg(user)
-        self.logger.warning("%s - storage backend error: %s", ctx, failure)
+        logger.warning("%s - storage backend error: %s", ctx, failure)
         raise errors.NotAvailable(failure.getErrorMessage())
 
 
@@ -264,7 +264,6 @@ class BaseUploadJob(object):
         self._initial_data = True
         self.storage_key = None
         self.canceling = False
-        self.logger = logging.getLogger('storage.server')
 
         self.original_file_hash = node_hash
         self.hash_hint = hash_hint
@@ -393,8 +392,8 @@ class BaseUploadJob(object):
                            'sent=%(bytes_sent)s')
             return context_msg % upload_context
 
-        self.logger.warning("%s - storage backend error: %s",
-                            context_msg(), failure)
+        logger.warning(
+            "%s - storage backend error: %s", context_msg(), failure)
         if failure.check(errors.UploadCorrupt):
             return failure
         raise errors.TryAgain(failure.value)
@@ -408,8 +407,8 @@ class BaseUploadJob(object):
             try:
                 yield self.uploadjob.delete()
             except Exception as exc:
-                self.logger.warning("%s(%s): while deleting uploadjob",
-                                    exc.__class__.__name__, exc)
+                logger.exception(
+                    "%s while deleting uploadjob:", exc.__class__.__name__)
         defer.returnValue(new_gen)
 
     @defer.inlineCallbacks

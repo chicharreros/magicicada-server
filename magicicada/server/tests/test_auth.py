@@ -21,8 +21,6 @@
 import logging
 
 from twisted.internet import defer
-
-from ubuntuone.devtools.handlers import MementoHandler
 from ubuntuone.storageprotocol import errors as protocol_errors, request
 
 from magicicada.filesync.errors import DoesNotExist
@@ -30,7 +28,9 @@ from magicicada.filesync.models import StorageUser
 from magicicada.server.auth import (
     DummyAuthProvider,
     SimpleAuthProvider,
+    logger as auth_logger,
 )
+from magicicada.server.server import logger as server_logger
 from magicicada.server.testing.testcase import TestWithDatabase
 
 
@@ -130,32 +130,27 @@ class ClientDummyAuthTests(AuthenticationBaseTestCase):
         yield super(ClientDummyAuthTests, self).setUp()
         self.creds = 'open sesame'
         self.bad_creds = 'not my secret'
-        self.handler = MementoHandler()
-        logger = logging.getLogger('storage.server')
-        logger.addHandler(self.handler)
-        self.addCleanup(logger.removeHandler, self.handler)
-        self.handler.setLevel(logging.DEBUG)
 
-    def assert_auth_ok_logging(self):
-        self.assertTrue(self.handler.check_debug(
-            "authenticated user", "OK", self.usr0.username))
-        self.assertFalse(self.handler.check_warning("missing user"))
+    def assert_auth_ok_logging(self, handler):
+        handler.assert_debug("authenticated user", "OK", self.usr0.username)
+        handler.assert_not_logged("missing user")
 
-    def assert_auth_ok_missing_user(self):
-        self.assertTrue(self.handler.check_debug(
-                        "missing user", "(id=%s)" % self.usr0.id))
-        self.assertFalse(self.handler.check_info("authenticated user"))
+    def assert_auth_ok_missing_user(self, handler):
+        handler.assert_debug("missing user", "(id=%s)" % self.usr0.id)
+        handler.assert_not_logged("authenticated user")
 
     @defer.inlineCallbacks
     def test_auth_ok_user_ok(self):
         """Correct authentication must succeed."""
+        handler = self.add_memento_handler(auth_logger, level=logging.DEBUG)
         yield self.callback_test(
             self.do_auth, credentials=self.creds, add_default_callbacks=True)
-        self.assert_auth_ok_logging()
+        self.assert_auth_ok_logging(handler)
 
     @defer.inlineCallbacks
     def test_auth_ok_bad_user(self):
         """Non existing user must fail authentication."""
+        handler = self.add_memento_handler(auth_logger, level=logging.DEBUG)
         # make the user getter fail
         self.patch(self.service.factory.content, 'get_user_by_id',
                    lambda *a, **k: defer.fail(DoesNotExist()))
@@ -164,7 +159,7 @@ class ClientDummyAuthTests(AuthenticationBaseTestCase):
             self.do_auth, credentials=self.creds, add_default_callbacks=True)
         yield self.assertFailure(d, protocol_errors.AuthenticationFailedError)
 
-        self.assert_auth_ok_missing_user()
+        self.assert_auth_ok_missing_user(handler)
 
     @defer.inlineCallbacks
     def test_auth_ok_with_session_id(self):
@@ -180,14 +175,13 @@ class ClientDummyAuthTests(AuthenticationBaseTestCase):
         """Correct authentication must succeed and include metadata."""
         m_called = []
         self.service.factory.metrics.meter = lambda *a: m_called.append(a)
-
+        handler = self.add_memento_handler(server_logger, level=logging.DEBUG)
         metadata = {u"platform": u"linux2", u"version": u"1.0", u"foo": u"bar"}
         yield self.callback_test(
             self.do_auth, credentials=self.creds, metadata=metadata,
             add_default_callbacks=True)
 
-        self.assertTrue(
-            self.handler.check_info("Client metadata: %s" % metadata))
+        handler.assert_info("Client metadata: %s" % metadata)
         self.assertIn(("client.platform.linux2", 1), m_called)
         self.assertIn(("client.version.1_0", 1), m_called)
         self.assertNotIn(("client.foo.bar", 1), m_called)
@@ -270,17 +264,14 @@ class ClientSimpleAuthTests(ClientDummyAuthTests):
             "password": 'invalid',
         }
 
-    def assert_auth_ok_logging(self):
-        self.assertTrue(self.handler.check_info(
+    def assert_auth_ok_logging(self, handler):
+        handler.assert_info(
             "authenticated user", "OK", self.usr0.username,
-            "(id=%s)" % self.usr0.id))
-        self.assertTrue(self.handler.check_info(
-            "valid tokens", "(id=%s)" % self.usr0.id))
-        self.assertFalse(self.handler.check_warning("missing user"))
+            "(id=%s)" % self.usr0.id)
+        handler.assert_info("valid tokens", "(id=%s)" % self.usr0.id)
+        handler.assert_not_logged("missing user")
 
-    def assert_auth_ok_missing_user(self):
-        self.assertTrue(self.handler.check_info(
-                        "valid tokens", "(id=%s)" % self.usr0.id))
-        self.assertTrue(self.handler.check_warning(
-                        "missing user", "(id=%s)" % self.usr0.id))
-        self.assertFalse(self.handler.check_info("authenticated user"))
+    def assert_auth_ok_missing_user(self, handler):
+        handler.assert_info("valid tokens", "(id=%s)" % self.usr0.id)
+        handler.assert_warning("missing user", "(id=%s)" % self.usr0.id)
+        handler.assert_not_logged("authenticated user")

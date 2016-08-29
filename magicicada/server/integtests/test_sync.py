@@ -58,22 +58,10 @@ from magicicada.server.testing.aq_helpers import (
     FakeGetContent,
 )
 from magicicada.server.testing.caps_helpers import required_caps
+from magicicada.server.testing.testcase import logger
 
 U1SYNC_QUIET = True
 NO_CONTENT_HASH = ""
-
-
-class ErrorHandler(logging.Handler):
-    """A Log Handler to detect exceptions."""
-    def __init__(self):
-        """create it"""
-        logging.Handler.__init__(self)
-        self.errors = []
-
-    def emit(self, record):
-        """Add the record."""
-        if record.levelno >= logging.ERROR:
-            self.errors.append(record)
 
 
 def deferToThread(func, *args, **kwargs):
@@ -147,14 +135,7 @@ class TestSync(TestWithDatabase):
         self.eq.push('SYS_NET_CONNECTED')
         yield d
 
-        self.error_handler = ErrorHandler()
-        logger = logging.getLogger("fsyncsrvr.SyncDaemon.sync")
-        logger.addHandler(self.error_handler)
-        self.addCleanup(logger.removeHandler, self.error_handler)
-
-        logger = logging.getLogger("twisted")
-        logger.addHandler(self.error_handler)
-        self.addCleanup(logger.removeHandler, self.error_handler)
+        self.handler = self.add_memento_handler(logger, level=logging.ERROR)
 
     def _wait_for_dead_nirvana(self):
         """Wait until it's disconnected."""
@@ -182,15 +163,13 @@ class TestSync(TestWithDatabase):
         if timer is not None and timer.active():
             timer.cancel()
 
-        try:
-            yield super(TestSync, self).tearDown()
-            yield self._wait_for_dead_nirvana()
-        finally:
-            # make sure no errors were reported
-            if self.error_handler.errors:
-                errs = "\n".join(e.getMessage()
-                                 for e in self.error_handler.errors)
-                raise Exception("Test ended with errors: \n" + errs)
+        yield super(TestSync, self).tearDown()
+        yield self._wait_for_dead_nirvana()
+
+        # make sure no errors were reported
+        if self.handler.records:
+            errs = "\n".join(e.getMessage() for e in self.handler.records)
+            raise Exception("Test ended with errors: \n" + errs)
 
     def compare_dirs(self):
         "run rsync to compare directories, needs some work"
@@ -2024,7 +2003,7 @@ class TestPartialRecover(TestServerBase):
         # Sync will raise an exception, because commit_file is leaving the
         # node in a different state of what the spreadsheet indicated.
         # As this is ok, we're cleaning the error here
-        self.error_handler.errors = []
+        self.handler.reset()
 
         # Now, let LR fix the node, and SD to download it again
         yield self.main.lr.scan_dir("mdid", self.root_dir)

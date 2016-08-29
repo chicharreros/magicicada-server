@@ -26,11 +26,9 @@ import zlib
 from StringIO import StringIO
 
 from mocker import Mocker, expect, ARGS, KWARGS, ANY
-from oops_datedir_repo import serializer
 from twisted.internet import defer, reactor, threads, task, address
 from twisted.trial.unittest import TestCase
 from twisted.test.proto_helpers import StringTransport
-from ubuntuone.devtools.handlers import MementoHandler
 from ubuntuone.storageprotocol import (
     request,
     client as sp_client,
@@ -46,7 +44,16 @@ from ubuntuone.storageprotocol.content_hash import (
 from magicicada import settings
 from magicicada.filesync import errors
 from magicicada.filesync.models import StorageObject, StorageUser
-from magicicada.server import server, content, diskstorage
+from magicicada.server import server, diskstorage
+from magicicada.server.content import (
+    BaseUploadJob,
+    BogusUploadJob,
+    DBUploadJob,
+    ContentManager,
+    UploadJob,
+    User,
+    logger,
+)
 from magicicada.server.testing.testcase import (
     BufferedConsumer,
     FactoryHelper,
@@ -478,16 +485,8 @@ class TestPutContent(TestWithDatabase):
     def setUp(self):
         """Set up."""
         d = super(TestPutContent, self).setUp()
-        self.handler = MementoHandler()
-        self.handler.setLevel(0)
-        self._logger = logging.getLogger('storage.server')
-        self._logger.addHandler(self.handler)
+        self.handler = self.add_memento_handler(server.logger, level=0)
         return d
-
-    def tearDown(self):
-        """Tear down."""
-        self._logger.removeHandler(self.handler)
-        return super(TestPutContent, self).tearDown()
 
     def test_putcontent_cancel(self):
         """Test putting content to a file and cancelling it."""
@@ -657,8 +656,8 @@ class TestPutContent(TestWithDatabase):
                 # check upload stat and the offset sent
                 self.assertTrue(('UploadJob.upload', 0) in gauge)
                 self.assertTrue(('UploadJob.upload.begin', 1) in meter)
-                self.assertTrue(self.handler.check_debug(
-                                "UploadJob begin content from offset 0"))
+                self.handler.assert_debug(
+                    "UploadJob begin content from offset 0")
 
         yield self.callback_test(auth, add_default_callbacks=True)
 
@@ -1057,10 +1056,8 @@ class TestPutContent(TestWithDatabase):
             try:
                 yield client.put_content(*args)
             except Exception as ex:
-                self.assertTrue(isinstance(ex, protoerrors.UploadCorruptError))
-            self.assertTrue(
-                self.handler.check_debug('UploadCorrupt', str(size)))
-            self.assertTrue(('oops_saved',) not in meter)
+                self.assertIsInstance(ex, protoerrors.UploadCorruptError)
+            self.handler.assert_debug('UploadCorrupt', str(size))
         return self.callback_test(test, add_default_callbacks=True)
 
     @defer.inlineCallbacks
@@ -1137,9 +1134,9 @@ class TestPutContent(TestWithDatabase):
         """Get both storage and content users."""
         s_user = self.make_user(
             max_storage_bytes=max_storage_bytes)
-        c_user = content.User(self.service.factory.content, s_user.id,
-                              s_user.root_volume_id, s_user.username,
-                              s_user.visible_name)
+        c_user = User(
+            self.service.factory.content, s_user.id, s_user.root_volume_id,
+            s_user.username, s_user.visible_name)
         return s_user, c_user
 
     @defer.inlineCallbacks
@@ -1516,7 +1513,7 @@ class TestPutContent(TestWithDatabase):
 
         # overwrite UploadJob method to detect if it
         # uploaded stuff (it shouldn't)
-        self.patch(content.BaseUploadJob, '_start_receiving',
+        self.patch(BaseUploadJob, '_start_receiving',
                    lambda s: defer.fail(Exception("This shouldn't be called")))
 
         @defer.inlineCallbacks
@@ -1596,19 +1593,10 @@ class TestMultipartPutContent(TestWithDatabase):
     @defer.inlineCallbacks
     def setUp(self):
         """Set up."""
-        self.handler = MementoHandler()
-        self.handler.setLevel(0)
-        self._logger = logging.getLogger('storage.server')
-        self._logger.addHandler(self.handler)
+        self.handler = self.add_memento_handler(server.logger, level=0)
         yield super(TestMultipartPutContent, self).setUp()
         # override defaults set by TestWithDatabase.setUp.
         self.patch(settings.api_server, 'STORAGE_CHUNK_SIZE', 1024)
-
-    @defer.inlineCallbacks
-    def tearDown(self):
-        """Tear down."""
-        self._logger.removeHandler(self.handler)
-        yield super(TestMultipartPutContent, self).tearDown()
 
     def get_data(self, size):
         """Return random data of the specified size."""
@@ -1653,8 +1641,8 @@ class TestMultipartPutContent(TestWithDatabase):
                 # check upload stat and log, with the offset sent
                 self.assertIn(('UploadJob.upload', 0), gauge)
                 self.assertIn(('UploadJob.upload.begin', 1), meter)
-                self.assertTrue(self.handler.check_debug(
-                    "UploadJob begin content from offset 0"))
+                self.handler.assert_debug(
+                    "UploadJob begin content from offset 0")
 
         yield self.callback_test(auth, timeout=self.timeout,
                                  add_default_callbacks=True)
@@ -1724,8 +1712,7 @@ class TestMultipartPutContent(TestWithDatabase):
             # first time tarts from beginning.
             self.assertTrue(('UploadJob.upload', 0) in gauge)
             self.assertTrue(('UploadJob.upload.begin', 1) in meter)
-            self.assertTrue(self.handler.check_debug(
-                            "UploadJob begin content from offset 0"))
+            self.handler.assert_debug("UploadJob begin content from offset 0")
         else:
             self.fail("Should raise EOFError.")
         yield client.kill()
@@ -1777,8 +1764,8 @@ class TestMultipartPutContent(TestWithDatabase):
         # check upload stat and log, with the offset sent, second time it
         # resumes from the first chunk
         self.assertTrue(('UploadJob.upload', offset_sent) in gauge)
-        self.assertTrue(self.handler.check_debug("UploadJob "
-                        "begin content from offset %d" % offset_sent))
+        self.handler.assert_debug(
+            "UploadJob begin content from offset %d" % offset_sent)
 
         yield client.kill()
         yield connector.disconnect()
@@ -1822,8 +1809,8 @@ class TestMultipartPutContent(TestWithDatabase):
             yield req.deferred
             self.assertTrue(('UploadJob.upload', 0) in gauge)
             self.assertTrue(('UploadJob.upload.begin', 1) in meter)
-            self.assertTrue(self.handler.check_debug(
-                "UploadJob begin content from offset 0"))
+            self.handler.assert_debug(
+                "UploadJob begin content from offset 0")
             self.assertEqual(len(upload_id), 1)
             self.assertIsInstance(uuid.UUID(upload_id[0]), uuid.UUID)
 
@@ -1888,9 +1875,8 @@ class TestMultipartPutContent(TestWithDatabase):
                 putc_req = client.put_content_request(*args)
                 yield putc_req.deferred
             except Exception as ex:
-                self.assertTrue(isinstance(ex, protoerrors.UploadCorruptError))
-            self.assertTrue(self.handler.check_debug('UploadCorrupt',
-                                                     str(size)))
+                self.assertIsInstance(ex, protoerrors.UploadCorruptError)
+            self.handler.assert_debug('UploadCorrupt', str(size))
             # check that the uploadjob was deleted.
             node = self.usr0.volume(None).get_node(make_req.new_id)
             self.assertRaises(errors.DoesNotExist,
@@ -1970,8 +1956,6 @@ class TestMultipartPutContentGoodCompression(TestMultipartPutContent):
 class TestPutContentInternalError(TestWithDatabase):
     """Test put_content command."""
 
-    createOOPSFiles = True
-
     @defer.inlineCallbacks
     def test_putcontent_handle_internal_error_in_uploadjob_deferred(self):
         """PutContent should handle errors in upload_job.deferred.
@@ -1981,9 +1965,9 @@ class TestPutContentInternalError(TestWithDatabase):
         """
         chunk_size = settings.api_server.STORAGE_CHUNK_SIZE
         user = self.make_user(max_storage_bytes=chunk_size ** 2)
-        content_user = content.User(self.service.factory.content, user.id,
-                                    user.root_volume_id, user.username,
-                                    user.visible_name)
+        content_user = User(
+            self.service.factory.content, user.id, user.root_volume_id,
+            user.username, user.visible_name)
         # create the file
         a_file = user.root.make_file(u"A new file")
         # build the upload data
@@ -2030,7 +2014,7 @@ class TestPutContentInternalError(TestWithDatabase):
         def crash(*_):
             """Make it crash."""
             raise ValueError("Fail!")
-        self.patch(content.BaseUploadJob, 'add_data', crash)
+        self.patch(BaseUploadJob, 'add_data', crash)
 
         # start uploading
         pc.start()
@@ -2050,13 +2034,6 @@ class TestPutContentInternalError(TestWithDatabase):
         yield storage_server.wait_for_shutdown()
         self.assertTrue(pc.finished)
         self.assertTrue(storage_server.shutting_down)
-        # check the generated oops
-        oopses = list(self.get_oops())
-        self.assert_(1, len(oopses) > 0)
-        with open(oopses[0], 'r') as f:
-            oops_data = serializer.read(f)
-        self.assertEqual("ValueError", oops_data["type"])
-        self.assertEqual("Fail!", oops_data["value"])
 
     @defer.inlineCallbacks
     def test_putcontent_handle_error_in_sendok(self):
@@ -2229,8 +2206,9 @@ class UserTest(TestWithDatabase):
 
         # user and root to use in the tests
         u = self.suser = self.make_user(max_storage_bytes=64 ** 2)
-        self.user = content.User(self.service.factory.content, u.id,
-                                 u.root_volume_id, u.username, u.visible_name)
+        self.user = User(
+            self.service.factory.content, u.id, u.root_volume_id, u.username,
+            u.visible_name)
 
     @defer.inlineCallbacks
     def test_make_file_node_with_gen(self):
@@ -2287,8 +2265,7 @@ class UserTest(TestWithDatabase):
         upload_job = yield self.user.get_upload_job(
             None, node_id, NO_CONTENT_HASH, 'foo', 10, size / 2, size / 4,
             True)
-        self.assertTrue(isinstance(upload_job, content.UploadJob),
-                        upload_job.__class__)
+        self.assertIsInstance(upload_job, UploadJob)
 
     @defer.inlineCallbacks
     def test_get_free_bytes_root(self):
@@ -2329,7 +2306,7 @@ class UserTest(TestWithDatabase):
 class TestUploadJob(TestWithDatabase):
     """Tests for UploadJob class."""
 
-    upload_class = content.UploadJob
+    upload_class = UploadJob
 
     @defer.inlineCallbacks
     def setUp(self):
@@ -2339,11 +2316,10 @@ class TestUploadJob(TestWithDatabase):
         self.half_size = self.chunk_size / 2
         self.double_size = self.chunk_size * 2
         self.user = self.make_user(max_storage_bytes=self.chunk_size ** 2)
-        self.content_user = content.User(self.service.factory.content,
-                                         self.user.id,
-                                         self.user.root_volume_id,
-                                         self.user.username,
-                                         self.user.visible_name)
+        self.content_user = User(
+            self.service.factory.content, self.user.id,
+            self.user.root_volume_id, self.user.username,
+            self.user.visible_name)
 
         def slowScheduler(x):
             """A slower scheduler for our cooperator."""
@@ -2379,7 +2355,7 @@ class TestUploadJob(TestWithDatabase):
         node = yield c_user.get_node(self.user.root_volume_id, node_id, None)
         args = (c_user, self.user.root_volume_id, node_id, node.content_hash,
                 hash_value, crc32_value, size)
-        upload = yield content.DBUploadJob.make(*args)
+        upload = yield DBUploadJob.make(*args)
         upload_job = self.upload_class(c_user, node, node.content_hash,
                                        hash_value, crc32_value, size,
                                        deflated_size, None, False,
@@ -2591,21 +2567,10 @@ class TestUploadJob(TestWithDatabase):
         # also delete
         self.patch(upload_job.uploadjob, "delete",
                    lambda: defer.fail(ValueError("delete boom")))
-        logger = logging.getLogger('storage.server')
-        hdlr = MementoHandler()
-        hdlr.setLevel(logging.WARNING)
-        logger.addHandler(hdlr)
-        self.addCleanup(logger.removeHandler, hdlr)
-        hdlr.debug = True
-        try:
-            yield upload_job.commit()
-        except ValueError as e:
-            # twisted bug: even it sees the last exception happened, even if
-            # not the one that exploding one
-            self.assertEqual(str(e), "delete boom")
-            self.assertTrue(hdlr.check_warning("delete boom"))
-        else:
-            self.fail("Should fail and log a warning.")
+        handler = self.add_memento_handler(logger, level=logging.WARNING)
+        failure = yield self.assertFailure(upload_job.commit(), ValueError)
+        self.assertEqual(str(failure), "delete boom")
+        handler.assert_exception("delete boom")
 
     @defer.inlineCallbacks
     def test_delete_after_commit_ok(self):
@@ -2614,19 +2579,12 @@ class TestUploadJob(TestWithDatabase):
         deflated_data, _, upload_job = yield self.make_upload(size)
         yield upload_job.connect()
         yield upload_job.add_data(deflated_data)
-        logger = logging.getLogger('storage.server')
-        hdlr = MementoHandler()
-        hdlr.setLevel(logging.WARNING)
-        logger.addHandler(hdlr)
-        self.addCleanup(logger.removeHandler, hdlr)
-        hdlr.debug = True
         yield upload_job.commit()
         node = upload_job.file_node
         # check that the upload is no more
-        d = content.DBUploadJob.get(self.content_user, node.volume_id,
-                                    node.id, upload_job.upload_id,
-                                    upload_job.hash_hint,
-                                    upload_job.crc32_hint)
+        d = DBUploadJob.get(
+            self.content_user, node.volume_id, node.id, upload_job.upload_id,
+            upload_job.hash_hint, upload_job.crc32_hint)
         yield self.assertFailure(d, errors.DoesNotExist)
 
     @defer.inlineCallbacks
@@ -2675,7 +2633,7 @@ class TestUploadJob(TestWithDatabase):
 class TestNode(TestWithDatabase):
     """Tests for Node class."""
 
-    upload_class = content.UploadJob
+    upload_class = UploadJob
 
     @defer.inlineCallbacks
     def setUp(self):
@@ -2685,27 +2643,20 @@ class TestNode(TestWithDatabase):
         self.half_size = self.chunk_size / 2
         self.double_size = self.chunk_size * 2
         self.user = self.make_user(max_storage_bytes=self.chunk_size ** 2)
-        self.suser = content.User(self.service.factory.content, self.user.id,
-                                  self.user.root_volume_id, self.user.username,
-                                  self.user.visible_name)
+        self.suser = User(
+            self.service.factory.content, self.user.id,
+            self.user.root_volume_id, self.user.username,
+            self.user.visible_name)
 
         # add a memento handler, to check we log ok
-        self.logger = logging.getLogger('storage.server')
-        self.handler = MementoHandler()
-        self.handler.setLevel(logging.WARNING)
-        self.logger.addHandler(self.handler)
-
-    def tearDown(self):
-        """Tear down."""
-        self.logger.removeHandler(self.handler)
-        return super(TestNode, self).tearDown()
+        self.handler = self.add_memento_handler(server.logger)
 
     @defer.inlineCallbacks
     def _upload_a_file(self, user, content_user):
         """Upload a file.
 
         @param user: the storage user
-        @param content: the content.User
+        @param content: the User
         @return: a tuple (upload, deflated_data)
         """
         size = self.chunk_size / 2
@@ -2727,11 +2678,10 @@ class TestNode(TestWithDatabase):
         node = yield content_user.get_node(user.root_volume_id, node_id, None)
         args = (content_user, self.user.root_volume_id, node_id,
                 node.content_hash, hash_value, crc32_value, size)
-        upload = yield content.DBUploadJob.make(*args)
-        upload_job = content.UploadJob(content_user, node, node.content_hash,
-                                       hash_value, crc32_value, size,
-                                       deflated_size, None, False,
-                                       magic_hash_value, upload)
+        upload = yield DBUploadJob.make(*args)
+        upload_job = UploadJob(
+            content_user, node, node.content_hash, hash_value, crc32_value,
+            size, deflated_size, None, False, magic_hash_value, upload)
         yield upload_job.connect()
         yield upload_job.add_data(deflated_data)
         yield upload_job.commit()
@@ -2787,8 +2737,9 @@ class TestGenerations(TestWithDatabase):
         """Setup the test."""
         yield super(TestGenerations, self).setUp()
         self.suser = u = self.make_user(max_storage_bytes=64 ** 2)
-        self.user = content.User(self.service.factory.content, u.id,
-                                 u.root_volume_id, u.username, u.visible_name)
+        self.user = User(
+            self.service.factory.content, u.id, u.root_volume_id, u.username,
+            u.visible_name)
 
     @defer.inlineCallbacks
     def test_get_delta_empty(self):
@@ -2871,7 +2822,7 @@ class TestContentManagerTests(TestWithDatabase):
         """Setup the test."""
         yield super(TestContentManagerTests, self).setUp()
         self.suser = self.make_user(max_storage_bytes=64 ** 2)
-        self.cm = content.ContentManager(self.service.factory)
+        self.cm = ContentManager(self.service.factory)
         self.cm.rpc_dal = self.service.rpc_dal
 
     @defer.inlineCallbacks
@@ -2881,12 +2832,12 @@ class TestContentManagerTests(TestWithDatabase):
         u = yield self.cm.get_user_by_id(self.suser.id)
         self.assertEqual(u, None)
         u = yield self.cm.get_user_by_id(self.suser.id, required=True)
-        self.assertTrue(isinstance(u, content.User))
+        self.assertIsInstance(u, User)
         # make sure it's in the cache
         self.assertEqual(u, self.cm.users[self.suser.id])
         # get it from the cache
         u = yield self.cm.get_user_by_id(self.suser.id)
-        self.assertTrue(isinstance(u, content.User))
+        self.assertIsInstance(u, User)
 
     @defer.inlineCallbacks
     def test_get_user_by_id_race_condition(self):
@@ -3028,7 +2979,7 @@ class DBUploadJobTestCase(TestCase):
         """Test the getter."""
         args = (self.user, 'volume_id', 'node_id', 'uploadjob_id',
                 'hash_value', 'crc32')
-        dbuj = yield content.DBUploadJob.get(*args)
+        dbuj = yield DBUploadJob.get(*args)
 
         # check it called rpc dal correctly
         method, attribs = self.user.recorded
@@ -3039,7 +2990,7 @@ class DBUploadJobTestCase(TestCase):
         self.assertEqual(attribs, should)
 
         # check it built the instance correctly
-        self.assertTrue(isinstance(dbuj, content.DBUploadJob))
+        self.assertIsInstance(dbuj, DBUploadJob)
         self.assertEqual(dbuj.user, self.user)
         self.assertEqual(dbuj.volume_id, 'volume_id')
         self.assertEqual(dbuj.node_id, 'node_id')
@@ -3055,7 +3006,7 @@ class DBUploadJobTestCase(TestCase):
         args = (self.user, 'volume_id', 'node_id', 'previous_hash',
                 'hash_value', 'crc32', 'inflated_size')
         self.patch(uuid, 'uuid4', lambda: "test unique id")
-        dbuj = yield content.DBUploadJob.make(*args)
+        dbuj = yield DBUploadJob.make(*args)
 
         # check it called rpc dal correctly
         method, attribs = self.user.recorded
@@ -3068,7 +3019,7 @@ class DBUploadJobTestCase(TestCase):
         self.assertEqual(attribs, should)
 
         # check it built the instance correctly
-        self.assertTrue(isinstance(dbuj, content.DBUploadJob))
+        self.assertIsInstance(dbuj, DBUploadJob)
         self.assertEqual(dbuj.user, self.user)
         self.assertEqual(dbuj.volume_id, 'volume_id')
         self.assertEqual(dbuj.node_id, 'node_id')
@@ -3082,7 +3033,7 @@ class DBUploadJobTestCase(TestCase):
         """Helper to create the upload job."""
         args = (self.user, 'volume_id', 'node_id', 'previous_hash',
                 'hash_value', 'crc32', 'inflated_size')
-        return content.DBUploadJob.make(*args)
+        return DBUploadJob.make(*args)
 
     @defer.inlineCallbacks
     def test_add_part(self):
@@ -3132,7 +3083,7 @@ class DBUploadJobTestCase(TestCase):
     def test_bogus_upload_job(self):
         """Check the not-going-to-db upload job."""
         self.patch(uuid, 'uuid4', lambda: "test unique id")
-        uj = content.BogusUploadJob()
+        uj = BogusUploadJob()
 
         # basic attributes
         self.assertEqual(uj.multipart_key, "test unique id")

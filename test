@@ -74,10 +74,12 @@ if __name__ == "__main__":
     parser.add_option("-e", "--logs-on-failure", dest="logs_on_failure",
                       action='store_true',
                       help="Show logs on stdout if error or failure")
+    parser.add_option("-v", "--verbosity", dest="verbosity",
+                      type='int', default=1, help="Verbosity, default is 1")
 
     (options, args) = parser.parse_args()
 
-    setup_environment("magicicada.settings")
+    setup_environment("magicicada.settings.testing")
 
     from utilities.testlib import test_with_trial
 

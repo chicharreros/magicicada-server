@@ -18,7 +18,6 @@
 
 """Tests for server rescan."""
 
-import logging
 import zlib
 
 from cStringIO import StringIO
@@ -26,7 +25,6 @@ from cStringIO import StringIO
 from twisted.internet import defer
 from ubuntuone.storageprotocol import request
 from ubuntuone.storageprotocol.content_hash import content_hash_factory, crc32
-from ubuntuone.devtools.handlers import MementoHandler
 
 from magicicada.server.integtests.test_sync import TestServerBase
 from magicicada.server.testing.aq_helpers import NO_CONTENT_HASH
@@ -42,9 +40,6 @@ class TestServerScan(TestServerBase):
         yield super(TestServerScan, self).setUp()
         yield self.get_client()
         yield self.do_create_lots_of_files('_pre')
-        self.handler = handler = MementoHandler()
-        handler.setLevel(logging.DEBUG)
-        logging.getLogger('fsyncsrvr.SyncDaemon').addHandler(handler)
 
     @defer.inlineCallbacks
     def do_create_lots_of_files(self, suffix=''):

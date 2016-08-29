@@ -27,7 +27,7 @@ from threading import Lock
 
 from django.conf import settings
 
-from magicicada.server.logger import configure_logger
+logger = logging.getLogger(__name__)
 
 
 class FileBasedMeter(object):
@@ -39,10 +39,6 @@ class FileBasedMeter(object):
     def __init__(self, namespace):
         self._namespace = namespace
         self._counters = {}
-
-        # configure logs
-        self._logger = logging.getLogger('metrics')
-        configure_logger(logger=self._logger, filename='metrics.log')
 
     def gauge(self, name, value):
         """Record an absolute reading for C{name} with C{value}."""
@@ -76,7 +72,7 @@ class FileBasedMeter(object):
     def _write(self, kind, name, value):
         record = "%s.%s %s=%s" % (self._namespace, name, kind, value)
         with self._lock:
-            self._logger.info(record)
+            logger.info(record)
 
 
 def _build_namespace(namespace):

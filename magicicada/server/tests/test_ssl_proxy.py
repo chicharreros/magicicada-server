@@ -30,8 +30,6 @@ from twisted.internet import defer, reactor, error as txerror, ssl
 from twisted.python import failure
 from twisted.web import client, error as web_error
 from twisted.trial.unittest import TestCase
-
-from ubuntuone.devtools.handlers import MementoHandler
 from ubuntuone.storageprotocol.client import (
     StorageClientFactory, StorageClient)
 from ubuntuone.supervisor import utils as supervisor_utils
@@ -52,20 +50,12 @@ class SSLProxyServiceTest(TestWithDatabase):
     @defer.inlineCallbacks
     def setUp(self):
         yield super(SSLProxyServiceTest, self).setUp()
-        self.configure_logging()
+        self.handler = self.add_memento_handler(
+            ssl_proxy.logger, level=logging.DEBUG)
         self.metrics = MetricReceiver()
         self.patch(metrics, 'get_meter', lambda n: self.metrics)
         self.patch(settings.ssl_proxy, 'HEARTBEAT_INTERVAL',
                    self.ssl_proxy_heartbeat_interval)
-
-    def configure_logging(self):
-        """Configure logging for the tests."""
-        logger = logging.getLogger("ssl_proxy")
-        logger.setLevel(logging.DEBUG)
-        logger.propagate = False
-        self.handler = MementoHandler()
-        logger.addHandler(self.handler)
-        self.addCleanup(logger.removeHandler, self.handler)
 
     @defer.inlineCallbacks
     def test_start_stop(self):
@@ -86,7 +76,8 @@ class SSLProxyTestCase(TestWithDatabase):
     @defer.inlineCallbacks
     def setUp(self):
         yield super(SSLProxyTestCase, self).setUp()
-        self.configure_logging()
+        self.handler = self.add_memento_handler(
+            ssl_proxy.logger, level=logging.DEBUG)
         self.ssl_service = ssl_proxy.ProxyService(self.ssl_cert,
                                                   self.ssl_key,
                                                   self.ssl_cert_chain,
@@ -99,20 +90,7 @@ class SSLProxyTestCase(TestWithDatabase):
         self.patch(settings.ssl_proxy, 'HEARTBEAT_INTERVAL',
                    self.ssl_proxy_heartbeat_interval)
         yield self.ssl_service.startService()
-
-    def configure_logging(self):
-        """Configure logging for the tests."""
-        logger = logging.getLogger("ssl_proxy")
-        logger.setLevel(logging.DEBUG)
-        logger.propagate = False
-        self.handler = MementoHandler()
-        logger.addHandler(self.handler)
-        self.addCleanup(logger.removeHandler, self.handler)
-
-    @defer.inlineCallbacks
-    def tearDown(self):
-        yield super(SSLProxyTestCase, self).tearDown()
-        yield self.ssl_service.stopService()
+        self.addCleanup(self.ssl_service.stopService)
 
     @property
     def ssl_port(self):
@@ -290,6 +268,9 @@ class MetricReceiver(metrics.FileBasedMeter):
 class SSLProxyMetricsTestCase(SSLProxyTestCase):
     """Tests for ssl proxy metrics using real connections."""
 
+    from twisted.internet.base import DelayedCall
+    DelayedCall.debug = True
+
     @defer.inlineCallbacks
     def setUp(self):
         yield super(SSLProxyMetricsTestCase, self).setUp()
@@ -321,7 +302,7 @@ class SSLProxyMetricsTestCase(SSLProxyTestCase):
 
         yield self.callback_test(dummy, use_ssl=True)
         self.assertIn('frontend_connection_made', self.metrics)
-        self.assertTrue(self.handler.check_debug('Frontend connection made'))
+        self.handler.assert_debug('Frontend connection made')
 
     @defer.inlineCallbacks
     def test_frontend_connection_lost(self):
@@ -344,7 +325,7 @@ class SSLProxyMetricsTestCase(SSLProxyTestCase):
         yield self.callback_test(dummy, use_ssl=True)
         yield d
         self.assertIn('frontend_connection_lost', self.metrics)
-        self.assertTrue(self.handler.check_debug('Frontend connection lost'))
+        self.handler.assert_debug('Frontend connection lost')
 
     @defer.inlineCallbacks
     def test_backend_connection_made(self):
@@ -355,7 +336,7 @@ class SSLProxyMetricsTestCase(SSLProxyTestCase):
 
         yield self.callback_test(dummy, use_ssl=True)
         self.assertIn('backend_connection_made', self.metrics)
-        self.assertTrue(self.handler.check_debug('Backend connection made'))
+        self.handler.assert_debug('Backend connection made')
 
     @defer.inlineCallbacks
     def test_backend_connection_lost(self):
@@ -378,7 +359,7 @@ class SSLProxyMetricsTestCase(SSLProxyTestCase):
         yield self.callback_test(dummy, use_ssl=True)
         yield d
         self.assertIn('backend_connection_lost', self.metrics)
-        self.assertTrue(self.handler.check_debug('Backend connection lost'))
+        self.handler.assert_debug('Backend connection lost')
 
     @defer.inlineCallbacks
     def test_backend_connection_done(self):
@@ -401,4 +382,4 @@ class SSLProxyMetricsTestCase(SSLProxyTestCase):
         yield self.callback_test(dummy, use_ssl=True)
         yield d
         self.assertIn('backend_connection_done', self.metrics)
-        self.assertTrue(self.handler.check_debug('Backend connection done'))
+        self.handler.assert_debug('Backend connection done')

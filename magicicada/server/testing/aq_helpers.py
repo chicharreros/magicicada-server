@@ -39,7 +39,12 @@ from ubuntuone import platform
 from ubuntuone.storageprotocol import request, sharersp, client
 from ubuntuone.storageprotocol.content_hash import content_hash_factory, crc32
 from ubuntuone.syncdaemon.action_queue import ActionQueue, ActionQueueCommand
-from ubuntuone.syncdaemon import main, volume_manager, tritcask, logger
+from ubuntuone.syncdaemon import (
+    main,
+    volume_manager,
+    tritcask,
+    logger as syncdaemon_logger,
+)
 from ubuntuone.syncdaemon.event_queue import EventQueue
 from ubuntuone.syncdaemon.filesystem_manager import FileSystemManager
 from ubuntuone.syncdaemon.sync import Sync
@@ -57,7 +62,7 @@ SD_CONFIGS = [os.path.join(SD_CONFIG_DIR, 'syncdaemon.conf'),
               os.path.join(SD_CONFIG_DIR, 'syncdaemon-dev.conf')]
 
 _marker = object()
-
+logger = logging.getLogger(__name__)
 NO_CONTENT_HASH = ""
 
 
@@ -171,7 +176,7 @@ class ReallyFakeMain(main.Main):
         self.hash_q = type('fake hash queue', (),
                            {'empty': staticmethod(lambda: True),
                             '__len__': staticmethod(lambda: 0)})()
-        self.logger = logging.getLogger('fsyncsrvr.SyncDaemon.Main')
+        self.logger = logger
         self.db = tritcask.Tritcask(self.tritcask_dir)
         self.vm = DumbVolumeManager(self)
         self.fs = FileSystemManager(self.fsmdir, self.partials_dir, self.vm,
@@ -362,8 +367,8 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
 
         # logging can not be configured dinamically, touch the general logger
         # to get one big file and be able to get the logs if failure
-        logger.init()
-        logger.set_max_bytes(0)
+        syncdaemon_logger.init()
+        syncdaemon_logger.set_max_bytes(0)
         yield self.client_setup()
 
     @property

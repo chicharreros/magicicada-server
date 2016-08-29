@@ -34,12 +34,12 @@ from twisted.web import server, resource
 import metrics
 
 from magicicada import settings
-from magicicada.server.logger import configure_logger
 from magicicada.server.server import get_service_port
 from magicicada.server.ssl import disable_ssl_compression
 from ubuntuone.supervisor import utils as supervisor_utils
 
-logger = logging.getLogger('ssl_proxy')
+
+logger = logging.getLogger(__name__)
 
 
 def get_transport_info(t):
@@ -283,8 +283,6 @@ class ProxyService(MultiService):
 
 def create_service():
     """Create the service instance."""
-    configure_logger(logger=logger, filename=settings.ssl_proxy.LOG_FILENAME,
-                     level=logging.DEBUG, propagate=False, start_observer=True)
     server_key = settings.api_server.KEY
     server_crt = settings.api_server.CRT
     server_crt_chain = settings.api_server.CRT_CHAIN

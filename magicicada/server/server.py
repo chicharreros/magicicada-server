@@ -34,17 +34,14 @@ import urllib
 import uuid
 import weakref
 
-from functools import wraps
+from functools import partial, wraps
 
 import psycopg2
 import twisted
 import twisted.web.error
-import oops
-import oops_datedir_repo
 
 import metrics
 import metrics.services
-import timeline
 
 from twisted.application.service import MultiService, Service
 from twisted.application.internet import TCPServer
@@ -62,7 +59,6 @@ from magicicada.monitoring.reactor import ReactorInspector
 from magicicada.rpcdb import inthread
 from magicicada.server import auth, content, errors, stats
 from magicicada.server.diskstorage import DiskStorage
-from magicicada.server.logger import configure_logger
 
 try:
     from versioninfo import version_info
@@ -89,24 +85,7 @@ SUGGESTED_REDIRS = {
     # frozenset(['example2']): dict(srv_record='_https._tcp.fs.server.com')
 }
 
-MAX_OOPS_LINE = 300
-
-
-def loglevel(lvl):
-    """Make a function that logs at lvl log level."""
-    def level_log(self, message, *args, **kwargs):
-        """inner."""
-        self.log(lvl, message, *args, **kwargs)
-    return level_log
-
-
-def trace_message(function):
-    """A decorator to trace incoming messages."""
-    def decorator(self, message):
-        """inner."""
-        self.log.trace_message('IN: ', message)
-        function(self, message)
-    return decorator
+logger = logging.getLogger(__name__)
 
 
 def _prettify_traceback(report, context):
@@ -116,21 +95,6 @@ def _prettify_traceback(report, context):
         tb += report['tb_text']
         tb += "%s: '%s'" % (report['type'], report['value'])
         report['tb_text'] = tb
-
-
-def configure_oops():
-    """Configure the oopses."""
-    oops_config = oops.Config()
-    oops_config.on_create.append(_prettify_traceback)
-    vers_info = dict(branch_nick=version_info['branch_nick'],
-                     revno=version_info['revno'])
-    oops_config.template.update(vers_info)
-    datedir_repo = oops_datedir_repo.DateDirRepo(settings.OOPS_PATH,
-                                                 inherit_id=True)
-
-    oops_config.publisher = oops.publishers.publish_to_many(
-        datedir_repo.publish)
-    return oops_config
 
 
 class StorageLogger(object):
@@ -149,14 +113,18 @@ class StorageLogger(object):
     def __init__(self, protocol):
         """Create the logger."""
         self.protocol = protocol
+        self.critical = partial(self.log, logging.CRITICAL)
+        self.error = partial(self.log, logging.ERROR)
+        self.warning = partial(self.log, logging.WARNING)
+        self.info = partial(self.log, logging.INFO)
+        self.debug = partial(self.log, logging.DEBUG)
+        self.trace = partial(self.log, settings.TRACE)
 
     def log(self, lvl, message, *args, **kwargs):
-        """Log."""
-        if self.protocol.logger.isEnabledFor(lvl):
-            self._log(lvl, message, *args, **kwargs)
+        """Log if gloabl logger is enabled for 'lvl'."""
+        if not logger.isEnabledFor(lvl):
+            return
 
-    def _log(self, lvl, message, *args, **kwargs):
-        """Actually do the real log"""
         msg_format = '%(uuid)s %(remote)s %(userid)s %(message)s'
         extra = {'message': message}
         if self.protocol.user is not None:
@@ -175,20 +143,13 @@ class StorageLogger(object):
         extra['uuid'] = self.protocol.session_id
 
         message = msg_format % extra
-        self.protocol.logger.log(lvl, message, *args, **kwargs)
+        logger.log(lvl, message, *args, **kwargs)
 
     def trace_message(self, text, message):
         """Log a message with some pre processing."""
-        if self.protocol.logger.isEnabledFor(settings.TRACE):
+        if logger.isEnabledFor(settings.TRACE):
             if message.type != protocol_pb2.Message.BYTES:
                 self.trace(text + (str(message).replace('\n', ' ')))
-
-    critical = loglevel(logging.CRITICAL)
-    error = loglevel(logging.ERROR)
-    warning = loglevel(logging.WARNING)
-    info = loglevel(logging.INFO)
-    debug = loglevel(logging.DEBUG)
-    trace = loglevel(settings.TRACE)
 
 
 class StorageServerLogger(StorageLogger):
@@ -312,13 +273,12 @@ class StorageServer(request.RequestHandler):
     PING_TIMEOUT = 480
     PING_INTERVAL = 120
 
-    def __init__(self):
+    def __init__(self, session_id=None):
         """Create a network server. The factory does this."""
         request.RequestHandler.__init__(self)
         self.user = None
         self.factory = None
-        self.session_id = uuid.uuid4()
-        self.logger = logging.getLogger(settings.api_server.LOGGER_NAME)
+        self.session_id = session_id or uuid.uuid4()
         self.log = StorageServerLogger(self)
         self.shutting_down = False
         self.request_locked = False
@@ -338,10 +298,6 @@ class StorageServer(request.RequestHandler):
     def set_user(self, user):
         """Set user and adjust values that depend on which user it is."""
         self.user = user
-        if user.username in self.factory.trace_users:
-            # set up the logger to use the hackers' one
-            hackers_logger = settings.api_server.LOGGER_NAME + '.hackers'
-            self.logger = logging.getLogger(hackers_logger)
 
     def poison(self, tag):
         """Inject a failure in the server. Works with check_poison."""
@@ -374,28 +330,20 @@ class StorageServer(request.RequestHandler):
         self.waiting_on_poison.append(d)
         return d
 
-    def _log_error_and_oops(self, failure, where, tl=None, exc_info=None):
-        """Auxiliar method to log error and build oops."""
+    def _log_error(self, failure, where, exc_info=None):
+        """Auxiliar method to log error."""
         self.log.error('Unhandled %s when calling %r', failure,
                        where.__name__, exc_info=exc_info)
-        del exc_info
-
-        if not isinstance(failure, Failure):
-            failure = Failure(failure)
-        oops = self.build_oops(failure, tl)
-        self.save_oops(oops)
 
     def schedule_request(self, request, callback, head=False):
         """Schedule this request to run."""
-        tl = getattr(request, 'timeline', None)
         if head:
             self.pending_requests.appendleft((request, callback))
         else:
             self.pending_requests.append((request, callback))
         # we do care if it fails, means no one handled the failure before
         if not isinstance(request, Action):
-            request.deferred.addErrback(self._log_error_and_oops,
-                                        request.__class__, tl=tl)
+            request.deferred.addErrback(self._log_error, request.__class__)
         if not self.request_locked:
             self.execute_next_request()
 
@@ -412,19 +360,11 @@ class StorageServer(request.RequestHandler):
     def execute_next_request(self):
         """Read the queue and execute a request."""
         request, callback = self.pending_requests.popleft()
-        tl = getattr(request, 'timeline', None)
-
-        if tl is not None:
-            class_name = request.__class__.__name__
-            tl.start('REQ-' + class_name,
-                     'EXECUTE %s[%s]' % (class_name, request.id)).finish()
-
         try:
             self.request_locked = request
             callback()
         except Exception as e:
-            self._log_error_and_oops(e, request.__class__, tl=tl,
-                                     exc_info=sys.exc_info())
+            self._log_error(e, request.__class__, exc_info=sys.exc_info())
             self.release(request)
 
     def connectionLost(self, reason=None):
@@ -495,30 +435,7 @@ class StorageServer(request.RequestHandler):
                 self.log.warning('---- garbage in, garbage out')
                 return
 
-            self._log_error_and_oops(e, self.dataReceived,
-                                     exc_info=sys.exc_info())
-
-    def build_oops(self, failure, tl=None):
-        """Create an oops entry to log the failure."""
-        context = {'exc_info': (failure.type, failure.value, failure.tb)}
-        del failure
-
-        if tl is not None:
-            context['timeline'] = tl
-
-        report = self.factory.oops_config.create(context)
-        del context
-
-        if self.user is not None:
-            # The 'username' key is parsed as (login, user_id, display_name).
-            report['username'] = '%s,%s,%s' % (self.user.id, self.user.id,
-                                               self.user.username)
-
-        return report
-
-    def save_oops(self, report):
-        """save the oops entry."""
-        self.factory.oops_config.publish(report)
+            self._log_error(e, self.dataReceived, exc_info=sys.exc_info())
 
     def processMessage(self, message):
         """Log errors from requests created by incoming messages."""
@@ -529,16 +446,13 @@ class StorageServer(request.RequestHandler):
         try:
             result = request.RequestHandler.processMessage(self, message)
         except Exception as e:
-            self._log_error_and_oops(e, self.processMessage,
-                                     exc_info=sys.exc_info())
+            self._log_error(e, self.processMessage, exc_info=sys.exc_info())
             return
 
         if isinstance(result, defer.Deferred):
-            result.addErrback(self._log_error_and_oops, result.__class__)
+            result.addErrback(self._log_error, result.__class__)
         elif isinstance(result, request.Request):
-            tl = getattr(result, 'timeline', None)
-            result.deferred.addErrback(self._log_error_and_oops,
-                                       result.__class__, tl=tl)
+            result.deferred.addErrback(self._log_error, result.__class__)
 
     def handle_PROTOCOL_VERSION(self, message):
         """Handle PROTOCOL_VERSION message.
@@ -696,18 +610,13 @@ class BaseRequestResponse(request.RequestResponse):
     It keeps a weak reference of the protocol instead of the real ref.
     """
 
-    __slots__ = ('use_protocol_weakref', '_protocol_ref', 'timeline')
+    __slots__ = ('use_protocol_weakref', '_protocol_ref')
 
     def __init__(self, protocol, message):
         """Create the request response."""
         self.use_protocol_weakref = settings.api_server.PROTOCOL_WEAKREF
         self._protocol_ref = None
-        self.timeline = timeline.Timeline(format_stack=None)
         super(BaseRequestResponse, self).__init__(protocol, message)
-
-    def context(self):
-        """Get the context of this request, to be passed down the RPC layer."""
-        return {'timeline': self.timeline}
 
     def _get_protocol(self):
         """Return the protocol instance."""
@@ -792,18 +701,10 @@ class StorageServerRequestResponse(BaseRequestResponse):
         self.id = self.source_message.id
         self.protocol.requests[self.source_message.id] = self
 
-        class_name = self.__class__.__name__
-        self.timeline.start(
-            'REQ-' + class_name,
-            'SCHEDULE %s[%s:%s] CAPS %r WITH %r' % (
-                class_name, self.protocol.session_id,
-                self.id, self.protocol.working_caps,
-                str(self.source_message)[:MAX_OOPS_LINE])).finish()
-
         self.log.info('Request being scheduled')
         self.log.trace_message('IN: ', self.source_message)
-        self.protocol.factory.metrics.increment('request_instances.%s' %
-                                                (self.__class__.__name__,))
+        self.protocol.factory.metrics.increment(
+            'request_instances.%s' % self.__class__.__name__)
         self.protocol.schedule_request(self, _scheduled_start)
         self.protocol.check_poison('request_schedule')
 
@@ -823,7 +724,6 @@ class StorageServerRequestResponse(BaseRequestResponse):
         self.protocol.factory.metrics.decrement('request_instances.%s' %
                                                 (self.__class__.__name__,))
         self.protocol.release(self)
-        self.timeline = None
 
     def error(self, failure):
         """Overrided error to add logging. Never fail, always log."""
@@ -833,12 +733,9 @@ class StorageServerRequestResponse(BaseRequestResponse):
                 failure = Failure(failure)
             self.log.error('Request error',
                            exc_info=(failure.type, failure.value, None))
-            o = self.protocol.build_oops(failure, self.timeline)
-            self.protocol.save_oops(o)
             request.RequestResponse.error(self, failure)
         except Exception as e:
             msg = 'error() crashed when processing %s: %s'
-            # we shouldn't create an oops here since we just failed
             self.log.error(msg, failure, e, exc_info=sys.exc_info())
         else:
             self.protocol.factory.sli_metrics.report('sli_error', class_name)
@@ -1410,27 +1307,26 @@ class BytesMessageProducer(object):
     def __init__(self, bytes_producer, request):
         self.producer = bytes_producer
         self.request = request
-        self.logger = request.log
         bytes_producer.startProducing(self)
 
     def resumeProducing(self):
         """IPushProducer interface."""
-        self.logger.trace('BytesMessageProducer resumed, http producer: %s',
-                          self.producer)
+        logger.trace(
+            'BytesMessageProducer resumed, http producer: %s', self.producer)
         if self.producer:
             self.producer.resumeProducing()
 
     def stopProducing(self):
         """IPushProducer interface."""
-        self.logger.trace('BytesMessageProducer stopped, http producer: %s',
-                          self.producer)
+        logger.trace(
+            'BytesMessageProducer stopped, http producer: %s', self.producer)
         if self.producer:
             self.producer.stopProducing()
 
     def pauseProducing(self):
         """IPushProducer interface."""
-        self.logger.trace('BytesMessageProducer paused, http producer: %s',
-                          self.producer)
+        logger.trace(
+            'BytesMessageProducer paused, http producer: %s', self.producer)
         if self.producer:
             self.producer.pauseProducing()
 
@@ -1728,9 +1624,10 @@ class PutContentResponse(SimpleRequestResponse):
         except:
             yield self.internal_error(Failure())
 
-    @trace_message
     def _processMessage(self, message):
         """Receive the content for the upload."""
+        self.log.trace_message('IN: ', message)
+
         if self.state == self.states.uploading:
             try:
                 self._process_while_uploading(message)
@@ -2362,13 +2259,11 @@ class StorageServerFactory(Factory):
 
     def __init__(self, auth_provider_class=auth.DummyAuthProvider,
                  content_class=content.ContentManager,
-                 reactor=reactor, oops_config=None,
-                 servername=None, reactor_inspector=None):
+                 reactor=reactor, servername=None, reactor_inspector=None):
         """Create a StorageServerFactory."""
         self.auth_provider = auth_provider_class(self)
         self.content = content_class(self)
         self.diskstorage = DiskStorage(settings.api_server.STORAGE_BASEDIR)
-        self.logger = logging.getLogger('storage.server')
 
         self.metrics = metrics.get_meter('root')
         self.user_metrics = metrics.get_meter('user')
@@ -2406,8 +2301,6 @@ class StorageServerFactory(Factory):
         self.reactor = reactor
         self.trace_users = set(settings.api_server.TRACE_USERS)
 
-        # oops and log observer
-        self.oops_config = oops_config
         twisted.python.log.addObserver(self._deferror_handler)
 
     def _deferror_handler(self, data):
@@ -2426,38 +2319,19 @@ class StorageServerFactory(Factory):
             msg = failure.getTraceback()
 
         # log
-        self.logger.error('Unhandled error in deferred! %s', msg)
-
-    def build_notification_oops(self, failure, notif, tl=None):
-        """Create an oops entry to log the notification failure."""
-        context = {'exc_info': (failure.type, failure.value, failure.tb)}
-        del failure
-
-        if tl is not None:
-            context['timeline'] = tl
-
-        report = self.oops_config.create(context)
-        del context
-
-        return report
+        logger.error('Unhandled error in deferred! %s', msg)
 
     def event_callback_handler(self, func):
         """Wrap the event callback in an error handler."""
         @wraps(func)
         def wrapper(notif, **kwargs):
             """The wrapper."""
-            tl = timeline.Timeline(format_stack=None)
-            action = tl.start('EVENT-%s' % notif.event_type, '')
 
             def notification_error_handler(failure):
                 """Handle error while processing a Notification."""
-                action.detail = 'NOTIFY WITH %r (%s)' % (notif, kwargs)
-                action.finish()
-
-                oops = self.build_notification_oops(failure, notif, tl)
-                oops_id = self.oops_config.publish(oops)
-                self.logger.error(' %s in notification %r logged in OOPS: %s',
-                                  failure.value, notif, oops_id)
+                logger.error(
+                    '%s in notification %r while calling %s(**%r)',
+                    failure.value, notif, func.__name__, kwargs)
 
             d = defer.maybeDeferred(func, notif, **kwargs)
             d.addErrback(notification_error_handler)
@@ -2670,7 +2544,7 @@ class StorageServerService(OrderedMultiService):
     """Wrap the whole TCP StorageServer mess as a single twisted serv."""
 
     def __init__(self, port, auth_provider_class=None,
-                 oops_config=None, status_port=0, heartbeat_interval=None):
+                 status_port=0, heartbeat_interval=None):
         """Create a StorageServerService.
 
         @param port: the port to listen on without ssl.
@@ -2682,10 +2556,9 @@ class StorageServerService(OrderedMultiService):
             heartbeat_interval = float(settings.api_server.HEARTBEAT_INTERVAL)
         self.heartbeat_interval = heartbeat_interval
         self.rpc_dal = None
-        self.logger = logging.getLogger('storage.server')
         self.servername = settings.api_server.SERVERNAME
-        self.logger.info('Starting %s', self.servername)
-        self.logger.info(
+        logger.info('Starting %s', self.servername)
+        logger.info(
             'protocol buffers implementation: %s',
             os.environ.get('PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION', 'None'))
 
@@ -2695,12 +2568,11 @@ class StorageServerService(OrderedMultiService):
         listeners.setName('Listeners')
         listeners.setServiceParent(self)
 
-        self._reactor_inspector = ReactorInspector(self.logger,
-                                                   reactor.callFromThread)
+        self._reactor_inspector = ReactorInspector(reactor.callFromThread)
 
         self.factory = StorageServerFactory(
             auth_provider_class=auth_provider_class,
-            oops_config=oops_config, servername=self.servername,
+            servername=self.servername,
             reactor_inspector=self._reactor_inspector)
 
         self.tcp_service = TCPServer(port, self.factory)
@@ -2723,13 +2595,13 @@ class StorageServerService(OrderedMultiService):
 
     def start_rpc_dal(self):
         """Setup the rpc client."""
-        self.logger.info('Starting the RPC clients.')
+        logger.info('Starting the RPC clients.')
         self.rpc_dal = inthread.ThreadedNonRPC()
 
     @inlineCallbacks
     def startService(self):
         """Start listening on two ports."""
-        self.logger.info('- - - - - SERVER STARTING')
+        logger.info('- - - - - SERVER STARTING')
         yield OrderedMultiService.startService(self)
         yield defer.maybeDeferred(self.start_rpc_dal)
         self.factory.content.rpc_dal = self.rpc_dal
@@ -2743,12 +2615,12 @@ class StorageServerService(OrderedMultiService):
         if self.heartbeat_interval > 0:
             self.heartbeat_writer = stdio.StandardIO(
                 supervisor_utils.HeartbeatWriter(self.heartbeat_interval,
-                                                 self.logger))
+                                                 logger))
 
     @inlineCallbacks
     def stopService(self):
         """Stop listening on both ports."""
-        self.logger.info('- - - - - SERVER STOPPING')
+        logger.info('- - - - - SERVER STOPPING')
         yield OrderedMultiService.stopService(self)
         yield self.factory.wait_for_shutdown()
         self.metrics.meter('server_stop')
@@ -2757,26 +2629,12 @@ class StorageServerService(OrderedMultiService):
         if self.heartbeat_writer:
             self.heartbeat_writer.loseConnection()
             self.heartbeat_writer = None
-        self.logger.info('- - - - - SERVER STOPPED')
+        logger.info('- - - - - SERVER STOPPED')
 
 
 def create_service(status_port=None,
-                   auth_provider_class=auth.DummyAuthProvider,
-                   oops_config=None):
+                   auth_provider_class=auth.DummyAuthProvider):
     """Start the StorageServer service."""
-
-    # configure logs
-    logger = logging.getLogger(settings.api_server.LOGGER_NAME)
-    handler = configure_logger(logger=logger, propagate=False,
-                               filename=settings.api_server.LOG_FILENAME,
-                               start_observer=True)
-
-    # set up the hacker's logger always in TRACE
-    h_logger = logging.getLogger(settings.api_server.LOGGER_NAME + '.hackers')
-    h_logger.setLevel(settings.TRACE)
-    h_logger.propagate = False
-    h_logger.addHandler(handler)
-
     # turn on heapy if must to
     if os.getenv('USE_HEAPY'):
         logger.debug('importing heapy')
@@ -2800,6 +2658,5 @@ def create_service(status_port=None,
 
     # create the service
     service = StorageServerService(
-        settings.api_server.TCP_PORT, auth_provider_class,
-        oops_config, status_port)
+        settings.api_server.TCP_PORT, auth_provider_class, status_port)
     return service

@@ -20,6 +20,7 @@
 
 from __future__ import unicode_literals
 
+import logging
 import os
 import sys
 import time
@@ -32,11 +33,13 @@ import metrics
 from magicicada.settings import TRACE
 
 
+logger = logging.getLogger(__name__)
+
+
 class ReactorInspector(threading.Thread):
     """Log message with a time delta from the last call."""
 
-    def __init__(self, logger, reactor_call, loop_time=3):
-        self.logger = logger
+    def __init__(self, reactor_call, loop_time=3):
         self.running = False
         self.stopped = False
         self.queue = Queue.Queue()
@@ -58,7 +61,7 @@ class ReactorInspector(threading.Thread):
     def stop(self):
         """Stop the thread."""
         self.stopped = True
-        self.logger.info("ReactorInspector: stopped")
+        logger.info("ReactorInspector: stopped")
 
     def dump_frames(self):
         """Dump frames info to log file."""
@@ -74,12 +77,12 @@ class ReactorInspector(threading.Thread):
                 title = "Dumping Python frame for reactor main thread"
             else:
                 title = "Dumping Python frame"
-            self.logger.debug("%s %s (pid: %d):\n%s",
-                              title, frame_id, os.getpid(), stack)
+            logger.debug(
+                "%s %s (pid: %d):\n%s", title, frame_id, os.getpid(), stack)
 
     def run(self):
         """Start running the thread."""
-        self.logger.info("ReactorInspector: started")
+        logger.info("ReactorInspector: started")
         msg_id = 0
         oldest_pending_request_ts = time.time()
         while not self.stopped:
@@ -94,18 +97,18 @@ class ReactorInspector(threading.Thread):
                 # Oldest pending request is still out there
                 delay = time.time() - oldest_pending_request_ts
                 self.metrics.gauge("delay", delay)
-                self.logger.critical("ReactorInspector: detected unresponsive!"
-                                     " (current: %d, pid: %d) delay: %.3f",
-                                     msg_id, os.getpid(), delay)
+                logger.critical(
+                    "ReactorInspector: detected unresponsive! (current: %d, "
+                    "pid: %d) delay: %.3f", msg_id, os.getpid(), delay)
                 self.dump_frames()
             else:
                 delay = tsent - tini
                 self.metrics.gauge("delay", delay)
                 if msg_id > id_sent:
-                    self.logger.warning("ReactorInspector: late (current: %d, "
-                                        "got: %d, pid: %d, cleaning queue) "
-                                        "delay: %.3f", msg_id, id_sent,
-                                        os.getpid(), delay)
+                    logger.warning(
+                        "ReactorInspector: late (current: %d, got: %d, pid: "
+                        "%d, cleaning queue) delay: %.3f",
+                        msg_id, id_sent, os.getpid(), delay)
                     while not self.queue.empty():
                         self.queue.get_nowait()
                     # About to start a new request with nothing pending
@@ -115,8 +118,9 @@ class ReactorInspector(threading.Thread):
                     # About to start a new request with nothing pending
                     self.last_responsive_ts = time.time()
                     oldest_pending_request_ts = self.last_responsive_ts
-                    self.logger.log(TRACE, "ReactorInspector: ok (msg: %d, "
-                                    "pid: %d) delay: %.3f",
-                                    msg_id, os.getpid(), delay)
+                    logger.log(
+                        TRACE,
+                        "ReactorInspector: ok (msg: %d, pid: %d) delay: %.3f",
+                        msg_id, os.getpid(), delay)
             finally:
                 msg_id += 1

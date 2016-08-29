@@ -29,14 +29,6 @@ except ImportError:
 meter = get_meter('service')
 
 
-def oops_saved(report=None, context=None):
-    """A service has OOPSed."""
-    meter.meter('oops_saved')
-    if report and 'id' in report:
-        return [report['id']]
-    return []
-
-
 def revno():
     """Trigger a service revision number update."""
     meter.gauge('revno', version_info['revno'])

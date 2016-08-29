@@ -136,7 +136,7 @@ AUTH_USER_MODEL = 'filesync.StorageUser'
 
 # define the TRACE level
 TRACE = 5
-logging.addLevelName(TRACE, "TRACE")
+logging.addLevelName(TRACE, 'TRACE')
 
 # Custom settings
 
@@ -145,9 +145,55 @@ ENVIRONMENT_NAME = 'development'
 INSTANCE_ID = 1
 LOG_FOLDER = os.path.join(BASE_DIR, 'tmp')
 LOG_FORMAT = '%(asctime)s %(levelname)-8s %(name)s[%(process)d]: %(message)s'
-LOG_LEVEL = 5
-LOG_TO_SYSLOG = False
-OOPS_PATH = os.path.join(BASE_DIR, 'tmp', 'oops')
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'simple': {
+            'format': LOG_FORMAT,
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+        'file': {
+            'level': 'DEBUG',
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(LOG_FOLDER, 'magicicada.log'),
+            'formatter': 'simple',
+        },
+        'server': {
+            'level': 'TRACE',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': os.path.join(LOG_FOLDER, 'filesync-server.log'),
+            'formatter': 'simple',
+        },
+        'metrics': {
+            'level': 'TRACE',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': os.path.join(LOG_FOLDER, 'metrics.log'),
+            'formatter': 'simple',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['file'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        'magicicada.server': {
+            'handlers': ['server'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'magicicada.metrics': {
+            'handlers': ['metrics'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+    },
+}
 PUBLIC_URL_PREFIX = 'http://some_url'
 ROOT_USERVOLUME_NAME = 'Magicicada'
 ROOT_USERVOLUME_PATH = '~/' + ROOT_USERVOLUME_NAME

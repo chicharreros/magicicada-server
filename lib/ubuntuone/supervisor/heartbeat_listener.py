@@ -35,8 +35,6 @@ import xmlrpclib
 from supervisor import childutils, states
 from supervisor.events import EventTypes, getEventNameByType
 
-from magicicada.server.logger import configure_logger
-
 
 PROCESS_COMMUNICATION_STDOUT = \
     getEventNameByType(EventTypes.PROCESS_COMMUNICATION_STDOUT)
@@ -236,17 +234,6 @@ if __name__ == '__main__':
     if not options.groups or not options.interval or not options.timeout:
         parser.print_help()
         sys.exit(2)
-
-    # configure the logger
-    try:
-        level = logging._levelNames[options.log_level]
-    except KeyError:
-        # if level doesn't exist fallback to DEBUG
-        level = logging.DEBUG
-
-    root_logger = logging.getLogger()
-    configure_logger(logger=root_logger, filename=options.log_file,
-                     level=level, log_format=options.log_format)
 
     rpc = childutils.getRPCInterface(os.environ)
     hbl = HeartbeatListener(options.timeout, options.interval, options.groups,

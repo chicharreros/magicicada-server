@@ -24,10 +24,10 @@ import unittest
 
 import metrics
 
-from ubuntuone.devtools.handlers import MementoHandler
+from magicicada.testing.testcase import BaseTestCase
 
 
-class FileBasedMeterTestCase(unittest.TestCase):
+class FileBasedMeterTestCase(BaseTestCase):
     """Test the file based meter."""
 
     def setUp(self):
@@ -35,74 +35,56 @@ class FileBasedMeterTestCase(unittest.TestCase):
         self.meter = metrics.FileBasedMeter("test_namespace")
 
         # configure the memento handler to do the testings
-        self.handler = MementoHandler()
-        self.handler.level = logging.INFO
-        self.handler.debug = True
-        self.meter._logger.addHandler(self.handler)
-        self.addCleanup(self.meter._logger.removeHandler, self.handler)
+        self.handler = self.add_memento_handler(
+            metrics.logger, level=logging.INFO)
 
     def test_gauge(self):
         self.meter.gauge("name", "value")
-        self.assertTrue(self.handler.check_info(
-            "test_namespace.name", "gauge=value"))
+        self.handler.assert_info("test_namespace.name", "gauge=value")
 
     def test_increment_first(self):
         self.meter.increment("name")
-        self.assertTrue(self.handler.check_info(
-            "test_namespace.name", "counter=1"))
+        self.handler.assert_info("test_namespace.name", "counter=1")
 
     def test_increment_several(self):
         self.meter.increment("name")
-        self.assertTrue(self.handler.check_info(
-            "test_namespace.name", "counter=1"))
+        self.handler.assert_info("test_namespace.name", "counter=1")
         self.meter.increment("name")
-        self.assertTrue(self.handler.check_info(
-            "test_namespace.name", "counter=2"))
+        self.handler.assert_info("test_namespace.name", "counter=2")
         self.meter.increment("name", 5)
-        self.assertTrue(self.handler.check_info(
-            "test_namespace.name", "counter=7"))
+        self.handler.assert_info("test_namespace.name", "counter=7")
 
     def test_decrement_first(self):
         self.meter.decrement("name")
-        self.assertTrue(self.handler.check_info(
-            "test_namespace.name", "counter=-1"))
+        self.handler.assert_info("test_namespace.name", "counter=-1")
 
     def test_decrement_several(self):
         self.meter.decrement("name")
-        self.assertTrue(self.handler.check_info(
-            "test_namespace.name", "counter=-1"))
+        self.handler.assert_info("test_namespace.name", "counter=-1")
         self.meter.decrement("name")
-        self.assertTrue(self.handler.check_info(
-            "test_namespace.name", "counter=-2"))
+        self.handler.assert_info("test_namespace.name", "counter=-2")
         self.meter.decrement("name", 5)
-        self.assertTrue(self.handler.check_info(
-            "test_namespace.name", "counter=-7"))
+        self.handler.assert_info("test_namespace.name", "counter=-7")
 
     def test_increment_decrement_mixed(self):
         self.meter.increment("name")
-        self.assertTrue(self.handler.check_info(
-            "test_namespace.name", "counter=1"))
+        self.handler.assert_info("test_namespace.name", "counter=1")
         self.meter.decrement("name", 3)
-        self.assertTrue(self.handler.check_info(
-            "test_namespace.name", "counter=-2"))
+        self.handler.assert_info("test_namespace.name", "counter=-2")
         self.meter.increment("name")
-        self.assertTrue(self.handler.check_info(
-            "test_namespace.name", "counter=-1"))
+        self.handler.assert_info("test_namespace.name", "counter=-1")
 
     def test_timing(self):
         self.meter.timing("name", 0.55)
-        self.assertTrue(self.handler.check_info(
-            "test_namespace.name", "timing=0.55"))
+        self.handler.assert_info("test_namespace.name", "timing=0.55")
 
     def test_meter(self):
         self.meter.meter("name", 123)
-        self.assertTrue(self.handler.check_info(
-            "test_namespace.name", "meter=123"))
+        self.handler.assert_info("test_namespace.name", "meter=123")
 
     def test_report(self):
         self.meter.report("name", "whatever")
-        self.assertTrue(self.handler.check_info(
-            "test_namespace.name", "report=whatever"))
+        self.handler.assert_info("test_namespace.name", "report=whatever")
 
 
 class GetMeterTestCase(unittest.TestCase):

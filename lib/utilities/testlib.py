@@ -149,12 +149,12 @@ def load_unittest(relpath, loader=None):
 
 class MagicicadaRunner(DiscoverRunner):
 
-    def __init__(self, factory, filter_test):
+    def __init__(self, factory, filter_test, verbosity=1):
         self.factory = factory
         self.loader = RegexTestLoader(filter_test)
         self.server_suite = TestSuite()
         self.non_server_suite = TestSuite()
-        super(MagicicadaRunner, self).__init__()
+        super(MagicicadaRunner, self).__init__(verbosity=verbosity)
 
     def add_tests_for_dir(self, testdir, testpaths, topdir):
         """Helper for build_suite; searches a particular testdir for tests.
@@ -256,6 +256,7 @@ def test_with_trial(options, topdir, testdirs, testpaths):
                 result = False
         return result
 
-    runner = MagicicadaRunner(factory, filter_test)
+    runner = MagicicadaRunner(
+        factory, filter_test, verbosity=options.verbosity)
     result = runner.run_tests(test_labels=(topdir, testdirs, testpaths))
     return not result.wasSuccessful()

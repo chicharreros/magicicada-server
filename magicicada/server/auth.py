@@ -26,7 +26,7 @@ from magicicada.filesync.errors import DoesNotExist
 from magicicada.rpcdb import backend
 
 
-logger = logging.getLogger("storage.server")
+logger = logging.getLogger(__name__)
 
 
 class AuthenticationProvider(object):

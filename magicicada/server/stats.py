@@ -31,9 +31,7 @@ import metrics
 
 from magicicada.monitoring import dump
 
-
-logger = logging.getLogger("storage.server.stat")
-status_log = logging.getLogger("storage.server.status")
+logger = logging.getLogger(__name__)
 
 
 def report_reactor_stats(prefix="reactor"):
@@ -65,8 +63,6 @@ class GCResource(resource.Resource):
 class StatsWorker(object):
     """Execute actions and log the results at the specified interval."""
 
-    logger = logger
-
     def __init__(self, service, interval, servername=None):
         self.service = service
         if servername is None:
@@ -84,7 +80,7 @@ class StatsWorker(object):
 
     def log(self, msg, *args, **kwargs):
         """Wrap logger.info call to simplify testing."""
-        self.logger.info(msg, *args, **kwargs)
+        logger.info(msg, *args, **kwargs)
 
     def start(self):
         """Start rolling."""
@@ -139,8 +135,8 @@ class _Status(resource.Resource):
 
         def on_error(failure):
             """Error callback"""
-            status_log.error("Error while getting status. %s",
-                             failure.getTraceback())
+            logger.error(
+                "Error while getting status. %s", failure.getTraceback())
             request.setResponseCode(500)
             request.write(failure.getErrorMessage() + "\n")
             request.finish()

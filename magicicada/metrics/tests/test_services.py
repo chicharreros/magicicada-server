@@ -24,38 +24,11 @@ from mock import patch
 from testtools import TestCase
 
 from metrics import get_meter
-from metrics.services import oops_saved, revno, version_info
+from metrics.services import revno, version_info
 
 
 class ServicesTest(TestCase):
     """Tests for metric services."""
-
-    def test_meters_oops_passing_a_report(self):
-        """The service is able to meter an oops passing a report."""
-        service_meter = get_meter('service')
-        with patch.object(service_meter, 'meter') as meter:
-            oops_saved(report=dict())
-            meter.assert_called_with('oops_saved')
-
-    def test_meters_oops_passing_a_context(self):
-        """The service is able to meter an oops passing a context."""
-        service_meter = get_meter('service')
-        with patch.object(service_meter, 'meter') as meter:
-            oops_saved(context='some oops context')
-            meter.assert_called_with('oops_saved')
-
-    def test_oops_saved_with_no_report(self):
-        """oops_saved returns an empty list with no report."""
-        self.assertEqual([], oops_saved())
-
-    def test_oops_saved_with_report_with_no_id(self):
-        """oops_saved returns an empty list with no id in the report."""
-        self.assertEqual([], oops_saved(report=dict()))
-
-    def test_oops_saved_with_report_with_id(self):
-        """oops_saved returns a non-empty list with an id in the report."""
-        the_id = 'an id'
-        self.assertEqual([the_id], oops_saved(report=dict(id=the_id)))
 
     def test_meters_revno_with_gauge_meter(self):
         """The service is able to meter a revision by gauge meter."""
