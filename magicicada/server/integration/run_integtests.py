@@ -53,11 +53,14 @@ LIB_DIR = os.path.abspath("lib")
 DEP_STARTOAUTH = """
 make start-oauth
 """
+CLIENT_DIR = os.path.abspath(os.path.join('.sourcecode', 'magicicada-client'))
+PROTOCOL_DIR = os.path.abspath(
+    os.path.join('.sourcecode', 'magicicada-protocol'))
 DEP_BUILDCLIENT = """
-cd sourcecode/ubuntuone-client/
-./autogen.sh --with-protocol=../ubuntuone-storage-protocol/
+cd %s
+./autogen.sh --with-protocol=%s
 make
-"""
+""" % (CLIENT_DIR, PROTOCOL_DIR)
 
 
 ROOT = utils.get_rootdir()
@@ -101,8 +104,7 @@ def deps_missing():
         print "Not ready! Hint: did you do...?:\n" + DEP_STARTOAUTH
         return True
 
-    log_conf = os.path.join(ROOT, "sourcecode",
-                            "ubuntuone-client", "data", "logging.conf")
+    log_conf = os.path.join(CLIENT_DIR, "data", "logging.conf")
     if not os.path.exists(log_conf):
         print "Not ready! Hint: did you do...?:\n" + DEP_BUILDCLIENT
         return True
@@ -128,10 +130,11 @@ def create_syncdaemon(username, procnum, homedir, pidfile):
         f.write('\n')
 
     debug(prefix, "Launching SD with dbus", dbus_address)
-    dev_launcher.launch("sourcecode/ubuntuone-client/bin/ubuntuone-syncdaemon",
-                        username, params=("--send_events_over_dbus",
-                                          "--udf_autosubscribe=true"),
-                        environ=env, homedir=homedir, verbose=True)
+    dev_launcher.launch(
+        os.path.join(CLIENT_DIR, 'bin', 'ubuntuone-syncdaemon'),
+        username,
+        params=("--send_events_over_dbus", "--udf_autosubscribe=true"),
+        environ=env, homedir=homedir, verbose=True)
 
 
 class SyncDaemonToolProxy(object):

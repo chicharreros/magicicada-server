@@ -57,7 +57,8 @@ from magicicada.server.testing.testcase import BaseProtocolTestCase
 from magicicada.testing.testcase import BaseTestCase
 
 ROOT_DIR = os.getcwd()
-SD_CONFIG_DIR = ROOT_DIR + "/.sourcecode/ubuntuone-client/data"
+SD_CONFIG_DIR = os.path.join(
+    ROOT_DIR, '.sourcecode', 'magicicada-client', 'data')
 SD_CONFIGS = [os.path.join(SD_CONFIG_DIR, 'syncdaemon.conf'),
               os.path.join(SD_CONFIG_DIR, 'syncdaemon-dev.conf')]
 
@@ -258,7 +259,7 @@ class WaitingHelpingHandler(object):
 
 
 # The following class is a duplicated from
-# ubuntuone-client/tests/platform/linux/test_dbus.py
+# lib/ubuntuone/platform/tests/ipc/test_linux.py
 # will be removed when bug #917285 is resolved
 class FakeNetworkManager(dbus.service.Object):
     """A fake NetworkManager that only emits StatusChanged signal."""

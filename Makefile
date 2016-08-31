@@ -44,7 +44,7 @@ SOURCEDEPS_DIR ?= ../sourcedeps
 SOURCEDEPS_SOURCECODE_DIR = $(SOURCEDEPS_DIR)/sourcecode
 TARGET_SOURCECODE_DIR = $(CURDIR)/.sourcecode
 
-BUILD_DEPLOY_SOURCEDEPS=storm zope.interface ubuntuone-storage-protocol
+BUILD_DEPLOY_SOURCEDEPS=magicicada-protocol
 
 TESTFLAGS=
 
@@ -72,10 +72,8 @@ build: link-sourcedeps build-sourcedeps version
 
 link-sourcedeps:
 	@echo "Checking out external source dependencies..."
-	build/link-external-sourcecode \
-		-p $(SOURCEDEPS_SOURCECODE_DIR)/ \
-		-t $(TARGET_SOURCECODE_DIR) \
-		-c build/config-manager.txt
+	dev-scripts/link-external-sourcecode -p $(SOURCEDEPS_SOURCECODE_DIR)/ \
+		-t $(TARGET_SOURCECODE_DIR) -c config-manager.txt
 
 # no need to link sourcedeps before building them, as rollout process
 # handles config-manager.txt automatically
@@ -83,7 +81,7 @@ build-for-deployment: build-deploy-sourcedeps version
 
 build-sourcedeps: build-deploy-sourcedeps
 	@echo "Building client clientdefs.py"
-	@cd .sourcecode/ubuntuone-client/ubuntuone/ && sed \
+	@cd .sourcecode/magicicada-client/ubuntuone/ && sed \
 		-e 's|\@localedir\@|/usr/local/share/locale|g' \
 		-e 's|\@libexecdir\@|/usr/local/libexec|g' \
 		-e 's|\@GETTEXT_PACKAGE\@|ubuntuone-client|g' \
