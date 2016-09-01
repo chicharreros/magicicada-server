@@ -36,9 +36,8 @@ Then generate a self-signed certificate. Note that at some point it will
 ask you to write the "Common Name (e.g. server FQDN or YOUR name)", I found
 that what you put there needs to match the '--host' parameter you pass to the
 client (see below, in the part where the client is started), so this host name
-must be such the client machine can ping it.
+must be such the client machine can ping it::
 
-::
     openssl req -new -x509 -key privkey.pem -out cacert.pem -days 1095
 
 The just generated 'privkey.pem' and 'cacert.pem' will be used below.
@@ -52,8 +51,10 @@ Server setup
 Start with a clean Ubuntu Xenial environment (e.g., in a VPS, or using
 an LXC). As example, if you want to create a Xenial LXC, you can use::
 
-    sudo lxc-create -t ubuntu -n magicicada-xenial -- -r xenial \
-        -a amd64 -b $USER
+    sudo lxc-create -t ubuntu -n magicicada-xenial -- -r xenial -a amd64 -b $USER
+
+Dependencies
+^^^^^^^^^^^^
 
 Then you need to start the LXC instance and ssh into it::
 
@@ -78,7 +79,50 @@ Ensure the files 'privkey.pem' and 'cacert.pem' produced in the "Before server
 or client" section are copied into the ~/magicicada/magicicada-server/certs
 folder.
 
-Start the server::
+Using a system-level database
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Assuming you created a Postgresql 9.5 database named "filesync" with a
+"magicicada" user as owner::
+
+    sudo su - postgres
+    createuser magicicada -P
+    createdb filesync -O magicicada
+
+Edit or create the file magicicada/settings/local.py so it looks like this::
+
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql_psycopg2',
+            'NAME': 'filesync',
+            'HOST': 'localhost',
+            'USER': 'magicicada',
+            'PASSWORD': <what you choose in createuser>,
+        },
+    }
+
+Then, to confirm you have configured your database correctly, run::
+
+    make manage ARGS=dbshell
+
+and you should obtain a prompt in the PG database. Now, create the database
+schema::
+
+    make manage ARGS=migrate
+
+Using a temporary (in memory) database
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+If you don't want to use a system level database, ensure you have no custom
+definition for the DATABASES setting in magicicada/settings/local.py, and just
+run::
+
+    make start-db
+
+Run the filesync server
+^^^^^^^^^^^^^^^^^^^^^^^
+
+Start the server via command line this way::
 
     cd ~/magicicada/magicicada-server
     make start-oauth

@@ -10,4 +10,5 @@ before_install:
 
 script:
     - make clean-sourcedeps
+    - make start-db
     - make test SOURCEDEPS_DIR=sourcedeps

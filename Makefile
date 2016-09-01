@@ -136,9 +136,9 @@ start-oauth-heapy:
 	USE_HEAPY=1 $(MAKE) start-oauth
 
 start-base:
-	$(MAKE) start-db && $(MAKE) start-supervisor && $(MAKE) start-dbus || ( $(MAKE) stop ; exit 1 )
+	$(MAKE) start-supervisor && $(MAKE) start-dbus || ( $(MAKE) stop ; exit 1 )
 
-stop: stop-filesync-dummy-group stop-supervisor stop-db stop-dbus
+stop: stop-filesync-dummy-group stop-supervisor stop-dbus
 
 start-dbus:
 	dev-scripts/start-dbus.sh
