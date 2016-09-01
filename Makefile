@@ -111,7 +111,7 @@ bootstrap:
 raw-test:
 	./test $(TESTFLAGS)
 
-test: lint sourcedeps clean version start-base start-dbus raw-test stop
+test: lint sourcedeps clean version start-db start-base start-dbus raw-test stop
 
 ci-test:
 	$(MAKE) test TESTFLAGS="-1 $(TESTFLAGS)"
