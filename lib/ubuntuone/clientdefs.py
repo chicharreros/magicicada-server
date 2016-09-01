@@ -1,1 +1,1 @@
-../../.sourcecode/ubuntuone-client/ubuntuone/clientdefs.py
+../../.sourcecode/magicicada-client/ubuntuone/clientdefs.py

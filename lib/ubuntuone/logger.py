@@ -1,1 +1,1 @@
-../../.sourcecode/ubuntuone-client/ubuntuone/logger.py
+../../.sourcecode/magicicada-client/ubuntuone/logger.py
