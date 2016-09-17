@@ -39,7 +39,6 @@ COVERAGE_DIR = "./tmp/coverage"
 WORKING_DIR = "./tmp/trial"
 
 django.setup()
-logging.setLoggerClass(logging.Logger)
 
 
 class StopOnFailureDecorator(TestResultDecorator):

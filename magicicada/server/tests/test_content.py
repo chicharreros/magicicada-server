@@ -2515,13 +2515,15 @@ class TestUploadJob(TestWithDatabase):
         self.assertFailure(upload_job.deferred, server.errors.UploadCorrupt)
         yield upload_job.cancel()
 
+    @defer.inlineCallbacks
     def test_upload_id(self):
         """Test the upload_id generation."""
         size = self.half_size
         deflated_data, _, upload_job = yield self.make_upload(size)
-        # regular upload job always has '' as the upload_id
-        self.assertEqual(upload_job.upload_id, '')
+        self.assertEqual(upload_job.upload_id,
+                         upload_job.uploadjob.multipart_key)
 
+    @defer.inlineCallbacks
     def test_stop_sets_canceling(self):
         """Set canceling on stop."""
         size = self.half_size

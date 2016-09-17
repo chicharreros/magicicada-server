@@ -53,6 +53,7 @@ an LXC). As example, if you want to create a Xenial LXC, you can use::
 
     sudo lxc-create -t ubuntu -n magicicada-xenial -- -r xenial -a amd64 -b $USER
 
+
 Dependencies
 ^^^^^^^^^^^^
 
@@ -74,10 +75,17 @@ Install tools and dependencies (you will be prompted for your password for sudo
 access)::
 
     make bootstrap
+    make sourcedeps
+
+If you are in Xenial, please also install virtualenv (didn't include it in
+the previous step as it doesn't exist as a separate package in older systems)::
+
+    sudo apt-get install virtualenv
 
 Ensure the files 'privkey.pem' and 'cacert.pem' produced in the "Before server
 or client" section are copied into the ~/magicicada/magicicada-server/certs
 folder.
+
 
 Using a system-level database
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -110,6 +118,7 @@ schema::
 
     make manage ARGS=migrate
 
+
 Using a temporary (in memory) database
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -118,6 +127,7 @@ definition for the DATABASES setting in magicicada/settings/local.py, and just
 run::
 
     make start-db
+
 
 Run the filesync server
 ^^^^^^^^^^^^^^^^^^^^^^^

@@ -138,6 +138,18 @@ AUTH_USER_MODEL = 'filesync.StorageUser'
 TRACE = 5
 logging.addLevelName(TRACE, 'TRACE')
 
+
+class MagicicadaLogger(logging.Logger):
+    """Logger that support our custom levels."""
+
+    def trace(self, msg, *args, **kwargs):
+        """log at TRACE level"""
+        if self.isEnabledFor(TRACE):
+            self._log(TRACE, msg, args, **kwargs)
+
+logging.setLoggerClass(MagicicadaLogger)
+
+
 # Custom settings
 
 APP_NAME = 'filesync'

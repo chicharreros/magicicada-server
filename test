@@ -31,9 +31,13 @@ TESTDIRS = [
 for td in TESTDIRS:
     sys.path.insert(0, os.path.abspath(td))
 
+# import unittest first, to break an import loop in the twisted.trial 
+# package: reporter -> unittest -> _asyncrunner -> reporter
+from twisted.trial import unittest
+
 
 def setup_environment(django_settings):
-    """Setup the envrionment for running tests."""
+    """Setup the environment for running tests."""
     ROOTDIR = os.path.abspath(os.path.curdir)
     os.environ.setdefault('MAGICICADA_DEBUG', '1')
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', django_settings)

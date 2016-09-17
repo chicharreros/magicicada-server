@@ -40,7 +40,7 @@ def disable_ssl_compression(logger):
             openssl.SSL_COMP_get_compression_methods
         except AttributeError:
             # fallback to the first version we found of libssl.so.<version>
-            ssllib = sorted(glob.glob("/usr/lib/libssl.so.*"))[0]
+            ssllib = sorted(glob.glob("/lib/x86_64-linux-gnu/libssl.so.*"))[0]
             openssl = ctypes.CDLL(ssllib, ctypes.RTLD_GLOBAL)
 
         openssl.SSL_COMP_get_compression_methods.restype = ctypes.c_void_p
