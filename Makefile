@@ -128,9 +128,9 @@ lint:
 version:
 	bzr version-info --format=python > lib/versioninfo.py || true
 
-start: build start-base start-filesync-dummy-group load-sample-data publish-api-port
+start: build start-base start-filesync-dummy-group publish-api-port
 
-start-oauth: build start-base start-filesync-oauth-group load-sample-data publish-api-port
+start-oauth: build start-base start-filesync-oauth-group publish-api-port
 
 start-oauth-heapy:
 	USE_HEAPY=1 $(MAKE) start-oauth
@@ -170,9 +170,6 @@ publish-api-port:
 	python -c 'from magicicada import settings; print >> file("tmp/filesyncserver.port.ssl", "w"), settings.ssl_proxy.PORT'
 	python -c 'from magicicada import settings; print >> file("tmp/filesyncserver-status.port", "w"), settings.api_server.STATUS_PORT'
 
-load-sample-data:
-	DJANGO_SETTINGS_MODULE=$(DJANGO_SETTINGS_MODULE) $(PYTHON) dev-scripts/load_sample_data.py
-
 shell:
 	$(DJANGO_MANAGE) shell
 
@@ -183,8 +180,6 @@ admin:
 	$(DJANGO_ADMIN) $(ARGS)
 
 .PHONY: sourcedeps link-sourcedeps build-sourcedeps build-deploy-sourcedeps \
-	build clean version lint test ci-test \
-	build-for-deployment clean-sourcedeps tarball \
-	start stop load-sample-data publish-api-port \
-	start-supervisor stop-supervisor \
-	start-dbus stop-dbus start-oauth start-oauth-heapy
+	build clean version lint test ci-test build-for-deployment \
+	clean-sourcedeps tarball start stop publish-api-port start-supervisor \
+	stop-supervisor start-dbus stop-dbus start-oauth start-oauth-heapy

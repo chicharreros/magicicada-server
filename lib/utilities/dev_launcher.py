@@ -40,16 +40,7 @@ def launch(progname, username, params=None, environ=None, verbose=False,
 
     """
 
-    if auth_data is None:
-        # import the function here, as it needs the DB up... so, if we
-        # already have auth_data, don't need the DB ;)
-        from utilities.userutils import get_auth_info_from_keyfile
-
-        data = get_auth_info_from_keyfile(username)
-        if not data:
-            raise ValueError()
-        # build the auth_data with the file info
-        auth_data = data['username'] + ":" + data['password']
+    assert auth_data is not None
 
     if host is None:
         host = "localhost"
