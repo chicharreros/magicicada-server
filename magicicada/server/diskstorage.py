@@ -98,6 +98,10 @@ class FileWriterConsumer(object):
         self.temppath = temppath = filepath + ".temp"
 
         if offset:
+            filesize = os.stat(temppath).st_size
+            if filesize != offset:
+                m = "Trying to resume a file with size={} using offset={}"
+                raise ValueError(m.format(filesize, offset))
             fh = open(temppath, 'ab')
             fh.seek(offset)
         else:
@@ -114,6 +118,7 @@ class FileWriterConsumer(object):
 
     def write(self, data):
         self.fh.write(data)
+        self.fh.flush()
 
     def commit(self):
         """Commit the file."""

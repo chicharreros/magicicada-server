@@ -87,8 +87,19 @@ or client" section are copied into the ~/magicicada/magicicada-server/certs
 folder.
 
 
-Using a system-level database
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Using a temporary setup
+^^^^^^^^^^^^^^^^^^^^^^^
+
+Just run::
+
+    make start-db
+
+...and the server will use a in-memory database, and will store any transferred
+files in the ``./tmp`` temporary directory.
+
+
+Using a system-level setup
+^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Assuming you created a Postgresql 9.5 database named "filesync" with a
 "magicicada" user as owner::
@@ -97,7 +108,9 @@ Assuming you created a Postgresql 9.5 database named "filesync" with a
     createuser magicicada -P
     createdb filesync -O magicicada
 
-Edit or create the file magicicada/settings/local.py so it looks like this::
+Edit or create the file ``magicicada/settings/local.py`` so it makes to use
+the external DB and store the files in an external directory (change at
+will)::
 
     DATABASES = {
         'default': {
@@ -108,6 +121,7 @@ Edit or create the file magicicada/settings/local.py so it looks like this::
             'PASSWORD': <what you choose in createuser>,
         },
     }
+    STORAGE_BASEDIR = '/var/lib/magicicada/filestorage'
 
 Then, to confirm you have configured your database correctly, run::
 
@@ -117,16 +131,6 @@ and you should obtain a prompt in the PG database. Now, create the database
 schema::
 
     make manage ARGS=migrate
-
-
-Using a temporary (in memory) database
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-If you don't want to use a system level database, ensure you have no custom
-definition for the DATABASES setting in magicicada/settings/local.py, and just
-run::
-
-    make start-db
 
 
 Run the filesync server

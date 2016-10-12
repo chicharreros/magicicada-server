@@ -120,6 +120,39 @@ class BaseTestCase(TwistedTestCase):
             written = fh.read()
         self.assertEqual(written, data1 + data2)
 
+    def test_put_node_resumed_on_weird_file(self):
+        # write some
+        node_id = "dinw78cdync8"
+        ds = DiskStorage(self.tmpdir)
+        data1 = b'test content to write part 1'
+        consumer = ds.put(node_id)
+        consumer.write(data1)
+        consumer.unregisterProducer()
+
+        # modify the file
+        path = ds._get_treepath(node_id)
+        temppath = os.path.join(path, node_id) + ".temp"
+        with open(temppath, 'ab') as fh:
+            fh.write(b"garbage")
+
+        # try to write more
+        self.assertRaises(ValueError, ds.put, node_id, len(data1))
+
+    def test_put_node_flushing(self):
+        # write some
+        node_id = "dinw78cdync8"
+        ds = DiskStorage(self.tmpdir)
+        data = b'test content to write part 1'
+        consumer = ds.put(node_id)
+        consumer.write(data)
+
+        # even if not finished, disk should have written content
+        path = ds._get_treepath(node_id)
+        temppath = os.path.join(path, node_id) + ".temp"
+        with open(temppath, 'rb') as fh:
+            written = fh.read()
+        self.assertEqual(written, data)
+
     def test_put_node_rename_on_commit(self):
         # write it
         node_id = "dinw78cdync8"

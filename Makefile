@@ -132,6 +132,8 @@ start: build start-base start-filesync-dummy-group publish-api-port
 
 start-oauth: build start-base start-filesync-oauth-group publish-api-port
 
+resume: start-base start-filesync-oauth-group
+
 start-oauth-heapy:
 	USE_HEAPY=1 $(MAKE) start-oauth
 
