@@ -95,6 +95,7 @@ class Node(object):
         self.is_live = node['is_live']
         self.generation = node['generation']
         self.is_public = node['is_public']
+        self.public_url = node['public_url']
         last_modif = node['last_modified']
 
         # special cases for no content
@@ -772,6 +773,27 @@ class User(object):
                                     session_id=session_id)
         defer.returnValue((r['generation'], r['kind'],
                            r['name'], r['mimetype']))
+
+    @defer.inlineCallbacks
+    def list_public_files(self):
+        """List the public files for an user."""
+        r = yield self.rpc_dal.call('list_public_files', user_id=self.id)
+        nodes = [Node(self.manager, n) for n in r['public_files']]
+        defer.returnValue(nodes)
+
+    @defer.inlineCallbacks
+    def change_public_access(self, volume_id, node_id,
+                             is_public, session_id=None):
+        """Change public access of a node.
+
+        @param volume_id: the id of the volume of the node.
+        @param node_id: the id of the node.
+        @param is_public: if the node should be public or not.
+        """
+        r = yield self.rpc_dal.call('change_public_access', user_id=self.id,
+                                    volume_id=volume_id, node_id=node_id,
+                                    is_public=is_public, session_id=session_id)
+        defer.returnValue(r['public_url'])
 
     @defer.inlineCallbacks
     def get_upload_job(self, vol_id, node_id, previous_hash, hash_value, crc32,

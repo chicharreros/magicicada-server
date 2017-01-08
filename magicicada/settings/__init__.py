@@ -147,6 +147,7 @@ class MagicicadaLogger(logging.Logger):
         if self.isEnabledFor(TRACE):
             self._log(TRACE, msg, args, **kwargs)
 
+
 logging.setLoggerClass(MagicicadaLogger)
 
 

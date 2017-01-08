@@ -48,6 +48,7 @@ from magicicada.server.server import (
     Action,
     AuthenticateResponse,
     BytesMessageProducer,
+    ChangePublicAccess,
     CreateShare,
     CreateUDF,
     DeleteShare,
@@ -56,6 +57,7 @@ from magicicada.server.server import (
     GetContentResponse,
     GetDeltaResponse,
     ListShares,
+    ListPublicFiles,
     ListVolumes,
     LoopingPing,
     MakeResponse,
@@ -99,6 +101,8 @@ class FakeNode(object):
     last_modified = 2334524
     is_public = False
     path = u"path"
+    volume_id = 'volumeid'
+    public_url = 'public_url'
 
 
 class FakeUser(object):
@@ -1175,6 +1179,35 @@ class ListVolumesTestCase(SimpleRequestResponseTestCase):
             yield self.response._process()
 
         self.assertEqual(self.response.length, 6)
+
+
+class ChangePublicAccessTestCase(SimpleRequestResponseTestCase):
+    """Test the ChangePublicAccess class."""
+
+    response_class = ChangePublicAccess
+
+
+class ListPublicFilesTestCase(SimpleRequestResponseTestCase):
+    """Test the ListPublicFiles class."""
+
+    response_class = ListPublicFiles
+
+    @defer.inlineCallbacks
+    def test_process_set_values(self):
+        """Set length attribute and operation data while processing."""
+        mocker = Mocker()
+
+        user = mocker.mock()
+        self.response.protocol.user = user
+
+        nodes = [FakeNode(), FakeNode()]
+        expect(user.list_public_files()).result(nodes)
+
+        with mocker:
+            yield self.response._process()
+
+        self.assertEqual(self.response.length, 2)
+        self.assertEqual(self.response.operation_data, "public_files=2")
 
 
 class UnlinkTestCase(SimpleRequestResponseTestCase):

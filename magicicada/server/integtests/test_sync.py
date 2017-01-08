@@ -112,7 +112,6 @@ class TestSync(TestWithDatabase):
         self.source_dir = self.mktemp("source/root")
         self.share_source_dir = self.mktemp("source/share")
 
-        self.patch(Main, "start_status_listener", self.no_op)
         self.patch(hash_queue, "HASHQUEUE_DELAY", 0.1)
         self.main = Main(root_dir, shares_dir, data_dir, partials_dir,
                          "localhost", self.ssl_port, dns_srv=None, ssl=True,

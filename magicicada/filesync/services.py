@@ -1090,6 +1090,7 @@ class TimingMetrics(object):
             return result
         return wrapper
 
+
 timing_metric = TimingMetrics()
 
 

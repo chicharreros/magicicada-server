@@ -300,6 +300,7 @@ def test_merge_directories_with_overlap(udf_name, sd1, sd2, sd3, prefix):
         assert actual2 == expected_with_conflict, \
             'directory merge must be correct for SD2'
 
+
 test_merge_directories_with_overlap.skip = """
     The noconflict.txt file gets into conflict! Bug: #711389
 """
@@ -418,6 +419,7 @@ def test_remove_udf(udf_name, sd1, sd2, sd3, prefix):
     udf_content = os.listdir(os.path.join(sd2.homedir, udf_name))
     debug(prefix, 'contents for SD2', udf_content)
     assert udf_content == [], msg
+
 
 test_remove_udf.skip = """
     This test exposes a problem we have now in SD: deleting everything

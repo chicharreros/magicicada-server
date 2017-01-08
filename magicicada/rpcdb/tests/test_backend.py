@@ -1,5 +1,5 @@
 # Copyright 2008-2015 Canonical
-# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
+# Copyright 2015-2016 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -242,6 +242,118 @@ class DALTestCase(BaseTestCase):
         self.assertEqual(udf2['root_id'], 'udf2_root_id')
         self.assertEqual(udf2['path'], 'path2')
         self.assertEqual(udf2['generation'], 8)
+
+    def test_change_public_access(self):
+        """Change the public acces of a node."""
+        mocker = Mocker()
+
+        # node, with a generation attribute
+        node = mocker.mock()
+        expect(node.public_url).result('test public url')
+
+        # user, with the chained calls to the action
+        user = mocker.mock()
+        expect(
+            user.volume('vol_id').node('node_id').change_public_access(True)
+        ).result(node)
+        self.backend._get_user = lambda *a: user
+
+        with mocker:
+            kwargs = dict(user_id='user_id', volume_id='vol_id',
+                          node_id='node_id', is_public=True,
+                          session_id='session_id')
+            result = self.backend.change_public_access(**kwargs)
+
+        self.assertEqual(result, dict(public_url='test public url'))
+
+    def test_list_public_files(self):
+        """List public files."""
+        mocker = Mocker()
+
+        # node 1
+        node1 = mocker.mock()
+        expect(node1.id).result('node_id1')
+        expect(node1.path).result('path1')
+        expect(node1.name).result('name1')
+        expect(node1.vol_id).result('volume_id1')
+        expect(node1.generation).result('generation1')
+        expect(node1.is_public).result(True)
+        expect(node1.parent_id).result('parent_id1')
+        expect(node1.status).result(STATUS_LIVE)
+        expect(node1.content_hash).result('content_hash1')
+        expect(node1.kind).result(StorageObject.FILE)
+        expect(node1.when_last_modified).result('last_modified1')
+        content1 = mocker.mock()
+        expect(content1.size).result('size1')
+        expect(content1.crc32).result('crc321')
+        expect(content1.deflated_size).result('deflated_size1')
+        expect(content1.storage_key).result('storage_key1')
+        expect(node1.content).result(content1)
+        expect(node1.public_url).result('public url 1')
+
+        # node 2
+        node2 = mocker.mock()
+        expect(node2.id).result('node_id2')
+        expect(node2.path).result('path2')
+        expect(node2.name).result('name2')
+        expect(node2.vol_id).result('volume_id2')
+        expect(node2.generation).result('generation2')
+        expect(node2.is_public).result(True)
+        expect(node2.parent_id).result('parent_id2')
+        expect(node2.status).result(STATUS_DEAD)
+        expect(node2.content_hash).result('content_hash2')
+        expect(node2.kind).result(StorageObject.DIRECTORY)
+        expect(node2.when_last_modified).result('last_modified2')
+        content2 = mocker.mock()
+        expect(content2.size).result('size2')
+        expect(content2.crc32).result('crc322')
+        expect(content2.deflated_size).result('deflated_size2')
+        expect(content2.storage_key).result('storage_key2')
+        expect(node2.content).result(content2)
+        expect(node2.public_url).result('public url 2')
+
+        # user
+        user = mocker.mock()
+        self.backend._get_user = lambda *a: user
+        expect(user.get_public_files()).result([node1, node2])
+
+        with mocker:
+            result = self.backend.list_public_files(user_id='user_id',)
+        node1, node2 = result['public_files']
+
+        self.assertEqual(node1['id'], 'node_id1')
+        self.assertEqual(node1['path'], 'path1')
+        self.assertEqual(node1['name'], 'name1')
+        self.assertEqual(node1['volume_id'], 'volume_id1')
+        self.assertEqual(node1['parent_id'], 'parent_id1')
+        self.assertEqual(node1['is_live'], True)
+        self.assertEqual(node1['generation'], 'generation1')
+        self.assertEqual(node1['is_public'], True)
+        self.assertEqual(node1['content_hash'], 'content_hash1')
+        self.assertEqual(node1['is_file'], True)
+        self.assertEqual(node1['size'], 'size1')
+        self.assertEqual(node1['crc32'], 'crc321')
+        self.assertEqual(node1['deflated_size'], 'deflated_size1')
+        self.assertEqual(node1['storage_key'], 'storage_key1')
+        self.assertEqual(node1['last_modified'], 'last_modified1')
+        self.assertEqual(node1['public_url'], 'public url 1')
+
+        self.assertEqual(node2['id'], 'node_id2')
+        self.assertEqual(node2['path'], 'path2')
+        self.assertEqual(node2['name'], 'name2')
+        self.assertEqual(node2['volume_id'], 'volume_id2')
+        self.assertEqual(node2['parent_id'], 'parent_id2')
+        self.assertEqual(node2['is_live'], False)
+        self.assertEqual(node2['generation'], 'generation2')
+        self.assertEqual(node2['is_public'], True)
+        self.assertEqual(node2['content_hash'], 'content_hash2')
+        self.assertEqual(node2['is_file'], False)
+        self.assertEqual(node2['size'], 'size2')
+        self.assertEqual(node2['crc32'], 'crc322')
+        self.assertEqual(node2['deflated_size'], 'deflated_size2')
+        self.assertEqual(node2['storage_key'], 'storage_key2')
+        self.assertEqual(node2['last_modified'], 'last_modified2')
+        self.assertEqual(node2['public_url'], 'public url 2')
 
     def test_move(self):
         """Move."""
@@ -706,6 +818,7 @@ class DALTestCase(BaseTestCase):
         expect(content.deflated_size).result('deflated_size')
         expect(content.storage_key).result('storage_key')
         expect(node.content).count(1).result(content)
+        expect(node.public_url).result(None)
 
         # user
         user = mocker.mock()
@@ -722,7 +835,8 @@ class DALTestCase(BaseTestCase):
                       last_modified='last_modified', crc32='crc32',
                       generation='generation', content_hash='content_hash',
                       deflated_size='deflated_size', storage_key='storage_key',
-                      volume_id='volume_id', path='path', has_content=True)
+                      volume_id='volume_id', path='path', has_content=True,
+                      public_url=None)
         self.assertEqual(result, should)
 
     def test_get_node_no_content(self):
@@ -743,6 +857,7 @@ class DALTestCase(BaseTestCase):
         expect(node.kind).result(StorageObject.FILE)
         expect(node.when_last_modified).result('last_modified')
         expect(node.content).result(None)
+        expect(node.public_url).result(None)
 
         # user
         user = mocker.mock()
@@ -758,7 +873,7 @@ class DALTestCase(BaseTestCase):
                       is_public=False, is_live=True, is_file=True, size=None,
                       last_modified='last_modified', crc32=None,
                       generation='generation', content_hash='content_hash',
-                      deflated_size=None, storage_key=None,
+                      deflated_size=None, storage_key=None, public_url=None,
                       volume_id='volume_id', path="path", has_content=False)
         self.assertEqual(result, should)
 
@@ -780,6 +895,7 @@ class DALTestCase(BaseTestCase):
         expect(node.kind).result(StorageObject.FILE)
         expect(node.when_last_modified).result('last_modified')
         expect(node.content).count(1).result(None)
+        expect(node.public_url).result(None)
 
         # user
         user = mocker.mock()
@@ -798,7 +914,7 @@ class DALTestCase(BaseTestCase):
                       is_public=False, is_live=True, is_file=True, size=None,
                       last_modified='last_modified', crc32=None,
                       generation='generation', content_hash='content_hash',
-                      deflated_size=None, storage_key=None,
+                      deflated_size=None, storage_key=None, public_url=None,
                       volume_id='volume_id', path='path', has_content=False)
         self.assertEqual(result, should)
 
@@ -825,6 +941,7 @@ class DALTestCase(BaseTestCase):
         expect(content1.deflated_size).count(2).result('deflated_size1')
         expect(content1.storage_key).count(2).result('storage_key1')
         expect(node1.content).count(2).result(content1)
+        expect(node1.public_url).count(2).result('public url')
 
         # node 2
         node2 = mocker.mock()
@@ -845,6 +962,7 @@ class DALTestCase(BaseTestCase):
         expect(content2.deflated_size).count(2).result('deflated_size2')
         expect(content2.storage_key).count(2).result('storage_key2')
         expect(node2.content).count(2).result(content2)
+        expect(node2.public_url).count(2).result(None)
 
         # user
         user = mocker.mock()
@@ -880,6 +998,7 @@ class DALTestCase(BaseTestCase):
         self.assertEqual(node1['deflated_size'], 'deflated_size1')
         self.assertEqual(node1['storage_key'], 'storage_key1')
         self.assertEqual(node1['last_modified'], 'last_modified1')
+        self.assertEqual(node1['public_url'], 'public url')
 
         self.assertEqual(node2['id'], 'node_id2')
         self.assertEqual(node2['path'], 'path2')
@@ -896,6 +1015,7 @@ class DALTestCase(BaseTestCase):
         self.assertEqual(node2['deflated_size'], 'deflated_size2')
         self.assertEqual(node2['storage_key'], 'storage_key2')
         self.assertEqual(node2['last_modified'], 'last_modified2')
+        self.assertEqual(node2['public_url'], None)
 
     def test_get_user(self):
         """Get accessable nodes and their hashes."""

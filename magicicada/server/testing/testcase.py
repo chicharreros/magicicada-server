@@ -55,6 +55,7 @@ class FakeTimestampChecker(object):
         """In the present we trust."""
         return int(time.time())
 
+
 # need to patch this timestamp checker so it doesn't go to the real server
 client.tx_timestamp_checker = FakeTimestampChecker()
 

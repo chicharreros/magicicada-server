@@ -535,6 +535,16 @@ class StorageServer(request.RequestHandler):
         request = Unlink(self, message)
         request.start()
 
+    def handle_LIST_PUBLIC_FILES(self, message):
+        """Handle LIST_PUBLIC_FILES message."""
+        request = ListPublicFiles(self, message)
+        request.start()
+
+    def handle_CHANGE_PUBLIC_ACCESS(self, message):
+        """Handle UNLINK message."""
+        request = ChangePublicAccess(self, message)
+        request.start()
+
     def handle_CREATE_UDF(self, message):
         """Handle CREATE_UDF message."""
         request = CreateUDF(self, message)
@@ -1297,6 +1307,74 @@ class Unlink(SimpleRequestResponse):
         extension = self._get_extension(name)
         self.operation_data = 'vol_id=%s node_id=%s type=%s mime=%r ext=%r' % (
             share_id, node_id, kind, mime, extension)
+
+
+class ListPublicFiles(SimpleRequestResponse):
+    """LIST_PUBLIC_FILES Request Response."""
+
+    __slots__ = ()
+
+    @inlineCallbacks
+    def _process(self):
+        """List public files for the client."""
+        user = self.protocol.user
+        public_files = yield user.list_public_files()
+
+        counter = 0
+        for node in public_files:
+            message = protocol_pb2.Message()
+            message.type = protocol_pb2.Message.PUBLIC_FILE_INFO
+            message.public_file_info.share = node.volume_id or ''
+            message.public_file_info.node = str(node.id)
+            message.public_file_info.is_public = node.is_public
+            message.public_file_info.public_url = str(node.public_url)
+            self.sendMessage(message)
+            counter += 1
+
+        # we're done!
+        self.length = counter
+        response = protocol_pb2.Message()
+        response.type = protocol_pb2.Message.PUBLIC_FILE_INFO_END
+        self.sendMessage(response)
+
+        # save data to be logged on operation end
+        self.operation_data = 'public_files=%d' % len(public_files)
+
+
+class ChangePublicAccess(SimpleRequestResponse):
+    """CHANGE_PUBLIC_ACCESS Request Response."""
+
+    __slots__ = ()
+
+    expected_foreign_errors = [dataerror.NoPermission]
+
+    user_activity = 'sync_activity'
+
+    def _get_node_info(self):
+        """Return node info from the message."""
+        node_id = self.source_message.change_public_access.node
+        return 'node: %r' % (node_id,)
+
+    @inlineCallbacks
+    def _process(self):
+        """Change the public access to a node."""
+        share_id = self.convert_share_id(
+            self.source_message.change_public_access.share)
+        node_id = self.source_message.change_public_access.node
+        is_public = self.source_message.change_public_access.is_public
+        public_url = yield self.protocol.user.change_public_access(
+            share_id, node_id, is_public, session_id=self.protocol.session_id)
+
+        # answer the ok to original user
+        response = protocol_pb2.Message()
+        response.public_url = bytes(public_url)
+        response.type = protocol_pb2.Message.OK
+        self.sendMessage(response)
+
+        # save data to be logged on operation end
+        self.operation_data = (
+            'vol_id=%s node_id=%s is_public=%s public_url=%r' % (
+                share_id, node_id, is_public, public_url))
 
 
 class BytesMessageProducer(object):

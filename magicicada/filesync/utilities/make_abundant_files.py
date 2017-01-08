@@ -133,6 +133,7 @@ def main(username, sharer, wlist, num):
     if sys.stdout.isatty():
         sys.stdout.write(home + curses.tigetstr('el'))
 
+
 if __name__ == '__main__':
     from optparse import OptionParser
     parser = OptionParser("%prog [options] username")

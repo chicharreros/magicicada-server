@@ -1,5 +1,5 @@
 # Copyright 2008-2015 Canonical
-# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
+# Copyright 2015-2016 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -99,6 +99,22 @@ class DAL(object):
         result = dict(root=root_info, free_bytes=free_bytes,
                       shares=shares, udfs=udfs)
         return result
+
+    def list_public_files(self, user_id):
+        """List all the public files for the user."""
+        user = self._get_user(user_id)
+
+        public_files = [self._process_node(n) for n in user.get_public_files()]
+        result = dict(public_files=public_files)
+        return result
+
+    def change_public_access(self, user_id, volume_id, node_id,
+                             is_public, session_id=None):
+        """Change the public access for a node."""
+        user = self._get_user(user_id, session_id)
+        node = user.volume(volume_id).node(node_id)
+        node = node.change_public_access(is_public)
+        return dict(public_url=node.public_url)
 
     def move(self, user_id, volume_id, node_id,
              new_parent_id, new_name, session_id=None):
@@ -308,7 +324,8 @@ class DAL(object):
                  storage_key=storage_key, is_live=is_live,
                  size=size, is_file=is_file, volume_id=node.vol_id,
                  parent_id=node.parent_id, content_hash=node.content_hash,
-                 path=node.path, has_content=has_content)
+                 path=node.path, has_content=has_content,
+                 public_url=node.public_url)
         return d
 
     def get_delta(self, user_id, volume_id, from_generation, limit):

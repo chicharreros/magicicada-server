@@ -1700,13 +1700,13 @@ class TestMultipartPutContent(TestWithDatabase):
         root = yield client.get_root()
         filename = 'hola_12'
         mkfile_req = yield client.make_file(request.ROOT, root, filename)
-        upload_id = []
+        upload_info = []
         try:
             yield client.put_content(
                 request.ROOT, mkfile_req.new_id, NO_CONTENT_HASH,
                 hash_value, crc32_value, size, deflated_size,
                 StringIO(deflated_data),
-                upload_id_cb=upload_id.append)
+                upload_id_cb=lambda *a: upload_info.append(a))
         except EOFError:
             # check upload stat and log, with the offset sent,
             # first time tarts from beginning.
@@ -1745,7 +1745,7 @@ class TestMultipartPutContent(TestWithDatabase):
         req = sp_client.PutContent(
             client, request.ROOT, mkfile_req.new_id, NO_CONTENT_HASH,
             hash_value, crc32_value, size, deflated_size,
-            StringIO(deflated_data), upload_id=str(upload_id[0]))
+            StringIO(deflated_data), upload_id=str(upload_info[0][0]))
         req.start()
         yield req.deferred
 
@@ -1800,19 +1800,21 @@ class TestMultipartPutContent(TestWithDatabase):
             yield client.dummy_authenticate("open sesame")
             root = yield client.get_root()
             mkfile_req = yield client.make_file(request.ROOT, root, 'hola')
-            upload_id = []
+            upload_info = []
             req = client.put_content_request(
                 request.ROOT, mkfile_req.new_id, NO_CONTENT_HASH,
                 hash_value, crc32_value, size, deflated_size,
                 StringIO(deflated_data), upload_id="invalid id",
-                upload_id_cb=upload_id.append)
+                upload_id_cb=lambda *a: upload_info.append(a))
             yield req.deferred
             self.assertTrue(('UploadJob.upload', 0) in gauge)
             self.assertTrue(('UploadJob.upload.begin', 1) in meter)
             self.handler.assert_debug(
                 "UploadJob begin content from offset 0")
-            self.assertEqual(len(upload_id), 1)
-            self.assertIsInstance(uuid.UUID(upload_id[0]), uuid.UUID)
+            self.assertEqual(len(upload_info), 1)
+            upload_id, start_from = upload_info[0]
+            self.assertIsInstance(uuid.UUID(upload_id), uuid.UUID)
+            self.assertEqual(start_from, 0)
 
         yield self.callback_test(auth, add_default_callbacks=True)
 
@@ -2301,6 +2303,36 @@ class UserTest(TestWithDatabase):
         StorageUser.objects.filter(id=other_user.id).update(is_active=False)
         d = self.user.get_free_bytes(share.id)
         yield self.assertFailure(d, errors.DoesNotExist)
+
+    @defer.inlineCallbacks
+    def test_change_public_access(self):
+        """Test change public access action."""
+        root_id, root_gen = yield self.user.get_root()
+        volume_id = yield self.user.get_volume_id(root_id)
+        node_id, generation, _ = yield self.user.make_file(
+            volume_id, root_id, u"name")
+        public_url = yield self.user.change_public_access(
+            volume_id, node_id, True)
+        self.assertTrue(public_url.startswith(settings.PUBLIC_URL_PREFIX))
+
+    @defer.inlineCallbacks
+    def test_list_public_files(self):
+        """Test the public files listing."""
+        root_id, _ = yield self.user.get_root()
+        volume_id = yield self.user.get_volume_id(root_id)
+
+        # create three files, make two public
+        node_id_1, _, _ = yield self.user.make_file(
+            volume_id, root_id, u"name1")
+        yield self.user.make_file(volume_id, root_id, u"name2")
+        node_id_3, _, _ = yield self.user.make_file(
+            volume_id, root_id, u"name3")
+        yield self.user.change_public_access(volume_id, node_id_1, True)
+        yield self.user.change_public_access(volume_id, node_id_3, True)
+
+        public_files = yield self.user.list_public_files()
+        self.assertEqual(set(node.id for node in public_files),
+                         {node_id_1, node_id_3})
 
 
 class TestUploadJob(TestWithDatabase):

@@ -1,5 +1,5 @@
 # Copyright 2008-2015 Canonical
-# Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)
+# Copyright 2015-2016 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -421,3 +421,90 @@ class TestUnlink(TestWithDatabase):
             self.assertEqual(unlink_req.new_generation,
                              make_req.new_generation + 1)
         return self.callback_test(test, add_default_callbacks=True)
+
+
+class TestPublicFiles(TestWithDatabase):
+    """Test the public files management."""
+
+    def test_set_public_file_true(self):
+        @defer.inlineCallbacks
+        def auth(client):
+            yield client.dummy_authenticate("open sesame")
+            root = yield client.get_root()
+            req = yield client.make_file(request.ROOT, root, "hola")
+            resp = yield client.change_public_access(
+                request.ROOT, req.new_id, True)
+            fileobj = self.usr0.get_node(req.new_id)
+            self.assertTrue(fileobj.is_public)
+            self.assertEqual(resp.public_url, fileobj.public_url)
+
+        return self.callback_test(auth, add_default_callbacks=True)
+
+    def test_set_public_file_false(self):
+        @defer.inlineCallbacks
+        def auth(client):
+            yield client.dummy_authenticate("open sesame")
+            root = yield client.get_root()
+            req = yield client.make_file(request.ROOT, root, "hola")
+
+            # set it to public first
+            yield client.change_public_access(request.ROOT, req.new_id, True)
+            fileobj = self.usr0.get_node(req.new_id)
+            assert fileobj.is_public
+
+            # set it to false, check
+            yield client.change_public_access(request.ROOT, req.new_id, False)
+            fileobj = self.usr0.get_node(req.new_id)
+            self.assertFalse(fileobj.is_public)
+
+        return self.callback_test(auth, add_default_callbacks=True)
+
+    def test_list_public_files_none(self):
+        @defer.inlineCallbacks
+        def auth(client):
+            yield client.dummy_authenticate("open sesame")
+
+            # list and check
+            resp = yield client.list_public_files()
+            self.assertEqual(resp.public_files, [])
+
+        return self.callback_test(auth, add_default_callbacks=True)
+
+    def test_list_public_files_several(self):
+        @defer.inlineCallbacks
+        def auth(client):
+            yield client.dummy_authenticate("open sesame")
+            root = yield client.get_root()
+
+            # create three files, and set two of them to be public
+            req1 = yield client.make_file(request.ROOT, root, "file1")
+            yield client.make_file(request.ROOT, root, "file2")
+            req3 = yield client.make_file(request.ROOT, root, "file3")
+            yield client.change_public_access(request.ROOT, req1.new_id, True)
+            yield client.change_public_access(request.ROOT, req3.new_id, True)
+
+            # list and check
+            resp = yield client.list_public_files()
+            self.assertEqual({node.node_id for node in resp.public_files},
+                             set([req1.new_id, req3.new_id]))
+
+        return self.callback_test(auth, add_default_callbacks=True)
+
+    def test_list_public_files_unpublished(self):
+        @defer.inlineCallbacks
+        def auth(client):
+            yield client.dummy_authenticate("open sesame")
+            root = yield client.get_root()
+
+            # create a file, publish, and assert
+            req = yield client.make_file(request.ROOT, root, "file")
+            yield client.change_public_access(request.ROOT, req.new_id, True)
+            resp = yield client.list_public_files()
+            assert [node.node_id for node in resp.public_files] == [req.new_id]
+
+            # unpublish it and check
+            yield client.change_public_access(request.ROOT, req.new_id, False)
+            resp = yield client.list_public_files()
+            self.assertEqual(resp.public_files, [])
+
+        return self.callback_test(auth, add_default_callbacks=True)

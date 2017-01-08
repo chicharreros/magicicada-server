@@ -573,6 +573,7 @@ class _ShareListPlaceholder(_Placeholder):
     def __cmp__(self, other):
         return cmp(self.shares, other.shares)
 
+
 aHash = _HashPlaceholder('a hash')
 anUUID = _UUIDPlaceholder('an UUID')
 aShareUUID = _UUIDPlaceholder('a share UUID', ('',))
