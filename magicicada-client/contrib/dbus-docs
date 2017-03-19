@@ -1,0 +1,209 @@
+#!/usr/bin/python
+#
+# Copyright 2009-2013 Canonical Ltd.
+#
+# This program is free software: you can redistribute it and/or modify it
+# under the terms of the GNU General Public License version 3, as published
+# by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranties of
+# MERCHANTABILITY, SATISFACTORY QUALITY, or FITNESS FOR A PARTICULAR
+# PURPOSE.  See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# In addition, as a special exception, the copyright holders give
+# permission to link the code of portions of this program with the
+# OpenSSL library under certain conditions as described in each
+# individual source file, and distribute linked combinations
+# including the two.
+# You must obey the GNU General Public License in all respects
+# for all of the code used other than OpenSSL.  If you modify
+# file(s) with this exception, you may extend this exception to your
+# version of the file(s), but you are not obligated to do so.  If you
+# do not wish to do so, delete this exception statement from your
+# version.  If you delete this exception statement from all source
+# files in the program, then also delete it here.
+"""Tool to generate documentation for our D-Bus based APIs."""
+
+from twisted.internet import gireactor
+gireactor.install()
+
+import sys
+import os
+import dbus
+import shutil
+
+from xml.etree import ElementTree
+
+sys.path.insert(0, os.path.abspath("."))
+
+from contrib.dbus_util import DBusRunner
+from contrib.testing.testcase import (
+    FakeMain, 
+    DBusGMainLoop, 
+    DBusInterface, 
+    FakeNetworkManager,
+)
+
+from ubuntuone.platform.dbus_interface import (
+    DBUS_IFACE_SYNC_NAME,
+    DBUS_IFACE_STATUS_NAME,
+    DBUS_IFACE_EVENTS_NAME,
+    DBUS_IFACE_FS_NAME,
+    DBUS_IFACE_SHARES_NAME,
+    DBUS_IFACE_CONFIG_NAME,
+    DBUS_IFACE_FOLDERS_NAME,
+    DBUS_IFACE_PUBLIC_FILES_NAME,
+)
+from ubuntuone.platform.tools import DBusClient
+from twisted.internet import reactor, defer
+
+
+iface_path = ((DBUS_IFACE_SYNC_NAME, '/'), (DBUS_IFACE_CONFIG_NAME, '/config'),
+              (DBUS_IFACE_EVENTS_NAME, '/events'), 
+              (DBUS_IFACE_FS_NAME, '/filesystem'), 
+              (DBUS_IFACE_SHARES_NAME, '/shares'), 
+              (DBUS_IFACE_STATUS_NAME, '/status'),
+              (DBUS_IFACE_FOLDERS_NAME, '/folders'), 
+              (DBUS_IFACE_PUBLIC_FILES_NAME, '/publicfiles'),
+             )
+
+SRCDIR = os.environ.get('SRCDIR', os.getcwd())
+
+def parse_introspect_data(xml):
+    """Parse the xml returned by Introspect and returns a dict"""
+    info = dict()
+    e = ElementTree.fromstring(xml)
+    for c in e.findall('interface'):
+        # ignore other interfaces 
+        if not c.attrib['name'].startswith('com.ubuntuone'):
+            continue
+        iface_name = c.attrib['name']
+        info[iface_name] = dict()
+        # methods
+        methods = dict()
+        for method in c.findall('method'):
+            meth_name = method.attrib['name']
+            args = []
+            for arg in method.findall('arg'):
+                dir = arg.attrib['direction']
+                type = arg.attrib['type']
+                if 'name' in arg.attrib:
+                    name = arg.attrib['name']
+                    args.append((type, dir, name))
+                else:
+                    args.append((type, dir))
+            docstrings = method.findall('docstring')
+            docstring = docstrings[0].text if docstrings else 'No docstring'
+            methods[meth_name] = dict(args=args, docstring=docstring)
+        info[iface_name]['methods'] = methods
+        # signals
+        signals = dict()
+        for signal in c.findall('signal'):
+            sig_name = signal.attrib['name']
+            args = []
+            for arg in signal.findall('arg'):
+                type = arg.attrib['type']
+                name = arg.attrib['name']
+                args.append((type, name))
+            docstrings = signal.findall('docstring')
+            docstring = docstrings[0].text if docstrings else 'No docstring'
+            signals[sig_name] = dict(args=args, docstring=docstring)
+        info[iface_name]['signals'] = signals
+    return info
+
+
+def get_info(path):
+    """Get all the introspectable info from 'path'"""
+    d = defer.Deferred()
+    client = DBusClient(bus, path, 'org.freedesktop.DBus.Introspectable')
+    client.call_method('Introspect', reply_handler=d.callback, 
+                       error_handler=d.errback)
+    return d
+
+
+def dump_to_stream(info_by_path, stream):
+    print >>stream, "SyncDaemon DBus API\n"
+    for path, interfaces in info_by_path.items():
+        print >>stream, "Object path: %s" % path
+        for iface_name, kinds in interfaces.items():
+            print >>stream, "  Interface: %s" % iface_name
+            print >>stream, "    Methods:"
+            for meth_name, val in kinds['methods'].items():
+                in_args = ','.join([arg[2] + '=' + arg[0] for arg in 
+                                    val['args'] if arg[1] == 'in'])
+                out_args = ','.join([arg[0] for arg in val['args'] 
+                                     if arg[1] == 'out'])
+                if out_args and in_args:
+                    print >>stream, "      %s(%s) -> %s" % (meth_name, in_args,
+                                                            out_args)
+                elif in_args:
+                    print >>stream, "      %s(%s)" % (meth_name, in_args)
+                else:
+                    print >>stream, "      %s()" % meth_name
+                print >>stream, "        %s\n" % val['docstring']
+            print >>stream, "    Signals:"
+            for signal_name, val in kinds['signals'].items():
+                in_args = ','.join([arg[1] + '=' + arg[0] \
+                                    for arg in val['args']])
+                if in_args:
+                    print >>stream, "      %s(%s)" % (signal_name, in_args)
+                else:
+                    print >>stream, "      %s" % (signal_name, )
+                print >>stream, "        %s\n" % val['docstring']
+
+
+@defer.inlineCallbacks
+def main(bus):
+    """Entry point"""
+    info_by_path = dict()
+    for iface, path in iface_path:
+        xml = yield get_info(path)
+        obj_info = parse_introspect_data(xml)
+        info_by_path[path] = obj_info
+    dest_file = os.path.join(os.getcwd(), 'docs', 'syncdaemon_dbus_api.txt')
+    with open(dest_file, 'w') as f:
+        dump_to_stream(info_by_path, f)
+    reactor.stop() 
+
+
+def start_syncdaemon(tmp_dir):
+    """Starts a syncdaemon instance just like the one used in the test suite"""
+    xdg_cache = os.path.join(tmp_dir, 'xdg_cache')
+    data_dir = os.path.join(xdg_cache, 'data')
+    partials_dir = os.path.join(xdg_cache, 'partials')
+    root_dir = os.path.join(tmp_dir, 'root')
+    shares_dir = os.path.join(tmp_dir, 'shares')
+    main = FakeMain(root_dir, shares_dir, data_dir, partials_dir)
+    loop = DBusGMainLoop(set_as_default=True)
+    bus = dbus.bus.BusConnection(mainloop=loop)
+    nm = FakeNetworkManager(bus)
+    dbus_iface = DBusInterface(bus, main, system_bus=bus)
+    main.dbus_iface = dbus_iface
+    return main, bus
+
+
+if __name__ == '__main__':
+    dbus_runner = DBusRunner()
+    dbus_runner.startDBus()
+    tmp_dir = os.path.join(os.getcwd(), 'tmp')
+    try:
+
+        m, bus = start_syncdaemon(tmp_dir)
+        try:
+            reactor.callWhenRunning(main, bus)
+            reactor.run()
+        finally:
+            m.quit()
+    finally:
+        dbus_runner.stopDBus()
+        # remove the tmp dir
+        os.chmod(tmp_dir, 0777)
+        for dirpath, dirs, _ in os.walk(tmp_dir):
+            for dir in dirs:
+                os.chmod(os.path.join(dirpath, dir), 0777)
+        shutil.rmtree(tmp_dir)
+

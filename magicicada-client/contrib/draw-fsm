@@ -1,0 +1,118 @@
+#!/usr/bin/python
+# ubuntuone.syncdaemon.fsm.fsm_draw - draw a fsm
+#
+# Author: Lucio Torre <lucio.torre@canonical.com>
+#
+# Copyright 2009-2012 Canonical Ltd.
+#
+# This program is free software: you can redistribute it and/or modify it
+# under the terms of the GNU General Public License version 3, as published
+# by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranties of
+# MERCHANTABILITY, SATISFACTORY QUALITY, or FITNESS FOR A PARTICULAR
+# PURPOSE.  See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# In addition, as a special exception, the copyright holders give
+# permission to link the code of portions of this program with the
+# OpenSSL library under certain conditions as described in each
+# individual source file, and distribute linked combinations
+# including the two.
+# You must obey the GNU General Public License in all respects
+# for all of the code used other than OpenSSL.  If you modify
+# file(s) with this exception, you may extend this exception to your
+# version of the file(s), but you are not obligated to do so.  If you
+# do not wish to do so, delete this exception statement from your
+# version.  If you delete this exception statement from all source
+# files in the program, then also delete it here.
+"""This module is useful for debugging states machines by plotting them."""
+
+import tempfile
+import time
+import sys
+
+from gi.repository import Gtk as gtk
+
+import xdot
+from ubuntuone.syncdaemon.fsm import fsm
+
+
+def dict2label(d):
+    'transform a dictionary into a label'
+    t = '"%s"' % "\\n".join("%s=%s" % x for x in sorted(d.items()))
+    return t
+
+
+def main(filename, debug=False):
+    'draw the state machine that is in $filename'
+
+    print "Parsing file...   (%s)" % time.ctime()
+    machine = fsm.StateMachine(filename)
+
+    print "Building graph... (%s)" % time.ctime()
+    despair = object()
+    graph_base = u'digraph G {\n%s [label="despair"]\n%%s\n}' % id(despair)
+    graph_lines = []
+    s2s = {}
+    for state in machine.states.values():
+        line = "%s [label=%s]" % (id(state), dict2label(state.values))
+        graph_lines.append(line)
+
+    for event in machine.events.values():
+        for transition in event.draw_transitions:
+            if all(map(lambda x: x == "*", transition.target.values())):
+                target = despair
+            else:
+                try:
+                    target = machine.get_state(transition.target)
+                except KeyError:
+                    continue
+
+            l = s2s.setdefault((fsm.hash_dict(transition.source),
+                                fsm.hash_dict(transition.target)), [])
+            l.append(transition)
+
+    for (source, target), ts in s2s.items():
+        try:
+            source = machine.get_state(dict(source))
+            if all(map(lambda x: x == "*", dict(target).values())):
+                target = despair
+            else:
+                target = machine.get_state(dict(target))
+        except KeyError:
+            continue
+        cases = []
+        for t in ts:
+            ps = " ".join(["%s:%s" % (k, v) for k, v in t.parameters.items()])
+            cases.append("%s:%s" % (t.event, ps))
+        line = '%s [label="%s", shape=box, fontsize=7]' % (
+            id(ts), "\\n".join(cases))
+        graph_lines.append(line)
+
+        arrow = '%s -> %s' % (
+            id(source), id(ts))
+        graph_lines.append(arrow)
+        arrow = '%s -> %s' % (
+            id(ts), id(target))
+        graph_lines.append(arrow)
+
+    dotcode = graph_base % "\n".join(graph_lines)
+    if debug:
+        filename = tempfile.mkstemp(prefix='graph-', suffix='.debug')
+        a = open(filename, "w")
+        a.write(dotcode)
+        a.close()
+
+    # go for it!
+    print "Drawing...        (%s)" % time.ctime()
+    window = xdot.DotWindow()
+    window.set_dotcode(dotcode)
+    window.connect('destroy', gtk.main_quit)
+    gtk.main()
+
+if __name__ == "__main__":
+    main(sys.argv[1], True)

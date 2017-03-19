@@ -1,0 +1,4 @@
+[D-BUS Service]
+Name=com.ubuntuone.SyncDaemon
+Exec=@libexecdir@/ubuntuone-syncdaemon
+

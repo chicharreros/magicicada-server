@@ -1,0 +1,6 @@
+bzr
+make
+python-flake8
+python-mocker
+ubuntuone-dev-tools
+virtualenv
