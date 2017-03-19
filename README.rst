@@ -151,6 +151,48 @@ Finally, create all the users you want::
 (with this django command you'll be able to also retrieve and update user data,
 and delete users)
 
+After that, you could stop the server doing::
+
+    make stop
+
+...and resume back doing::
+
+    make resume
+
+
+How to autostart the server on reboot
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+These are the instructions using systemd. Create a file named
+``/lib/systemd/system/magicicada.service`` with the following
+content (be sure to fix the ``User`` and ``WorkingDirectory`` fields)::
+
+    [Unit]
+    Description=Magicicada Server
+    After=network.target
+
+    [Service]
+    User=<your user>
+    WorkingDirectory=<path to where you have the server>
+    Type=oneshot
+    ExecStart=/usr/bin/make resume
+    RemainAfterExit=true
+    ExecStop=/usr/bin/make stop
+
+    [Install]
+    WantedBy = multi-user.target
+
+After that file is in place, doing the following you should see in the
+magicicada logs as it stops and resumes::
+
+    systemctl start magicicada
+    systemctl stop magicicada
+
+When you are sure that those previous commands work ok, enable magicicada to
+be started at machine's boot time::
+
+    systemctl enable magicicada
+
 
 Client setup
 ------------
