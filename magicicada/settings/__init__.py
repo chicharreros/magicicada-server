@@ -35,6 +35,18 @@ import os
 
 from psycopg2.extensions import ISOLATION_LEVEL_REPEATABLE_READ
 
+
+def get_file_content(folder, filename):
+    filepath = os.path.join(folder, filename)
+    if not os.path.exists(filepath):
+        filepath = os.path.join(folder, 'dev-' + filename)
+
+    with open(filepath) as f:
+        content = f.read()
+
+    return content
+
+
 BASE_DIR = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -216,8 +228,37 @@ STORAGE_PROXY_PORT = None
 SYSLOG_FORMAT = (
     '%(processName)-13s %(levelname)-8s %(name)s[%(process)d]: %(message)s')
 
-from . import api_server  # noqa
-from . import ssl_proxy  # noqa
+
+# Server settings
+
+API_SERVER_NAME = 'filesync-server'
+API_STATUS_PORT = 21102
+CERTS_FOLDER = os.path.join(BASE_DIR, 'certs')
+# the `crt` key with the content of `cacert.pem` file
+CRT = get_file_content(CERTS_FOLDER, 'cacert.pem')
+CRT_CHAIN = None
+# the `key` key with the content of `privkey.pem` file
+CRT_KEY = get_file_content(CERTS_FOLDER, 'privkey.pem')
+DELTA_MAX_SIZE = 1000
+DISABLE_SSL_COMPRESSION = True
+GC_DEBUG = False
+GET_FROM_SCRATCH_LIMIT = 2000
+GRACEFUL_SHUTDOWN = True
+HEARTBEAT_INTERVAL = 5
+IDLE_TIMEOUT = 7200
+MAGIC_UPLOAD_ACTIVE = True
+MAX_DELTA_INFO = 20
+PROTOCOL_WEAKREF = False
+SSL_LOG_FILENAME = 'ssl-proxy.log'
+SSL_PORT = 21101
+SSL_SERVER_NAME = 'ssl-proxy'
+SSL_STATUS_PORT = 21103
+STATS_LOG_INTERVAL = 0
+STORAGE_CHUNK_SIZE = 5242880
+TCP_PORT = 21100
+TRACE_USERS = ['test', 'etc']
+UPLOAD_BUFFER_MAX_SIZE = 10485761
+STORAGE_BASEDIR = os.path.join(BASE_DIR, 'tmp', 'filestorage')
 
 
 try:

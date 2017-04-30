@@ -43,9 +43,9 @@ from magicicada.server.server import PREFERRED_CAP, StorageServerService
 from magicicada.testing.testcase import BaseTestCase
 
 logger = logging.getLogger(__name__)
-server_key = settings.api_server.KEY
-server_crt = settings.api_server.CRT
-server_crt_chain = settings.api_server.CRT_CHAIN
+server_key = settings.CRT_KEY
+server_crt = settings.CRT
+server_crt_chain = settings.CRT_CHAIN
 
 
 class FakeTimestampChecker(object):
@@ -365,7 +365,7 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
                 dummy_tokens[password] = user.id
 
         # tune the config for this tests
-        self.patch(settings.api_server, 'STORAGE_CHUNK_SIZE', 1024 * 64)
+        self.patch(settings, 'STORAGE_CHUNK_SIZE', 1024 * 64)
 
     def save_req(self, req, name):
         """Save a request for later use."""

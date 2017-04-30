@@ -54,8 +54,8 @@ class SSLProxyServiceTest(TestWithDatabase):
             ssl_proxy.logger, level=logging.DEBUG)
         self.metrics = MetricReceiver()
         self.patch(metrics, 'get_meter', lambda n: self.metrics)
-        self.patch(settings.ssl_proxy, 'HEARTBEAT_INTERVAL',
-                   self.ssl_proxy_heartbeat_interval)
+        self.patch(
+            settings, 'HEARTBEAT_INTERVAL', self.ssl_proxy_heartbeat_interval)
 
     @defer.inlineCallbacks
     def test_start_stop(self):
@@ -87,8 +87,8 @@ class SSLProxyTestCase(TestWithDatabase):
         # keep metrics in our MetricReceiver
         self.metrics = MetricReceiver()
         self.patch(metrics, 'get_meter', lambda n: self.metrics)
-        self.patch(settings.ssl_proxy, 'HEARTBEAT_INTERVAL',
-                   self.ssl_proxy_heartbeat_interval)
+        self.patch(
+            settings, 'HEARTBEAT_INTERVAL', self.ssl_proxy_heartbeat_interval)
         yield self.ssl_service.startService()
         self.addCleanup(self.ssl_service.stopService)
 

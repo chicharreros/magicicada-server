@@ -190,8 +190,8 @@ class DBUploadJob(object):
     def add_part(self, chunk_size):
         """Add a part to an upload job."""
         self.unsaved_count += chunk_size
-        if self.unsaved_count >= settings.api_server.STORAGE_CHUNK_SIZE:
-            self.unsaved_count -= settings.api_server.STORAGE_CHUNK_SIZE
+        if self.unsaved_count >= settings.STORAGE_CHUNK_SIZE:
+            self.unsaved_count -= settings.STORAGE_CHUNK_SIZE
             kwargs = dict(user_id=self.user.id, volume_id=self.volume_id,
                           uploadjob_id=self.uploadjob_id,
                           chunk_size=chunk_size)
@@ -870,7 +870,7 @@ class User(object):
         if upload is None:
             # no uploadjob found, create a new one: if the file is small just
             # get a bo
-            if deflated_size <= settings.api_server.STORAGE_CHUNK_SIZE:
+            if deflated_size <= settings.STORAGE_CHUNK_SIZE:
                 upload = BogusUploadJob()
             else:
                 try:

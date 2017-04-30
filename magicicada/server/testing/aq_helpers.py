@@ -332,8 +332,8 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
                                                   0,  # port
                                                   "localhost", self.port,
                                                   "ssl-proxy-test", 0)
-        self.patch(settings.ssl_proxy, 'HEARTBEAT_INTERVAL',
-                   self.ssl_proxy_heartbeat_interval)
+        self.patch(
+            settings, 'HEARTBEAT_INTERVAL', self.ssl_proxy_heartbeat_interval)
         yield self.ssl_service.startService()
 
         if os.path.exists(self.tmpdir):

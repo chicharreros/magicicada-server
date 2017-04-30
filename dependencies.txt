@@ -15,8 +15,6 @@ python-protobuf
 python-psutil
 python-psycopg2
 python-setuptools
-python-testresources
-python-transaction
 python-twisted-web
 python-tz
 python-virtualenv

@@ -719,7 +719,7 @@ class ClientCmd(cmd.Cmd):
     @parse_args(str, str)
     @require_connection
     @show_exception
-    def do_oauth(self):
+    def do_auth(self):
         """Perform authorisation."""
         self.defer_from_thread(self._auth)
 

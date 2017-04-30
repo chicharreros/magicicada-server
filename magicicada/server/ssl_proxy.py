@@ -245,7 +245,7 @@ class ProxyService(MultiService):
         self.status_service = create_status_service(self.factory, status_port)
         self.status_service.setServiceParent(self)
         # disable ssl compression
-        if settings.ssl_proxy.DISABLE_SSL_COMPRESSION:
+        if settings.DISABLE_SSL_COMPRESSION:
             disable_ssl_compression(logger)
 
     @property
@@ -265,7 +265,7 @@ class ProxyService(MultiService):
         # setup stats in the factory
         yield MultiService.startService(self)
         # only start the HeartbeatWriter if the interval is > 0
-        heartbeat_interval = float(settings.ssl_proxy.HEARTBEAT_INTERVAL)
+        heartbeat_interval = float(settings.HEARTBEAT_INTERVAL)
         if heartbeat_interval > 0:
             self.heartbeat_writer = stdio.StandardIO(
                 supervisor_utils.HeartbeatWriter(heartbeat_interval, logger))
@@ -283,9 +283,9 @@ class ProxyService(MultiService):
 
 def create_service():
     """Create the service instance."""
-    server_key = settings.api_server.KEY
-    server_crt = settings.api_server.CRT
-    server_crt_chain = settings.api_server.CRT_CHAIN
+    server_key = settings.CRT_KEY
+    server_crt = settings.CRT
+    server_crt_chain = settings.CRT_CHAIN
 
     ssl_cert = crypto.load_certificate(crypto.FILETYPE_PEM, server_crt)
     if server_crt_chain:
@@ -296,11 +296,11 @@ def create_service():
     ssl_key = crypto.load_privatekey(crypto.FILETYPE_PEM, server_key)
 
     ssl_proxy = ProxyService(ssl_cert, ssl_key, ssl_cert_chain,
-                             settings.ssl_proxy.PORT,
+                             settings.SSL_PORT,
                              '127.0.0.1',
-                             settings.api_server.TCP_PORT,
-                             settings.ssl_proxy.SERVER_NAME,
-                             settings.ssl_proxy.STATUS_PORT)
+                             settings.TCP_PORT,
+                             settings.SSL_SERVER_NAME,
+                             settings.SSL_STATUS_PORT)
     return ssl_proxy
 
 

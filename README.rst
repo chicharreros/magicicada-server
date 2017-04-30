@@ -139,7 +139,7 @@ Run the filesync server
 Start the server via command line this way::
 
     cd ~/magicicada/magicicada-server
-    make start-oauth
+    make start
 
 Note that the server will listen on port 21101, so you need to assure that the
 client could reach it (open the whole it in your firewall config, etc).

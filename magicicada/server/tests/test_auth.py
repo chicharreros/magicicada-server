@@ -96,7 +96,7 @@ class SimpleAuthProviderTests(AuthenticationBaseTestCase):
 
     @defer.inlineCallbacks
     def test_authenticate(self):
-        """The OAuth provider succeeds with a valid PLAINTEXT signature."""
+        """The Auth provider succeeds with a valid password."""
         user = yield self.provider.authenticate(self.creds, None)
         self.assertEqual(user.id, self.usr0.id)
 
@@ -106,7 +106,7 @@ class SimpleAuthProviderTests(AuthenticationBaseTestCase):
 
     @defer.inlineCallbacks
     def test_authenticate_failure(self):
-        """The OAuth provider succeeds with an invalid PLAINTEXT signature."""
+        """The Auth provider succeeds with an invalid password."""
         auth_parameters = self.creds.copy()
         auth_parameters['password'] = 'invalid'
 
@@ -115,7 +115,7 @@ class SimpleAuthProviderTests(AuthenticationBaseTestCase):
 
     @defer.inlineCallbacks
     def test_authenticate_no_parameters(self):
-        """The OAuth provider fails with no parameters."""
+        """The Auth provider fails with no parameters."""
         user = yield self.provider.authenticate({}, None)
         self.assertEqual(user, None)
 
@@ -248,7 +248,7 @@ class ClientDummyAuthTests(AuthenticationBaseTestCase):
 
 
 class ClientSimpleAuthTests(ClientDummyAuthTests):
-    """Client authentication tests using the OAuth provider."""
+    """Client authentication tests using the Auth provider."""
 
     auth_provider_class = SimpleAuthProvider
 

@@ -55,7 +55,7 @@ def main():
     """Start the server."""
 
     status_port = int(
-        os.getenv('API_STATUS_PORT', settings.api_server.STATUS_PORT))
+        os.getenv('API_STATUS_PORT', settings.STATUS_PORT))
     service = server.create_service(status_port)
 
     yield service.startService()

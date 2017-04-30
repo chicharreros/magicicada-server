@@ -48,11 +48,6 @@ from magicicada.server.integration.helpers import debug, retryable
 dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
 
 LIB_DIR = os.path.abspath("lib")
-
-# this should be done manually before:
-DEP_STARTOAUTH = """
-make start-oauth
-"""
 CLIENT_DIR = os.path.abspath(os.path.join('.sourcecode', 'magicicada-client'))
 PROTOCOL_DIR = os.path.abspath(
     os.path.join('.sourcecode', 'magicicada-protocol'))
@@ -101,7 +96,7 @@ def deps_missing():
     """
     couchdb_port = os.path.join(TMP_DIR, "couchdb-master0.port")
     if not os.path.exists(couchdb_port):
-        print "Not ready! Hint: did you do...?:\n" + DEP_STARTOAUTH
+        print "Not ready! Hint: did you run...?:\nmake start"
         return True
 
     log_conf = os.path.join(CLIENT_DIR, "data", "logging.conf")

@@ -349,7 +349,7 @@ class StorageServerTestCase(BaseStorageServerTestCase):
 
     def test_protocol_ref_enabled(self):
         """Test that protocol weakref is disabled in tests."""
-        self.patch(settings.api_server, 'PROTOCOL_WEAKREF', True)
+        self.patch(settings, 'PROTOCOL_WEAKREF', True)
         _server = StorageServer()
         response = StorageServerRequestResponse(
             protocol=_server, message=self.make_protocol_message())
@@ -358,7 +358,7 @@ class StorageServerTestCase(BaseStorageServerTestCase):
 
     def test_protocol_ref_disabled(self):
         """Test that protocol weakref is disabled in tests."""
-        self.patch(settings.api_server, 'PROTOCOL_WEAKREF', False)
+        self.patch(settings, 'PROTOCOL_WEAKREF', False)
         _server = StorageServer()
         response = StorageServerRequestResponse(
             protocol=_server, message=self.make_protocol_message())
@@ -2340,7 +2340,7 @@ class GetDeltaResponseTestCase(SimpleRequestResponseTestCase):
 
     def test_reset_send_delta_info_counter(self):
         """Test that the count is reset on each iteration."""
-        self.patch(settings.api_server, 'MAX_DELTA_INFO', 5)
+        self.patch(settings, 'MAX_DELTA_INFO', 5)
         # create a few fake nodes
         nodes = []
         right_now = now()
@@ -2415,7 +2415,7 @@ class RescanFromScratchResponseTestCase(SimpleRequestResponseTestCase):
     @defer.inlineCallbacks
     def test_chunked_get_from_scratch(self):
         """Get the nodes list in chunks."""
-        self.patch(settings.api_server, 'GET_FROM_SCRATCH_LIMIT', 5)
+        self.patch(settings, 'GET_FROM_SCRATCH_LIMIT', 5)
         # build fake nodes
         nodes = []
         right_now = now()
@@ -2612,7 +2612,7 @@ class StorageServerFactoryTestCase(BaseTestCase, TwistedTestCase):
     def test_trace_users(self):
         """Check trace users are correctly set."""
         # set a specific config to test
-        self.patch(settings.api_server, 'TRACE_USERS', ['foo', 'bar', 'baz'])
+        self.patch(settings, 'TRACE_USERS', ['foo', 'bar', 'baz'])
         factory = StorageServerFactory()
         self.assertEqual(factory.trace_users, set(['foo', 'bar', 'baz']))
 

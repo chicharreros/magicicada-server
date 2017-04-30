@@ -565,7 +565,7 @@ class TestPutContent(TestWithDatabase):
 
     def test_putcontent_cancel_middle(self):
         """Test putting content to a file and cancelling it in the middle."""
-        size = int(settings.api_server.STORAGE_CHUNK_SIZE * 1.5)
+        size = int(settings.STORAGE_CHUNK_SIZE * 1.5)
         data = os.urandom(size)
         deflated_data = zlib.compress(data)
         hash_object = content_hash_factory()
@@ -1146,7 +1146,7 @@ class TestPutContent(TestWithDatabase):
         Test that a PutContent fails and is terminated as soon we get an
         error, instead of wait until the full upload is done.
         """
-        chunk_size = settings.api_server.STORAGE_CHUNK_SIZE
+        chunk_size = settings.STORAGE_CHUNK_SIZE
         user, content_user = self._get_users(chunk_size ** 2)
         # create the file
         a_file = user.root.make_file(u"A new file")
@@ -1596,7 +1596,7 @@ class TestMultipartPutContent(TestWithDatabase):
         self.handler = self.add_memento_handler(server.logger, level=0)
         yield super(TestMultipartPutContent, self).setUp()
         # override defaults set by TestWithDatabase.setUp.
-        self.patch(settings.api_server, 'STORAGE_CHUNK_SIZE', 1024)
+        self.patch(settings, 'STORAGE_CHUNK_SIZE', 1024)
 
     def get_data(self, size):
         """Return random data of the specified size."""
@@ -1650,7 +1650,7 @@ class TestMultipartPutContent(TestWithDatabase):
     @defer.inlineCallbacks
     def test_resume_putcontent(self):
         """Test that the client can resume a putcontent request."""
-        self.patch(settings.api_server, 'STORAGE_CHUNK_SIZE', 1024 * 64)
+        self.patch(settings, 'STORAGE_CHUNK_SIZE', 1024 * 64)
         size = 2 * 1024 * 512
         StorageUser.objects.filter(id=self.usr0.id).update(
             max_storage_bytes=size * 2)
@@ -1776,7 +1776,7 @@ class TestMultipartPutContent(TestWithDatabase):
 
         It receives a new upload_id.
         """
-        self.patch(settings.api_server, 'STORAGE_CHUNK_SIZE', 1024 * 32)
+        self.patch(settings, 'STORAGE_CHUNK_SIZE', 1024 * 32)
         size = 2 * 1024 * 128
         StorageUser.objects.filter(id=self.usr0.id).update(
             max_storage_bytes=size * 2)
@@ -1848,7 +1848,7 @@ class TestMultipartPutContent(TestWithDatabase):
 
     def test_putcontent_corrupt(self):
         """Put content on a file with corrupt data."""
-        self.patch(settings.api_server, 'STORAGE_CHUNK_SIZE', 1024 * 64)
+        self.patch(settings, 'STORAGE_CHUNK_SIZE', 1024 * 64)
         size = 2 * 1024 * 512
         StorageUser.objects.filter(id=self.usr0.id).update(
             max_storage_bytes=size * 2)
@@ -1965,7 +1965,7 @@ class TestPutContentInternalError(TestWithDatabase):
         Test that a PutContent fails and is terminated as soon we get an
         error, instead of wait until the full upload is done.
         """
-        chunk_size = settings.api_server.STORAGE_CHUNK_SIZE
+        chunk_size = settings.STORAGE_CHUNK_SIZE
         user = self.make_user(max_storage_bytes=chunk_size ** 2)
         content_user = User(
             self.service.factory.content, user.id, user.root_volume_id,
@@ -2079,11 +2079,11 @@ class TestChunkedContent(TestWithDatabase):
         """Setup the test."""
         yield super(TestChunkedContent, self).setUp()
         # tune the config for this tests
-        self.patch(settings.api_server, 'STORAGE_CHUNK_SIZE', 1024 * 1024)
+        self.patch(settings, 'STORAGE_CHUNK_SIZE', 1024 * 1024)
 
     def test_putcontent_chunked(self, put_fail=False, get_fail=False):
         """Checks a chunked putcontent."""
-        size = int(settings.api_server.STORAGE_CHUNK_SIZE * 1.5)
+        size = int(settings.STORAGE_CHUNK_SIZE * 1.5)
         data = os.urandom(size)
         deflated_data = zlib.compress(data)
         hash_object = content_hash_factory()
@@ -2162,7 +2162,7 @@ class TestChunkedContent(TestWithDatabase):
 
     def test_deferred_add_part_to_uj(self):
         """Check that parts are added to upload job only after a limit."""
-        size = int(settings.api_server.STORAGE_CHUNK_SIZE * 2.5)
+        size = int(settings.STORAGE_CHUNK_SIZE * 2.5)
         data = os.urandom(size)
         deflated_data = zlib.compress(data)
         hash_object = content_hash_factory()
@@ -2344,7 +2344,7 @@ class TestUploadJob(TestWithDatabase):
     def setUp(self):
         """Setup the test."""
         yield super(TestUploadJob, self).setUp()
-        self.chunk_size = settings.api_server.STORAGE_CHUNK_SIZE
+        self.chunk_size = settings.STORAGE_CHUNK_SIZE
         self.half_size = self.chunk_size / 2
         self.double_size = self.chunk_size * 2
         self.user = self.make_user(max_storage_bytes=self.chunk_size ** 2)
@@ -2673,7 +2673,7 @@ class TestNode(TestWithDatabase):
     def setUp(self):
         """Setup the test."""
         yield super(TestNode, self).setUp()
-        self.chunk_size = settings.api_server.STORAGE_CHUNK_SIZE
+        self.chunk_size = settings.STORAGE_CHUNK_SIZE
         self.half_size = self.chunk_size / 2
         self.double_size = self.chunk_size * 2
         self.user = self.make_user(max_storage_bytes=self.chunk_size ** 2)
@@ -3073,7 +3073,7 @@ class DBUploadJobTestCase(TestCase):
     def test_add_part(self):
         """Test add_part method."""
         dbuj = yield self._make_uj()
-        chunk_size = int(settings.api_server.STORAGE_CHUNK_SIZE) + 1
+        chunk_size = int(settings.STORAGE_CHUNK_SIZE) + 1
         yield dbuj.add_part(chunk_size)
 
         # check it called rpc dal correctly

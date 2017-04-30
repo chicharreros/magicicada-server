@@ -57,7 +57,7 @@ class DALTestCase(BaseTestCase):
         self.assertEqual(result, dict(user_id=self.usr.id))
 
     def test_get_user_id_bad_auth(self):
-        """Bad parameters in the oauth request."""
+        """Bad parameters in the auth request."""
         bad_parameters = self.auth_parameters.copy()
         bad_parameters['password'] = "bad"
         try:

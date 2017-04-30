@@ -285,8 +285,7 @@ class StorageServer(request.RequestHandler):
         self.pending_requests = collections.deque()
         self.ping_loop = LoopingPing(StorageServer.PING_INTERVAL,
                                      StorageServer.PING_TIMEOUT,
-                                     settings.api_server.IDLE_TIMEOUT,
-                                     self)
+                                     settings.IDLE_TIMEOUT, self)
 
         # capabilities that the server is working with
         self.working_caps = MIN_CAP
@@ -624,7 +623,7 @@ class BaseRequestResponse(request.RequestResponse):
 
     def __init__(self, protocol, message):
         """Create the request response."""
-        self.use_protocol_weakref = settings.api_server.PROTOCOL_WEAKREF
+        self.use_protocol_weakref = settings.PROTOCOL_WEAKREF
         self._protocol_ref = None
         super(BaseRequestResponse, self).__init__(protocol, message)
 
@@ -1841,7 +1840,7 @@ class PutContentResponse(SimpleRequestResponse):
     def _get_upload_job(self):
         """Get the uploadjob."""
         share_id = self.convert_share_id(self.source_message.put_content.share)
-        if settings.api_server.MAGIC_UPLOAD_ACTIVE:
+        if settings.MAGIC_UPLOAD_ACTIVE:
             magic_hash = self.source_message.put_content.magic_hash or None
         else:
             magic_hash = None
@@ -1907,7 +1906,7 @@ class GetDeltaResponse(SimpleRequestResponse):
         msg = self.source_message
         share_id = self.convert_share_id(msg.get_delta.share)
         from_generation = msg.get_delta.from_generation
-        delta_max_size = settings.api_server.DELTA_MAX_SIZE
+        delta_max_size = settings.DELTA_MAX_SIZE
         delta_info = yield self.protocol.user.get_delta(
             share_id, from_generation, limit=delta_max_size)
         nodes, vol_generation, free_bytes = delta_info
@@ -1942,7 +1941,7 @@ class GetDeltaResponse(SimpleRequestResponse):
         """Build and send the DELTA_INFO for each node."""
         count = 0
         for node in nodes:
-            if count == settings.api_server.MAX_DELTA_INFO:
+            if count == settings.MAX_DELTA_INFO:
                 count = 0
                 yield
             message = protocol_pb2.Message()
@@ -1983,7 +1982,7 @@ class RescanFromScratchResponse(GetDeltaResponse):
     def _process(self):
         """Get all the live nodes and send DeltaInfos."""
         msg = self.source_message
-        limit = settings.api_server.GET_FROM_SCRATCH_LIMIT
+        limit = settings.GET_FROM_SCRATCH_LIMIT
         share_id = self.convert_share_id(msg.get_delta.share)
         # get the first chunk
         delta_info = yield self.protocol.user.get_from_scratch(
@@ -2333,7 +2332,7 @@ class StorageServerFactory(Factory):
     @cvar protocol: The class of the server.
     """
     protocol = StorageServer
-    graceful_shutdown = settings.api_server.GRACEFUL_SHUTDOWN
+    graceful_shutdown = settings.GRACEFUL_SHUTDOWN
 
     def __init__(self, auth_provider_class=auth.DummyAuthProvider,
                  content_class=content.ContentManager,
@@ -2341,7 +2340,7 @@ class StorageServerFactory(Factory):
         """Create a StorageServerFactory."""
         self.auth_provider = auth_provider_class(self)
         self.content = content_class(self)
-        self.diskstorage = DiskStorage(settings.api_server.STORAGE_BASEDIR)
+        self.diskstorage = DiskStorage(settings.STORAGE_BASEDIR)
 
         self.metrics = metrics.get_meter('root')
         self.user_metrics = metrics.get_meter('user')
@@ -2377,7 +2376,7 @@ class StorageServerFactory(Factory):
 
         self.protocols = []
         self.reactor = reactor
-        self.trace_users = set(settings.api_server.TRACE_USERS)
+        self.trace_users = set(settings.TRACE_USERS)
 
         twisted.python.log.addObserver(self._deferror_handler)
 
@@ -2631,10 +2630,10 @@ class StorageServerService(OrderedMultiService):
         OrderedMultiService.__init__(self)
         self.heartbeat_writer = None
         if heartbeat_interval is None:
-            heartbeat_interval = float(settings.api_server.HEARTBEAT_INTERVAL)
+            heartbeat_interval = float(settings.HEARTBEAT_INTERVAL)
         self.heartbeat_interval = heartbeat_interval
         self.rpc_dal = None
-        self.servername = settings.api_server.SERVERNAME
+        self.servername = settings.API_SERVER_NAME
         logger.info('Starting %s', self.servername)
         logger.info(
             'protocol buffers implementation: %s',
@@ -2726,15 +2725,15 @@ def create_service(status_port=None,
             logger.debug('activated heapy remote monitor')
 
     # set GC's debug
-    if settings.api_server.GC_DEBUG:
+    if settings.GC_DEBUG:
         import gc
         gc.set_debug(gc.DEBUG_UNCOLLECTABLE)
         logger.debug('set gc debug on')
 
     if status_port is None:
-        status_port = settings.api_server.STATUS_PORT
+        status_port = settings.API_STATUS_PORT
 
     # create the service
     service = StorageServerService(
-        settings.api_server.TCP_PORT, auth_provider_class, status_port)
+        settings.TCP_PORT, auth_provider_class, status_port)
     return service

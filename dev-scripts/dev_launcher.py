@@ -37,7 +37,7 @@ def usage():
             "runs PROGNAME with args plus:\n"
             "     --port with the local server port\n"
             "     --host localhost\n"
-            "     --oauth keys for user USERNAME\n")
+            "     --auth username and password for user USERNAME\n")
 
 
 def main(args):

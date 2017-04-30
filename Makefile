@@ -128,14 +128,12 @@ lint:
 version:
 	bzr version-info --format=python > lib/versioninfo.py || true
 
-start: build start-base start-filesync-dummy-group publish-api-port
+start: build start-base start-filesync-server-group publish-api-port
 
-start-oauth: build start-base start-filesync-oauth-group publish-api-port
+resume: start-base start-filesync-server-group
 
-resume: start-base start-filesync-oauth-group
-
-start-oauth-heapy:
-	USE_HEAPY=1 $(MAKE) start-oauth
+start-heapy:
+	USE_HEAPY=1 $(MAKE) start
 
 start-base:
 	$(MAKE) start-supervisor && $(MAKE) start-dbus || ( $(MAKE) stop ; exit 1 )
@@ -168,9 +166,9 @@ stop-%:
 	-@dev-scripts/supervisorctl-dev stop $*
 
 publish-api-port:
-	python -c 'from magicicada import settings; print >> file("tmp/filesyncserver.port", "w"), settings.api_server.TCP_PORT'
-	python -c 'from magicicada import settings; print >> file("tmp/filesyncserver.port.ssl", "w"), settings.ssl_proxy.PORT'
-	python -c 'from magicicada import settings; print >> file("tmp/filesyncserver-status.port", "w"), settings.api_server.STATUS_PORT'
+	python -c 'from magicicada import settings; print >> file("tmp/filesyncserver.port", "w"), settings.TCP_PORT'
+	python -c 'from magicicada import settings; print >> file("tmp/filesyncserver.port.ssl", "w"), settings.SSL_PORT'
+	python -c 'from magicicada import settings; print >> file("tmp/filesyncserver-status.port", "w"), settings.API_STATUS_PORT'
 
 shell:
 	$(DJANGO_MANAGE) shell
@@ -184,4 +182,4 @@ admin:
 .PHONY: sourcedeps link-sourcedeps build-sourcedeps build-deploy-sourcedeps \
 	build clean version lint test ci-test build-for-deployment \
 	clean-sourcedeps tarball start stop publish-api-port start-supervisor \
-	stop-supervisor start-dbus stop-dbus start-oauth start-oauth-heapy
+	stop-supervisor start-dbus stop-dbus start-heapy
