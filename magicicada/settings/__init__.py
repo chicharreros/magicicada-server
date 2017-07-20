@@ -1,5 +1,5 @@
 # Copyright 2008-2015 Canonical
-# Copyright 2015-2016 Chicharreros (https://launchpad.net/~chicharreros)
+# Copyright 2015-2017 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -27,7 +27,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/1.8/ref/settings/
 """
 
-from __future__ import unicode_literals
+from __future__ import unicode_literals, print_function
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 import logging
@@ -204,12 +204,12 @@ LOGGING = {
     'loggers': {
         'django': {
             'handlers': ['file'],
-            'level': 'INFO',
+            'level': os.getenv('MAGICICADA_LOG_LEVEL', 'INFO'),
             'propagate': True,
         },
         'magicicada.server': {
             'handlers': ['server'],
-            'level': 'DEBUG',
+            'level': os.getenv('MAGICICADA_LOG_LEVEL', 'DEBUG'),
             'propagate': False,
         },
         'magicicada.metrics': {
@@ -263,5 +263,5 @@ STORAGE_BASEDIR = os.path.join(BASE_DIR, 'tmp', 'filestorage')
 
 try:
     from magicicada.settings.local import *  # noqa
-except ImportError:
-    pass
+except ImportError as err:
+    print("ERROR importing local settings:", err)
