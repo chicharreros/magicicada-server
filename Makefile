@@ -1,5 +1,5 @@
 # Copyright 2008-2015 Canonical
-# Copyright 2015-2016 Chicharreros (https://launchpad.net/~chicharreros)
+# Copyright 2015-2018 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -17,11 +17,10 @@
 # For further info, check  http://launchpad.net/magicicada-server
 
 DJANGO_SETTINGS_MODULE ?= magicicada.settings
-FLAKE8 = flake8
-PYTHON = python
+ENV = $(CURDIR)/.env
+PYTHON = $(ENV)/bin/$(PYTHON)
 SRC_DIR = $(CURDIR)/magicicada
 LIB_DIR = $(CURDIR)/lib
-ENV = $(CURDIR)/env
 PYTHONPATH := $(SRC_DIR):$(LIB_DIR):$(CURDIR):$(PYTHONPATH)
 DJANGO_ADMIN = $(LIB_DIR)/django/bin/django-admin.py
 DJANGO_MANAGE = $(PYTHON) manage.py
@@ -104,9 +103,17 @@ build-deploy-sourcedeps:
 tarball: build-for-deployment
 	tar czf ../filesync-server.tgz $(TAR_EXTRA) .
 
-bootstrap:
+bootstrap: venv
 	cat dependencies.txt | sudo xargs apt-get install -y --no-install-recommends
 	cat dependencies-devel.txt | sudo xargs apt-get install -y --no-install-recommends
+
+docker-bootstrap: clean
+	cat dependencies.txt | xargs apt-get install -y --no-install-recommends
+	cat dependencies-devel.txt | xargs apt-get install -y --no-install-recommends
+
+venv:
+	virtualenv --system-site-packages $(ENV)
+	$(ENV)/bin/pip install -r requirements.txt -r requirements-devel.txt
 
 raw-test:
 	./test $(TESTFLAGS)
@@ -120,13 +127,11 @@ clean:
 	rm -rf tmp/* _trial_temp $(ENV)
 
 lint:
-	virtualenv $(ENV)
-	$(ENV)/bin/pip install flake8 rst2html5
 	$(ENV)/bin/flake8 --filename='*.py' --exclude='migrations' $(SRC_DIR)
 	dev-scripts/check_readme.sh
 
 version:
-	bzr version-info --format=python > lib/versioninfo.py || true
+	bzr version-info --format=$(PYTHON) > lib/versioninfo.py || true
 
 start: build start-base start-filesync-server-group publish-api-port
 
@@ -147,7 +152,7 @@ stop-dbus:
 	dev-scripts/stop-dbus.sh
 
 start-supervisor:
-	@python dev-scripts/supervisor-config-dev.py
+	$(PYTHON) dev-scripts/supervisor-config-dev.py
 	-@$(START_SUPERVISORD) dev-scripts/supervisor-dev.conf.tpl
 
 stop-supervisor:
@@ -166,9 +171,9 @@ stop-%:
 	-@dev-scripts/supervisorctl-dev stop $*
 
 publish-api-port:
-	python -c 'from magicicada import settings; print >> file("tmp/filesyncserver.port", "w"), settings.TCP_PORT'
-	python -c 'from magicicada import settings; print >> file("tmp/filesyncserver.port.ssl", "w"), settings.SSL_PORT'
-	python -c 'from magicicada import settings; print >> file("tmp/filesyncserver-status.port", "w"), settings.API_STATUS_PORT'
+	$(PYTHON) -c 'from magicicada import settings; print >> file("tmp/filesyncserver.port", "w"), settings.TCP_PORT'
+	$(PYTHON) -c 'from magicicada import settings; print >> file("tmp/filesyncserver.port.ssl", "w"), settings.SSL_PORT'
+	$(PYTHON) -c 'from magicicada import settings; print >> file("tmp/filesyncserver-status.port", "w"), settings.API_STATUS_PORT'
 
 shell:
 	$(DJANGO_MANAGE) shell

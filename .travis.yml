@@ -1,13 +1,14 @@
-addons:
-    postgresql: "9.5"
+sudo: required
+dist: trusty
+language: bash
 
 services:
-    - postgresql
+    - docker
 
 before_install:
-    - sudo apt-get update
-    - make bootstrap
+    - docker pull ubuntu:16.04
+    - docker build -t magicicada-client-test-run .
 
 script:
-    - make clean-sourcedeps
-    - make test SOURCEDEPS_DIR=sourcedeps
+    - docker run magicicada-client-test-run make clean-sourcedeps
+    - docker run magicicada-client-test-run make test SOURCEDEPS_DIR=sourcedeps
