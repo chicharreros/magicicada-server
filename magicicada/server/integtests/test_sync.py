@@ -113,9 +113,14 @@ class TestSync(TestWithDatabase):
         self.share_source_dir = self.mktemp("source/share")
 
         self.patch(hash_queue, "HASHQUEUE_DELAY", 0.1)
+        connection_info = [{
+            'host': "localhost",
+            'port': self.ssl_port,
+            'use_ssl': True,
+            'disable_ssl_verify': True,
+        }]
         self.main = Main(root_dir, shares_dir, data_dir, partials_dir,
-                         "localhost", self.ssl_port, dns_srv=None, ssl=True,
-                         disable_ssl_verify=True)
+                         connection_info=connection_info)
         self.addCleanup(self.main.shutdown)
 
         self.eq = self.main.event_q
@@ -972,8 +977,8 @@ class TestServerCornerCases(TestServerBase):
 
         # check locally and in the server
         # it should only be our file in the directory, with content ok
-        l = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
-        self.assertEqual(l, ["foo"])
+        files = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
+        self.assertEqual(files, ["foo"])
         self.assertEqual(open(foo_path).read(), ":)")
         yield self.compare_server()
 
@@ -1130,8 +1135,8 @@ class TestClientMove(TestSync):
         yield self.main.wait_for_nirvana(.5)
 
         # check that everything is ok: it should only be our file in the dir...
-        l = os.listdir(dir2)
-        self.assertEqual(l, ["test_file"])
+        files = os.listdir(dir2)
+        self.assertEqual(files, ["test_file"])
 
         # ... and our file should have the correct content
         f = open(filepath2)
@@ -1172,8 +1177,8 @@ class TestClientMove(TestSync):
         def local_check(_):
             """Check that everything is ok"""
             # it should only be our file in the directory
-            l = os.listdir(dir2)
-            self.assertEqual(l, ["test_file"])
+            files = os.listdir(dir2)
+            self.assertEqual(files, ["test_file"])
 
             # our file should have the correct content
             f = open(filepath2)
@@ -1233,8 +1238,8 @@ class TestClientMove(TestSync):
 
         # wait dust to settle, check locally and in the server
         yield self.main.wait_for_nirvana(.5)
-        l = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
-        self.assertEqual(l, ["test_file"])
+        files = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
+        self.assertEqual(files, ["test_file"])
         yield self.compare_server()
 
     @defer.inlineCallbacks
@@ -1317,8 +1322,8 @@ class TestTimings(TestServerBase):
         yield self.main.wait_for_nirvana(0.5)
 
         # check that everything is ok
-        l = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
-        self.assertEqual(l, ["test_file"])
+        files = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
+        self.assertEqual(files, ["test_file"])
         with open(self.root_dir + "/test_file") as f:
             content = f.read()
         self.assertEqual(content, ":)")
@@ -1474,8 +1479,8 @@ class TestConflict(TestServerBase):
 
         def local_check(_):
             """check that everything is in sync"""
-            l = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
-            self.assertEqual(l, ["test_file"])
+            files = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
+            self.assertEqual(files, ["test_file"])
 
             final_data = open(self.root_dir + '/test_file').read()
             self.assertEqual(data, final_data)
@@ -1503,8 +1508,8 @@ class TestConflict(TestServerBase):
 
         def content_check(_):
             """Check that everything is in sync."""
-            l = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
-            self.assertEqual(l, ["test_dir"])
+            files = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
+            self.assertEqual(files, ["test_dir"])
             self.assertTrue(stat.S_ISDIR(
                 os.stat(self.root_dir + '/test_dir')[stat.ST_MODE]))
 
@@ -1564,8 +1569,8 @@ class TestConflict(TestServerBase):
         yield self.main.wait_for_nirvana(.5)
 
         # it should only be our file in the directory
-        l = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
-        self.assertEqual(l, ["test_file"])
+        files = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
+        self.assertEqual(files, ["test_file"])
 
         # our file should have the full content
         filesize = os.stat(self.root_dir + "/test_file").st_size
@@ -1610,8 +1615,8 @@ class TestConflict(TestServerBase):
         yield self.main.wait_for_nirvana(.5)
 
         # we should have both files...
-        l = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
-        self.assertEqual(sorted(l), ["test_file", "test_file.u1conflict"])
+        files = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
+        self.assertEqual(sorted(files), ["test_file", "test_file.u1conflict"])
 
         # ...with the respective content
         sanefile = open(test_file).read()
@@ -1631,8 +1636,8 @@ class TestConflict(TestServerBase):
         yield self.main.wait_for_nirvana(.5)
 
         # finally, only one file with right content
-        l = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
-        self.assertEqual(sorted(l), ["test_file"])
+        files = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
+        self.assertEqual(sorted(files), ["test_file"])
         sanefile = open(test_file).read()
         self.assertEqual(sanefile, data_local)
         yield self.compare_server()
@@ -1647,8 +1652,8 @@ class TestConflict(TestServerBase):
         yield self.main.wait_for_nirvana(.5)
 
         # finally, only one file with right content
-        l = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
-        self.assertEqual(sorted(l), ["test_file", "test_file_new"])
+        files = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
+        self.assertEqual(sorted(files), ["test_file", "test_file_new"])
         srvfile = open(test_file).read()
         self.assertEqual(srvfile, data_server)
         newfile = open(test_file + "_new").read()
@@ -1703,8 +1708,8 @@ class TestConflictOnServerSideDelete(TestServerBase):
 
         def no_conflict_check(_):
             """Check the absence of conflict, and the deletion of the node."""
-            l = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
-            self.assertEqual(l, [])
+            files = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
+            self.assertEqual(files, [])
 
         d = self.get_client()
         d.addCallback(self.create_and_check)
@@ -1740,8 +1745,8 @@ class TestConflictOnServerSideDelete(TestServerBase):
         self.update_state(None)
         yield self.main.wait_for_nirvana(.5)
 
-        l = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
-        self.assertEqual(sorted(l), [self.dir_name_conflict])
+        files = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
+        self.assertEqual(sorted(files), [self.dir_name_conflict])
 
 
 class TestConflict2(TestServerBase):
@@ -1757,7 +1762,7 @@ class TestConflict2(TestServerBase):
         os.mkdir(self.root_dir + "/test_dir/test_dir")
         try:
             yield self.client.unlink(request.ROOT, req.new_id)
-        except:
+        except Exception:
             # ignore if the unlink fails
             pass
         yield self.main.wait_for_nirvana(0.5)
@@ -1840,8 +1845,8 @@ class TestConflict2(TestServerBase):
         yield self.wait_for_nirvana(.5)
 
         # no conflicts, and the server with correct data
-        l = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
-        self.assertEqual(l, ['testfile'])
+        files = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
+        self.assertEqual(files, ['testfile'])
         self.assertEqual(open(fname).read(), "other content")
         yield self.check()
 
@@ -1879,8 +1884,8 @@ class TestConflict2(TestServerBase):
         play_hash()
 
         # check that we don't have conflict, and all is the same with server
-        l = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
-        self.assertEqual(l, ['tfile'])
+        files = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
+        self.assertEqual(files, ['tfile'])
         self.assertEqual(open(fname).read(), fcontent)
         yield self.check()
 
@@ -1916,8 +1921,8 @@ class TestConflict2(TestServerBase):
         yield self.wait_for_nirvana(.5)
 
         # check that we don't have conflict, and all is the same with server
-        l = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
-        self.assertEqual(l, ['tfile'])
+        files = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
+        self.assertEqual(files, ['tfile'])
         self.assertEqual(open(fname).read(), fcontent)
         yield self.check()
 
@@ -1958,8 +1963,8 @@ class TestConflict2(TestServerBase):
         yield self.wait_for_nirvana(.5)
 
         # check that we don't have conflict, and all is the same with server
-        l = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
-        self.assertEqual(sorted(l), ['tfile'])
+        files = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
+        self.assertEqual(sorted(files), ['tfile'])
         self.assertEqual(open(fname).read(), 'foo')
         yield self.check()
 
@@ -2301,8 +2306,8 @@ class TestLocalRescan(TestServerBase):
         self.aq.get_delta(request.ROOT, 0)
         yield self.main.wait_for_nirvana(0)
 
-        l = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
-        self.assertEqual(l, ["tfile"])
+        files = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
+        self.assertEqual(files, ["tfile"])
         yield self.check()
 
     @defer.inlineCallbacks
@@ -2494,8 +2499,8 @@ class TestOpenFiles(TestServerBase):
         yield wait_download
 
         # check the node is conflicted, both files with corerct content
-        l = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
-        self.assertEqual(sorted(l), ["test_file", "test_file.u1conflict"])
+        files = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
+        self.assertEqual(sorted(files), ["test_file", "test_file.u1conflict"])
         with open(filepath) as f:
             self.assertEqual(f.read(), ":)")
         with open(filepath + ".u1conflict") as f:
@@ -2520,8 +2525,8 @@ class TestOpenFiles(TestServerBase):
         yield self.main.wait_for_nirvana(0.5)
 
         # check that everything is ok
-        l = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
-        self.assertEqual(l, ["test_file"])
+        files = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
+        self.assertEqual(files, ["test_file"])
         with open(filepath) as f:
             self.assertEqual(f.read(), ":)")
 

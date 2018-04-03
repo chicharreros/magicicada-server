@@ -99,7 +99,7 @@ class TestShutdown(TwistedTestCase, BaseTestCase):
         try:
             yield client.put_content(request.ROOT, mkfile_req.new_id,
                                      empty_hash, "fake_hash", 1234, 1000, None)
-        except:
+        except Exception:
             client.transport.loseConnection()
 
         ujobs = self.usr0.get_uploadjobs(node_id=mkfile_req.new_id)

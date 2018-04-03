@@ -35,13 +35,11 @@ from ubuntuone.syncdaemon.action_queue import (
     ActionQueue,
     Download,
     Upload,
-    dns_client,
 )
 from ubuntuone.syncdaemon.marker import MDMarker as Marker
 
 from magicicada.server.testing.aq_helpers import (
     FakeFailure,
-    FakeResolver,
     NO_CONTENT_HASH,
     NoCloseStringIO,
     TestBase,
@@ -958,48 +956,3 @@ class TestMulticon(TestWithDatabase):
         d.addBoth(lambda _: self.main.wait_for_nirvana())
         d.addBoth(lambda _: self.eq.push('SYS_USER_DISCONNECT'))
         return d
-
-
-class SRVLookupTest(TestWithDatabase):
-    """ Test for SRV lookup in the ActionQueue. """
-
-    @defer.inlineCallbacks
-    def setUp(self):
-        """
-        Replace the resolver with a FakeResolver
-        """
-        yield super(SRVLookupTest, self).setUp()
-        dns_client.theResolver = FakeResolver()
-
-    @defer.inlineCallbacks
-    def tearDown(self):
-        """
-        By setting the resolver to None, it will be recreated next time a name
-        lookup is done.
-        """
-        yield super(SRVLookupTest, self).tearDown()
-        dns_client.theResolver = None
-
-    def test_SRV_lookup_dev(self):
-        """Test the srv lookup in development mode (localhost:<randomport>)."""
-
-        def checkResult(result):
-            """ Verify that we are correclty doing the lookup """
-            host, port = result
-            self.assertEqual(host, self.aq.host)
-
-        d = self.aq._lookup_srv()
-        d.addCallback(checkResult)
-        return d
-
-    def test_SRV_lookup_prod(self):
-        """ test the srv lookup using a fake resolver. """
-        def checkResult(result):
-            """ Verify that we are correclty doing the lookup """
-            host, port = result
-            self.assertTrue(host in ['fs-1.server.com', 'fs-0.server.com'],
-                            host)
-            self.assertEqual(port, 443)
-        self.aq.dns_srv = '_http._tcp.fs.server.com'
-        d = self.aq._lookup_srv()
-        d.addCallback(checkResult)
