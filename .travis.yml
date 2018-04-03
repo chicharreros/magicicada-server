@@ -7,8 +7,8 @@ services:
 
 before_install:
     - docker pull ubuntu:16.04
-    - docker build -t magicicada-client-test-run .
+    - docker build -t magicicada-server-test-run .
 
 script:
-    - docker run magicicada-client-test-run make clean-sourcedeps
-    - docker run magicicada-client-test-run make test SOURCEDEPS_DIR=sourcedeps
+    - docker run magicicada-server-test-run make clean-sourcedeps
+    - docker run magicicada-server-test-run make test SOURCEDEPS_DIR=sourcedeps

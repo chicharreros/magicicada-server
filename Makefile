@@ -126,7 +126,7 @@ ci-test:
 clean:
 	rm -rf tmp/* _trial_temp $(ENV)
 
-lint:
+lint: venv
 	$(ENV)/bin/flake8 --filename='*.py' --exclude='migrations' $(SRC_DIR)
 	dev-scripts/check_readme.sh
 
