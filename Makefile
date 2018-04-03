@@ -112,7 +112,7 @@ docker-bootstrap: clean
 	cat dependencies-devel.txt | xargs apt-get install -y --no-install-recommends
 
 venv:
-	virtualenv --system-site-packages $(ENV)
+	virtualenv $(ENV)
 	$(ENV)/bin/pip install -r requirements.txt -r requirements-devel.txt
 
 raw-test:
