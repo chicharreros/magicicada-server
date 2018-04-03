@@ -10,3 +10,4 @@ python-pyinotify
 python-testtools
 python-twisted-names
 python-virtualenv
+virtualenv
