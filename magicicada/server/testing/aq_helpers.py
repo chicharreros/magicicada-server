@@ -165,8 +165,7 @@ class DumbVolumeManager(volume_manager.VolumeManager):
 class ReallyFakeMain(main.Main):
     """This main is so fake, it breaks nearly everything."""
 
-    def __init__(self, port, root_dir, data_dir, partials_dir,
-                 dns_srv=None):
+    def __init__(self, port, root_dir, data_dir, partials_dir):
         self.root_dir = root_dir
         self.shares_dir = os.path.join(os.path.dirname(root_dir), 'shares_dir')
         self.shares_dir_link = os.path.join(root_dir, 'shares_link')
@@ -186,8 +185,13 @@ class ReallyFakeMain(main.Main):
         self.event_q.subscribe(self.vm)
         self.fs.register_eq(self.event_q)
         self.sync = Sync(self)
-        self.action_q = ActionQueue(self.event_q, self, '127.0.0.1', port,
-                                    dns_srv, disable_ssl_verify=True)
+        connection_info = [{
+            'host': '127.0.0.1',
+            'port': port,
+            'use_ssl': False,
+            'disable_ssl_verify': True,
+        }]
+        self.action_q = ActionQueue(self.event_q, self, connection_info)
         self.state_manager = main.StateManager(self, handshake_timeout=30)
         self.state_manager.connection.waiting_timeout = .1
         self.vm.init_root()
@@ -353,7 +357,6 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
             }
             user = self.make_user(username=username, password=password)
             self.storage_users[username] = user
-        self.dns_srv = None
 
         # override and cleanup user config
         self.old_get_config_files = main.config.get_config_files
@@ -442,8 +445,7 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
         root_dir = self.mktemp('fake_root_dir')
         data_dir = self.mktemp('fake_data_dir')
         partials = self.mktemp('partials_dir')
-        self.main = ReallyFakeMain(self.port, root_dir,
-                                   data_dir, partials, self.dns_srv)
+        self.main = ReallyFakeMain(self.port, root_dir, data_dir, partials)
         self.state = self.main.state_manager
         self.eq = self.main.event_q
         self.listener = ReallyAttentiveListener()
@@ -765,7 +767,8 @@ class MethodInterferer(object):
         """Nukes the method"""
         self.old = getattr(self.obj, self.meth)
         if func is None:
-            def func(*args, **kwargs): return None
+            def func(*args, **kwargs):
+                return None
         setattr(self.obj, self.meth, func)
         return info
 
@@ -808,7 +811,8 @@ class NukeAQClient(object):
         """Nukes the method"""
         self.old = getattr(self.aq.client, self.meth)
         if func is None:
-            def func(*args, **kwargs): return defer.Deferred
+            def func(*args, **kwargs):
+                return defer.Deferred
         setattr(self.aq.client, self.meth, func)
         return info
 

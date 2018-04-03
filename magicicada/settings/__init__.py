@@ -32,6 +32,7 @@ from __future__ import unicode_literals, print_function
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 import logging
 import os
+import sys
 
 from psycopg2.extensions import ISOLATION_LEVEL_REPEATABLE_READ
 
@@ -264,4 +265,4 @@ STORAGE_BASEDIR = os.path.join(BASE_DIR, 'tmp', 'filestorage')
 try:
     from magicicada.settings.local import *  # noqa
 except ImportError as err:
-    print("ERROR importing local settings:", err)
+    print("ERROR importing local settings:", err, file=sys.stderr)
