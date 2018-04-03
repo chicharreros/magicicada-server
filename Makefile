@@ -18,7 +18,7 @@
 
 DJANGO_SETTINGS_MODULE ?= magicicada.settings
 ENV = $(CURDIR)/.env
-PYTHON = $(ENV)/bin/$(PYTHON)
+PYTHON = $(ENV)/bin/python
 SRC_DIR = $(CURDIR)/magicicada
 LIB_DIR = $(CURDIR)/lib
 PYTHONPATH := $(SRC_DIR):$(LIB_DIR):$(CURDIR):$(PYTHONPATH)
