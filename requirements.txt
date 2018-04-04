@@ -2,7 +2,6 @@ Django<1.10
 configglue
 https://launchpad.net/dirspec/stable-13-10/13.10/+download/dirspec-13.10.tar.gz
 cython
-meliae
 pyOpenSSL
 protobuf
 psycopg2-binary

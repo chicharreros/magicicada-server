@@ -1,7 +1,8 @@
 flake8
-rst2html5
 dbus-python
 pygobject
+meliae
 mock
 mocker
 pyinotify
+rst2html5
