@@ -24,7 +24,7 @@ from mock import patch
 from unittest import TestCase
 
 from metrics import get_meter
-from metrics.services import revno, version_info
+from metrics.services import revno
 
 
 class ServicesTest(TestCase):
@@ -35,4 +35,4 @@ class ServicesTest(TestCase):
         service_meter = get_meter('service')
         with patch.object(service_meter, 'gauge') as gauge:
             revno()
-            gauge.assert_called_with('revno', version_info['revno'])
+            gauge.assert_called_with('revno', 'revno-undefined')

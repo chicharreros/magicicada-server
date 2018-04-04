@@ -60,14 +60,6 @@ from magicicada.rpcdb import inthread
 from magicicada.server import auth, content, errors, stats
 from magicicada.server.diskstorage import DiskStorage
 
-try:
-    from versioninfo import version_info
-except ImportError:
-    version_info = {
-        'branch_nick': 'Unavailable',
-        'revno': 'Unavailable',
-    }
-
 
 # this is the minimal cap we support (to avoid hardcoding it in the code)
 MIN_CAP = frozenset(['no-content', 'account-info', 'resumable-uploads',
@@ -381,8 +373,9 @@ class StorageServer(request.RequestHandler):
         request.RequestHandler.connectionMade(self)
         self.factory.protocols.append(self)
         self.log.info('Connection Made')
+        # XXX: calculate revno
         msg = '%d filesync server revision %s.\r\n' % (
-            self.PROTOCOL_VERSION, version_info['revno'])
+            self.PROTOCOL_VERSION, 'revno-undefined')
         self.transport.write(msg)
         self.ping_loop.start()
         self.factory.metrics.meter('connection_made', 1)

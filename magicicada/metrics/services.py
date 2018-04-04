@@ -21,14 +21,10 @@
 from __future__ import unicode_literals
 
 from metrics import get_meter
-try:
-    from versioninfo import version_info
-except ImportError:
-    version_info = {'revno': 'Undefined'}
-
-meter = get_meter('service')
 
 
 def revno():
     """Trigger a service revision number update."""
-    meter.gauge('revno', version_info['revno'])
+    meter = get_meter('service')
+    # XXX: calculate revno
+    meter.gauge('revno', 'revno-undefined')

@@ -67,7 +67,7 @@ endif
 	$(MAKE) build-sourcedeps
 	touch $(SOURCEDEPS_TAG)
 
-build: link-sourcedeps build-sourcedeps version
+build: link-sourcedeps build-sourcedeps
 
 link-sourcedeps:
 	@echo "Checking out external source dependencies..."
@@ -76,7 +76,7 @@ link-sourcedeps:
 
 # no need to link sourcedeps before building them, as rollout process
 # handles config-manager.txt automatically
-build-for-deployment: build-deploy-sourcedeps version
+build-for-deployment: build-deploy-sourcedeps
 
 build-sourcedeps: build-deploy-sourcedeps
 	@echo "Building client clientdefs.py"
@@ -115,17 +115,19 @@ docker-bootstrap: clean
 	$(MAKE) venv
 	mkdir -p tmp
 
-$(ENV): requirements.txt requirements-devel.txt
+$(ENV): $(ENV)/bin/activate
+
+# only runs when requirements.txt or requirements-devel.txt changes
+$(ENV)/bin/activate: requirements.txt requirements-devel.txt
 	test -d $(ENV) || virtualenv $(ENV)
 	$(ENV)/bin/pip install -Ur requirements.txt
 	$(ENV)/bin/pip install -Ur requirements-devel.txt
-
-venv: $(ENV)
+	touch $(ENV)/bin/activate
 
 raw-test:
 	$(PYTHON) test $(TESTFLAGS)
 
-test: lint sourcedeps version start-db start-base start-dbus raw-test stop
+test: lint sourcedeps start-db start-base start-dbus raw-test stop
 
 ci-test:
 	$(MAKE) test TESTFLAGS="-1 $(TESTFLAGS)"
@@ -133,12 +135,9 @@ ci-test:
 clean:
 	rm -rf tmp/* _trial_temp $(ENV)
 
-lint:
+lint: $(ENV)
 	$(ENV)/bin/flake8 --filename='*.py' --exclude='migrations' $(SRC_DIR)
 	dev-scripts/check_readme.sh
-
-version:
-	bzr version-info --format=python > lib/versioninfo.py || true
 
 start: build start-base start-filesync-server-group publish-api-port
 
@@ -192,6 +191,6 @@ admin:
 	$(DJANGO_ADMIN) $(ARGS)
 
 .PHONY: sourcedeps link-sourcedeps build-sourcedeps build-deploy-sourcedeps \
-	build clean version lint test ci-test build-for-deployment \
+	build clean lint test ci-test build-for-deployment \
 	clean-sourcedeps tarball start stop publish-api-port start-supervisor \
 	stop-supervisor start-dbus stop-dbus start-heapy
