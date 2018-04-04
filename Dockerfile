@@ -12,3 +12,4 @@ RUN chown -R ubuntu:ubuntu /home/ubuntu
 
 USER ubuntu
 ENV HOME /home/ubuntu
+ENV PG_HOST /home/ubuntu/pg_data
