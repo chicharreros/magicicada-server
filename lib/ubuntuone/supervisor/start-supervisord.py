@@ -79,7 +79,7 @@ def main(tpls):
     except OSError:
         pass
 
-    os_exec("supervisord", "-c", conf_file_path)
+    os_exec(".env/bin/supervisord", "-c", conf_file_path)
 
 
 if __name__ == "__main__":

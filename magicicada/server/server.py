@@ -41,7 +41,6 @@ import twisted
 import twisted.web.error
 
 import metrics
-import metrics.services
 
 from twisted.application.service import MultiService, Service
 from twisted.application.internet import TCPServer
@@ -2676,7 +2675,6 @@ class StorageServerService(OrderedMultiService):
         self.factory.rpc_dal = self.rpc_dal
         self.metrics.meter('server_start')
         self.metrics.increment('services_active')
-        metrics.services.revno()
 
         self._reactor_inspector.start()
         # only start the HeartbeatWriter if the interval is > 0

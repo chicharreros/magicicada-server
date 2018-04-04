@@ -36,7 +36,6 @@ from ubuntuone.storageprotocol import request
 from ubuntuone.supervisor import utils as supervisor_utils
 
 import metrics
-import metrics.services
 
 from magicicada.filesync.models import StorageUser
 from magicicada.server.server import logger
@@ -119,9 +118,6 @@ class TestBasic(TestWithDatabase):
 
         service_meter = mocker.mock(name='meter')
         self.service.metrics = service_meter
-
-        revno = mocker.mock(name='revno')
-        self.patch(metrics.services, 'revno', revno)
 
         service_meter.meter('server_stop')
         service_meter.decrement('services_active')
