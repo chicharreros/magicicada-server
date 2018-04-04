@@ -35,8 +35,6 @@ from twisted.web import client, error
 from ubuntuone.storageprotocol import request
 from ubuntuone.supervisor import utils as supervisor_utils
 
-import metrics
-
 from magicicada.filesync.models import StorageUser
 from magicicada.server.server import logger
 from magicicada.server.testing.testcase import TestWithDatabase
@@ -125,9 +123,6 @@ class TestBasic(TestWithDatabase):
         service_meter.increment('services_active')
 
         service_meter.timing("busy.ping", ANY)
-        mocker.count(0, None)
-
-        revno()
         mocker.count(0, None)
 
         with mocker:
