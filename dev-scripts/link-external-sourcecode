@@ -1,4 +1,4 @@
-#!/usr/bin/python -Wignore
+#!/usr/bin/env python
 
 # Copyright 2008-2015 Canonical
 # Copyright 2015 Chicharreros (https://launchpad.net/~chicharreros)

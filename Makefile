@@ -74,10 +74,6 @@ link-sourcedeps:
 	dev-scripts/link-external-sourcecode -p $(SOURCEDEPS_SOURCECODE_DIR)/ \
 		-t $(TARGET_SOURCECODE_DIR) -c config-manager.txt
 
-# no need to link sourcedeps before building them, as rollout process
-# handles config-manager.txt automatically
-build-for-deployment: build-deploy-sourcedeps
-
 build-sourcedeps: build-deploy-sourcedeps
 	@echo "Building client clientdefs.py"
 	@cd .sourcecode/magicicada-client/ubuntuone/ && sed \
@@ -99,9 +95,6 @@ build-deploy-sourcedeps:
 
 	@echo "Generating twistd plugin cache"
 	@$(PYTHON) -c "from twisted.plugin import IPlugin, getPlugins; list(getPlugins(IPlugin));"
-
-tarball: build-for-deployment
-	tar czf ../filesync-server.tgz $(TAR_EXTRA) .
 
 bootstrap:
 	cat dependencies.txt | sudo xargs apt-get install -y --no-install-recommends
@@ -191,6 +184,5 @@ admin:
 	$(DJANGO_ADMIN) $(ARGS)
 
 .PHONY: sourcedeps link-sourcedeps build-sourcedeps build-deploy-sourcedeps \
-	build clean lint test ci-test build-for-deployment \
-	clean-sourcedeps tarball start stop publish-api-port start-supervisor \
-	stop-supervisor start-dbus stop-dbus start-heapy
+	build clean lint test ci-test clean-sourcedeps start stop publish-api-port \
+	start-supervisor stop-supervisor start-dbus stop-dbus start-heapy

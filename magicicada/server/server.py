@@ -373,9 +373,7 @@ class StorageServer(request.RequestHandler):
         request.RequestHandler.connectionMade(self)
         self.factory.protocols.append(self)
         self.log.info('Connection Made')
-        # XXX: calculate revno
-        msg = '%d filesync server revision %s.\r\n' % (
-            self.PROTOCOL_VERSION, 'revno-undefined')
+        msg = '%d filesync server.\r\n' % self.PROTOCOL_VERSION
         self.transport.write(msg)
         self.ping_loop.start()
         self.factory.metrics.meter('connection_made', 1)
