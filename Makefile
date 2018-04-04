@@ -106,13 +106,13 @@ tarball: build-for-deployment
 bootstrap:
 	cat dependencies.txt | sudo xargs apt-get install -y --no-install-recommends
 	cat dependencies-devel.txt | sudo xargs apt-get install -y --no-install-recommends
-	$(MAKE) venv
+	$(MAKE) $(ENV)
 	$(MAKE) sourcedeps
 
 docker-bootstrap: clean
 	cat dependencies.txt | xargs apt-get install -y --no-install-recommends
 	cat dependencies-devel.txt | xargs apt-get install -y --no-install-recommends
-	$(MAKE) venv
+	$(MAKE) $(ENV)
 	mkdir -p tmp
 
 $(ENV): $(ENV)/bin/activate
