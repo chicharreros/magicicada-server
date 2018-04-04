@@ -113,6 +113,7 @@ docker-bootstrap: clean
 	cat dependencies.txt | xargs apt-get install -y --no-install-recommends
 	cat dependencies-devel.txt | xargs apt-get install -y --no-install-recommends
 	$(MAKE) venv
+	mkdir -p tmp
 
 $(ENV): requirements.txt requirements-devel.txt
 	test -d $(ENV) || virtualenv $(ENV)
