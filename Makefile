@@ -116,7 +116,8 @@ docker-bootstrap: clean
 
 $(ENV): requirements.txt requirements-devel.txt
 	test -d $(ENV) || virtualenv $(ENV)
-	$(ENV)/bin/pip install -Ur requirements.txt -Ur requirements-devel.txt
+	$(ENV)/bin/pip install -Ur requirements.txt
+	$(ENV)/bin/pip install -Ur requirements-devel.txt
 
 venv: $(ENV)
 
