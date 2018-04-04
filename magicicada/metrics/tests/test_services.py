@@ -21,7 +21,7 @@
 from __future__ import unicode_literals
 
 from mock import patch
-from testtools import TestCase
+from unittest import TestCase
 
 from metrics import get_meter
 from metrics.services import revno, version_info

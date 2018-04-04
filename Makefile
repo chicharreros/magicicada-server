@@ -103,22 +103,27 @@ build-deploy-sourcedeps:
 tarball: build-for-deployment
 	tar czf ../filesync-server.tgz $(TAR_EXTRA) .
 
-bootstrap: venv
+bootstrap:
 	cat dependencies.txt | sudo xargs apt-get install -y --no-install-recommends
 	cat dependencies-devel.txt | sudo xargs apt-get install -y --no-install-recommends
+	$(MAKE) venv
+	$(MAKE) sourcedeps
 
 docker-bootstrap: clean
 	cat dependencies.txt | xargs apt-get install -y --no-install-recommends
 	cat dependencies-devel.txt | xargs apt-get install -y --no-install-recommends
+	$(MAKE) venv
 
-venv:
-	virtualenv $(ENV)
-	$(ENV)/bin/pip install -r requirements.txt -r requirements-devel.txt
+$(ENV): requirements.txt requirements-devel.txt
+	test -d $(ENV) || virtualenv $(ENV)
+	$(ENV)/bin/pip install -Ur requirements.txt -Ur requirements-devel.txt
+
+venv: $(ENV)
 
 raw-test:
-	./test $(TESTFLAGS)
+	$(PYTHON) test $(TESTFLAGS)
 
-test: lint sourcedeps clean version start-db start-base start-dbus raw-test stop
+test: lint sourcedeps version start-db start-base start-dbus raw-test stop
 
 ci-test:
 	$(MAKE) test TESTFLAGS="-1 $(TESTFLAGS)"
@@ -126,12 +131,12 @@ ci-test:
 clean:
 	rm -rf tmp/* _trial_temp $(ENV)
 
-lint: venv
+lint:
 	$(ENV)/bin/flake8 --filename='*.py' --exclude='migrations' $(SRC_DIR)
 	dev-scripts/check_readme.sh
 
 version:
-	bzr version-info --format=$(PYTHON) > lib/versioninfo.py || true
+	bzr version-info --format=python > lib/versioninfo.py || true
 
 start: build start-base start-filesync-server-group publish-api-port
 

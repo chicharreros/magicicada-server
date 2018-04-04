@@ -75,7 +75,6 @@ Install tools and dependencies (you will be prompted for your password for sudo
 access)::
 
     make bootstrap
-    make sourcedeps
 
 If you are in Xenial, please also install virtualenv (didn't include it in
 the previous step as it doesn't exist as a separate package in older systems)::

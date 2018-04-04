@@ -54,10 +54,10 @@ def setup_environment(django_settings):
         with open(dbus_address_file) as fh:
             os.environ["DBUS_SESSION_BUS_ADDRESS"] = fh.read().strip()
 
-    # install the glib2reactor before any import of the reactor to avoid
+    # install the twisted reactor before any import of the reactor to avoid
     # using the default SelectReactor and be able to run the dbus tests
-    from twisted.internet import glib2reactor
-    glib2reactor.install()
+    from twisted.internet import gireactor
+    gireactor.install()
 
 
 if __name__ == "__main__":
