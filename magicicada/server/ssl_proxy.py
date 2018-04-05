@@ -34,7 +34,7 @@ from twisted.web import server, resource
 import metrics
 
 from magicicada import settings
-from magicicada.server.server import get_service_port
+from magicicada.server.server import FILESYNC_STATUS_MSG, get_service_port
 from magicicada.server.ssl import disable_ssl_compression
 from ubuntuone.supervisor import utils as supervisor_utils
 
@@ -164,7 +164,7 @@ class RemoteHostChecker(basic.LineReceiver):
 
     def lineReceived(self, line):
         """Handle a single line received."""
-        if "filesync server revision" in line:
+        if FILESYNC_STATUS_MSG in line:
             self.factory.deferred.callback(line)
         else:
             self.factory.deferred.errback(ValueError(line))

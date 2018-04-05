@@ -76,6 +76,8 @@ SUGGESTED_REDIRS = {
     # frozenset(['example2']): dict(srv_record='_https._tcp.fs.server.com')
 }
 
+FILESYNC_STATUS_MSG = 'filesync server'
+
 logger = logging.getLogger(__name__)
 
 
@@ -372,7 +374,7 @@ class StorageServer(request.RequestHandler):
         request.RequestHandler.connectionMade(self)
         self.factory.protocols.append(self)
         self.log.info('Connection Made')
-        msg = '%d filesync server.\r\n' % self.PROTOCOL_VERSION
+        msg = '%d %s.\r\n' % (self.PROTOCOL_VERSION, FILESYNC_STATUS_MSG)
         self.transport.write(msg)
         self.ping_loop.start()
         self.factory.metrics.meter('connection_made', 1)

@@ -36,10 +36,12 @@ def write_conf(tpl, inet_http_server_port):
     """Write out filled in conf template in tmp."""
     template = open(os.path.join(ROOT_DIR, tpl)).read()
 
-    template_vars = {}
-    template_vars['inet_http_server_port'] = inet_http_server_port
-    template_vars['basepath'] = ROOT_DIR
-    template_vars['tmp_dir'] = TMP_DIR
+    template_vars = {
+        'inet_http_server_port': inet_http_server_port,
+        'basepath': ROOT_DIR,
+        'tmp_dir': TMP_DIR,
+        'pythonpath': ':'.join(filter(None, sys.path)),
+    }
 
     conf = template % template_vars
 

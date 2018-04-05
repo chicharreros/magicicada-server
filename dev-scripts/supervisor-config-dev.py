@@ -20,24 +20,68 @@
 
 import os
 import socket
+import sys
 
 import _pythonpath  # NOQA
 
 from ubuntuone.supervisor.config_helpers import generate_server_config
-from utilities import utils
+from utilities.utils import get_rootdir, get_tmpdir
 
-from supervisor_templates import TEMPLATES
 
-ROOTDIR = utils.get_rootdir()
-TMPDIR = os.path.join(ROOTDIR, 'tmp')
-if not os.path.exists(TMPDIR):
-    os.mkdir(TMPDIR)
+ROOT_DIR = get_rootdir()
+TMP_DIR = get_tmpdir()
 
+
+FILESYNC_TEMPLATE = (
+    '[program:%(instance_name)s]\n'
+    'command=%(basepath)s/dev-scripts/set_rlimits.sh -d %(fs_memory_limit)s '
+    '-m %(fs_memory_limit)s -v %(fs_memory_limit)s -n %(open_fds)s '
+    '%(basepath)s/.env/bin/twistd --pidfile %(pid_folder)s/fsync_slave_%(instance)s.pid '
+    '-n -y %(basepath)s/magicicada/server/server.tac '
+    '--reactor=epoll\n'
+    'environment=DJANGO_SETTINGS_MODULE="magicicada.settings",'
+    'PYTHONPATH="%(pythonpath)s",'
+    'FSYNC_INSTANCE_ID=%(instance)03d,'
+    'CONFIG="%(basepath)s/configs/%(config)s"%(environment_vars)s\n'
+    'autostart=false\n'
+    'stdout_capture_maxbytes=%(stdout_capture_maxbytes)s\n'
+    'stopsignal=INT\n'
+)
+
+SSL_PROXY_TEMPLATE = (
+    '[program:%(instance_name)s]\n'
+    'command=%(basepath)s/dev-scripts/set_rlimits.sh -d %(ssl_memory_limit)s '
+    '-m %(ssl_memory_limit)s -v %(ssl_memory_limit)s -n %(open_fds)s '
+    '%(basepath)s/.env/bin/twistd --pidfile %(pid_folder)s/ssl-proxy-%(instance)s.pid '
+    '-n -y %(basepath)s/magicicada/server/ssl_proxy.tac '
+    '--reactor=epoll\n'
+    'environment=DJANGO_SETTINGS_MODULE="magicicada.settings",'
+    'PYTHONPATH="%(pythonpath)s",'
+    'FSYNC_INSTANCE_ID=%(instance)03d,'
+    'CONFIG="%(basepath)s/configs/%(config)s",'
+    'FSYNC_SERVICE_NAME="ssl-proxy"%(environment_vars)s\n'
+    'autostart=false\n'
+    'stdout_capture_maxbytes=%(stdout_capture_maxbytes)s\n'
+    'stopsignal=INT\n'
+)
+
+
+TEMPLATES = {
+    'filesync': {
+        'name': "filesync-worker-%(instance)d",
+        'config': FILESYNC_TEMPLATE,
+    },
+    'ssl-proxy': {
+        'name': "ssl-proxy-%(instance)d",
+        'config': SSL_PROXY_TEMPLATE,
+    },
+}
 
 config_spec = {
-    "basepath": ROOTDIR,
-    "log_folder": TMPDIR,
-    "pid_folder": TMPDIR,
+    "basepath": ROOT_DIR,
+    "log_folder": TMP_DIR,
+    "pid_folder": TMP_DIR,
+    "pythonpath": ':'.join(filter(None, sys.path)),
 }
 
 workers = {}
@@ -52,5 +96,5 @@ if __name__ == '__main__':
     config_content = generate_server_config(
         hostname, services, config_spec, TEMPLATES, None,
         with_heartbeat=False, with_header=False)
-    with open(os.path.join(TMPDIR, 'services-supervisor.conf'), 'w') as f:
+    with open(os.path.join(TMP_DIR, 'services-supervisor.conf'), 'w') as f:
         f.write(config_content)

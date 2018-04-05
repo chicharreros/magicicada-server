@@ -33,12 +33,8 @@ import zlib
 from threading import Thread
 from optparse import OptionParser
 
-try:
-    from twisted.internet import gireactor
-    gireactor.install()
-except ImportError:
-    from twisted.internet import glib2reactor
-    glib2reactor.install()
+from twisted.internet import gireactor
+gireactor.install()
 
 from dbus.mainloop.glib import DBusGMainLoop
 DBusGMainLoop(set_as_default=True)

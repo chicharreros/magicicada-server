@@ -21,7 +21,8 @@ ENV = $(CURDIR)/.env
 PYTHON = $(ENV)/bin/python
 SRC_DIR = $(CURDIR)/magicicada
 LIB_DIR = $(CURDIR)/lib
-PYTHONPATH := $(SRC_DIR):$(LIB_DIR):$(CURDIR):$(PYTHONPATH)
+PATH := $(ENV)/bin:$(PATH)
+PYTHONPATH := $(ENV)/lib/python2.7:$(ENV)/lib/python2.7/site-packages:$(SRC_DIR):$(LIB_DIR):$(CURDIR):$(PYTHONPATH)
 DJANGO_ADMIN = $(LIB_DIR)/django/bin/django-admin.py
 DJANGO_MANAGE = $(PYTHON) manage.py
 
@@ -31,7 +32,9 @@ PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=cpp
 PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION_VERSION=2
 
 START_SUPERVISORD = lib/ubuntuone/supervisor/start-supervisord.py
+SUPERVISOR_CTL = $(ENV)/bin/supervisorctl
 
+export PATH
 export PYTHONPATH
 export DJANGO_SETTINGS_MODULE
 export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION
@@ -101,6 +104,7 @@ bootstrap:
 	cat dependencies-devel.txt | sudo xargs apt-get install -y --no-install-recommends
 	$(MAKE) $(ENV)
 	$(MAKE) sourcedeps
+	mkdir -p tmp
 
 docker-bootstrap: clean
 	cat dependencies.txt | xargs apt-get install -y --no-install-recommends
@@ -132,7 +136,7 @@ lint: $(ENV)
 	$(ENV)/bin/flake8 --filename='*.py' --exclude='migrations' $(SRC_DIR)
 	dev-scripts/check_readme.sh
 
-start: build start-base start-filesync-server-group publish-api-port
+start: $(ENV) build start-base start-filesync-server-group publish-api-port
 
 resume: start-base start-filesync-server-group
 
@@ -142,7 +146,7 @@ start-heapy:
 start-base:
 	$(MAKE) start-supervisor && $(MAKE) start-dbus || ( $(MAKE) stop ; exit 1 )
 
-stop: stop-filesync-dummy-group stop-supervisor stop-dbus
+stop: stop-supervisor stop-dbus
 
 start-dbus:
 	dev-scripts/start-dbus.sh
@@ -155,19 +159,19 @@ start-supervisor:
 	-@$(START_SUPERVISORD) dev-scripts/supervisor-dev.conf.tpl
 
 stop-supervisor:
-	-@dev-scripts/supervisorctl-dev shutdown
+	$(SUPERVISOR_CTL) -c $(CURDIR)/tmp/supervisor-dev.conf shutdown
 
 start-%-group:
-	-@dev-scripts/supervisorctl-dev start $*:
+	$(SUPERVISOR_CTL) -c $(CURDIR)/tmp/supervisor-dev.conf start $*:
 
 stop-%-group:
-	-@dev-scripts/supervisorctl-dev stop $*:
+	$(SUPERVISOR_CTL) -c $(CURDIR)/tmp/supervisor-dev.conf stop $*:
 
 start-%:
-	-@dev-scripts/supervisorctl-dev start $*
+	$(SUPERVISOR_CTL) -c $(CURDIR)/tmp/supervisor-dev.conf start $*
 
 stop-%:
-	-@dev-scripts/supervisorctl-dev stop $*
+	$(SUPERVISOR_CTL) -c $(CURDIR)/tmp/supervisor-dev.conf stop $*
 
 publish-api-port:
 	$(PYTHON) -c 'from magicicada import settings; print >> file("tmp/filesyncserver.port", "w"), settings.TCP_PORT'

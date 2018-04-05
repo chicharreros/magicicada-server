@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#! /usr/bin/env python -i
 
 # Copyright 2008-2015 Canonical
 # Copyright 2015-2018 Chicharreros (https://launchpad.net/~chicharreros)

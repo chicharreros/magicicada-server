@@ -25,20 +25,20 @@ files=services-supervisor.conf workers-supervisor.conf
 
 [eventlistener:heartbeat]
 command=python %(basepath)s/lib/ubuntuone/supervisor/heartbeat_listener.py --interval=10 --timeout=20 --log_level=DEBUG --log_file=%(tmp_dir)s/heartbeat.log --groups=filesync-server
-environment=PYTHONPATH="%(basepath)s:%(basepath)s/lib"
+environment=PYTHONPATH="%(pythonpath)s"
 events=PROCESS_COMMUNICATION,TICK_5
 buffer_size=42
 
 [program:filesync]
 command=%(basepath)s/.env/bin/twistd --pidfile %(tmp_dir)s/filesync.pid -n -y %(basepath)s/magicicada/server/server.tac --reactor=epoll
-environment=PYTHONPATH="%(basepath)s:%(basepath)s/lib",DJANGO_SETTINGS_MODULE="magicicada.settings",PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=cpp
+environment=PYTHONPATH="%(pythonpath)s",DJANGO_SETTINGS_MODULE="magicicada.settings",PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=cpp
 stdout_capture_maxbytes=16384
 autostart=false
 stopsignal=INT
 
 [program:ssl-proxy]
 command=%(basepath)s/.env/bin/twistd --pidfile %(tmp_dir)s/ssl-proxy.pid -n -y %(basepath)s/magicicada/server/ssl_proxy.tac  --reactor=epoll
-environment=PYTHONPATH="%(basepath)s:%(basepath)s/lib",DJANGO_SETTINGS_MODULE="magicicada.settings"
+environment=PYTHONPATH="%(pythonpath)s",DJANGO_SETTINGS_MODULE="magicicada.settings"
 stdout_capture_maxbytes=16384
 autostart=false
 stopsignal=INT
