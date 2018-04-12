@@ -4,4 +4,5 @@ make
 postgresql-9.5
 postgresql-contrib
 postgresql-plpython-9.5
+python-dev
 virtualenv
