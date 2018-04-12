@@ -23,4 +23,3 @@
 
 ./.sourcecode/u1sync                      ~facundo/u1sync/opensourcing;revno=10
 ./.sourcecode/magicicada-client           ~chicharreros/magicicada-client/trunk;revno=1440
-./.sourcecode/magicicada-protocol         ~chicharreros/magicicada-protocol/trunk;revno=169

@@ -4,5 +4,4 @@ make
 postgresql-9.5
 postgresql-contrib
 postgresql-plpython-9.5
-protobuf-compiler
-python-dev
+virtualenv

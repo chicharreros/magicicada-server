@@ -22,7 +22,7 @@ PYTHON = $(ENV)/bin/python
 SRC_DIR = $(CURDIR)/magicicada
 LIB_DIR = $(CURDIR)/lib
 PATH := $(ENV)/bin:$(PATH)
-PYTHONPATH := $(ENV)/lib/python2.7:$(ENV)/lib/python2.7/site-packages:$(SRC_DIR):$(LIB_DIR):$(CURDIR):$(PYTHONPATH)
+PYTHONPATH := $(SRC_DIR):$(LIB_DIR):$(CURDIR):$(PYTHONPATH)
 DJANGO_ADMIN = $(LIB_DIR)/django/bin/django-admin.py
 DJANGO_MANAGE = $(PYTHON) manage.py
 
@@ -46,8 +46,6 @@ SOURCEDEPS_DIR ?= ../sourcedeps
 SOURCEDEPS_SOURCECODE_DIR = $(SOURCEDEPS_DIR)/sourcecode
 TARGET_SOURCECODE_DIR = $(CURDIR)/.sourcecode
 
-BUILD_DEPLOY_SOURCEDEPS=magicicada-protocol
-
 TESTFLAGS=
 
 TAR_EXTRA = --exclude 'tmp/*' --exclude tags
@@ -67,49 +65,33 @@ $(SOURCEDEPS_TAG):
 ifndef EXPORT_FROM_BZR
 	$(MAKE) link-sourcedeps
 endif
-	$(MAKE) build-sourcedeps
 	touch $(SOURCEDEPS_TAG)
-
-build: link-sourcedeps build-sourcedeps
 
 link-sourcedeps:
 	@echo "Checking out external source dependencies..."
 	dev-scripts/link-external-sourcecode -p $(SOURCEDEPS_SOURCECODE_DIR)/ \
 		-t $(TARGET_SOURCECODE_DIR) -c config-manager.txt
 
-build-sourcedeps: build-deploy-sourcedeps
+build-clientdefs:
 	@echo "Building client clientdefs.py"
-	@cd .sourcecode/magicicada-client/ubuntuone/ && sed \
+	@cd $(TARGET_SOURCECODE_DIR)/magicicada-client/ubuntuone/ && sed \
 		-e 's|\@localedir\@|/usr/local/share/locale|g' \
 		-e 's|\@libexecdir\@|/usr/local/libexec|g' \
 		-e 's|\@GETTEXT_PACKAGE\@|ubuntuone-client|g' \
 		-e 's|\@VERSION\@|0.0.0|g' < clientdefs.py.in > clientdefs.py
 
-build-deploy-sourcedeps:
-	@echo "Building Python extensions"
-
-	@for sourcedep in $(BUILD_DEPLOY_SOURCEDEPS) ; do \
-            d=".sourcecode/$$sourcedep" ; \
-            if test -e "$$d/setup.py" ; then \
-	        (cd "$$d" && $(PYTHON) \
-	        setup.py build build_ext --inplace > /dev/null) ; \
-            fi ; \
-	done
-
-	@echo "Generating twistd plugin cache"
-	@$(PYTHON) -c "from twisted.plugin import IPlugin, getPlugins; list(getPlugins(IPlugin));"
-
 bootstrap:
 	cat dependencies.txt | sudo xargs apt-get install -y --no-install-recommends
 	cat dependencies-devel.txt | sudo xargs apt-get install -y --no-install-recommends
 	$(MAKE) $(ENV)
-	$(MAKE) sourcedeps
+	$(MAKE) sourcedeps build-clientdefs
 	mkdir -p tmp
 
 docker-bootstrap: clean
 	cat dependencies.txt | xargs apt-get install -y --no-install-recommends
 	cat dependencies-devel.txt | xargs apt-get install -y --no-install-recommends
 	$(MAKE) $(ENV)
+	$(MAKE) sourcedeps build-clientdefs
 	mkdir -p tmp
 
 $(ENV): $(ENV)/bin/activate
@@ -119,6 +101,7 @@ $(ENV)/bin/activate: requirements.txt requirements-devel.txt
 	test -d $(ENV) || virtualenv $(ENV)
 	$(ENV)/bin/pip install -Ur requirements.txt
 	$(ENV)/bin/pip install -Ur requirements-devel.txt
+	$(ENV)/bin/pip install ubuntuone-storageprotocol --no-deps -t $(TARGET_SOURCECODE_DIR)
 	touch $(ENV)/bin/activate
 
 raw-test:
@@ -132,11 +115,13 @@ ci-test:
 clean:
 	rm -rf tmp/* _trial_temp $(ENV)
 
-lint: $(ENV)
-	$(ENV)/bin/flake8 --filename='*.py' --exclude='migrations' $(SRC_DIR)
-	dev-scripts/check_readme.sh
+check-readme:
+	$(ENV)/bin/rst2html5 README.rst  --exit-status=warning > /dev/null && echo "README.rst OK"|| ( echo "ERROR: README.rst format is incorrect!!!!!" && exit 1)
 
-start: $(ENV) build start-base start-filesync-server-group publish-api-port
+lint: $(ENV) check-readme
+	$(ENV)/bin/flake8 --filename='*.py' --exclude='migrations' $(SRC_DIR)
+
+start: $(ENV) start-base start-filesync-server-group publish-api-port
 
 resume: start-base start-filesync-server-group
 
@@ -187,6 +172,6 @@ manage:
 admin:
 	$(DJANGO_ADMIN) $(ARGS)
 
-.PHONY: sourcedeps link-sourcedeps build-sourcedeps build-deploy-sourcedeps \
-	build clean lint test ci-test clean-sourcedeps start stop publish-api-port \
-	start-supervisor stop-supervisor start-dbus stop-dbus start-heapy
+.PHONY: sourcedeps link-sourcedeps clean lint test ci-test clean-sourcedeps \
+	start stop publish-api-port start-supervisor stop-supervisor \
+	start-dbus stop-dbus start-heapy check-readme

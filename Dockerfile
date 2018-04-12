@@ -1,8 +1,8 @@
 FROM ubuntu:16.04
 
-ADD . /home/ubuntu/magicicada-server
-COPY . /home/ubuntu/magicicada-server
-WORKDIR /home/ubuntu/magicicada-server
+ADD . /home/ubuntu/magicicada
+COPY . /home/ubuntu/magicicada
+WORKDIR /home/ubuntu/magicicada
 
 RUN apt-get update && apt-get install make -y
 RUN make docker-bootstrap

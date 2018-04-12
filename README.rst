@@ -76,11 +76,6 @@ access)::
 
     make bootstrap
 
-If you are in Xenial, please also install virtualenv (didn't include it in
-the previous step as it doesn't exist as a separate package in older systems)::
-
-    sudo apt-get install virtualenv
-
 Ensure the files 'privkey.pem' and 'cacert.pem' produced in the "Before server
 or client" section are copied into the ~/magicicada/magicicada-server/certs
 folder.
