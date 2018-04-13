@@ -101,7 +101,7 @@ $(ENV)/bin/activate: requirements.txt requirements-devel.txt
 	test -d $(ENV) || virtualenv $(ENV)
 	$(ENV)/bin/pip install -Ur requirements.txt
 	$(ENV)/bin/pip install -Ur requirements-devel.txt
-	$(ENV)/bin/pip install ubuntuone-storageprotocol --no-deps -t $(TARGET_SOURCECODE_DIR)
+	$(ENV)/bin/pip install ubuntuone-storageprotocol --no-deps -t "$(TARGET_SOURCECODE_DIR)/magicicada-protocol"
 	touch $(ENV)/bin/activate
 
 raw-test:
