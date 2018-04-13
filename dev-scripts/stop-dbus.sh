@@ -23,7 +23,6 @@ PID_FILE="${ROOTDIR}/tmp/dbus.pid"
 ADDRESS_FILE="${ROOTDIR}/tmp/dbus.address"
 
 /sbin/start-stop-daemon -v --stop --oknodo --pidfile $PID_FILE
-kill `cat $PID_FILE`
+kill `cat $PID_FILE` || true
 # cleanup the files created on start
 rm -f $PID_FILE $ADDRESS_FILE
-

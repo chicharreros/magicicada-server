@@ -1,0 +1,8 @@
+flake8
+dbus-python
+pygobject
+meliae
+mock
+mocker
+pyinotify
+rst2html5

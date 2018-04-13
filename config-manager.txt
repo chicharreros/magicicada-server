@@ -21,9 +21,5 @@
 #
 #   make clean-sourcedeps sourcedeps
 
-./.sourcecode/configglue                  ~configglue/configglue/trunk;revno=1
-./.sourcecode/dirspec                     ~ubuntuone-control-tower/dirspec/trunk;revno=14
-./.sourcecode/django                      ~ubuntuone-pqm-team/django/stable;revno=17
 ./.sourcecode/u1sync                      ~facundo/u1sync/opensourcing;revno=10
 ./.sourcecode/magicicada-client           ~chicharreros/magicicada-client/trunk;revno=1440
-./.sourcecode/magicicada-protocol         ~chicharreros/magicicada-protocol/trunk;revno=169

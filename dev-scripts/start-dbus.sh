@@ -41,4 +41,3 @@ exec 3>&-
 exec 4>&-
 
 echo "DBUS_SESSION_BUS_ADDRESS=$(cat $ADDRESS_FILE)"
-

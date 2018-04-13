@@ -1,12 +1,7 @@
 dbus
-openssl
+libcairo2-dev
+libdbus-1-dev
+libdbus-glib-1-dev
+libgirepository1.0-dev
+pkg-config
 postgresql-client-9.5
-python-dbus
-python-gobject
-python-httplib2
-python-mock
-python-mocker
-python-pyinotify
-python-testtools
-python-twisted-names
-python-virtualenv

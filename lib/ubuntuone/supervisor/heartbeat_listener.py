@@ -219,7 +219,7 @@ log_format.help = The logging format
 
 # main entry point, parse args and start the service.
 if __name__ == '__main__':
-    from configglue import configglue
+    from configglue.inischema.glue import configglue
     from StringIO import StringIO
     config_file = StringIO()
     config_file.write(default_config)

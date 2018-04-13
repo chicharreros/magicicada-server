@@ -17,11 +17,11 @@
 # For further info, check  http://launchpad.net/magicicada-server
 
 DJANGO_SETTINGS_MODULE ?= magicicada.settings
-FLAKE8 = flake8
-PYTHON = python
+ENV = $(CURDIR)/.env
+PYTHON = $(ENV)/bin/python
 SRC_DIR = $(CURDIR)/magicicada
 LIB_DIR = $(CURDIR)/lib
-ENV = $(CURDIR)/env
+PATH := $(ENV)/bin:$(PATH)
 PYTHONPATH := $(SRC_DIR):$(LIB_DIR):$(CURDIR):$(PYTHONPATH)
 DJANGO_ADMIN = $(LIB_DIR)/django/bin/django-admin.py
 DJANGO_MANAGE = $(PYTHON) manage.py
@@ -32,7 +32,9 @@ PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=cpp
 PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION_VERSION=2
 
 START_SUPERVISORD = lib/ubuntuone/supervisor/start-supervisord.py
+SUPERVISOR_CTL = $(ENV)/bin/supervisorctl
 
+export PATH
 export PYTHONPATH
 export DJANGO_SETTINGS_MODULE
 export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION
@@ -43,8 +45,6 @@ SOURCEDEPS_TAG = .sourcecode/sourcedeps-tag
 SOURCEDEPS_DIR ?= ../sourcedeps
 SOURCEDEPS_SOURCECODE_DIR = $(SOURCEDEPS_DIR)/sourcecode
 TARGET_SOURCECODE_DIR = $(CURDIR)/.sourcecode
-
-BUILD_DEPLOY_SOURCEDEPS=magicicada-protocol
 
 TESTFLAGS=
 
@@ -65,53 +65,49 @@ $(SOURCEDEPS_TAG):
 ifndef EXPORT_FROM_BZR
 	$(MAKE) link-sourcedeps
 endif
-	$(MAKE) build-sourcedeps
 	touch $(SOURCEDEPS_TAG)
-
-build: link-sourcedeps build-sourcedeps version
 
 link-sourcedeps:
 	@echo "Checking out external source dependencies..."
 	dev-scripts/link-external-sourcecode -p $(SOURCEDEPS_SOURCECODE_DIR)/ \
 		-t $(TARGET_SOURCECODE_DIR) -c config-manager.txt
 
-# no need to link sourcedeps before building them, as rollout process
-# handles config-manager.txt automatically
-build-for-deployment: build-deploy-sourcedeps version
-
-build-sourcedeps: build-deploy-sourcedeps
+build-clientdefs:
 	@echo "Building client clientdefs.py"
-	@cd .sourcecode/magicicada-client/ubuntuone/ && sed \
+	@cd $(TARGET_SOURCECODE_DIR)/magicicada-client/ubuntuone/ && sed \
 		-e 's|\@localedir\@|/usr/local/share/locale|g' \
 		-e 's|\@libexecdir\@|/usr/local/libexec|g' \
 		-e 's|\@GETTEXT_PACKAGE\@|ubuntuone-client|g' \
 		-e 's|\@VERSION\@|0.0.0|g' < clientdefs.py.in > clientdefs.py
 
-build-deploy-sourcedeps:
-	@echo "Building Python extensions"
-
-	@for sourcedep in $(BUILD_DEPLOY_SOURCEDEPS) ; do \
-            d=".sourcecode/$$sourcedep" ; \
-            if test -e "$$d/setup.py" ; then \
-	        (cd "$$d" && $(PYTHON) \
-	        setup.py build build_ext --inplace > /dev/null) ; \
-            fi ; \
-	done
-
-	@echo "Generating twistd plugin cache"
-	@$(PYTHON) -c "from twisted.plugin import IPlugin, getPlugins; list(getPlugins(IPlugin));"
-
-tarball: build-for-deployment
-	tar czf ../filesync-server.tgz $(TAR_EXTRA) .
-
 bootstrap:
 	cat dependencies.txt | sudo xargs apt-get install -y --no-install-recommends
 	cat dependencies-devel.txt | sudo xargs apt-get install -y --no-install-recommends
+	$(MAKE) $(ENV)
+	$(MAKE) sourcedeps build-clientdefs
+	mkdir -p tmp
+
+docker-bootstrap: clean
+	cat dependencies.txt | xargs apt-get install -y --no-install-recommends
+	cat dependencies-devel.txt | xargs apt-get install -y --no-install-recommends
+	$(MAKE) $(ENV)
+	$(MAKE) sourcedeps build-clientdefs
+	mkdir -p tmp
+
+$(ENV): $(ENV)/bin/activate
+
+# only runs when requirements.txt or requirements-devel.txt changes
+$(ENV)/bin/activate: requirements.txt requirements-devel.txt
+	test -d $(ENV) || virtualenv $(ENV)
+	$(ENV)/bin/pip install -Ur requirements.txt
+	$(ENV)/bin/pip install -Ur requirements-devel.txt
+	$(ENV)/bin/pip install ubuntuone-storageprotocol --no-deps -t $(TARGET_SOURCECODE_DIR)
+	touch $(ENV)/bin/activate
 
 raw-test:
-	./test $(TESTFLAGS)
+	$(PYTHON) test $(TESTFLAGS)
 
-test: lint sourcedeps clean version start-db start-base start-dbus raw-test stop
+test: lint sourcedeps start-db start-base start-dbus raw-test stop
 
 ci-test:
 	$(MAKE) test TESTFLAGS="-1 $(TESTFLAGS)"
@@ -119,16 +115,13 @@ ci-test:
 clean:
 	rm -rf tmp/* _trial_temp $(ENV)
 
-lint:
-	virtualenv $(ENV)
-	$(ENV)/bin/pip install flake8 rst2html5
+check-readme:
+	$(ENV)/bin/rst2html5 README.rst  --exit-status=warning > /dev/null && echo "README.rst OK"|| ( echo "ERROR: README.rst format is incorrect!!!!!" && exit 1)
+
+lint: $(ENV) check-readme
 	$(ENV)/bin/flake8 --filename='*.py' --exclude='migrations' $(SRC_DIR)
-	dev-scripts/check_readme.sh
 
-version:
-	bzr version-info --format=python > lib/versioninfo.py || true
-
-start: build start-base start-filesync-server-group publish-api-port
+start: $(ENV) start-base start-filesync-server-group publish-api-port
 
 resume: start-base start-filesync-server-group
 
@@ -138,7 +131,7 @@ start-heapy:
 start-base:
 	$(MAKE) start-supervisor && $(MAKE) start-dbus || ( $(MAKE) stop ; exit 1 )
 
-stop: stop-filesync-dummy-group stop-supervisor stop-dbus
+stop: stop-supervisor stop-dbus
 
 start-dbus:
 	dev-scripts/start-dbus.sh
@@ -147,28 +140,28 @@ stop-dbus:
 	dev-scripts/stop-dbus.sh
 
 start-supervisor:
-	@python dev-scripts/supervisor-config-dev.py
+	$(PYTHON) dev-scripts/supervisor-config-dev.py
 	-@$(START_SUPERVISORD) dev-scripts/supervisor-dev.conf.tpl
 
 stop-supervisor:
-	-@dev-scripts/supervisorctl-dev shutdown
+	$(SUPERVISOR_CTL) -c $(CURDIR)/tmp/supervisor-dev.conf shutdown
 
 start-%-group:
-	-@dev-scripts/supervisorctl-dev start $*:
+	$(SUPERVISOR_CTL) -c $(CURDIR)/tmp/supervisor-dev.conf start $*:
 
 stop-%-group:
-	-@dev-scripts/supervisorctl-dev stop $*:
+	$(SUPERVISOR_CTL) -c $(CURDIR)/tmp/supervisor-dev.conf stop $*:
 
 start-%:
-	-@dev-scripts/supervisorctl-dev start $*
+	$(SUPERVISOR_CTL) -c $(CURDIR)/tmp/supervisor-dev.conf start $*
 
 stop-%:
-	-@dev-scripts/supervisorctl-dev stop $*
+	$(SUPERVISOR_CTL) -c $(CURDIR)/tmp/supervisor-dev.conf stop $*
 
 publish-api-port:
-	python -c 'from magicicada import settings; print >> file("tmp/filesyncserver.port", "w"), settings.TCP_PORT'
-	python -c 'from magicicada import settings; print >> file("tmp/filesyncserver.port.ssl", "w"), settings.SSL_PORT'
-	python -c 'from magicicada import settings; print >> file("tmp/filesyncserver-status.port", "w"), settings.API_STATUS_PORT'
+	$(PYTHON) -c 'from magicicada import settings; print >> file("tmp/filesyncserver.port", "w"), settings.TCP_PORT'
+	$(PYTHON) -c 'from magicicada import settings; print >> file("tmp/filesyncserver.port.ssl", "w"), settings.SSL_PORT'
+	$(PYTHON) -c 'from magicicada import settings; print >> file("tmp/filesyncserver-status.port", "w"), settings.API_STATUS_PORT'
 
 shell:
 	$(DJANGO_MANAGE) shell
@@ -179,7 +172,6 @@ manage:
 admin:
 	$(DJANGO_ADMIN) $(ARGS)
 
-.PHONY: sourcedeps link-sourcedeps build-sourcedeps build-deploy-sourcedeps \
-	build clean version lint test ci-test build-for-deployment \
-	clean-sourcedeps tarball start stop publish-api-port start-supervisor \
-	stop-supervisor start-dbus stop-dbus start-heapy
+.PHONY: sourcedeps link-sourcedeps clean lint test ci-test clean-sourcedeps \
+	start stop publish-api-port start-supervisor stop-supervisor \
+	start-dbus stop-dbus start-heapy check-readme

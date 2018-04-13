@@ -20,6 +20,7 @@
 
 import os
 import platform
+import sys
 
 from utilities.utils import get_rootdir
 
@@ -34,7 +35,7 @@ programs=%(programs)s
 HEARTBEAT_LISTENER_TEMPLATE = '\n'.join((
     "[eventlistener:heartbeat]",
     "command=python %(basepath)s/lib/ubuntuone/supervisor/heartbeat_listener.py --interval=%(interval)s --timeout=%(timeout)s --log_level=%(log_level)s --log_file=%(log_folder)s/heartbeat_listener.log --groups=%(groups)s %(processes)s",  # NOQA
-    'environment=PYTHONPATH="%(basepath)s:%(basepath)s/lib",DJANGO_SETTINGS_MODULE="magicicada.settings"',  # NOQA
+    'environment=PYTHONPATH="%(pythonpath)s",DJANGO_SETTINGS_MODULE="magicicada.settings"',  # NOQA
     "events=PROCESS_COMMUNICATION,TICK_5",
     "buffer_size=%(buffer_size)s",
 ))
@@ -68,6 +69,7 @@ base_spec = {
     "log_folder": "/srv/%(base_dir)s/%(env)s-logs",
     "pid_folder": "/srv/%(base_dir)s/var",
     "stdout_capture_maxbytes": 16384,
+    "pythonpath": ':'.join(filter(None, sys.path)),
 }
 
 base_heartbeat_listener_spec = {

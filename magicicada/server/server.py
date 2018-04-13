@@ -41,7 +41,6 @@ import twisted
 import twisted.web.error
 
 import metrics
-import metrics.services
 
 from twisted.application.service import MultiService, Service
 from twisted.application.internet import TCPServer
@@ -60,14 +59,6 @@ from magicicada.rpcdb import inthread
 from magicicada.server import auth, content, errors, stats
 from magicicada.server.diskstorage import DiskStorage
 
-try:
-    from versioninfo import version_info
-except ImportError:
-    version_info = {
-        'branch_nick': 'Unavailable',
-        'revno': 'Unavailable',
-    }
-
 
 # this is the minimal cap we support (to avoid hardcoding it in the code)
 MIN_CAP = frozenset(['no-content', 'account-info', 'resumable-uploads',
@@ -84,6 +75,8 @@ SUGGESTED_REDIRS = {
     # frozenset(['example1']): dict(hostname='fs-3.server.com', port=443)
     # frozenset(['example2']): dict(srv_record='_https._tcp.fs.server.com')
 }
+
+FILESYNC_STATUS_MSG = 'filesync server'
 
 logger = logging.getLogger(__name__)
 
@@ -381,8 +374,7 @@ class StorageServer(request.RequestHandler):
         request.RequestHandler.connectionMade(self)
         self.factory.protocols.append(self)
         self.log.info('Connection Made')
-        msg = '%d filesync server revision %s.\r\n' % (
-            self.PROTOCOL_VERSION, version_info['revno'])
+        msg = '%d %s.\r\n' % (self.PROTOCOL_VERSION, FILESYNC_STATUS_MSG)
         self.transport.write(msg)
         self.ping_loop.start()
         self.factory.metrics.meter('connection_made', 1)
@@ -2685,7 +2677,6 @@ class StorageServerService(OrderedMultiService):
         self.factory.rpc_dal = self.rpc_dal
         self.metrics.meter('server_start')
         self.metrics.increment('services_active')
-        metrics.services.revno()
 
         self._reactor_inspector.start()
         # only start the HeartbeatWriter if the interval is > 0
