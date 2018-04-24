@@ -37,7 +37,7 @@ def check_process(proc_name, pid_file):
         with open(proc_stat, 'r') as f:
             if proc_name in f.read():
                 return True
-    except:
+    except Exception:
         # ignore all errors
         pass
     return False

@@ -28,8 +28,7 @@ import threading
 import traceback
 import Queue
 
-import metrics
-
+from magicicada import metrics
 from magicicada.settings import TRACE
 
 

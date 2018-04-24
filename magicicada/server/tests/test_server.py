@@ -28,8 +28,6 @@ import time
 import uuid
 import weakref
 
-import metrics
-
 from django.utils.timezone import now
 from mocker import expect, Mocker, MockerTestCase, ARGS, KWARGS, ANY
 from twisted.python.failure import Failure
@@ -38,7 +36,7 @@ from twisted.internet import defer, task, error as txerror
 from twisted.trial.unittest import TestCase as TwistedTestCase
 from ubuntuone.storageprotocol import protocol_pb2, request
 
-from magicicada import settings
+from magicicada import metrics, settings
 from magicicada.filesync import errors as dataerror
 from magicicada.filesync.models import Share
 from magicicada.server import errors

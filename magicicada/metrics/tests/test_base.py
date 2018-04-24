@@ -22,8 +22,7 @@ from __future__ import unicode_literals
 import logging
 import unittest
 
-import metrics
-
+from magicicada import metrics
 from magicicada.testing.testcase import BaseTestCase
 
 

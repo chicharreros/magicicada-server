@@ -31,9 +31,7 @@ from twisted.internet.interfaces import ITCPTransport
 from twisted.protocols import portforward, basic
 from twisted.web import server, resource
 
-import metrics
-
-from magicicada import settings
+from magicicada import metrics, settings
 from magicicada.server.server import FILESYNC_STATUS_MSG, get_service_port
 from magicicada.server.ssl import disable_ssl_compression
 from ubuntuone.supervisor import utils as supervisor_utils

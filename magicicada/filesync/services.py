@@ -34,12 +34,11 @@ import uuid
 from functools import wraps
 from weakref import WeakValueDictionary
 
-import metrics
-
 from django.conf import settings
 from django.db import connection, models
 from django.utils.timezone import now
 
+from magicicada import metrics
 from magicicada.filesync import errors, utils
 from magicicada.filesync.dbmanager import (
     fsync_readonly,

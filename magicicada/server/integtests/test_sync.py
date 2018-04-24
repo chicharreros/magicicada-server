@@ -35,9 +35,6 @@ from StringIO import StringIO
 from twisted.internet import reactor, defer
 from twisted.python.failure import Failure
 
-import u1sync.client
-
-from u1sync.main import do_diff, do_init, do_sync
 from ubuntuone.platform import tools
 from ubuntuone.storageprotocol import client as protocol_client
 from ubuntuone.storageprotocol import request
@@ -59,6 +56,9 @@ from magicicada.server.testing.aq_helpers import (
 )
 from magicicada.server.testing.caps_helpers import required_caps
 from magicicada.server.testing.testcase import logger
+from magicicada.u1sync import client as u1sync_client
+from magicicada.u1sync.main import do_diff, do_init, do_sync
+
 
 U1SYNC_QUIET = True
 NO_CONTENT_HASH = ""
@@ -225,7 +225,7 @@ class TestSync(TestWithDatabase):
 
     def _u1sync_client(self):
         """Create a u1sync client instance."""
-        client = u1sync.client.Client()
+        client = u1sync_client.Client()
         client.connect_ssl("localhost", self.ssl_port, True)
         client.set_capabilities()
         auth_info = self.access_tokens['jack']

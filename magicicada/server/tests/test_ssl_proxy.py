@@ -34,9 +34,7 @@ from ubuntuone.storageprotocol.client import (
     StorageClientFactory, StorageClient)
 from ubuntuone.supervisor import utils as supervisor_utils
 
-import metrics
-
-from magicicada import settings
+from magicicada import metrics, settings
 from magicicada.server import ssl_proxy
 from magicicada.server.server import PREFERRED_CAP
 from magicicada.server.testing.testcase import TestWithDatabase

@@ -26,8 +26,7 @@ import threading
 from twisted.trial.unittest import TestCase as TwistedTestCase
 from twisted.internet import reactor, defer
 
-import metrics
-
+from magicicada import metrics
 from magicicada.monitoring.reactor import ReactorInspector, logger
 from magicicada.settings import TRACE
 from magicicada.testing.testcase import BaseTestCase

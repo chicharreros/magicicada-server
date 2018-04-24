@@ -27,8 +27,7 @@ from twisted.application.internet import TCPServer, SSLServer
 from twisted.internet import defer, reactor
 from twisted.web import server, resource
 
-import metrics
-
+from magicicada import metrics
 from magicicada.monitoring import dump
 
 logger = logging.getLogger(__name__)

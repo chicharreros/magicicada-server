@@ -20,8 +20,7 @@
 
 from twisted.internet import defer
 
-import metrics
-
+from magicicada import metrics
 from magicicada.server.stats import StatsWorker
 from magicicada.server.testing.testcase import TestWithDatabase
 
