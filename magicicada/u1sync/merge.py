@@ -20,7 +20,7 @@ from __future__ import with_statement
 import os
 import uuid
 
-from ubuntuone.storageprotocol.dircontent_pb2 import DIRECTORY
+from magicicadaprotocol.dircontent_pb2 import DIRECTORY
 
 from magicicada.u1sync.genericmerge import MergeNode, generic_merge
 

@@ -24,10 +24,10 @@ import zlib
 from StringIO import StringIO
 
 from django.db import transaction
+from magicicadaprotocol import request, client
+from magicicadaprotocol.content_hash import content_hash_factory, crc32
 from twisted.internet import threads, defer
 from twisted.internet.protocol import connectionDone
-from ubuntuone.storageprotocol import request, client
-from ubuntuone.storageprotocol.content_hash import content_hash_factory, crc32
 
 from magicicada.filesync import services
 from magicicada.filesync.models import ContentBlob

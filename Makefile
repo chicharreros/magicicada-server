@@ -27,9 +27,6 @@ DJANGO_ADMIN = $(LIB_DIR)/django/bin/django-admin.py
 DJANGO_MANAGE = $(PYTHON) manage.py
 
 MAKEFLAGS:=$(MAKEFLAGS) --no-print-directory
-# use protobuf cpp
-PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=cpp
-PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION_VERSION=2
 
 START_SUPERVISORD = lib/ubuntuone/supervisor/start-supervisord.py
 SUPERVISOR_CTL = $(ENV)/bin/supervisorctl
@@ -37,8 +34,6 @@ SUPERVISOR_CTL = $(ENV)/bin/supervisorctl
 export PATH
 export PYTHONPATH
 export DJANGO_SETTINGS_MODULE
-export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION
-export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION_VERSION
 export ROOTDIR ?= $(CURDIR)
 
 SOURCEDEPS_TAG = .sourcecode/sourcedeps-tag
@@ -101,7 +96,6 @@ $(ENV)/bin/activate: requirements.txt requirements-devel.txt
 	test -d $(ENV) || virtualenv $(ENV)
 	$(ENV)/bin/pip install -Ur requirements.txt
 	$(ENV)/bin/pip install -Ur requirements-devel.txt
-	$(ENV)/bin/pip install ubuntuone-storageprotocol --no-deps -t "$(TARGET_SOURCECODE_DIR)/magicicada-protocol"
 	touch $(ENV)/bin/activate
 
 raw-test:

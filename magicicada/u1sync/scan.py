@@ -23,7 +23,7 @@ import shutil
 
 from errno import ENOTDIR, EINVAL
 
-from ubuntuone.storageprotocol.dircontent_pb2 import DIRECTORY, FILE, SYMLINK
+from magicicadaprotocol.dircontent_pb2 import DIRECTORY, FILE, SYMLINK
 
 from magicicada.u1sync.genericmerge import MergeNode
 from magicicada.u1sync.utils import should_sync

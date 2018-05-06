@@ -24,7 +24,7 @@ from contextlib import contextmanager
 import cPickle as pickle
 from errno import ENOENT
 
-from ubuntuone.storageprotocol.dircontent_pb2 import DIRECTORY
+from magicicadaprotocol.dircontent_pb2 import DIRECTORY
 
 from magicicada.u1sync.merge import MergeNode
 from magicicada.u1sync.utils import safe_unlink

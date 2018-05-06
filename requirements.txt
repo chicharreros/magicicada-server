@@ -2,6 +2,7 @@ Django<1.10
 bzr
 configglue
 cython
+magicicadaprotocol==2.0
 pyOpenSSL
 protobuf
 psycopg2-binary

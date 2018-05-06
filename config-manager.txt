@@ -21,4 +21,4 @@
 #
 #   make clean-sourcedeps sourcedeps
 
-./.sourcecode/magicicada-client           ~chicharreros/magicicada-client/trunk;revno=1442
+./.sourcecode/magicicada-client           ~chicharreros/magicicada-client/trunk;revno=1444

@@ -28,11 +28,11 @@ import sys
 from StringIO import StringIO
 
 from django.conf import settings
+from magicicadaprotocol import request
 from mocker import Mocker, ANY
 from twisted.internet import reactor, defer
 from twisted.internet.error import ConnectionDone
 from twisted.web import client, error
-from ubuntuone.storageprotocol import request
 from ubuntuone.supervisor import utils as supervisor_utils
 
 from magicicada.filesync.models import StorageUser

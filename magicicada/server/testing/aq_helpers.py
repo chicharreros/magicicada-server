@@ -31,13 +31,13 @@ import dbus
 import dbus.service
 
 from dbus.mainloop.glib import DBusGMainLoop
+from magicicadaprotocol import request, sharersp, client
+from magicicadaprotocol.content_hash import content_hash_factory, crc32
 from twisted.internet import defer, reactor
 from twisted.names import dns
 from twisted.names.common import ResolverBase
 from twisted.python.failure import Failure
 from ubuntuone import platform
-from ubuntuone.storageprotocol import request, sharersp, client
-from ubuntuone.storageprotocol.content_hash import content_hash_factory, crc32
 from ubuntuone.syncdaemon.action_queue import ActionQueue, ActionQueueCommand
 from ubuntuone.syncdaemon import (
     main,

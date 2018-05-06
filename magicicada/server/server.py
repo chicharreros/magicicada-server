@@ -40,13 +40,13 @@ import psycopg2
 import twisted
 import twisted.web.error
 
+from magicicadaprotocol import protocol_pb2, request, sharersp
 from twisted.application.service import MultiService, Service
 from twisted.application.internet import TCPServer
 from twisted.internet.defer import maybeDeferred, inlineCallbacks
 from twisted.internet.protocol import Factory
 from twisted.internet import defer, reactor, error, task, stdio
 from twisted.python.failure import Failure
-from ubuntuone.storageprotocol import protocol_pb2, request, sharersp
 from ubuntuone.supervisor import utils as supervisor_utils
 
 from magicicada import metrics, settings

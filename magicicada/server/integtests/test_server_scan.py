@@ -22,9 +22,9 @@ import zlib
 
 from cStringIO import StringIO
 
+from magicicadaprotocol import request
+from magicicadaprotocol.content_hash import content_hash_factory, crc32
 from twisted.internet import defer
-from ubuntuone.storageprotocol import request
-from ubuntuone.storageprotocol.content_hash import content_hash_factory, crc32
 
 from magicicada.server.integtests.test_sync import TestServerBase
 from magicicada.server.testing.aq_helpers import NO_CONTENT_HASH

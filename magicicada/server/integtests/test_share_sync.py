@@ -23,9 +23,9 @@ import subprocess
 
 from cStringIO import StringIO
 
+from magicicadaprotocol import request
 from twisted.internet import reactor, defer
 from twisted.python.failure import Failure
-from ubuntuone.storageprotocol import request
 from ubuntuone.syncdaemon import states
 
 from magicicada.server.integtests import test_sync

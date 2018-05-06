@@ -35,15 +35,13 @@ from StringIO import StringIO
 from twisted.internet import reactor, defer
 from twisted.python.failure import Failure
 
-from ubuntuone.platform import tools
-from ubuntuone.storageprotocol import client as protocol_client
-from ubuntuone.storageprotocol import request
-from ubuntuone.storageprotocol.client import (
+from magicicadaprotocol import client as protocol_client, protocol_pb2, request
+from magicicadaprotocol.client import (
     StorageClient,
     StorageClientFactory,
 )
-from ubuntuone.storageprotocol.content_hash import content_hash_factory, crc32
-from ubuntuone.storageprotocol import protocol_pb2
+from magicicadaprotocol.content_hash import content_hash_factory, crc32
+from ubuntuone.platform import tools
 from ubuntuone.syncdaemon import REQUIRED_CAPS, hash_queue
 from ubuntuone.syncdaemon.main import Main
 

@@ -20,8 +20,8 @@
 
 import os
 
+from magicicadaprotocol import request
 from twisted.internet import reactor, defer
-from ubuntuone.storageprotocol import request
 
 from magicicada.server.testing.aq_helpers import (
     NO_CONTENT_HASH,

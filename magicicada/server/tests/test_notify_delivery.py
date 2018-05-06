@@ -21,12 +21,12 @@
 import logging
 import uuid
 
+from magicicadaprotocol import protocol_pb2, request
 from mocker import Mocker, expect
 from twisted.internet.defer import inlineCallbacks, succeed
 from twisted.internet import defer, reactor
 from twisted.python.failure import Failure
 from twisted.trial.unittest import TestCase as TwistedTestCase
-from ubuntuone.storageprotocol import protocol_pb2, request
 
 from magicicada.filesync.models import Share
 from magicicada.filesync.notifier import notifier

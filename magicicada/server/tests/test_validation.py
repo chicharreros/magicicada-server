@@ -22,7 +22,7 @@
 
 import re
 
-from ubuntuone.storageprotocol import request
+from magicicadaprotocol import request
 
 from magicicada.server.testing.testcase import TestWithDatabase
 

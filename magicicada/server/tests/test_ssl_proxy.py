@@ -25,13 +25,12 @@ from StringIO import StringIO
 
 import OpenSSL
 
+from magicicadaprotocol.client import StorageClientFactory, StorageClient
 from mocker import Mocker, expect
 from twisted.internet import defer, reactor, error as txerror, ssl
 from twisted.python import failure
 from twisted.web import client, error as web_error
 from twisted.trial.unittest import TestCase
-from ubuntuone.storageprotocol.client import (
-    StorageClientFactory, StorageClient)
 from ubuntuone.supervisor import utils as supervisor_utils
 
 from magicicada import metrics, settings

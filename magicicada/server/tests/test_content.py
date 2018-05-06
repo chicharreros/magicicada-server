@@ -25,21 +25,21 @@ import zlib
 
 from StringIO import StringIO
 
-from mocker import Mocker, expect, ARGS, KWARGS, ANY
-from twisted.internet import defer, reactor, threads, task, address
-from twisted.trial.unittest import TestCase
-from twisted.test.proto_helpers import StringTransport
-from ubuntuone.storageprotocol import (
+from magicicadaprotocol import (
     request,
     client as sp_client,
     errors as protoerrors,
     protocol_pb2,
 )
-from ubuntuone.storageprotocol.content_hash import (
+from magicicadaprotocol.content_hash import (
     content_hash_factory,
     crc32,
     magic_hash_factory,
 )
+from mocker import Mocker, expect, ARGS, KWARGS, ANY
+from twisted.internet import defer, reactor, threads, task, address
+from twisted.trial.unittest import TestCase
+from twisted.test.proto_helpers import StringTransport
 
 from magicicada import settings
 from magicicada.filesync import errors

@@ -22,12 +22,12 @@ import os
 import shutil
 import zlib
 
-from twisted.internet import defer, reactor, task
-from ubuntuone.storageprotocol.content_hash import (
+from magicicadaprotocol.content_hash import (
     content_hash_factory,
     crc32,
     magic_hash_factory,
 )
+from twisted.internet import defer, reactor, task
 
 from magicicada.server import upload, diskstorage
 from magicicada.server.auth import DummyAuthProvider

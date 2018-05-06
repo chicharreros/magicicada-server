@@ -17,7 +17,7 @@
 
 from itertools import chain
 
-from ubuntuone.storageprotocol.dircontent_pb2 import DIRECTORY
+from magicicadaprotocol.dircontent_pb2 import DIRECTORY
 
 
 class MergeNode(object):

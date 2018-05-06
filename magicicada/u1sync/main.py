@@ -28,8 +28,8 @@ from Queue import Queue
 
 import gobject
 
-import ubuntuone.storageprotocol.dircontent_pb2 as dircontent_pb2
-from ubuntuone.storageprotocol.dircontent_pb2 import DIRECTORY, SYMLINK
+import magicicadaprotocol.dircontent_pb2 as dircontent_pb2
+from magicicadaprotocol.dircontent_pb2 import DIRECTORY, SYMLINK
 from twisted.internet import reactor
 
 from magicicada.u1sync import metadata

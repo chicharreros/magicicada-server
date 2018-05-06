@@ -20,7 +20,7 @@ import os
 
 from unittest import TestCase
 
-from ubuntuone.storageprotocol.dircontent_pb2 import FILE, DIRECTORY
+from magicicadaprotocol.dircontent_pb2 import FILE, DIRECTORY
 
 from magicicada.u1sync.genericmerge import MergeNode, generic_merge
 from magicicada.u1sync.merge import (

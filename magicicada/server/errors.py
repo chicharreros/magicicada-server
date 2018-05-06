@@ -16,8 +16,7 @@
 #
 # For further info, check  http://launchpad.net/magicicada-server
 
-from ubuntuone.storageprotocol import request
-from ubuntuone.storageprotocol import protocol_pb2
+from magicicadaprotocol import protocol_pb2, request
 
 
 class StorageServerError(request.StorageProtocolError):

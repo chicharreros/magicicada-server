@@ -27,14 +27,13 @@ import time
 from functools import wraps
 from StringIO import StringIO
 
+from magicicadaprotocol import client, request, protocol_pb2
+from magicicadaprotocol.client import StorageClientFactory, StorageClient
 from OpenSSL import crypto
 from twisted.internet import reactor, defer, ssl
 from twisted.internet.protocol import connectionDone
 from twisted.python.failure import Failure
 from twisted.trial.unittest import TestCase as TwistedTestCase
-from ubuntuone.storageprotocol import client, request, protocol_pb2
-from ubuntuone.storageprotocol.client import (
-    StorageClientFactory, StorageClient)
 
 from magicicada import settings
 from magicicada.filesync import services

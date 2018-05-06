@@ -18,8 +18,8 @@
 
 """Account info tests."""
 
+from magicicadaprotocol import request
 from twisted.internet import defer
-from ubuntuone.storageprotocol import request
 
 from magicicada.filesync import services
 from magicicada.filesync.models import StorageUser

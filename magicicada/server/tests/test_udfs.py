@@ -25,9 +25,9 @@ import zlib
 
 from StringIO import StringIO
 
+from magicicadaprotocol import request
+from magicicadaprotocol.content_hash import content_hash_factory, crc32
 from twisted.internet import reactor, defer
-from ubuntuone.storageprotocol import request
-from ubuntuone.storageprotocol.content_hash import content_hash_factory, crc32
 
 from magicicada.filesync.errors import DoesNotExist
 from magicicada.server.testing.testcase import FactoryHelper, TestWithDatabase

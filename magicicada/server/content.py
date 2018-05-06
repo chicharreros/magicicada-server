@@ -31,8 +31,8 @@ import zlib
 import twisted.internet.error
 import twisted.web.error
 
+from magicicadaprotocol import protocol_pb2
 from twisted.internet import defer
-from ubuntuone.storageprotocol import protocol_pb2
 
 from magicicada import settings
 from magicicada.filesync import errors as dataerrors

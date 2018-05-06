@@ -20,10 +20,9 @@
 
 from StringIO import StringIO
 
+from magicicadaprotocol import errors as protocol_errors, request
+from magicicadaprotocol.content_hash import content_hash_factory, crc32
 from twisted.internet import threads, defer
-from ubuntuone.storageprotocol import request
-from ubuntuone.storageprotocol import errors as protocol_errors
-from ubuntuone.storageprotocol.content_hash import content_hash_factory, crc32
 
 from magicicada.filesync import errors
 from magicicada.filesync.models import STATUS_LIVE, STATUS_DEAD

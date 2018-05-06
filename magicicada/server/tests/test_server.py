@@ -29,12 +29,12 @@ import uuid
 import weakref
 
 from django.utils.timezone import now
+from magicicadaprotocol import protocol_pb2, request
 from mocker import expect, Mocker, MockerTestCase, ARGS, KWARGS, ANY
 from twisted.python.failure import Failure
 from twisted.python import log
 from twisted.internet import defer, task, error as txerror
 from twisted.trial.unittest import TestCase as TwistedTestCase
-from ubuntuone.storageprotocol import protocol_pb2, request
 
 from magicicada import metrics, settings
 from magicicada.filesync import errors as dataerror

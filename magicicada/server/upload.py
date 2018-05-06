@@ -29,12 +29,12 @@ import zlib
 
 from cStringIO import StringIO
 
-from twisted.internet import defer
-from ubuntuone.storageprotocol.content_hash import (
+from magicicadaprotocol.content_hash import (
     content_hash_factory,
     crc32,
     magic_hash_factory,
 )
+from twisted.internet import defer
 
 from magicicada.server import errors
 from magicicada.server.diskstorage import FileReaderProducer

@@ -25,9 +25,9 @@ import os
 import uuid
 import zlib
 
+from magicicadaprotocol import request
+from magicicadaprotocol.client import StorageClient
 from twisted.internet import defer, reactor
-from ubuntuone.storageprotocol import request
-from ubuntuone.storageprotocol.client import StorageClient
 from ubuntuone.syncdaemon.states import (
     StateManager, QueueManager, ConnectionManager)
 from ubuntuone.syncdaemon import action_queue

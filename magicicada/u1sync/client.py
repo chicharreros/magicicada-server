@@ -31,15 +31,15 @@ from Queue import Queue
 from threading import Lock
 
 from dirspec.basedir import xdg_cache_home
+from magicicadaprotocol import request, volumes
+from magicicadaprotocol.content_hash import crc32
+from magicicadaprotocol.context import get_ssl_context
+from magicicadaprotocol.client import (
+    StorageClientFactory, StorageClient)
+from magicicadaprotocol.delta import DIRECTORY as delta_DIR
+from magicicadaprotocol.dircontent_pb2 import DIRECTORY, FILE
 from twisted.internet import reactor, defer
 from twisted.internet.defer import inlineCallbacks, returnValue
-from ubuntuone.storageprotocol import request, volumes
-from ubuntuone.storageprotocol.content_hash import crc32
-from ubuntuone.storageprotocol.context import get_ssl_context
-from ubuntuone.storageprotocol.client import (
-    StorageClientFactory, StorageClient)
-from ubuntuone.storageprotocol.delta import DIRECTORY as delta_DIR
-from ubuntuone.storageprotocol.dircontent_pb2 import DIRECTORY, FILE
 
 from magicicada.u1sync.genericmerge import MergeNode
 from magicicada.u1sync.utils import should_sync

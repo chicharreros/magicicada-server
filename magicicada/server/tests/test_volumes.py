@@ -20,10 +20,9 @@
 
 """Test volume operations."""
 
+from magicicadaprotocol import request
+from magicicadaprotocol.volumes import RootVolume, UDFVolume, ShareVolume
 from twisted.internet import defer
-from ubuntuone.storageprotocol import request
-from ubuntuone.storageprotocol.volumes import (
-    RootVolume, UDFVolume, ShareVolume)
 
 from magicicada.filesync.models import Share
 from magicicada.filesync.services import get_storage_user

@@ -20,12 +20,11 @@
 
 import os
 
+from magicicadaprotocol import request
+from magicicadaprotocol.content_hash import content_hash_factory
+from magicicadaprotocol.client import StorageClientFactory, StorageClient
 from twisted.trial.unittest import TestCase as TwistedTestCase
 from twisted.internet import reactor, defer, error
-from ubuntuone.storageprotocol import request
-from ubuntuone.storageprotocol.content_hash import content_hash_factory
-from ubuntuone.storageprotocol.client import (
-    StorageClientFactory, StorageClient)
 
 from magicicada.filesync.services import make_storage_user
 from magicicada.server.auth import DummyAuthProvider

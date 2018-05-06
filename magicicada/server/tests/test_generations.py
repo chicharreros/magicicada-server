@@ -22,8 +22,8 @@
 
 import calendar
 
+from magicicadaprotocol import request, delta as protodelta
 from twisted.internet import defer
-from ubuntuone.storageprotocol import request, delta as protodelta
 
 from magicicada.filesync.models import StorageObject
 from magicicada.server import server

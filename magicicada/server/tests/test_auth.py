@@ -20,8 +20,8 @@
 
 import logging
 
+from magicicadaprotocol import errors as protocol_errors, request
 from twisted.internet import defer
-from ubuntuone.storageprotocol import errors as protocol_errors, request
 
 from magicicada.filesync.errors import DoesNotExist
 from magicicada.filesync.models import StorageUser
