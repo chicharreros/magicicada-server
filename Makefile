@@ -44,8 +44,7 @@ TAR_EXTRA = --exclude 'tmp/*' --exclude tags
 include Makefile.db
 
 sourcedeps: $(SOURCEDEPS_TAG)
-	git clone https://github.com/chicharreros/magicicada-client.git $(TARGET_SOURCECODE_DIR)/magicicada-client
-	cd $(TARGET_SOURCECODE_DIR)/magicicada-client && git reset --hard 836c4e4a1c801a323594141af2a00292b5e8b9e1 && cd -
+	git clone --depth 1 --branch 1.0 https://github.com/chicharreros/magicicada-client.git $(TARGET_SOURCECODE_DIR)/magicicada-client
 
 clean-sourcedeps:
 	rm -rf .sourcecode/*
