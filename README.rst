@@ -226,7 +226,7 @@ Finally, start the client::
     export $(dbus-launch)  # seems this is needed if you're inside a LXC or VPS
     PYTHONPATH=. SSL_CERTIFICATES_DIR=~/magicicada/certs \
         bin/ubuntuone-syncdaemon --auth=testuser:testpass \
-        --host=testfsyncserver --port=21101 --logging-level=DEBUG
+        --server=testfsyncserver:21101 --logging-level=DEBUG
 
 If you want, check logs to see all went ok::
 
