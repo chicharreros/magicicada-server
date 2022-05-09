@@ -1,5 +1,4 @@
-# Copyright 2008-2015 Canonical
-# Copyright 2015-2018 Chicharreros (https://launchpad.net/~chicharreros)
+# Copyright 2015-2022 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -37,35 +36,22 @@ export DJANGO_SETTINGS_MODULE
 export ROOTDIR ?= $(CURDIR)
 
 SOURCEDEPS_TAG = .sourcecode/sourcedeps-tag
-SOURCEDEPS_DIR ?= ../sourcedeps
-SOURCEDEPS_SOURCECODE_DIR = $(SOURCEDEPS_DIR)/sourcecode
 TARGET_SOURCECODE_DIR = $(CURDIR)/.sourcecode
-
 TESTFLAGS=
 
 TAR_EXTRA = --exclude 'tmp/*' --exclude tags
 
-ifneq ($(strip $(STRIP_BZR)),)
-TAR_EXTRA += --exclude .bzr
-endif
-
 include Makefile.db
 
 sourcedeps: $(SOURCEDEPS_TAG)
+	git clone https://github.com/chicharreros/magicicada-client.git $(TARGET_SOURCECODE_DIR)/magicicada-client
+	cd $(TARGET_SOURCECODE_DIR)/magicicada-client && git reset --hard 836c4e4a1c801a323594141af2a00292b5e8b9e1 && cd -
 
 clean-sourcedeps:
 	rm -rf .sourcecode/*
 
 $(SOURCEDEPS_TAG):
-ifndef EXPORT_FROM_BZR
-	$(MAKE) link-sourcedeps
-endif
 	touch $(SOURCEDEPS_TAG)
-
-link-sourcedeps:
-	@echo "Checking out external source dependencies..."
-	dev-scripts/link-external-sourcecode -p $(SOURCEDEPS_SOURCECODE_DIR)/ \
-		-t $(TARGET_SOURCECODE_DIR) -c config-manager.txt
 
 build-clientdefs:
 	@echo "Building client clientdefs.py"
@@ -82,18 +68,11 @@ bootstrap:
 	$(MAKE) sourcedeps build-clientdefs
 	mkdir -p tmp
 
-docker-bootstrap: clean
-	cat dependencies.txt | xargs apt-get install -y --no-install-recommends
-	cat dependencies-devel.txt | xargs apt-get install -y --no-install-recommends
-	$(MAKE) $(ENV)
-	$(MAKE) sourcedeps build-clientdefs
-	mkdir -p tmp
-
 $(ENV): $(ENV)/bin/activate
 
 # only runs when requirements.txt or requirements-devel.txt changes
 $(ENV)/bin/activate: requirements.txt requirements-devel.txt
-	test -d $(ENV) || virtualenv $(ENV)
+	test -d $(ENV) || virtualenv -p python2 $(ENV) --system-site-packages
 	$(ENV)/bin/pip install -Ur requirements.txt
 	$(ENV)/bin/pip install -Ur requirements-devel.txt
 	touch $(ENV)/bin/activate
@@ -101,7 +80,7 @@ $(ENV)/bin/activate: requirements.txt requirements-devel.txt
 raw-test:
 	$(PYTHON) test $(TESTFLAGS)
 
-test: lint sourcedeps start-db start-base start-dbus raw-test stop
+test: start-db start-base start-dbus raw-test stop
 
 ci-test:
 	$(MAKE) test TESTFLAGS="-1 $(TESTFLAGS)"
@@ -166,6 +145,6 @@ manage:
 admin:
 	$(DJANGO_ADMIN) $(ARGS)
 
-.PHONY: sourcedeps link-sourcedeps clean lint test ci-test clean-sourcedeps \
+.PHONY: sourcedeps clean lint test ci-test clean-sourcedeps \
 	start stop publish-api-port start-supervisor stop-supervisor \
 	start-dbus stop-dbus start-heapy check-readme

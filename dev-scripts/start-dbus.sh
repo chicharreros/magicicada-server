@@ -18,7 +18,7 @@
 #
 # For further info, check  http://launchpad.net/magicicada-server
 
-ROOTDIR=${ROOTDIR:-`bzr root`}
+ROOTDIR=${ROOTDIR:-`pwd`}
 PID_FILE="${ROOTDIR}/tmp/dbus.pid"
 ADDRESS_FILE="${ROOTDIR}/tmp/dbus.address"
 CONFIG_FILE="${ROOTDIR}/configs/dbus-session.conf"

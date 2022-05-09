@@ -1,0 +1,4 @@
+*.pyc
+.env
+.sourcecode
+tmp

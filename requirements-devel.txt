@@ -1,7 +1,6 @@
 Send2Trash==1.5.0
 flake8
 dbus-python
-pygobject
 meliae
 mock
 mocker

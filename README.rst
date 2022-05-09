@@ -51,16 +51,16 @@ Server setup
 Start with a clean Ubuntu Xenial environment (e.g., in a VPS, or using
 an LXC). As example, if you want to create a Xenial LXC, you can use::
 
-    sudo lxc-create -t ubuntu -n magicicada-xenial -- -r xenial -a amd64 -b $USER
+    lxc launch ubuntu:bionic -p default -p $USER magicicada-server
 
 
 Dependencies
 ^^^^^^^^^^^^
 
-Then you need to start the LXC instance and ssh into it::
+Find the instance IP (and optionally configure `/etc/hosts` to be able to ssh
+into the container by name) and ssh into it:
 
-    sudo lxc-start -n magicicada-xenial
-    ssh magicicada-xenial
+    ssh `lxc list magicicada-server -c4 -fcsv | cut -d ' ' -f 1`
 
 Install ``make``, you'll need it for the rest of the process::
 
@@ -69,7 +69,8 @@ Install ``make``, you'll need it for the rest of the process::
 Branch the project and get into that dir::
 
     cd ~/magicicada
-    bzr branch lp:magicicada-server
+    git clone https://github.com/chicharreros/magicicada-server.git
+    cd magicicada-server
 
 Install tools and dependencies (you will be prompted for your password for sudo
 access)::

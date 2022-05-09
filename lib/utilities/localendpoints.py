@@ -26,13 +26,12 @@ import socket
 
 from os.path import abspath, isdir
 from warnings import warn
-from bzrlib.workingtree import WorkingTree
 
 
 def _bad_rootdir(rootdir):
     """Tell whether the given rootdir is bad"""
     return (rootdir is None or                # shouldn't happen
-            not isdir(rootdir) or             # garbage in env or bzr error
+            not isdir(rootdir) or             # garbage in env
             not os.access(rootdir, os.R_OK))  # perms are wrong
 
 
@@ -44,15 +43,14 @@ def get_rootdir():
     if 'ROOTDIR' in os.environ:
         rootdir = os.environ['ROOTDIR']
         if _bad_rootdir(rootdir):
-            warn('Environment variable ROOTDIR is bad, falling back to bzr')
+            warn('Environment variable ROOTDIR is bad, failing')
             rootdir = None
         elif not abspath(__file__).startswith(abspath(rootdir)):
             warn('Environment variable ROOTDIR is pointing somewhere else')
 
-    if rootdir is None:
-        rootdir = WorkingTree.open_containing(__file__)[0].basedir
-        if _bad_rootdir(rootdir):
-            raise RuntimeError("Bad ROOTDIR %r (bzr trouble?)" % (rootdir,))
+    if _bad_rootdir(rootdir):
+        raise RuntimeError("Bad ROOTDIR %r" % rootdir)
+
     return rootdir
 
 

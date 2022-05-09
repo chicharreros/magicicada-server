@@ -1,5 +1,4 @@
 Django<1.10
-bzr
 configglue
 cython
 magicicadaprotocol==2.0
