@@ -51,16 +51,16 @@ Server setup
 Start with a clean Ubuntu Xenial environment (e.g., in a VPS, or using
 an LXC). As example, if you want to create a Xenial LXC, you can use::
 
-    sudo lxc-create -t ubuntu -n magicicada-xenial -- -r xenial -a amd64 -b $USER
+    lxc launch ubuntu:bionic -p default -p $USER magicicada-server
 
 
 Dependencies
 ^^^^^^^^^^^^
 
-Then you need to start the LXC instance and ssh into it::
+Find the instance IP (and optionally configure `/etc/hosts` to be able to ssh
+into the container by name) and ssh into it:
 
-    sudo lxc-start -n magicicada-xenial
-    ssh magicicada-xenial
+    ssh `lxc list magicicada-server -c4 -fcsv | cut -d ' ' -f 1`
 
 Install ``make``, you'll need it for the rest of the process::
 
@@ -69,7 +69,8 @@ Install ``make``, you'll need it for the rest of the process::
 Branch the project and get into that dir::
 
     cd ~/magicicada
-    bzr branch lp:magicicada-server
+    git clone https://github.com/chicharreros/magicicada-server.git
+    cd magicicada-server
 
 Install tools and dependencies (you will be prompted for your password for sudo
 access)::
@@ -192,7 +193,7 @@ Client setup
 ------------
 
 This is to be repeated in all places that you want the system to run.
-Instructions are for an Ubuntu Xenial environment, adapt as needed. It's
+Instructions are for an Ubuntu Focal environment, adapt as needed. It's
 assuming you're starting from a clean machine (e.g.: a just installed one,
 or an LXC), if you're not you may have some of the needed parts
 already installed.
@@ -207,16 +208,9 @@ protocol so the final layout will be as follow:
 First branch the client and install all the needed tools and dependencies::
 
     cd ~/magicicada
-    bzr branch lp:magicicada-client
+    git clone https://github.com/chicharreros/magicicada-client.git
     cd magicicada-client
-    cat dependencies.txt | sudo xargs apt-get install -y --no-install-recommends
-
-Then, branch and build the storage protocol::
-
-    cd ~/magicicada
-    bzr branch lp:magicicada-protocol
-    cd magicicada-protocol
-    ./setup.py build
+    make bootstrap
 
 Ensure the proper certificate is the right folder, for the client you only need
 `cacert.pem` (be sure the `private.pem` file is NOT there)::
@@ -227,19 +221,12 @@ You should see something like::
 
     -rw-rw-r-- 1 user user 765 Aug 13 09:18 cacert.pem
 
-Now go to the client, relate it to the storage-protocol, and build it::
-
-    cd ~/magicicada/magicicada-client/ubuntuone
-    ln -s ~/magicicada/magicicada-protocol/ubuntuone/storageprotocol .
-    cd ..
-    ./setup.py build
-
 Finally, start the client::
 
     export $(dbus-launch)  # seems this is needed if you're inside a LXC or VPS
     PYTHONPATH=. SSL_CERTIFICATES_DIR=~/magicicada/certs \
         bin/ubuntuone-syncdaemon --auth=testuser:testpass \
-        --host=testfsyncserver --port=21101 --logging-level=DEBUG
+        --server=testfsyncserver:21101 --logging-level=DEBUG
 
 If you want, check logs to see all went ok::
 

@@ -5,7 +5,7 @@ PGUSER = $(shell $(SHELL_ENV) $(PYTHON) -c "from django.conf import settings; pr
 DATA_DIR = $(PGHOST)/data
 LOG_FILE = $(PGHOST)/postgresql.log
 CONF_FILE = $(PGHOST)/postgresql.conf
-PGBIN = /usr/lib/postgresql/9.5/bin
+PGBIN = /usr/lib/postgresql/10/bin
 PGCTL = $(PGBIN)/pg_ctl
 PGINIT = $(PGBIN)/initdb
 
