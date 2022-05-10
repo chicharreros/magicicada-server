@@ -35,15 +35,15 @@ from StringIO import StringIO
 from twisted.internet import reactor, defer
 from twisted.python.failure import Failure
 
+from magicicadaclient.platform import tools
+from magicicadaclient.syncdaemon import REQUIRED_CAPS, hash_queue
+from magicicadaclient.syncdaemon.main import Main
 from magicicadaprotocol import client as protocol_client, protocol_pb2, request
 from magicicadaprotocol.client import (
     StorageClient,
     StorageClientFactory,
 )
 from magicicadaprotocol.content_hash import content_hash_factory, crc32
-from ubuntuone.platform import tools
-from ubuntuone.syncdaemon import REQUIRED_CAPS, hash_queue
-from ubuntuone.syncdaemon.main import Main
 
 from magicicada.server import server
 from magicicada.server.testing.aq_helpers import (

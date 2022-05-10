@@ -22,7 +22,7 @@
 
 import functools
 
-from ubuntuone import syncdaemon
+from magicicadaclient import syncdaemon
 
 from magicicada.server import server
 

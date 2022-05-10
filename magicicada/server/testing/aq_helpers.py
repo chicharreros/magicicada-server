@@ -31,24 +31,24 @@ import dbus
 import dbus.service
 
 from dbus.mainloop.glib import DBusGMainLoop
+from magicicadaclient import platform
+from magicicadaclient.syncdaemon.action_queue import ActionQueue, ActionQueueCommand
+from magicicadaclient.syncdaemon import (
+    main,
+    volume_manager,
+    tritcask,
+    logger as syncdaemon_logger,
+)
+from magicicadaclient.syncdaemon.event_queue import EventQueue
+from magicicadaclient.syncdaemon.filesystem_manager import FileSystemManager
+from magicicadaclient.syncdaemon.sync import Sync
+from magicicadaclient.syncdaemon.marker import MDMarker
 from magicicadaprotocol import request, sharersp, client
 from magicicadaprotocol.content_hash import content_hash_factory, crc32
 from twisted.internet import defer, reactor
 from twisted.names import dns
 from twisted.names.common import ResolverBase
 from twisted.python.failure import Failure
-from ubuntuone import platform
-from ubuntuone.syncdaemon.action_queue import ActionQueue, ActionQueueCommand
-from ubuntuone.syncdaemon import (
-    main,
-    volume_manager,
-    tritcask,
-    logger as syncdaemon_logger,
-)
-from ubuntuone.syncdaemon.event_queue import EventQueue
-from ubuntuone.syncdaemon.filesystem_manager import FileSystemManager
-from ubuntuone.syncdaemon.sync import Sync
-from ubuntuone.syncdaemon.marker import MDMarker
 
 from magicicada import settings
 from magicicada.server import ssl_proxy
@@ -263,7 +263,7 @@ class WaitingHelpingHandler(object):
 
 
 # The following class is a duplicated from
-# lib/ubuntuone/platform/tests/ipc/test_linux.py
+# lib/magicicadaclient/platform/tests/ipc/test_linux.py
 # will be removed when bug #917285 is resolved
 class FakeNetworkManager(dbus.service.Object):
     """A fake NetworkManager that only emits StatusChanged signal."""

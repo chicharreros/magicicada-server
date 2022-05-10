@@ -37,9 +37,9 @@ from twisted.internet import glib2reactor
 glib2reactor.install()  # NOQA: before any reactor import
 
 from django.conf import settings
+from magicicadaclient.platform.linux import tools
 from utilities import utils, dev_launcher
 from twisted.internet import reactor, defer
-from ubuntuone.platform.linux import tools
 
 from magicicada.filesync import services
 from magicicada.server.integration.helpers import debug, retryable

@@ -23,10 +23,10 @@ import subprocess
 
 from cStringIO import StringIO
 
+from magicicadaclient.syncdaemon import states
 from magicicadaprotocol import request
 from twisted.internet import reactor, defer
 from twisted.python.failure import Failure
-from ubuntuone.syncdaemon import states
 
 from magicicada.server.integtests import test_sync
 from magicicada.server.testing.aq_helpers import NO_CONTENT_HASH

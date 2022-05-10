@@ -20,10 +20,10 @@
 
 """Test the capabilities decorator."""
 
+from magicicadaclient import syncdaemon
 from twisted.trial.unittest import TestCase
 from twisted.trial.reporter import TestResult
 from twisted.internet import defer
-from ubuntuone import syncdaemon
 
 from magicicada.server import server as server_module
 from magicicada.server.testing.caps_helpers import required_caps
