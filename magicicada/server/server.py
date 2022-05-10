@@ -2331,6 +2331,9 @@ class StorageServerFactory(Factory):
         self.auth_provider = auth_provider_class(self)
         self.content = content_class(self)
         self.diskstorage = DiskStorage(settings.STORAGE_BASEDIR)
+        logger.info(
+            'Started StorageServerFactory with DiskStorage at %s',
+            settings.STORAGE_BASEDIR)
 
         self.metrics = metrics.get_meter('root')
         self.user_metrics = metrics.get_meter('user')

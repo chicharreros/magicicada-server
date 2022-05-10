@@ -18,6 +18,8 @@
 #
 # For further info, check  http://launchpad.net/magicicada-server
 
+set -x
+
 ROOTDIR=${ROOTDIR:-`pwd`}
 PID_FILE="${ROOTDIR}/tmp/dbus.pid"
 ADDRESS_FILE="${ROOTDIR}/tmp/dbus.address"
