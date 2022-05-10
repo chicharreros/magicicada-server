@@ -1,3 +1,5 @@
 *.pyc
 .env
 tmp
+magicicada/settings/local.py
+.sourcecode/*
