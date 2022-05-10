@@ -1,17 +1,18 @@
-Django<1.10
 configglue==1.1.3
-cython
+Cython==0.29.28
+Django==1.11.29
+dirspec @ https://launchpad.net/dirspec/stable-13-10/13.10/+download/dirspec-13.10.tar.gz
 magicicadaprotocol==2.0
-pyOpenSSL
-protobuf
-psycopg2-binary
+pyOpenSSL==21.0.0
+protobuf==3.17.3
+psycopg2-binary==2.8.6
 # From twisted UserWarning: You do not have a working installation of the
 # service_identity module: 'No module named service_identity'.  Please install
 # it from <https://pypi.python.org/pypi/service_identity> and make sure all of
 # its dependencies are satisfied.  Without the service_identity module, Twisted
 # can perform only rudimentary TLS client hostname verification.  Many valid
 # certificate/hostname mappings may be rejected.
-service_identity
-supervisor
+service-identity==21.1.0
+supervisor==4.2.4
 Twisted==20.3.0
-https://launchpad.net/dirspec/stable-13-10/13.10/+download/dirspec-13.10.tar.gz
+
