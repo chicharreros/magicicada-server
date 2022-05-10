@@ -45,9 +45,6 @@ from magicicada.u1sync.genericmerge import MergeNode
 from magicicada.u1sync.utils import should_sync
 
 
-CONSUMER_KEY = "ubuntuone"
-CONSUMER_SECRET = "hammertime"
-
 u1sync_log_dir = os.path.join(xdg_cache_home, 'u1sync', 'log')
 LOGFILENAME = os.path.join(u1sync_log_dir, 'u1sync.log')
 if not os.path.exists(u1sync_log_dir):
@@ -193,9 +190,6 @@ class Client(object):
         self._status_reason = None
         self._status_waiting = []
         self._active_waiters = set()
-
-        self.consumer_key = CONSUMER_KEY
-        self.consumer_secret = CONSUMER_SECRET
 
     def force_shutdown(self):
         """Forces the client to shut itself down."""
