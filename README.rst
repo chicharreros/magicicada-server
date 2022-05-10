@@ -1,3 +1,9 @@
+Magicicada Server
+=================
+
+![tests](https://github.com/chicharreros/magicicada-server/actions/workflows/tests.yml/badge.svg)
+
+
 How to setup Magicicada Server and Client
 =========================================
 
