@@ -44,7 +44,7 @@ TAR_EXTRA = --exclude 'tmp/*' --exclude tags
 include Makefile.db
 
 sourcedeps: $(SOURCEDEPS_TAG)
-	test -d $(TARGET_SOURCECODE_DIR)/magicicada-client || git clone --depth 1 --branch 1.0 https://github.com/chicharreros/magicicada-client.git $(TARGET_SOURCECODE_DIR)/magicicada-client
+	test -d $(TARGET_SOURCECODE_DIR)/magicicada-client || git clone --depth 1 --branch 2.0 https://github.com/chicharreros/magicicada-client.git $(TARGET_SOURCECODE_DIR)/magicicada-client
 
 clean-sourcedeps:
 	rm -rf .sourcecode/*
@@ -54,7 +54,7 @@ $(SOURCEDEPS_TAG):
 
 build-clientdefs:
 	@echo "Building client clientdefs.py"
-	@cd $(TARGET_SOURCECODE_DIR)/magicicada-client/ubuntuone/ && sed \
+	@cd $(TARGET_SOURCECODE_DIR)/magicicada-client/magicicadaclient/ && sed \
 		-e 's|\@localedir\@|/usr/local/share/locale|g' \
 		-e 's|\@libexecdir\@|/usr/local/libexec|g' \
 		-e 's|\@GETTEXT_PACKAGE\@|ubuntuone-client|g' \

@@ -22,10 +22,10 @@ import os
 
 from cStringIO import StringIO
 
+from magicicadaclient.syncdaemon.marker import MDMarker as Marker
 from magicicadaprotocol import request
 from magicicadaprotocol.content_hash import content_hash_factory, crc32
 from twisted.internet import defer, error
-from ubuntuone.syncdaemon.marker import MDMarker as Marker
 
 from magicicada.server.testing.aq_helpers import (
     NO_CONTENT_HASH,

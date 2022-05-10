@@ -23,13 +23,11 @@ import time
 import logging
 
 from StringIO import StringIO
-from unittest import TestCase
 
 from supervisor.events import ProcessCommunicationEvent
 from twisted.internet import defer, task, protocol
-from twisted.trial.unittest import TestCase as TwistedTestCase
 
-from ubuntuone.devtools.handlers import MementoHandler
+from magicicada.testing.testcase import BaseTestCase
 from ubuntuone.supervisor.utils import (
     send_heartbeat,
     heartbeat_generator,
@@ -51,7 +49,7 @@ def wait_for(func, sleep=0.1, retries=10):
         count += 1
 
 
-class HeartbeatTestCase(TestCase):
+class HeartbeatTestCase(BaseTestCase):
     """Tests for heartbeat related utilities."""
 
     def test_send_heartbeat(self):
@@ -81,7 +79,7 @@ class Timer(object):
         return self.current_time
 
 
-class HeartbeatGeneratorTestCase(TestCase):
+class HeartbeatGeneratorTestCase(BaseTestCase):
     """Tests for HeartbeatGenerator."""
 
     def setUp(self):
@@ -123,7 +121,7 @@ class HeartbeatGeneratorTestCase(TestCase):
         self.timer.advance(5)
 
 
-class HeartbeatWriterTest(TwistedTestCase):
+class HeartbeatWriterTest(BaseTestCase):
     """Tests for HeartbeatWriter."""
 
     interval = 5
@@ -132,18 +130,15 @@ class HeartbeatWriterTest(TwistedTestCase):
     def setUp(self):
         yield super(HeartbeatWriterTest, self).setUp()
         self.logger = logging.Logger("HeartbeatWriter.test")
-        self.handler = MementoHandler()
-        self.logger.addHandler(self.handler)
-        self.addCleanup(self.logger.removeHandler, self.handler)
+        self.handler = self.add_memento_handler(self.logger)
         self.clock = task.Clock()
-        self.hw = HeartbeatWriter(self.interval, self.logger,
-                                  reactor=self.clock)
+        self.hw = HeartbeatWriter(
+            self.interval, self.logger, reactor=self.clock)
 
     def test_send_no_transport(self):
         """Log a warning when there is no transport."""
         self.hw.send()
-        self.assertTrue(self.handler.check_warning(
-            "Can't send heartbeat without a transport"))
+        self.handler.assert_warning("Can't send heartbeat without a transport")
 
     def test_send_loop(self):
         """Send heartbeats in the LoopingCall."""
@@ -185,8 +180,8 @@ class HeartbeatWriterTest(TwistedTestCase):
         called = []
         self.patch(self.hw.loop, 'stop', lambda: called.append(True))
         self.hw.connectionLost(protocol.connectionDone)
-        self.assertTrue(self.handler.check_info(
-            "HeartbeatWriter connectionLost: %s" % (protocol.connectionDone,)))
+        self.handler.assert_info(
+            "HeartbeatWriter connectionLost: %s" % protocol.connectionDone)
         self.assertTrue(called)
         self.assertEqual(self.hw.loop, None)
         self.assertEqual(self.hw.reactor, None)

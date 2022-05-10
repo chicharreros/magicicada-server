@@ -24,18 +24,17 @@ import time
 import xmlrpclib
 
 from StringIO import StringIO
-from unittest import TestCase
 
 from mocker import Mocker, expect
 from supervisor import states, childutils
 
-from ubuntuone.devtools.handlers import MementoHandler
+from magicicada.testing.testcase import BaseTestCase
 from ubuntuone.supervisor.heartbeat_listener import HeartbeatListener
 
 RUNNING = states.ProcessStates.RUNNING
 
 
-class HeartbeatListenerTestCase(TestCase):
+class HeartbeatListenerTestCase(BaseTestCase):
     """Tests for HeartbeatListener class."""
 
     def setUp(self):
@@ -49,22 +48,11 @@ class HeartbeatListenerTestCase(TestCase):
                                           stdin=self.stdin, stdout=self.stdout,
                                           stderr=self.stderr)
         self.next_fail = {}
-        self.handler = MementoHandler()
-        self.listener.logger.addHandler(self.handler)
-        self.listener.logger.setLevel(logging.DEBUG)
-        self.handler.setLevel(logging.DEBUG)
-        self.listener.logger.propagate = False
-        self.processes = [dict(name="heartbeat", group="heartbeat", pid="101",
-                               state=RUNNING)]
-        self.handler.debug = True
-
-    def tearDown(self):
-        self.listener.logger.removeHandler(self.handler)
-        self.handler.close()
-        self.next_fail = None
-        self.handler = None
-        self.listener = None
-        super(HeartbeatListenerTestCase, self).tearDown()
+        self.handler = self.add_memento_handler(  # add the log handler
+            self.listener.logger, level=logging.DEBUG)
+        self.processes = [
+            dict(name="heartbeat", group="heartbeat", pid="101", state=RUNNING)
+        ]
 
     def fail_next_stop(self, pname):
         """Make next stopProcess to fail."""
@@ -82,23 +70,19 @@ class HeartbeatListenerTestCase(TestCase):
         expect(self.rpc.supervisor.startProcess("foo"))
         with self.mocker:
             self.listener.restart("foo", "testing")
-        self.assertTrue(self.handler.check_info("Restarting foo (last "
-                                                "hearbeat: testing)"))
+        self.handler.assert_info("Restarting foo (last hearbeat: testing)")
 
     def test_restart_fail_stop(self):
         """Test the restart method failing to stop the process."""
         self.fail_next_stop("foo")
         last = time.time()
         with self.mocker:
-            try:
+            with self.assertRaises(xmlrpclib.Fault):
                 self.listener.restart("foo", last)
-            except xmlrpclib.Fault:
-                msg = ("Failed to stop process %s (last heartbeat: %s), "
-                       "exiting: %s") % \
-                    ("foo", last, "<Fault 42: 'Failed to stop the process.'>")
-                self.assertTrue(self.handler.check_error(msg))
-            else:
-                self.fail("Should get an xmlrpclib.Fault")
+
+            msg = "Failed to stop process %s (last heartbeat: %s), exiting: %s"
+            args = ("foo", last, "<Fault 42: 'Failed to stop the process.'>")
+            self.handler.assert_error(msg % args)
 
     def test_restart_fail_start(self):
         """Test the restart method failing to start the process."""
@@ -106,15 +90,11 @@ class HeartbeatListenerTestCase(TestCase):
         self.fail_next_start("foo")
         last = time.time()
         with self.mocker:
-            try:
+            with self.assertRaises(xmlrpclib.Fault):
                 self.listener.restart("foo", last)
-            except xmlrpclib.Fault:
-                msg = (
-                    'Failed to start process %s after stopping it, exiting: %s'
-                ) % ("foo", "<Fault 42: 'Failed to start the process.'>")
-                self.assertTrue(self.handler.check_error(msg))
-            else:
-                self.fail("Should get an xmlrpclib.Fault")
+            msg = 'Failed to start process %s after stopping it, exiting: %s'
+            self.handler.assert_error(
+                msg % ("foo", "<Fault 42: 'Failed to start the process.'>"))
 
     def test_check_processes(self):
         """Test the check_processes method."""
@@ -155,12 +135,12 @@ class HeartbeatListenerTestCase(TestCase):
         with self.mocker:
             # one process to restart
             self.listener.check_processes()
-        self.assertTrue(self.handler.check_warning(
+        self.handler.assert_warning(
             "Restarting process foo:foo (42), as we never received a hearbeat"
-            " event from it"))
-        self.assertTrue(self.handler.check_warning(
+            " event from it")
+        self.handler.assert_warning(
             "Restarting process bar:bar (43), as we never received a hearbeat"
-            " event from it"))
+            " event from it")
 
     def test_check_processes_untracked(self):
         """Test the check_processes method with a untracked proccess."""
@@ -174,10 +154,10 @@ class HeartbeatListenerTestCase(TestCase):
         expect(self.rpc.supervisor.getAllProcessInfo()).result(self.processes)
         with self.mocker:
             self.listener.check_processes()
-        self.assertTrue(self.handler.check_info(
-            "Ignoring untracked:foo-untracked (43) as isn't tracked."))
-        self.assertTrue(self.handler.check_info(
-            "Ignoring bar:bar-untracked (44) as isn't tracked."))
+        self.handler.assert_info(
+            "Ignoring untracked:foo-untracked (43) as isn't tracked.")
+        self.handler.assert_info(
+            "Ignoring bar:bar-untracked (44) as isn't tracked.")
 
     def test_check_processes_not_running(self):
         """Test the check_processes method if the proccess isn't running."""
@@ -196,10 +176,8 @@ class HeartbeatListenerTestCase(TestCase):
         expect(self.rpc.supervisor.getAllProcessInfo()).result(self.processes)
         with self.mocker:
             self.listener.check_processes()
-        self.assertTrue(self.handler.check_info(
-            "Ignoring foo:foo (42) as isn't running."))
-        self.assertTrue(self.handler.check_info(
-            "Ignoring bar:bar (43) as isn't running."))
+        self.handler.assert_info("Ignoring foo:foo (42) as isn't running.")
+        self.handler.assert_info("Ignoring bar:bar (43) as isn't running.")
 
     def test_handle_heartbeat(self):
         """Test handle_heartbeat method."""
@@ -234,8 +212,8 @@ class HeartbeatListenerTestCase(TestCase):
         self.assertEqual(1, len(called))
         del payload_dict['type']
         self.assertEqual(('ticker', 'ticker', '42', payload_dict), called[0])
-        self.assertTrue(self.handler.check_debug(
-            "Event '%s' received: %r" % (headers['eventname'], raw_data)))
+        self.handler.assert_debug(
+            "Event '%s' received: %r" % (headers['eventname'], raw_data))
         # check the stdout info
         self.assertEqual(["READY", "RESULT 2", "OK"],
                          self.stdout.getvalue().split("\n"))
@@ -252,8 +230,8 @@ class HeartbeatListenerTestCase(TestCase):
         self.stdin.seek(0)
         self.listener._handle_event()
         # check
-        self.assertTrue(self.handler.check_error(
-            "Unable to handle event type '%s' - %r" % ('ping', raw_data)))
+        self.handler.assert_error(
+            "Unable to handle event type '%s' - %r" % ('ping', raw_data))
 
     def test_invalid_payload(self):
         """Test with an invalid payload."""
@@ -267,8 +245,8 @@ class HeartbeatListenerTestCase(TestCase):
         self.stdin.seek(0)
         self.listener._handle_event()
         # check
-        self.assertTrue(self.handler.check_error(
-            "Unable to handle event type '%s' - %r" % ('None', raw_data)))
+        self.handler.assert_error(
+            "Unable to handle event type '%s' - %r" % ('None', raw_data))
 
     def test_unhandled_event(self):
         """A unhandled event type."""
@@ -281,13 +259,13 @@ class HeartbeatListenerTestCase(TestCase):
         self.stdin.seek(0)
         self.listener._handle_event()
         # check
-        self.assertTrue(self.handler.check_warning(
-            "Received unsupported event: %s - %r" % ('UNKNOWN', raw_data)))
+        self.handler.assert_warning(
+            "Received unsupported event: %s - %r" % ('UNKNOWN', raw_data))
 
     def test_check_interval(self):
         """Check that we properly check on the specified interval."""
-        header = "ver:3.0 server:supervisor serial:1 pool:heartbeat " + \
-                 "poolserial:1 eventname:TICK_5 len:0\n"
+        header = ("ver:3.0 server:supervisor serial:1 pool:heartbeat "
+                  "poolserial:1 eventname:TICK_5 len:0\n")
         expect(self.rpc.supervisor.getAllProcessInfo()).result([])
         self.stdin.write(header)
         self.stdin.seek(0)

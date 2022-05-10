@@ -50,12 +50,10 @@ except ImportError:
 
 import _pythonpath  # NOQA
 
-from ubuntuone.storageprotocol.client import (
-    StorageClientFactory, StorageClient)
-from ubuntuone.storageprotocol import request, dircontent_pb2, volumes
-from ubuntuone.storageprotocol.dircontent_pb2 import \
-    DirectoryContent, DIRECTORY
-from ubuntuone.storageprotocol.content_hash import content_hash_factory, crc32
+from magicicadaprotocol.client import StorageClientFactory, StorageClient
+from magicicadaprotocol import request, dircontent_pb2, volumes
+from magicicadaprotocol.dircontent_pb2 import DirectoryContent, DIRECTORY
+from magicicadaprotocol.content_hash import content_hash_factory, crc32
 
 
 def show_volume(volume):

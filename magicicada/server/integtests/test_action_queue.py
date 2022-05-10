@@ -25,18 +25,18 @@ import os
 import uuid
 import zlib
 
-from magicicadaprotocol import request
-from magicicadaprotocol.client import StorageClient
-from twisted.internet import defer, reactor
-from ubuntuone.syncdaemon.states import (
+from magicicadaclient.syncdaemon.states import (
     StateManager, QueueManager, ConnectionManager)
-from ubuntuone.syncdaemon import action_queue
-from ubuntuone.syncdaemon.action_queue import (
+from magicicadaclient.syncdaemon import action_queue
+from magicicadaclient.syncdaemon.action_queue import (
     ActionQueue,
     Download,
     Upload,
 )
-from ubuntuone.syncdaemon.marker import MDMarker as Marker
+from magicicadaclient.syncdaemon.marker import MDMarker as Marker
+from magicicadaprotocol import request
+from magicicadaprotocol.client import StorageClient
+from twisted.internet import defer, reactor
 
 from magicicada.server.testing.aq_helpers import (
     FakeFailure,

@@ -25,7 +25,7 @@ import shutil
 
 from copy import copy
 
-from ubuntuone.platform.linux import tools
+from magicicadaclient.platform.linux import tools
 from twisted.internet import defer
 
 from magicicada.filesync.models import Share
