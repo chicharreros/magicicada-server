@@ -13,13 +13,15 @@ PGINIT = $(PGBIN)/initdb
 migrate:
 	$(DJANGO_MANAGE) migrate --noinput
 
-setup-db:
+$(DATA_DIR):
 	mkdir -p $(DATA_DIR)
 	$(PGINIT) -A trust -D $(DATA_DIR)
 	echo "fsync = off" > $(CONF_FILE)
 	$(PGCTL) start -w -D $(DATA_DIR) -l $(LOG_FILE) -o "-F -k $(PGHOST) -h ''"
 	PGHOST=$(PGHOST) createdb $(PGNAME)
 	PGHOST=$(PGHOST) createuser --superuser --createdb $(PGUSER)
+
+setup-db: $(DATA_DIR)
 
 start-db:
 	$(MAKE) setup-db

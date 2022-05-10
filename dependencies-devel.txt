@@ -1,9 +1,7 @@
 dbus
-gir1.2-gtk-3.0
 libcairo2-dev
 libdbus-1-dev
 libdbus-glib-1-dev
 libgirepository1.0-dev
-libgtk2.0-dev
 pkg-config
 postgresql-client

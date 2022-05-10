@@ -44,7 +44,7 @@ TAR_EXTRA = --exclude 'tmp/*' --exclude tags
 include Makefile.db
 
 sourcedeps: $(SOURCEDEPS_TAG)
-	git clone --depth 1 --branch 1.0 https://github.com/chicharreros/magicicada-client.git $(TARGET_SOURCECODE_DIR)/magicicada-client
+	test -d $(TARGET_SOURCECODE_DIR)/magicicada-client || git clone --depth 1 --branch 1.0 https://github.com/chicharreros/magicicada-client.git $(TARGET_SOURCECODE_DIR)/magicicada-client
 
 clean-sourcedeps:
 	rm -rf .sourcecode/*
@@ -61,8 +61,8 @@ build-clientdefs:
 		-e 's|\@VERSION\@|0.0.0|g' < clientdefs.py.in > clientdefs.py
 
 bootstrap:
-	cat dependencies.txt | sudo xargs apt-get install -y --no-install-recommends
-	cat dependencies-devel.txt | sudo xargs apt-get install -y --no-install-recommends
+	sudo apt update
+	cat dependencies.txt dependencies-devel.txt | sudo xargs apt install -y --no-install-recommends
 	$(MAKE) $(ENV)
 	$(MAKE) sourcedeps build-clientdefs
 	mkdir -p tmp
