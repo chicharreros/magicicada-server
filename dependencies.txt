@@ -1,7 +1,4 @@
-gcc
 make
 postgresql
 postgresql-contrib
-postgresql-plpython-10
-python-dev
-virtualenv
+postgresql-plpython3-12

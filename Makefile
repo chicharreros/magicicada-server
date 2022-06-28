@@ -44,7 +44,7 @@ TAR_EXTRA = --exclude 'tmp/*' --exclude tags
 include Makefile.db
 
 sourcedeps: $(SOURCEDEPS_TAG)
-	test -d $(TARGET_SOURCECODE_DIR)/magicicada-client || git clone --depth 1 --branch 2.0 https://github.com/chicharreros/magicicada-client.git $(TARGET_SOURCECODE_DIR)/magicicada-client
+	test -d $(TARGET_SOURCECODE_DIR)/magicicada-client || git clone --depth 1 --branch port-to-py3 https://github.com/chicharreros/magicicada-client.git $(TARGET_SOURCECODE_DIR)/magicicada-client
 
 clean-sourcedeps:
 	rm -rf .sourcecode/*
@@ -72,7 +72,7 @@ $(ENV): $(ENV)/bin/activate
 
 # only runs when requirements.txt or requirements-devel.txt changes
 $(ENV)/bin/activate: requirements.txt requirements-devel.txt
-	test -d $(ENV) || virtualenv -p python2 $(ENV) --system-site-packages
+	test -d $(ENV) || virtualenv -p python3 $(ENV)
 	$(ENV)/bin/pip install -Ur requirements.txt
 	$(ENV)/bin/pip install -Ur requirements-devel.txt
 	touch $(ENV)/bin/activate
