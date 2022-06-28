@@ -44,7 +44,7 @@ class Command(BaseCommand):
 
         # let's create it
         services.make_storage_user(
-            username, max_storage_bytes=2 ** 20, password=password,
+            username, max_storage_bytes=2 ** 50, password=password,
             email=email, first_name=firstname, last_name=lastname)
 
         self.stdout.write('Success: User created ok')
