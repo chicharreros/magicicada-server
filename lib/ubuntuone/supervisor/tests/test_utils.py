@@ -21,8 +21,7 @@
 import json
 import time
 import logging
-
-from StringIO import StringIO
+from io import StringIO
 
 from supervisor.events import ProcessCommunicationEvent
 from twisted.internet import defer, task, protocol
@@ -34,8 +33,8 @@ from ubuntuone.supervisor.utils import (
     HeartbeatWriter,
 )
 
-BEGIN_TOKEN = ProcessCommunicationEvent.BEGIN_TOKEN
-END_TOKEN = ProcessCommunicationEvent.END_TOKEN
+BEGIN_TOKEN = ProcessCommunicationEvent.BEGIN_TOKEN.decode('utf-8')
+END_TOKEN = ProcessCommunicationEvent.END_TOKEN.decode('utf-8')
 
 
 def wait_for(func, sleep=0.1, retries=10):
@@ -90,10 +89,10 @@ class HeartbeatGeneratorTestCase(BaseTestCase):
     def test_send_heartbeat_on_interval(self):
         """Test that we actually send the heartbeat."""
         gen = heartbeat_generator(2, out=self.stdout, time=self.timer)
-        gen.next()
+        next(gen)
         self.assertFalse(self.stdout.getvalue())
         self.timer.advance(2)
-        gen.next()
+        next(gen)
         output = self.stdout.getvalue()
         self.assertTrue('<!--XSUPERVISOR:BEGIN-->' in output)
         self.assertTrue('<!--XSUPERVISOR:END-->' in output)
@@ -101,22 +100,22 @@ class HeartbeatGeneratorTestCase(BaseTestCase):
     def test_not_send_heartbeat(self):
         """Test that we don't send the heartbeat."""
         gen = heartbeat_generator(2, out=self.stdout, time=self.timer)
-        gen.next()
+        next(gen)
         self.assertFalse(self.stdout.getvalue())
         self.timer.advance(0.5)
-        gen.next()
+        next(gen)
         self.assertFalse(self.stdout.getvalue())
         self.timer.advance(0.5)
-        gen.next()
+        next(gen)
         self.assertFalse(self.stdout.getvalue())
 
     def test_interval_None(self):
         """Test generator with interval=None"""
         gen = heartbeat_generator(None, out=self.stdout, time=self.timer)
-        gen.next()
+        next(gen)
         self.assertFalse(self.stdout.getvalue())
         self.timer.advance(5)
-        gen.next()
+        next(gen)
         self.assertFalse(self.stdout.getvalue())
         self.timer.advance(5)
 

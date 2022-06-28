@@ -15,7 +15,8 @@
 
 """Test the client code."""
 
-import mock
+from unittest import mock
+
 from twisted.trial.unittest import TestCase
 
 from magicicada.u1sync import client

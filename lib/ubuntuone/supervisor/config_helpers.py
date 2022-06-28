@@ -109,7 +109,7 @@ def get_config(environ, config_spec, base_dir):
 
     for k, v in config.items():
         # only apply the env to string values
-        if isinstance(v, basestring) and '%' in v:
+        if isinstance(v, str) and '%' in v:
             config[k] = v % {"env": environ,
                              "host_env": config["host_env"],
                              "base_dir": base_dir}

@@ -30,7 +30,7 @@ import os
 import re
 import sys
 import time
-import urllib
+import urllib.parse
 import uuid
 import weakref
 
@@ -74,7 +74,7 @@ SUGGESTED_REDIRS = {
     # frozenset(['example2']): dict(srv_record='_https._tcp.fs.server.com')
 }
 
-FILESYNC_STATUS_MSG = 'filesync server'
+FILESYNC_STATUS_MSG = b'filesync server'
 
 logger = logging.getLogger(__name__)
 
@@ -119,8 +119,11 @@ class StorageLogger(object):
         msg_format = '%(uuid)s %(remote)s %(userid)s %(message)s'
         extra = {'message': message}
         if self.protocol.user is not None:
-            extra['userid'] = urllib.quote(self.protocol.user.username,
-                                           ':~/').replace('%', '%%')
+            username = self.protocol.user.username
+            if isinstance(username, bytes):
+                username = username.decode('utf-8')
+            extra['userid'] = urllib.parse.quote(
+                username, ':~/').replace('%', '%%')
         else:
             extra['userid'] = '-'
 
@@ -372,7 +375,7 @@ class StorageServer(request.RequestHandler):
         request.RequestHandler.connectionMade(self)
         self.factory.protocols.append(self)
         self.log.info('Connection Made')
-        msg = '%d %s.\r\n' % (self.PROTOCOL_VERSION, FILESYNC_STATUS_MSG)
+        msg = b'%d %s.\r\n' % (self.PROTOCOL_VERSION, FILESYNC_STATUS_MSG)
         self.transport.write(msg)
         self.ping_loop.start()
         self.factory.metrics.meter('connection_made', 1)
@@ -906,7 +909,7 @@ class SimpleRequestResponse(StorageServerRequestResponse):
         foreign_errors = (self.generic_foreign_errors +
                           self.expected_foreign_errors)
         error = failure.check(errors.StorageServerError, *foreign_errors)
-        comment = failure.getErrorMessage().decode('utf8')
+        comment = failure.getErrorMessage()
         if failure.check(errors.TryAgain):
             orig_error_name = failure.value.orig_error.__class__.__name__
             comment = '%s: %s' % (orig_error_name, comment)

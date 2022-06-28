@@ -20,8 +20,6 @@
 
 """Given a user, create UDFs, folders and files to help with manual testing."""
 
-from __future__ import unicode_literals
-
 import sys
 import random
 import uuid
@@ -32,10 +30,6 @@ from twisted.python.util import makeStatBar
 
 from magicicada.filesync.services import get_storage_user
 from magicicada.filesync.tests.testcase import Factory
-
-
-def utf2unicode(s):
-    return unicode(s, 'utf-8', 'replace')
 
 
 def make_udf(user, sample):
@@ -50,11 +44,11 @@ def make_udf(user, sample):
 
 def main(username, sharer, wlist, num):
     """Create UDFs, folders and files for the given user using a wordlist."""
-    user = get_storage_user(None, username=utf2unicode(username))
-    sharer = get_storage_user(None, username=utf2unicode(sharer))
+    user = get_storage_user(None, username=username)
+    sharer = get_storage_user(None, username=sharer)
     folders = [user.root]
     with open(wlist) as f:
-        names = [utf2unicode(i.strip()) for i in f.readlines() if i.strip()]
+        names = [i.strip() for i in f.readlines() if i.strip()]
     sample = random.sample(names, num)
 
     if sys.stdout.isatty():

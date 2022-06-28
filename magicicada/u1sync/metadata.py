@@ -15,13 +15,10 @@
 
 """Routines for loading/storing u1sync mirror metadata."""
 
-from __future__ import with_statement
-
 import os
+import pickle
 import uuid
-
 from contextlib import contextmanager
-import cPickle as pickle
 from errno import ENOENT
 
 from magicicadaprotocol.dircontent_pb2 import DIRECTORY

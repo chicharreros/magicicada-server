@@ -18,12 +18,10 @@
 
 """Test the Data Access Objects."""
 
-from __future__ import unicode_literals
-
 import uuid
 from operator import attrgetter
+from unittest import mock
 
-import mock
 from django.conf import settings
 
 from magicicada.filesync import errors, services, utils
@@ -197,7 +195,7 @@ class DAOInitTestCase(StorageDALTestCase):
         self.assertEqual(dao_download.volume_id, download.volume.id)
         self.assertEqual(dao_download.file_path, 'The Path')
         self.assertEqual(dao_download.download_url, 'The Url')
-        self.assertEqual(dao_download.download_key, "u'Key'")
+        self.assertEqual(dao_download.download_key, "'Key'")
 
 
 class VolumeProxyTestCase(StorageDALTestCase):

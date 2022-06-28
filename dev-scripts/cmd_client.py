@@ -28,7 +28,7 @@ import time
 import traceback
 import uuid
 import zlib
-from Queue import Queue
+from queue import Queue
 from threading import Thread
 from optparse import OptionParser
 
@@ -546,10 +546,10 @@ class ClientCmd(cmd.Cmd):
             """Actually do it."""
             tini = time.time()
             for _ in range(intensity):
-                name = u"testdir-" + unicode(uuid.uuid4())
+                name = "testdir-" + str(uuid.uuid4())
                 req = yield make_dir(self.volume, subroot_id, name)
                 for _ in range(intensity):
-                    name = u"testfile-" + unicode(uuid.uuid4())
+                    name = "testfile-" + str(uuid.uuid4())
                     yield make_file(self.volume, req.new_id, name)
             tend = time.time()
             print(

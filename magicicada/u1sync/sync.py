@@ -22,8 +22,6 @@ the server to correspond to the merged result.
 
 """
 
-from __future__ import with_statement, unicode_literals
-
 import os
 import logging
 
@@ -35,7 +33,7 @@ from magicicada.u1sync.genericmerge import MergeNode, generic_merge
 from magicicada.u1sync.utils import safe_mkdir
 
 
-EMPTY_HASH = b""
+EMPTY_HASH = ""
 UPLOAD_SYMBOL = "▲"
 DOWNLOAD_SYMBOL = "▼"
 CONFLICT_SYMBOL = "!"
@@ -113,6 +111,7 @@ def sync_tree(merged_tree, original_tree, sync_mode, path):
                 logger.debug(
                     "%s %s %s",
                     sync_mode.symbol, conflict_symbol, display_path)
+
                 if original_node is not None:
                     node_uuid = original_node.uuid or merged_node.uuid
                     original_hash = original_node.content_hash or EMPTY_HASH
@@ -163,9 +162,8 @@ def sync_tree(merged_tree, original_tree, sync_mode, path):
 
         if model_node is not None:
             if model_node.node_type == DIRECTORY:
-                child_iter = child_results.items()
                 merged_children = dict(
-                    (name, child) for (name, child) in child_iter
+                    (name, child) for (name, child) in child_results.items()
                     if child is not None)
             else:
                 # if there are children here it's because they failed to delete

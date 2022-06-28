@@ -18,8 +18,6 @@
 
 """Exceptions raised by the data access layer."""
 
-from __future__ import unicode_literals
-
 from django.db import IntegrityError  # noqa
 
 from magicicada.filesync.dbmanager import RetryLimitReached  # noqa

@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 # Copyright 2008-2015 Canonical
 # Copyright 2015-2018 Chicharreros (https://launchpad.net/~chicharreros)
 #
@@ -81,7 +79,7 @@ class TestMakeFile(TestWithDatabase):
             d = client.dummy_authenticate("open sesame")
             d.addCallbacks(lambda r: client.get_root(), client.test_fail)
             d.addCallbacks(
-                lambda r: client.make_file(request.ROOT, r, u"á"),
+                lambda r: client.make_file(request.ROOT, r, "á"),
                 client.test_fail)
             d.addCallbacks(client.test_done, client.test_fail)
         return self.callback_test(auth)
@@ -236,7 +234,7 @@ class TestMakeDir(TestWithDatabase):
             d = client.dummy_authenticate("open sesame")
             d.addCallbacks(lambda r: client.get_root(), client.test_fail)
             d.addCallbacks(
-                lambda r: client.make_dir(request.ROOT, r, u"¶á"),
+                lambda r: client.make_dir(request.ROOT, r, "¶á"),
                 client.test_fail)
             d.addCallbacks(client.test_done, client.test_fail)
         return self.callback_test(auth)
@@ -265,7 +263,7 @@ class TestMakeDir(TestWithDatabase):
             """Test."""
             yield client.dummy_authenticate("open sesame")
             root = yield client.get_root()
-            d = client.make_dir(request.ROOT, root, u"surrogate \udad6")
+            d = client.make_dir(request.ROOT, root, "surrogate \\udad6")
             res = yield self.assertFailure(d, request.StorageRequestError)
             self.assertEqual(str(res), "INVALID_FILENAME")
         return self.callback_test(test, add_default_callbacks=True)

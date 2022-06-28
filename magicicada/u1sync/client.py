@@ -15,8 +15,6 @@
 
 """Pretty API for protocol client."""
 
-from __future__ import with_statement
-
 import logging
 import os
 import sys
@@ -24,9 +22,8 @@ import shutil
 import time
 import uuid
 import zlib
-
-from cStringIO import StringIO
-from Queue import Queue
+from io import StringIO
+from queue import Queue
 from threading import Lock
 
 from magicicadaprotocol import request, volumes
@@ -95,7 +92,7 @@ class Waiter(object):
         (result, exc_info) = self.queue.get()
         if exc_info:
             try:
-                raise exc_info[0], exc_info[1], exc_info[2]
+                raise exc_info[0](exc_info[1]).with_traceback(exc_info[2])
             finally:
                 exc_info = None
         else:
@@ -287,7 +284,7 @@ class Client(object):
         result, exc_info, failure = self._wait(waiter)
         if exc_info:
             try:
-                raise exc_info[0], exc_info[1], exc_info[2]
+                raise exc_info[0](exc_info[1]).with_traceback(exc_info[2])
             finally:
                 exc_info = None
         elif failure:

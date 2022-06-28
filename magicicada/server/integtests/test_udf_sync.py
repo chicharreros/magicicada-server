@@ -20,8 +20,7 @@
 
 import os
 import subprocess
-
-from cStringIO import StringIO
+from io import StringIO
 
 from twisted.internet import reactor, defer
 from twisted.python.failure import Failure

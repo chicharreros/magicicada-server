@@ -201,7 +201,7 @@ class TestCleanup(TestBase):
     @failure_ignore('ALREADY_EXISTS')
     def test_create_share(self):
         """Create share..."""
-        self.aq.create_share(self.root, u'jane', '', 'View', 'marker:x', '')
+        self.aq.create_share(self.root, 'jane', '', 'View', 'marker:x', '')
         d = self.wait_for('SYS_QUEUE_DONE')
         self.eq.push('SYS_NET_DISCONNECTED')
         self.eq.push('SYS_CONNECTION_LOST')

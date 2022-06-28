@@ -18,8 +18,6 @@
 
 """Test downloadservices functions."""
 
-from __future__ import unicode_literals
-
 import uuid
 
 from magicicada.filesync import downloadservices, services
@@ -111,7 +109,7 @@ class DownloadServicesTestCase(BaseTestCase):
         self.assertEqual(dl.volume_id, self.volume_id)
         self.assertEqual(dl.file_path, self.fpath)
         self.assertEqual(dl.download_url, self.dl_url)
-        self.assertEqual(dl.download_key, unicode(repr(self.dl_key)))
+        self.assertEqual(dl.download_key, repr(self.dl_key))
         # do it again, make sure we get the same one
         dl2 = downloadservices.get_or_make_download(
             self.user.id, self.volume_id, self.fpath, self.dl_url, self.dl_key)

@@ -24,9 +24,9 @@ import os
 import shutil
 import struct
 import sys
-from StringIO import StringIO
+from io import StringIO
+from unittest import mock
 
-import mock
 from django.conf import settings
 from magicicadaprotocol import request
 from twisted.internet import reactor, defer
@@ -100,7 +100,7 @@ class TestBasic(TestWithDatabase):
             root_id = yield client.get_root()
             # lock the user:
             StorageUser.objects.filter(id=self.usr0.id).update(locked=True)
-            client.make_dir(request.ROOT, root_id, u"open sesame")
+            client.make_dir(request.ROOT, root_id, "open sesame")
             yield d
             # check we logged a warning about this.
             handler.assert_warning("Shutting down protocol: user locked")

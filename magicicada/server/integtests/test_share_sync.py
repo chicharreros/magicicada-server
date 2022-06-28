@@ -20,8 +20,7 @@
 
 import os
 import subprocess
-
-from cStringIO import StringIO
+from io import StringIO
 
 from magicicadaclient.syncdaemon import states
 from magicicadaprotocol import request
@@ -60,9 +59,9 @@ class TestSharesSync(test_sync.TestSync):
 
         # create two shares more for the tests.
         self.jane_share_id, self.jane_share_subtree = self.create_share(
-            shared_by='jane', dirname=u'TestSync', name=u'TestSyncShare')
+            shared_by='jane', dirname='TestSync', name='TestSyncShare')
         self.john_share_id, self.john_share_subtree = self.create_share(
-            shared_by='john', dirname=u'TestSync2', name=u'TestSyncShare2')
+            shared_by='john', dirname='TestSync2', name='TestSyncShare2')
         self.main.action_q.list_shares()
         yield self.wait_for_nirvana(.2)
 
@@ -233,8 +232,8 @@ class TestReadOnlyShares(TestShareServerBase):
 
         # create another share (ro) for this tests
         self.jane_ro_share_id, self.jane_ro_share_subtree = self.create_share(
-            shared_by='jane', dirname=u'TestJaneShareRO',
-            name=u'TestJaneShareRO', access_level='View')
+            shared_by='jane', dirname='TestJaneShareRO',
+            name='TestJaneShareRO', access_level='View')
         d = self.wait_for('AQ_SHARES_LIST')
         self.main.action_q.list_shares()
         yield d

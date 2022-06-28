@@ -176,7 +176,7 @@ class ClientDummyAuthTests(AuthenticationBaseTestCase):
         m_called = []
         self.service.factory.metrics.meter = lambda *a: m_called.append(a)
         handler = self.add_memento_handler(server_logger, level=logging.DEBUG)
-        metadata = {u"platform": u"linux2", u"version": u"1.0", u"foo": u"bar"}
+        metadata = {"platform": "linux2", "version": "1.0", "foo": "bar"}
         yield self.callback_test(
             self.do_auth, credentials=self.creds, metadata=metadata,
             add_default_callbacks=True)

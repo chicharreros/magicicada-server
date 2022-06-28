@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 # Copyright 2008-2015 Canonical
 # Copyright 2015-2018 Chicharreros (https://launchpad.net/~chicharreros)
 #
@@ -254,7 +252,7 @@ class TestBrokenNode(TestSync):
         #   - increase the generation
         user = self.storage_users['jack']
         root = user.root_node
-        afile = root.get_child_by_name(u"test_file")
+        afile = root.get_child_by_name("test_file")
         # create a "invalid" content blob
         content = self.factory.make_content_blob(
             hash="", magic_hash="", storage_key=uuid.uuid4(), crc32=1, size=1,
@@ -275,7 +273,7 @@ class TestBrokenNode(TestSync):
         with open(file_path) as f:
             self.assertEqual(f.read(), "foo")
         # re-get the file and check the server content is fixed
-        afile = root.get_child_by_name(u"test_file")
+        afile = root.get_child_by_name("test_file")
         self.assertTrue(afile.content.hash)
         self.assertTrue(afile.content.magic_hash)
 
@@ -317,7 +315,7 @@ class TestBasic(TestSync):
 
     def test_sync_a_strangely_named_file(self):
         """Sync one file with non-ascii name."""
-        open(self.source_dir + u"/propósito".encode("utf8"), "w").close()
+        open(self.source_dir + "/propósito", "w").close()
         return self.sync_and_check()
 
     @defer.inlineCallbacks
@@ -1095,7 +1093,7 @@ class TestClientMove(TestSync):
         def change_file(event, *args, **kwargs):
             """Changes the file permissions when HQ_HASH_NEW is received."""
             if event == "HQ_HASH_NEW":
-                os.chmod(filepath, 0666)
+                os.chmod(filepath, 0o666)
                 methinterf.restore()
             return True  # for the original function to be called
 
@@ -1489,9 +1487,9 @@ class TestConflict(TestServerBase):
 class TestConflictOnServerSideDelete(TestServerBase):
     """Test corner cases on server side tree delete."""
 
-    dir_name = u'foo'
-    dir_name_conflict = dir_name + u'.u1conflict'
-    file_name = u'bar.txt'
+    dir_name = 'foo'
+    dir_name_conflict = dir_name + '.u1conflict'
+    file_name = 'bar.txt'
 
     def create_and_check(self, _=None):
         """Create initial directory hierarchy."""

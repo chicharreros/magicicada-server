@@ -18,11 +18,9 @@
 
 """Tests for the DAL entry point."""
 
-from __future__ import unicode_literals
-
 import uuid
+from unittest import mock
 
-import mock
 from twisted.internet import defer
 
 from magicicada.filesync import errors

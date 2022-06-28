@@ -26,8 +26,7 @@ The NullConsumer is just a consumer that discards whatever it gets.
 """
 
 import zlib
-
-from cStringIO import StringIO
+from io import StringIO
 
 from magicicadaprotocol.content_hash import (
     content_hash_factory,

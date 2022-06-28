@@ -15,8 +15,6 @@
 
 """Code for merging changes between modified trees."""
 
-from __future__ import with_statement
-
 import os
 import uuid
 
@@ -37,7 +35,7 @@ def merge_trees(old_local_tree, local_tree, old_remote_tree, remote_tree,
         """Accumulates path and determines merged node type."""
         old_local_node, local_node, old_remote_node, remote_node = nodes
         (parent_path, parent_type) = partial_parent
-        path = os.path.join(parent_path, name.encode("utf-8"))
+        path = os.path.join(parent_path, name)
         node_type = merge_action.get_node_type(old_local_node=old_local_node,
                                                local_node=local_node,
                                                old_remote_node=old_remote_node,
@@ -65,7 +63,7 @@ def merge_trees(old_local_tree, local_tree, old_remote_tree, remote_tree,
     return generic_merge(trees=[old_local_tree, local_tree,
                                 old_remote_tree, remote_tree],
                          pre_merge=pre_merge, post_merge=post_merge,
-                         name=u"", partial_parent=("", None))
+                         name="", partial_parent=("", None))
 
 
 class SyncMerge(object):

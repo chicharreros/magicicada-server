@@ -18,8 +18,6 @@
 
 """Services for handling downloads."""
 
-from __future__ import unicode_literals
-
 from magicicada.filesync import errors
 from magicicada.filesync.dbmanager import (
     retryable_transaction,

@@ -20,8 +20,6 @@
 
 """Test for the storage model."""
 
-from __future__ import unicode_literals
-
 import threading
 import unittest
 import uuid

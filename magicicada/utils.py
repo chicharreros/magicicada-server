@@ -18,8 +18,6 @@
 
 """Some generic utilities."""
 
-from __future__ import unicode_literals
-
 from magicicada.filesync import services
 
 

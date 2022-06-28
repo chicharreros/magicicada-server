@@ -18,8 +18,6 @@
 
 """Tests for the admin features."""
 
-from __future__ import unicode_literals
-
 from magicicada.filesync import admin, services
 from magicicada.testing.testcase import BaseTestCase
 

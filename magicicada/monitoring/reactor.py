@@ -18,11 +18,9 @@
 
 """A thread that measures responsiveness of the twisted reactor."""
 
-from __future__ import unicode_literals
-
 import logging
 import os
-import Queue as queue
+import queue
 import sys
 import time
 import threading

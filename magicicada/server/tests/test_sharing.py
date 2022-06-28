@@ -47,7 +47,7 @@ class TestCreateShare(TestWithDatabase):
             yield client.dummy_authenticate("open sesame")
             root = yield client.get_root()
             res = yield client.create_share(root, self.usr1.username,
-                                            u"name", Share.VIEW)
+                                            "name", Share.VIEW)
             share_id = uuid.UUID(res.share_id)
             yield client.delete_share(share_id)
             self.assertRaises(errors.DoesNotExist,
@@ -59,7 +59,7 @@ class TestCreateShare(TestWithDatabase):
         """Test deletion of an offered to me and accepted share."""
 
         def create_share(_):
-            share = self.usr1.root.share(self.usr0.id, u"sharename",
+            share = self.usr1.root.share(self.usr0.id, "sharename",
                                          readonly=True)
             self.usr0.get_share(share.id).accept()
             return share
@@ -91,7 +91,7 @@ class TestCreateShare(TestWithDatabase):
             # create the share
             d.addCallbacks(
                 lambda r: client.create_share(
-                    r, self.usr1.username, u"name", Share.VIEW),
+                    r, self.usr1.username, "name", Share.VIEW),
                 client.test_fail)
 
             d.addCallback(lambda _: verifyDB())
@@ -111,7 +111,7 @@ class TestCreateShare(TestWithDatabase):
             # create the share
             d.addCallbacks(
                 lambda r: client.create_share(
-                    r, self.usr1.username, u"name", Share.MODIFY),
+                    r, self.usr1.username, "name", Share.MODIFY),
                 client.test_fail)
 
             d.addCallbacks(client.test_done, client.test_fail)
@@ -129,13 +129,13 @@ class TestCreateShare(TestWithDatabase):
             # create the share
             d.addCallbacks(
                 lambda r: client.create_share(
-                    r, self.usr1.username, u"name1", Share.MODIFY),
+                    r, self.usr1.username, "name1", Share.MODIFY),
                 client.test_fail)
 
             # create a share of the same node to the same user
             d.addCallbacks(
                 lambda r: client.create_share(
-                    r, self.usr1.username, u"name2", Share.MODIFY),
+                    r, self.usr1.username, "name2", Share.MODIFY),
                 client.test_fail)
 
             d.addCallbacks(client.test_fail, lambda x: client.test_done("ok"))
@@ -155,14 +155,14 @@ class TestCreateShare(TestWithDatabase):
             d.addCallbacks(
                 lambda r: client.create_share(self._state.root_id,
                                               self.usr1.username,
-                                              u"same name", Share.VIEW),
+                                              "same name", Share.VIEW),
                 client.test_fail)
 
             # create the share to other user
             d.addCallbacks(
                 lambda r: client.create_share(self._state.root_id,
                                               self.usr2.username,
-                                              u"same name", Share.VIEW),
+                                              "same name", Share.VIEW),
                 client.test_fail)
 
             d.addCallbacks(client.test_done, client.test_fail)
@@ -187,14 +187,14 @@ class TestCreateShare(TestWithDatabase):
             d.addCallbacks(
                 lambda r: client.create_share(r.new_id,
                                               self.usr1.username,
-                                              u"new dir", Share.VIEW),
+                                              "new dir", Share.VIEW),
                 client.test_fail)
 
             # create the share using root
             d.addCallbacks(
                 lambda r: client.create_share(self._state.root_id,
                                               self.usr1.username,
-                                              u"root dir", Share.VIEW),
+                                              "root dir", Share.VIEW),
                 client.test_fail)
 
             d.addCallbacks(client.test_done, client.test_fail)
@@ -211,15 +211,15 @@ class TestCreateShare(TestWithDatabase):
             root_id = yield client.get_root()
 
             # create other directory to share
-            makedir_req = yield client.make_dir(request.ROOT, root_id, u"hola")
+            makedir_req = yield client.make_dir(request.ROOT, root_id, "hola")
 
             # create the share using the just created directory
             yield client.create_share(makedir_req.new_id, self.usr1.username,
-                                      u"same_name", Share.VIEW)
+                                      "same_name", Share.VIEW)
 
             # create the share using root
             d = client.create_share(root_id, self.usr1.username,
-                                    u"same_name", Share.VIEW)
+                                    "same_name", Share.VIEW)
 
             # the last call must fail with AlreadyExist
             yield self.assertFailure(d, protocol_errors.AlreadyExistsError)
@@ -242,7 +242,7 @@ class TestCreateShare(TestWithDatabase):
             # create the share
             d.addCallbacks(
                 lambda r: client.create_share(r.new_id, self.usr1.username,
-                                              u"foo", Share.MODIFY),
+                                              "foo", Share.MODIFY),
                 client.test_fail)
 
             d.addCallbacks(client.test_fail, lambda x: client.test_done("ok"))
@@ -274,7 +274,7 @@ class TestCreateShare(TestWithDatabase):
                            client.test_fail)
             d.addCallbacks(
                 lambda _: client.create_share(
-                    self._state.root_id, "usr0", u"name", Share.VIEW),
+                    self._state.root_id, "usr0", "name", Share.VIEW),
                 client.test_fail)
 
         return self.callback_test(auth)
@@ -287,7 +287,7 @@ class TestCreateShare(TestWithDatabase):
                 # check the DB
                 shares = self.usr0.get_shared_to(accepted=False)
                 share = shares[0]
-                self.assertEqual(share.name, u"acc Y")
+                self.assertEqual(share.name, "acc Y")
                 self.assertEqual(str(share.root_id), self._state.root_id)
                 self.assertEqual(share.access, Share.VIEW)
                 self.assertEqual(share.accepted, False)
@@ -323,7 +323,7 @@ class TestCreateShare(TestWithDatabase):
             # create the share
             d.addCallbacks(
                 lambda _: client.create_share(
-                    self._state.root_id, self.usr0.username, u"acc Y",
+                    self._state.root_id, self.usr0.username, "acc Y",
                     Share.VIEW),
                 client.test_fail)
 
@@ -373,7 +373,7 @@ class TestCreateShare(TestWithDatabase):
             # create the share
             d.addCallbacks(
                 lambda _: client.create_share(
-                    self._state.root_id, self.usr0.username, u"acc N",
+                    self._state.root_id, self.usr0.username, "acc N",
                     Share.VIEW),
                 client.test_fail)
 
@@ -416,7 +416,7 @@ class TestCreateShare(TestWithDatabase):
             d.addCallback(self.save_req, 'root_id')
             d.addCallbacks(
                 lambda _: client1.create_share(
-                    self._state.root_id, self.usr1.username, u"acc Y",
+                    self._state.root_id, self.usr1.username, "acc Y",
                     Share.VIEW),
                 client1.test_fail)
 
@@ -425,7 +425,7 @@ class TestCreateShare(TestWithDatabase):
             # check the share
             shares = self.usr1.get_shared_to(accepted=False)
             share = shares[0]
-            self.assertEqual(share.name, u"acc Y")
+            self.assertEqual(share.name, "acc Y")
             self.assertEqual(str(share.root_id), self._state.client1.root_id)
             self.assertEqual(share.access, Share.VIEW)
             self.assertEqual(share.accepted, False)
@@ -467,7 +467,7 @@ class TestCreateShare(TestWithDatabase):
                            client.test_fail)
             d.addCallbacks(
                 lambda _: client.create_share(
-                    self._state.root_id, self.usr1.username, u"name",
+                    self._state.root_id, self.usr1.username, "name",
                     Share.VIEW),
                 client.test_fail)
 
@@ -489,7 +489,7 @@ class TestCreateShare(TestWithDatabase):
 
             def create_share(r):
                 d = client.create_share(
-                    r, self.usr1.username, u"name", Share.VIEW)
+                    r, self.usr1.username, "name", Share.VIEW)
                 d.addCallbacks(check_share_id, client.test_fail)
                 return d
             d.addCallbacks(lambda r: create_share(r), client.test_fail)
@@ -499,7 +499,7 @@ class TestCreateShare(TestWithDatabase):
 
     def test_accept_dead_share(self):
         """Try to accept a dead share."""
-        share = self.usr0.root.share(self.usr1.id, u"a dead share")
+        share = self.usr0.root.share(self.usr1.id, "a dead share")
         share.delete()
 
         def auth(client):
@@ -525,19 +525,19 @@ class TestSharesWithData(TestWithDatabase):
 
         root1 = self.usr1.root
         root2 = self.usr2.root
-        filero = root2.make_file(u"file")
-        rwdir = root2.make_subdirectory(u"rwdir")
-        filerw = rwdir.make_file(u"file")
-        subdir = root2.make_subdirectory(u"subdir")
-        subfile = subdir.make_file(u"subfile")
-        subsubdir = subdir.make_subdirectory(u"subsubdir")
-        subsubfile = subsubdir.make_file(u"subsubfile")
+        filero = root2.make_file("file")
+        rwdir = root2.make_subdirectory("rwdir")
+        filerw = rwdir.make_file("file")
+        subdir = root2.make_subdirectory("subdir")
+        subfile = subdir.make_file("subfile")
+        subsubdir = subdir.make_subdirectory("subsubdir")
+        subsubfile = subsubdir.make_file("subsubfile")
 
-        share = root2.share(self.usr0.id, u"foo", readonly=True)
-        share_other = root2.share(self.usr1.id, u"foo", readonly=True)
-        subshare = subdir.share(self.usr0.id, u"foo2", readonly=True)
-        share_owner = root1.share(self.usr0.id, u"foo3", readonly=True)
-        share_modify = rwdir.share(self.usr0.id, u"foo4")
+        share = root2.share(self.usr0.id, "foo", readonly=True)
+        share_other = root2.share(self.usr1.id, "foo", readonly=True)
+        subshare = subdir.share(self.usr0.id, "foo2", readonly=True)
+        share_owner = root1.share(self.usr0.id, "foo3", readonly=True)
+        share_modify = rwdir.share(self.usr0.id, "foo4")
         for s in self.usr0.get_shared_to(accepted=False):
             s.accept()
         for s in self.usr1.get_shared_to(accepted=False):
@@ -740,7 +740,7 @@ class TestListShares(TestWithDatabase):
             self.assertEqual(len(resp.shares), 1)
             share = resp.shares[0]
             self.assertEqual(share.direction, "from_me")
-            self.assertEqual(share.other_username, u"usr1")
+            self.assertEqual(share.other_username, "usr1")
             self.assertEqual(share.name, "n1")
             self.assertEqual(share.access_level, Share.VIEW)
             self.assertEqual(share.subtree, uuid.UUID(self._state.root_id))
@@ -754,7 +754,7 @@ class TestListShares(TestWithDatabase):
             # create the share
             d.addCallbacks(
                 lambda r: client.create_share(
-                    r, self.usr1.username, u"n1", Share.VIEW),
+                    r, self.usr1.username, "n1", Share.VIEW),
                 client.test_fail)
 
             # list the shares and check
@@ -785,7 +785,7 @@ class TestListShares(TestWithDatabase):
             # create the share
             d.addCallbacks(
                 lambda r: client.create_share(
-                    r, self.usr1.username, u"n1", Share.MODIFY),
+                    r, self.usr1.username, "n1", Share.MODIFY),
                 client.test_fail)
 
             # list the shares and check
@@ -798,7 +798,7 @@ class TestListShares(TestWithDatabase):
     def _create_share(self, _, accepted=False):
         """Creates a share, optionally accepted."""
         root = self.usr1.root.load()
-        share = root.share(self.usr0.id, u"sharename", readonly=True)
+        share = root.share(self.usr0.id, "sharename", readonly=True)
         if accepted:
             self.usr0.get_share(share.id).accept()
         # save the node id to be able to compare it later
@@ -852,7 +852,7 @@ class TestListShares(TestWithDatabase):
         """List several mixed shares."""
 
         def createShare():
-            self.usr1.root.share(self.usr0.id, u"share 3", readonly=True)
+            self.usr1.root.share(self.usr0.id, "share 3", readonly=True)
 
         def check(resp):
             self.assertEqual(len(resp.shares), 3)
@@ -882,14 +882,14 @@ class TestListShares(TestWithDatabase):
             d.addCallbacks(
                 lambda r: client.create_share(
                     self._state.root_id, self.usr1.username,
-                    u"share 1", Share.VIEW),
+                    "share 1", Share.VIEW),
                 client.test_fail)
 
             # create one share from me with Modify
             d.addCallbacks(
                 lambda r: client.create_share(
                     self._state.root_id, self.usr2.username,
-                    u"share 2", Share.MODIFY),
+                    "share 2", Share.MODIFY),
                 client.test_fail)
 
             # create the share to me
@@ -907,7 +907,7 @@ class TestListShares(TestWithDatabase):
 
         def createShareOffer():
             # test a share offer
-            self.usr0.root.make_shareoffer(u"me@example.com", u"share Offer",
+            self.usr0.root.make_shareoffer("me@example.com", "share Offer",
                                            readonly=True)
 
         def check(resp):
@@ -915,7 +915,7 @@ class TestListShares(TestWithDatabase):
 
             share = [s for s in resp.shares if s.name == "share Offer"][0]
             self.assertEqual(share.direction, "from_me")
-            self.assertEqual(share.other_username, u"")
+            self.assertEqual(share.other_username, "")
             self.assertEqual(share.access_level, Share.VIEW)
 
         def auth(client):
@@ -939,7 +939,7 @@ class TestListShares(TestWithDatabase):
 
         def createShare():
             share = self.usr1.root.share(self.usr0.id,
-                                         u"another dead share", readonly=True)
+                                         "another dead share", readonly=True)
             share.delete()
 
         def check(resp):
@@ -969,13 +969,13 @@ class TestListShares(TestWithDatabase):
             yield client.dummy_authenticate("open sesame")
             root_id = yield client.get_root()
             yield client.create_share(root_id, self.usr1.username,
-                                      u"n1", Share.VIEW)
+                                      "n1", Share.VIEW)
             # list the shares and check
             resp = yield client.list_shares()
             self.assertEqual(len(resp.shares), 1)
             share = resp.shares[0]
             self.assertEqual(share.direction, "from_me")
-            self.assertEqual(share.other_username, u"usr1")
+            self.assertEqual(share.other_username, "usr1")
             self.assertEqual(share.name, "n1")
             self.assertEqual(share.access_level, Share.VIEW)
             self.assertEqual(share.subtree, uuid.UUID(root_id))
@@ -991,15 +991,15 @@ class TestListShares(TestWithDatabase):
             # authenticate and create a root to share
             yield client.dummy_authenticate("open sesame")
             yield client.get_root()
-            udf = yield client.create_udf(u"~/myudf", u"foo")
+            udf = yield client.create_udf("~/myudf", "foo")
             yield client.create_share(udf.node_id, self.usr1.username,
-                                      u"n1", Share.VIEW)
+                                      "n1", Share.VIEW)
             # list the shares and check
             resp = yield client.list_shares()
             self.assertEqual(len(resp.shares), 1)
             share = resp.shares[0]
             self.assertEqual(share.direction, "from_me")
-            self.assertEqual(share.other_username, u"usr1")
+            self.assertEqual(share.other_username, "usr1")
             self.assertEqual(share.name, "n1")
             self.assertEqual(share.access_level, Share.VIEW)
             self.assertEqual(share.subtree, uuid.UUID(udf.node_id))
@@ -1046,7 +1046,7 @@ class TestSharesNotified(TestWithDatabase):
             root_id = yield client.get_root()
             # create the share
             yield client.create_share(
-                root_id, self.usr1.username, u"name", Share.VIEW)
+                root_id, self.usr1.username, "name", Share.VIEW)
             # mark the share as accepted by hand, so we don't
             # have to emulate the whole process just for this test
             shares = [s for s in self.usr1.get_shared_to()
@@ -1104,7 +1104,7 @@ class TestSharesNotified(TestWithDatabase):
             req = yield client.make_dir(request.ROOT, root_id, "hi")
             # create the share
             yield client.create_share(
-                req.new_id, self.usr1.username, u"name", Share.VIEW)
+                req.new_id, self.usr1.username, "name", Share.VIEW)
             # mark the share as accepted by hand, so we don't
             # have to emulate the whole process just for this test
             share = self.usr1.get_shared_to(accepted=False)[0]
@@ -1229,7 +1229,7 @@ class TestSharesNotified(TestWithDatabase):
             d.addCallback(
                 lambda _: client1.create_share(
                     self._state.node.new_id, self.usr1.username,
-                    u"name", Share.VIEW))
+                    "name", Share.VIEW))
             d.addCallback(mark_share)
 
             # move the source over the shared node

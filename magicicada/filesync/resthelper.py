@@ -18,8 +18,6 @@
 #
 """A set of utilites to build a REST API."""
 
-from __future__ import unicode_literals
-
 import logging
 import os
 
@@ -191,8 +189,8 @@ class RestHelper(object):
 
     def get_volume(self, user, volume_path, from_generation=None):
         """GET a volume representation."""
-        self.log_dal("get_udf_by_path", user, volume_path=unicode(volume_path))
-        volume = user.get_udf_by_path(unicode(volume_path))
+        self.log_dal("get_udf_by_path", user, volume_path=volume_path)
+        volume = user.get_udf_by_path(volume_path)
         if from_generation is not None:
             volume_proxy = VolumeProxy(volume.id, user)
             self.log_dal("get_delta", user, volume_id=volume.id,
@@ -206,8 +204,8 @@ class RestHelper(object):
 
     def put_volume(self, user, path):
         """PUT a new volume."""
-        self.log_dal("make_udf", user, path=unicode(path))
-        udf = user.make_udf(unicode(path))
+        self.log_dal("make_udf", user, path=path)
+        udf = user.make_udf(path)
         return self.map.volume_repr(udf)
 
     def delete_volume(self, user, volume_path):
@@ -262,8 +260,8 @@ class RestHelper(object):
         """
         hash = node_repr.get('hash')
         magic_hash = node_repr.get('magic_hash')
-        hash = str(hash) if hash else None
-        magic_hash = str(magic_hash) if magic_hash else None
+        hash = bytes(hash) if hash else None
+        magic_hash = bytes(magic_hash) if magic_hash else None
         try:
             self.log_dal("get_node_by_path", user, node_path=node_path)
             node = user.get_node_by_path(node_path)
@@ -299,13 +297,11 @@ class RestHelper(object):
             new_path, new_name = os.path.split(new_path)
             if node.name != new_name or node.path != new_path:
                 self.log_dal("get_node_by_path", user, volume_id=node.vol_id,
-                             path=unicode(new_path))
-                parent = user.volume(node.vol_id).get_node_by_path(
-                    unicode(new_path))
+                             path=new_path)
+                parent = user.volume(node.vol_id).get_node_by_path(new_path)
                 self.log_dal("move", user, node_id=node.id,
-                             parent_id=parent.id,
-                             new_name=unicode(new_name))
-                node.move(parent.id, unicode(new_name))
+                             parent_id=parent.id, new_name=new_name)
+                node.move(parent.id, new_name)
         # are we changing it's public status?
         is_public = node_repr.get('is_public')
         if is_public is not None:

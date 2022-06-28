@@ -18,7 +18,7 @@
 import re
 
 # the name of the directory u1sync uses to keep metadata about a mirror
-METADATA_DIR_NAME = u".ubuntuone-sync"
+METADATA_DIR_NAME = ".ubuntuone-sync"
 
 # filenames to ignore
 SPECIAL_FILE_RE = re.compile(".*\\.("
