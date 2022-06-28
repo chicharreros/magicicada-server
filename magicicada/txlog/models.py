@@ -425,7 +425,8 @@ class TransactionLog(models.Model):
 
 class DBWorkerLastRow(models.Model):
 
-    txlog = models.ForeignKey(TransactionLog, null=True)
+    txlog = models.ForeignKey(
+        TransactionLog, null=True, on_delete=models.CASCADE)
     worker_id = models.TextField()
 
 

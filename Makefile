@@ -34,6 +34,7 @@ export PATH
 export PYTHONPATH
 export DJANGO_SETTINGS_MODULE
 export ROOTDIR ?= $(CURDIR)
+export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
 
 SOURCEDEPS_TAG = .sourcecode/sourcedeps-tag
 TARGET_SOURCECODE_DIR = $(CURDIR)/.sourcecode
@@ -44,7 +45,7 @@ TAR_EXTRA = --exclude 'tmp/*' --exclude tags
 include Makefile.db
 
 sourcedeps: $(SOURCEDEPS_TAG)
-	test -d $(TARGET_SOURCECODE_DIR)/magicicada-client || git clone --depth 1 --branch 2.0 https://github.com/chicharreros/magicicada-client.git $(TARGET_SOURCECODE_DIR)/magicicada-client
+	test -d $(TARGET_SOURCECODE_DIR)/magicicada-client || git clone --depth 1 --branch port-to-py3 https://github.com/chicharreros/magicicada-client.git $(TARGET_SOURCECODE_DIR)/magicicada-client
 
 clean-sourcedeps:
 	rm -rf .sourcecode/*
@@ -65,13 +66,14 @@ bootstrap:
 	cat dependencies.txt dependencies-devel.txt | sudo xargs apt install -y --no-install-recommends
 	$(MAKE) $(ENV)
 	$(MAKE) sourcedeps build-clientdefs
+	$(ENV)/bin/pip install -Ur $(TARGET_SOURCECODE_DIR)/magicicada-client/requirements.txt
 	mkdir -p tmp
 
 $(ENV): $(ENV)/bin/activate
 
 # only runs when requirements.txt or requirements-devel.txt changes
 $(ENV)/bin/activate: requirements.txt requirements-devel.txt
-	test -d $(ENV) || virtualenv -p python2 $(ENV) --system-site-packages
+	test -d $(ENV) || virtualenv -p python3 $(ENV)
 	$(ENV)/bin/pip install -Ur requirements.txt
 	$(ENV)/bin/pip install -Ur requirements-devel.txt
 	touch $(ENV)/bin/activate
@@ -87,10 +89,7 @@ ci-test:
 clean:
 	rm -rf tmp/* _trial_temp $(ENV)
 
-check-readme:
-	$(ENV)/bin/rst2html5 README.rst  --exit-status=warning > /dev/null && echo "README.rst OK"|| ( echo "ERROR: README.rst format is incorrect!!!!!" && exit 1)
-
-lint: $(ENV) check-readme
+lint: $(ENV)
 	$(ENV)/bin/flake8 --filename='*.py' --exclude='migrations' $(SRC_DIR)
 
 start: $(ENV) start-base start-filesync-server-group publish-api-port
@@ -146,4 +145,4 @@ admin:
 
 .PHONY: sourcedeps clean lint test ci-test clean-sourcedeps \
 	start stop publish-api-port start-supervisor stop-supervisor \
-	start-dbus stop-dbus start-heapy check-readme
+	start-dbus stop-dbus start-heapy

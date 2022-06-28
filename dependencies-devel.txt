@@ -1,7 +1,11 @@
 dbus
-libcairo2-dev
+gcc
+gir1.2-gtk-3.0
 libdbus-1-dev
 libdbus-glib-1-dev
 libgirepository1.0-dev
+libcairo2-dev
 pkg-config
 postgresql-client
+python3-dev
+virtualenv
