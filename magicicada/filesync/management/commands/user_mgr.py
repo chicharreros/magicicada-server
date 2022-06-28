@@ -20,8 +20,6 @@
 
 """Script to manage the users in the system."""
 
-from __future__ import unicode_literals
-
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 
@@ -102,30 +100,30 @@ class Command(BaseCommand):
         p_create = subparsers.add_parser(
             'create', help='Create a user.', cmd=self)
         p_create.set_defaults(func=self.create)
-        p_create.add_argument('username', type=unicode)
-        p_create.add_argument('firstname', type=unicode)
-        p_create.add_argument('lastname', type=unicode)
-        p_create.add_argument('email', type=unicode)
-        p_create.add_argument('password', type=unicode)
+        p_create.add_argument('username', type=str)
+        p_create.add_argument('firstname', type=str)
+        p_create.add_argument('lastname', type=str)
+        p_create.add_argument('email', type=str)
+        p_create.add_argument('password', type=str)
 
         p_update = subparsers.add_parser(
             'update', help='Change information for a user.', cmd=self)
         p_update.add_argument('username')
         p_update.set_defaults(func=self.update)
-        p_update.add_argument('--email', type=unicode)
-        p_update.add_argument('--firstname', type=unicode)
-        p_update.add_argument('--lastname', type=unicode)
-        p_update.add_argument('--password', type=unicode)
+        p_update.add_argument('--email', type=str)
+        p_update.add_argument('--firstname', type=str)
+        p_update.add_argument('--lastname', type=str)
+        p_update.add_argument('--password', type=str)
 
         p_delete = subparsers.add_parser(
             'delete', help='Remove a user from the system.', cmd=self)
         p_delete.set_defaults(func=self.delete)
-        p_delete.add_argument('username', type=unicode)
+        p_delete.add_argument('username', type=str)
 
         p_show = subparsers.add_parser(
             'show', help='Show information about an user.', cmd=self)
         p_show.set_defaults(func=self.show)
-        p_show.add_argument('username', type=unicode)
+        p_show.add_argument('username', type=str)
 
     def handle(self, *args, **options):
         f = options.pop('func')

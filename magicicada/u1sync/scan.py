@@ -15,8 +15,6 @@
 
 """Code for scanning local directory state."""
 
-from __future__ import with_statement
-
 import os
 import hashlib
 import shutil
@@ -35,7 +33,7 @@ EMPTY_HASH = "sha1:%s" % hashlib.sha1().hexdigest()
 def scan_directory(path, display_path="", quiet=False):
     """Scans a local directory and builds an in-memory tree from it."""
     if display_path != "" and not quiet:
-        print display_path
+        print(display_path)
 
     link_target = None
     child_names = None

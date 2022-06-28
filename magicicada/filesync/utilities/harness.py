@@ -20,8 +20,6 @@
 
 """The Storage DAL test harness"""
 
-from __future__ import unicode_literals
-
 from magicicada.filesync import services  # NOQA
 from magicicada.filesync.notifier.notifier import register_notifier_for_bus
 from magicicada.filesync.notifier.testing.testcase import AccumulatingNotifyBus
@@ -29,7 +27,7 @@ from magicicada.filesync.notifier.testing.testcase import AccumulatingNotifyBus
 nb = AccumulatingNotifyBus()
 register_notifier_for_bus(nb)
 
-print """
+print("""
 OH HAI HACKERS
 This sets up an environment making it easy to play with the data access layer.
 
@@ -48,4 +46,4 @@ file = tim.volume(share.id).root.make_file("file.txt")
 
 # You also can see events queued for MQ:
 print nb.events
-"""
+""")

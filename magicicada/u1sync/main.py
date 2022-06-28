@@ -15,8 +15,6 @@
 
 """A prototype directory sync client."""
 
-from __future__ import with_statement
-
 import signal
 import os
 import sys
@@ -24,7 +22,7 @@ import uuid
 
 from errno import EEXIST
 from optparse import OptionParser, SUPPRESS_HELP
-from Queue import Queue
+from queue import Queue
 
 import gobject
 
@@ -103,7 +101,7 @@ def do_init(client, share_spec, directory, quiet, subtree_path,
         info.path = "/"
 
     if not quiet:
-        print "\nInitializing directory..."
+        print("\nInitializing directory...")
     safe_mkdir(directory)
 
     metadata_dir = os.path.join(directory, METADATA_DIR_NAME)
@@ -116,11 +114,11 @@ def do_init(client, share_spec, directory, quiet, subtree_path,
             raise
 
     if not quiet:
-        print "\nWriting mirror metadata..."
+        print("\nWriting mirror metadata...")
     metadata.write(metadata_dir, info)
 
     if not quiet:
-        print "\nDone."
+        print("\nDone.")
 
 
 def do_sync(client, directory, action, dry_run, quiet):
@@ -135,7 +133,7 @@ def do_sync(client, directory, action, dry_run, quiet):
         absolute_path = os.path.split(absolute_path)[0]
 
     if not quiet:
-        print "\nReading mirror metadata..."
+        print("\nReading mirror metadata...")
     info = metadata.read(metadata_dir)
 
     top_uuid, writable = client.get_root_info(info.share_uuid)
@@ -154,17 +152,17 @@ def do_sync(client, directory, action, dry_run, quiet):
         raise ReadOnlyShareError(info.share_uuid)
 
     if not quiet:
-        print "\nScanning directory..."
+        print("\nScanning directory...")
     local_tree = scan_directory(absolute_path, quiet=quiet)
 
     if not quiet:
-        print "\nFetching metadata..."
+        print("\nFetching metadata...")
     remote_tree = client.build_tree(info.share_uuid, info.root_uuid)
     if not quiet:
         show_tree(remote_tree)
 
     if not quiet:
-        print "\nMerging trees..."
+        print("\nMerging trees...")
     merged_tree = merge_trees(old_local_tree=info.local_tree,
                               local_tree=local_tree,
                               old_remote_tree=info.remote_tree,
@@ -174,7 +172,7 @@ def do_sync(client, directory, action, dry_run, quiet):
         show_tree(merged_tree)
 
     if not quiet:
-        print "\nSyncing content..."
+        print("\nSyncing content...")
     if should_download:
         info.local_tree = download_tree(merged_tree=merged_tree,
                                         local_tree=local_tree,
@@ -196,11 +194,11 @@ def do_sync(client, directory, action, dry_run, quiet):
 
     if not dry_run:
         if not quiet:
-            print "\nUpdating mirror metadata..."
+            print("\nUpdating mirror metadata...")
         metadata.write(metadata_dir, info)
 
     if not quiet:
-        print "\nDone."
+        print("\nDone.")
 
 
 def do_list_shares(client):
@@ -213,7 +211,7 @@ def do_list_shares(client):
             status = ""
         name = name.encode("utf-8")
         user = user.encode("utf-8")
-        print "%s  %s (from %s) [%s]%s" % (id, name, user, access, status)
+        print("%s  %s (from %s) [%s]%s" % (id, name, user, access, status))
 
 
 def do_diff(client, share_spec, directory, quiet, subtree_path,
@@ -239,25 +237,25 @@ def do_diff(client, share_spec, directory, quiet, subtree_path,
         differs = True
         if local_node is None:
             if not quiet:
-                print "%s missing from client" % display_path
+                print("%s missing from client" % display_path)
         elif remote_node is None:
             if ignore_symlinks and local_node.node_type == SYMLINK:
                 differs = False
             elif not quiet:
-                print "%s missing from server" % display_path
+                print("%s missing from server" % display_path)
         elif local_node.node_type != remote_node.node_type:
             local_type = node_type_str(local_node.node_type)
             remote_type = node_type_str(remote_node.node_type)
             if not quiet:
-                print ("%s node types differ (client: %s, server: %s)" %
-                       (display_path, local_type, remote_type))
+                print(("%s node types differ (client: %s, server: %s)" %
+                       (display_path, local_type, remote_type)))
         elif (local_node.node_type != DIRECTORY and
                 local_node.content_hash != remote_node.content_hash):
             local_content = local_node.content_hash
             remote_content = remote_node.content_hash
             if not quiet:
-                print ("%s has different content (client: %s, server: %s)" %
-                       (display_path, local_content, remote_content))
+                print(("%s has different content (client: %s, server: %s)" %
+                       (display_path, local_content, remote_content)))
         else:
             differs = False
         return (display_path, differs)
@@ -265,11 +263,11 @@ def do_diff(client, share_spec, directory, quiet, subtree_path,
     def post_merge(nodes, partial_result, child_results):
         """Aggregates 'differs' flags."""
         (display_path, differs) = partial_result
-        return differs or any(child_results.itervalues())
+        return differs or any(child_results.values())
 
     differs = generic_merge(trees=[local_tree, remote_tree],
                             pre_merge=pre_merge, post_merge=post_merge,
-                            partial_parent=("", False), name=u"")
+                            partial_parent=("", False), name="")
     if differs:
         raise TreesDiffer(quiet=quiet)
 
@@ -414,7 +412,7 @@ def do_main(argv):
     reactor.run(installSignalHandlers=False)
     exc_info = queue.get(True, 0.1)
     if exc_info:
-        raise exc_info[0], exc_info[1], exc_info[2]
+        raise exc_info[0](exc_info[1]).with_traceback(exc_info[2])
 
 
 def main(*argv):
@@ -422,22 +420,22 @@ def main(*argv):
     try:
         do_main(argv=argv)
     except AuthenticationError as e:
-        print "Authentication failed: %s" % e
+        print("Authentication failed: %s" % e)
     except ConnectionError as e:
-        print "Connection failed: %s" % e
+        print("Connection failed: %s" % e)
     except DirectoryNotInitializedError:
-        print "Directory not initialized; use --init [DIRECTORY] to init it."
+        print("Directory not initialized; use --init [DIRECTORY] to init it.")
     except DirectoryAlreadyInitializedError:
-        print "Directory already initialized."
+        print("Directory already initialized.")
     except NoSuchShareError:
-        print "No matching share found."
+        print("No matching share found.")
     except ReadOnlyShareError:
-        print "The selected action isn't possible on a read-only share."
+        print("The selected action isn't possible on a read-only share.")
     except (ForcedShutdown, KeyboardInterrupt):
-        print "Interrupted!"
+        print("Interrupted!")
     except TreesDiffer as e:
         if not e.quiet:
-            print "Trees differ."
+            print("Trees differ.")
     else:
         return 0
     return 1

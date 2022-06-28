@@ -23,8 +23,6 @@ actions based on the principal. In the case of a ReadWriteVolumeGateway,
 security is imposed based on the user's access to the storage objects.
 """
 
-from __future__ import unicode_literals
-
 import mimetypes
 import os
 import posixpath as pypath
@@ -539,7 +537,7 @@ class StorageNode(VolumeObjectBase):
                 return utils.make_nodekey(None, self.id)
             return utils.make_nodekey(self.vol_id, self.id)
 
-    def _load(self, with_content=False):
+    def _load(self, with_content=True):
         """Load the object from the database base on the id."""
         ob = self._gateway.get_node(self.id, with_content=with_content)
         self._copy(ob)
@@ -1077,7 +1075,7 @@ class TimingMetrics(object):
         def wrapper(inner_self, *args, **kwargs):
             """Wrapper method."""
             # grab info for the metric
-            func_name = orig_func.func_name
+            func_name = orig_func.__name__
 
             tini = time.time()
             try:
@@ -1316,7 +1314,7 @@ class SystemGateway(GatewayBase):
         """Get a download by its UDF, file path and download key."""
         self.get_user(user_id)
         download = Download.objects.filter(
-            models.Q(download_key=unicode(repr(download_key))) |
+            models.Q(download_key=repr(download_key)) |
             models.Q(download_url=download_url),
             volume__owner__id=user_id, volume__id=udf_id, file_path=file_path,
         ).order_by('status_change_date').last()
@@ -2192,7 +2190,7 @@ class ReadOnlyVolumeGateway(GatewayBase):
                 owner=self.owner, permissions=self._get_node_perms(node))
 
     @timing_metric
-    def get_node(self, id, verify_hash=None, with_content=False):
+    def get_node(self, id, verify_hash=None, with_content=True):
         """Get one of the user's nodes."""
         if id == 'root':
             id = self._get_root_node().id
@@ -2206,7 +2204,7 @@ class ReadOnlyVolumeGateway(GatewayBase):
         return node
 
     @timing_metric
-    def get_node_by_path(self, full_path, kind=None, with_content=None):
+    def get_node_by_path(self, full_path, kind=None, with_content=True):
         """Get a node based on the path.
 
         path is a path relative to the volume's root. So a shared
@@ -2295,7 +2293,7 @@ class ReadOnlyVolumeGateway(GatewayBase):
             yield self._get_storage_node(child)
 
     @timing_metric
-    def get_child_by_name(self, id, name, with_content=False):
+    def get_child_by_name(self, id, name, with_content=True):
         """Get a Child by Name returning a StorageNode."""
         children = self._get_children(id, with_content=with_content)
         nodes = children.filter(name=name)
@@ -2449,8 +2447,7 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
             newfile = parent.make_file(name)
             mime = mimetypes.guess_type(name)
             if mime[0] is not None:
-                mime = unicode(mime[0])
-                newfile.mimetype = mime
+                newfile.mimetype = mime[0]
                 newfile.save()
         elif newfile.kind != StorageObject.FILE:
             raise errors.AlreadyExists(
@@ -2608,7 +2605,7 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
         # get the paths that can see this node now.
         see_now = []
         see_after = []
-        for path, share_ids in shared_paths.iteritems():
+        for path, share_ids in shared_paths.items():
             if old_parent.full_path.startswith(path):
                 see_now.extend(share_ids)
             if new_parent.full_path.startswith(path):
@@ -2654,10 +2651,12 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
             self._delete_node(conflicting_node.id, cascade=True)
 
         old_name = node.name
-        node.move(StorageObject.objects.get(id=parent_id), new_name)
+        parent = StorageObject.objects.select_related(
+            'content_blob').get(id=parent_id)
+        node.move(parent, new_name)
         if node.kind == StorageObject.FILE:
             mime = mimetypes.guess_type(node.name)[0]
-            node.mimetype = unicode(mime) if mime else None
+            node.mimetype = str(mime) if mime else None
         if is_move:
             self._make_moves_from_shares(node, old_name,
                                          old_parent, new_parent)
@@ -2669,7 +2668,8 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
     def _update_node_content(self, fnode, content, new, enforce_quota):
         """Reusable function for updating file content."""
         # reload node from DB
-        fnode = StorageObject.objects.get(id=fnode.id)
+        fnode = StorageObject.objects.select_related(
+            'content_blob').get(id=fnode.id)
         old_content = fnode.content
         if fnode.content_hash == bytes(content.hash):
             return StorageNode.factory(
@@ -2750,7 +2750,7 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
         """
         if mimetype is None:
             mime = mimetypes.guess_type(name)[0]
-            mimetype = unicode(mime) if mime else ''
+            mimetype = str(mime) if mime else ''
 
         parent = self._get_directory_node(parent_id)
         fnode = parent.get_child_by_name(name)

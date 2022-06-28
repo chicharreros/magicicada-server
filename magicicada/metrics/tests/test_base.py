@@ -17,8 +17,6 @@
 
 """Test the basic meter functionality."""
 
-from __future__ import unicode_literals
-
 import logging
 import unittest
 

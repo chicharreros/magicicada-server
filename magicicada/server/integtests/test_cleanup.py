@@ -54,7 +54,7 @@ class TestCleanup(TestContentBase):
         reactor.callLater(0.2, self.eq.push, 'SYS_NET_CONNECTED')
         self.assertInQ(d, ('AQ_FILE_NEW_OK', {'marker': 'marker:foo',
                                               'new_id': anUUID,
-                                              'new_generation': 1L,
+                                              'new_generation': 1,
                                               'volume_id': request.ROOT}))
         return d
 
@@ -83,7 +83,7 @@ class TestCleanup(TestContentBase):
                                              'error': 'ALREADY_EXISTS'}))
         events.append(('AQ_FILE_NEW_OK', {'marker': 'marker:foo',
                                           'new_id': anUUID,
-                                          'new_generation': 1L,
+                                          'new_generation': 1,
                                           'volume_id': request.ROOT}))
         self.assertOneInQ(d, events)
         return d
@@ -107,7 +107,7 @@ class TestCleanup(TestContentBase):
                        {'marker': 'marker:foo', 'error': 'ALREADY_EXISTS'}))
         events.append(('AQ_DIR_NEW_OK', {'marker': 'marker:foo',
                                          'new_id': anUUID,
-                                         'new_generation': 1L,
+                                         'new_generation': 1,
                                          'volume_id': request.ROOT}))
         self.assertOneInQ(d, events)
         return d
@@ -144,7 +144,7 @@ class TestCleanup(TestContentBase):
                                              'error': 'DOES_NOT_EXIST'}))
             events.append(('AQ_MOVE_OK', {'share_id': '',
                                           'node_id': new_id,
-                                          'new_generation': 2L}))
+                                          'new_generation': 2}))
             self.assertOneInQ(d, events)
             return d1
 
@@ -196,7 +196,7 @@ class TestCleanup(TestContentBase):
     @failure_ignore('ALREADY_EXISTS')
     def test_create_share(self):
         """Create share..."""
-        self.aq.create_share(self.root, u'jane', '', 'View', 'marker:x', '')
+        self.aq.create_share(self.root, 'jane', '', 'View', 'marker:x', '')
         d = self.wait_for('SYS_QUEUE_DONE')
         self.eq.push('SYS_NET_DISCONNECTED')
         self.eq.push('SYS_CONNECTION_LOST')
@@ -248,5 +248,5 @@ class TestCleanup(TestContentBase):
         yield self.wait_for_nirvana(1)
         self.assertEvent(('AQ_UPLOAD_FINISHED', {'share_id': '',
                                                  'node_id': anUUID,
-                                                 'new_generation': 2L,
+                                                 'new_generation': 2,
                                                  'hash': hash_value}))

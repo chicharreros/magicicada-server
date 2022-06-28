@@ -20,9 +20,9 @@
 
 """A simple ping client."""
 
-import Queue
 import cmd
 import os
+import queue
 import shlex
 import tempfile
 import time
@@ -59,11 +59,11 @@ from magicicadaprotocol.content_hash import content_hash_factory, crc32
 def show_volume(volume):
     """Show a volume."""
     if isinstance(volume, volumes.ShareVolume):
-        print "Share %r (other: %s, access: %s, id: %s)" % (
+        print("Share %r (other: %s, access: %s, id: %s)" % (
             volume.share_name, volume.other_username,
-            volume.access_level, volume.volume_id)
+            volume.access_level, volume.volume_id))
     elif isinstance(volume, volumes.UDFVolume):
-        print "UDF %r (id: %s)" % (volume.suggested_path, volume.volume_id)
+        print("UDF %r (id: %s)" % (volume.suggested_path, volume.volume_id))
 
 
 class CmdStorageClient(StorageClient):
@@ -77,7 +77,7 @@ class CmdStorageClient(StorageClient):
             self.factory.current_protocol.transport.loseConnection()
         self.factory.current_protocol = self
         self.factory.cmd.status = "connected"
-        print "Connected."
+        print("Connected.")
 
     def connectionLost(self, reason=None):
         """Callback for connection lost"""
@@ -86,9 +86,9 @@ class CmdStorageClient(StorageClient):
             self.factory.current_protocol = None
             self.factory.cmd.status = "disconnected"
             if reason is not None:
-                print "Disconnected: %s" % reason.value
+                print("Disconnected: %s" % reason.value)
             else:
-                print "Disconnected: no reason"
+                print("Disconnected: no reason")
 
 
 class CmdClientFactory(StorageClientFactory):
@@ -103,7 +103,7 @@ class CmdClientFactory(StorageClientFactory):
 
     def clientConnectionFailed(self, connector, reason):
         """We failed at connecting."""
-        print 'ERROR: Connection failed. Reason:', reason.value
+        print('ERROR: Connection failed. Reason:', reason.value)
         self.current_protocol = None
         self.cmd.status = "disconnected"
 
@@ -136,7 +136,7 @@ def parse_args(*args, **kwargs):
             parts = split_args(rest)
 
             if len(parts) != len(args):
-                print (
+                print(
                     "ERROR: Wrong number of arguments. Expected %i, got %i" % (
                         len(args), len(parts)))
                 return
@@ -146,8 +146,9 @@ def parse_args(*args, **kwargs):
                 try:
                     value = constructor(part)
                 except ValueError:
-                    print "ERROR: cant convert argument %i to %s" % (
-                        i, constructor)
+                    print(
+                        "ERROR: cant convert argument %i to %s" % (
+                            i, constructor))
                     return
                 result.append(value)
 
@@ -163,7 +164,7 @@ def require_connection(method):
     def decorator(self, *args):
         """inner"""
         if self.status != "connected":
-            print "ERROR: Must be connected."
+            print("ERROR: Must be connected.")
             return
         else:
             return method(self, *args)
@@ -200,7 +201,7 @@ class ClientCmd(cmd.Cmd):
         self.cwd = "/"
         self.volume = request.ROOT
         self.volume_root = None
-        self.queue = Queue.Queue()
+        self.queue = queue.Queue()
 
         self.username = username
         self.password = password
@@ -224,7 +225,7 @@ class ClientCmd(cmd.Cmd):
     def defer_from_thread(self, function, *args, **kwargs):
         """Do twisted defer magic to get results and show exceptions."""
 
-        queue = Queue.Queue()
+        queue = queue.Queue()
 
         def runner():
             """inner."""
@@ -235,7 +236,7 @@ class ClientCmd(cmd.Cmd):
                     d.addBoth(queue.put)
                 else:
                     queue.put(d)
-            except Exception, e:
+            except Exception as e:
                 queue.put(e)
 
         reactor.callFromThread(runner)
@@ -391,13 +392,13 @@ class ClientCmd(cmd.Cmd):
     @parse_args()
     def do_status(self):
         """Print the status string."""
-        print "STATUS: %s" % self.status
+        print("STATUS: %s" % self.status)
 
     @parse_args()
     def do_disconnect(self):
         """Disconnect."""
         if self.status != "connected":
-            print "ERROR: Not connecting."
+            print("ERROR: Not connecting.")
             return
         reactor.callFromThread(
             self.factory.current_protocol.transport.loseConnection)
@@ -418,7 +419,7 @@ class ClientCmd(cmd.Cmd):
         r = self.defer_from_thread(
             self.factory.current_protocol.list_shares)
         for share in r.shares:
-            print share
+            print(share)
             if share.accepted and share.direction == 'to_me':
                 self.shares.add(str(share.id))
 
@@ -434,7 +435,7 @@ class ClientCmd(cmd.Cmd):
                 self.volume_root = share.subtree
                 break
         else:
-            print "BAD SHARE NAME"
+            print("BAD SHARE NAME")
             return
         self.volume = sharename
         self.cwd = '/'
@@ -463,7 +464,7 @@ class ClientCmd(cmd.Cmd):
                 self.volume_root = volume.node_id
                 break
         else:
-            print "BAD Volume ID"
+            print("BAD Volume ID")
             return
         self.volume = volume_id
         self.cwd = '/'
@@ -477,7 +478,7 @@ class ClientCmd(cmd.Cmd):
         self.cwd = '/'
         self.volume_root = None
         root = self.get_root()
-        print "root is", root
+        print("root is", root)
 
     @require_connection
     def _list_dir(self, node_id):
@@ -498,7 +499,7 @@ class ClientCmd(cmd.Cmd):
         for entry in entries:
             node_type = dircontent_pb2._NODETYPE. \
                 values_by_number[entry.node_type].name
-            print "%s %10s %s" % (entry.node, node_type, entry.name)
+            print("%s %10s %s" % (entry.node, node_type, entry.name))
 
     @parse_args(str)
     @require_connection
@@ -545,15 +546,16 @@ class ClientCmd(cmd.Cmd):
         def go():
             """Actually do it."""
             tini = time.time()
-            for _ in xrange(intensity):
-                name = u"testdir-" + unicode(uuid.uuid4())
+            for _ in range(intensity):
+                name = "testdir-" + str(uuid.uuid4())
                 req = yield make_dir(self.volume, subroot_id, name)
-                for _ in xrange(intensity):
-                    name = u"testfile-" + unicode(uuid.uuid4())
+                for _ in range(intensity):
+                    name = "testfile-" + str(uuid.uuid4())
                     yield make_file(self.volume, req.new_id, name)
             tend = time.time()
-            print "%d dirs and %d files created in %.2f seconds" % (
-                intensity, intensity ** 2, tend - tini)
+            print(
+                "%d dirs and %d files created in %.2f seconds" % (
+                    intensity, intensity ** 2, tend - tini))
 
         self.defer_from_thread(go)
 
@@ -574,7 +576,7 @@ class ClientCmd(cmd.Cmd):
 
         for part in parts:
             if not self.is_dir(parent_id, part):
-                print "ERROR: Not a directory"
+                print("ERROR: Not a directory")
                 return
 
             parent_id = self.get_child_id(parent_id, part)
@@ -668,7 +670,7 @@ class ClientCmd(cmd.Cmd):
     def do_cat(self, remote):
         """Show the contents of remote file on screen."""
         data = self.get_file(remote)
-        print data
+        print(data)
 
     @parse_args(str)
     @require_connection
@@ -677,7 +679,7 @@ class ClientCmd(cmd.Cmd):
         """Print the hash of filename."""
         node_id = self.get_id_from_filename(filename)
         hash_value = self.get_hash(node_id)
-        print hash_value
+        print(hash_value)
 
     @parse_args(str)
     @require_connection
@@ -708,7 +710,7 @@ class ClientCmd(cmd.Cmd):
         """Really authenticate, and show the session id."""
         auth_method = self.factory.current_protocol.simple_authenticate
         req = yield auth_method(self.username, self.password)
-        print "Authenticated ok, session:", req.session_id
+        print("Authenticated ok, session:", req.session_id)
 
     @parse_args(str, str)
     @require_connection
@@ -723,7 +725,7 @@ class ClientCmd(cmd.Cmd):
 
     def do_quit(self, rest):
         """Exit the shell."""
-        print "Goodbye", rest
+        print("Goodbye", rest)
         return True
     do_EOF = do_quit
 

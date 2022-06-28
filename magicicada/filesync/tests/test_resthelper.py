@@ -18,8 +18,6 @@
 
 """Test the resthelper."""
 
-from __future__ import unicode_literals
-
 import logging
 import operator
 import os
@@ -287,7 +285,7 @@ class RestHelperTestCase(BaseTestCase):
         info = self.helper.get_volume(user=self.user,
                                       volume_path=volume_path)
         self.assertEqual(info, self.mapper.volume_repr(udf))
-        ids = [repr(x) for x in [self.user.id, unicode(volume_path)]]
+        ids = [repr(self.user.id), repr(volume_path)]
         self.handler.assert_info("get_udf_by_path", *ids)
 
     def test_GET_volume_with_delta0(self):
@@ -301,7 +299,7 @@ class RestHelperTestCase(BaseTestCase):
         self.assertEqual(
             info,
             self.mapper.volume_repr(volume=udf, from_generation=0, nodes=[]))
-        ids = [repr(x) for x in [self.user.id, unicode(volume_path)]]
+        ids = [repr(self.user.id), repr(volume_path)]
         self.handler.assert_info("get_udf_by_path", *ids)
         ids = [repr(x) for x in [self.user.id, udf.id, 0]]
         self.handler.assert_info("get_delta", *ids)
@@ -332,7 +330,7 @@ class RestHelperTestCase(BaseTestCase):
         info = self.helper.put_volume(user=self.user, path=path)
         udf = self.user.get_udf_by_path(path)
         self.assertEqual(self.mapper.volume_repr(udf), info)
-        ids = [repr(x) for x in [self.user.id, unicode(path)]]
+        ids = [repr(self.user.id), repr(path)]
         self.handler.assert_info("make_udf", *ids)
 
     def test_GET_node_directory(self):
@@ -519,9 +517,9 @@ class RestHelperTestCase(BaseTestCase):
         ids = [repr(x) for x in [self.user.id, new_file_path]]
         self.handler.assert_info("get_node_by_path", *ids)
         new_dir, new_name = os.path.split(new_path)
-        ids = [repr(x) for x in [self.user.id, node.vol_id, unicode(new_dir)]]
+        ids = [repr(self.user.id), repr(node.vol_id), repr(new_dir)]
         self.handler.assert_info("get_node_by_path", *ids)
-        ids = [repr(x) for x in [self.user.id, node.id, unicode(new_name)]]
+        ids = [repr(self.user.id), repr(node.id), repr(new_name)]
         self.handler.assert_info("move", *ids)
 
     def test_PUT_node_path_is_public(self):

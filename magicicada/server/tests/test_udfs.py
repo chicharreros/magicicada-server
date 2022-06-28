@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 # Copyright 2008-2015 Canonical
 # Copyright 2015-2018 Chicharreros (https://launchpad.net/~chicharreros)
 #
@@ -22,8 +20,7 @@
 
 import uuid
 import zlib
-
-from StringIO import StringIO
+from io import StringIO
 
 from magicicadaprotocol import request
 from magicicadaprotocol.content_hash import content_hash_factory, crc32
@@ -50,14 +47,14 @@ class TestManageUDF(TestWithDatabase):
                 self.assertFalse(req.volume_id is None)
                 self.assertFalse(req.node_id is None)
 
-            d.addCallback(lambda _: client.create_udf(u"~", u"myudf"))
+            d.addCallback(lambda _: client.create_udf("~", "myudf"))
             d.addCallback(check_result)
             d.addCallbacks(client.test_done, client.test_fail)
         return self.callback_test(auth)
 
     def test_create_udf_same_path(self):
         """Try to create two UDFs with the same path."""
-        udf = self.usr0.make_udf(u"~/myudf")
+        udf = self.usr0.make_udf("~/myudf")
 
         def auth(client):
             """Authenticate and test."""
@@ -67,7 +64,7 @@ class TestManageUDF(TestWithDatabase):
                 """Check the request result."""
                 self.assertEqual(req.volume_id, str(udf.id))
 
-            d.addCallback(lambda _: client.create_udf(u"~", u"myudf"))
+            d.addCallback(lambda _: client.create_udf("~", "myudf"))
             d.addCallback(check_result)
             d.addCallbacks(client.test_done, client.test_fail)
         return self.callback_test(auth)
@@ -85,8 +82,8 @@ class TestManageUDF(TestWithDatabase):
                 self.assertEqual(str(failure.value), 'NO_PERMISSION')
                 client.test_done(True)
 
-            d.addCallback(lambda _: client.create_udf(u"~", u"myudf"))
-            d.addCallback(lambda _: client.create_udf(u"~/myudf/foo", u"bar"))
+            d.addCallback(lambda _: client.create_udf("~", "myudf"))
+            d.addCallback(lambda _: client.create_udf("~/myudf/foo", "bar"))
             d.addCallbacks(client.test_fail, check)
         return self.callback_test(auth)
 
@@ -103,8 +100,8 @@ class TestManageUDF(TestWithDatabase):
                 self.assertEqual(str(failure.value), 'NO_PERMISSION')
                 client.test_done(True)
 
-            d.addCallback(lambda _: client.create_udf(u"~/myudf/foo", u"bar"))
-            d.addCallback(lambda _: client.create_udf(u"~", u"myudf"))
+            d.addCallback(lambda _: client.create_udf("~/myudf/foo", "bar"))
+            d.addCallback(lambda _: client.create_udf("~", "myudf"))
             d.addCallbacks(client.test_fail, check)
         return self.callback_test(auth)
 
@@ -113,9 +110,9 @@ class TestManageUDF(TestWithDatabase):
         def auth(client):
             """Authenticate and test."""
             d = client.dummy_authenticate("open sesame")
-            d.addCallback(lambda _: client.create_udf(u"~/foob", u"myudf"))
-            d.addCallback(lambda _: client.create_udf(u"~/foobar", u"myudf"))
-            d.addCallback(lambda _: client.create_udf(u"~/fo", u"myudf"))
+            d.addCallback(lambda _: client.create_udf("~/foob", "myudf"))
+            d.addCallback(lambda _: client.create_udf("~/foobar", "myudf"))
+            d.addCallback(lambda _: client.create_udf("~/fo", "myudf"))
             d.addCallbacks(client.test_done, client.test_fail)
         return self.callback_test(auth)
 
@@ -124,7 +121,7 @@ class TestManageUDF(TestWithDatabase):
         def auth(client):
             """Authenticate and test."""
             d = client.dummy_authenticate("open sesame")
-            d.addCallback(lambda _: client.create_udf(u"~", u"myudf"))
+            d.addCallback(lambda _: client.create_udf("~", "myudf"))
             d.addCallback(lambda r: client.delete_volume(r.volume_id))
             d.addCallbacks(client.test_done, client.test_fail)
         return self.callback_test(auth)
@@ -137,7 +134,7 @@ class TestManageUDF(TestWithDatabase):
             yield client.dummy_authenticate("open sesame")
 
             # create the udf and a file in it
-            udf_req = yield client.create_udf(u"~", u"myudf")
+            udf_req = yield client.create_udf("~", "myudf")
             mk_req = yield client.make_file(udf_req.volume_id,
                                             udf_req.node_id, "test_file")
 
@@ -159,7 +156,7 @@ class TestManageUDF(TestWithDatabase):
             yield client.dummy_authenticate("open sesame")
 
             # create the udf and a file in it
-            udf_req = yield client.create_udf(u"~", u"myudf")
+            udf_req = yield client.create_udf("~", "myudf")
             mk_req = yield client.make_dir(udf_req.volume_id,
                                            udf_req.node_id, "test_dir")
 
@@ -200,7 +197,7 @@ class TestManageUDF(TestWithDatabase):
             d.addCallback(lambda _: reactor.connectTCP(
                 'localhost', self.port, factory2))
             d.addCallback(lambda _: d2)  # will wait second connection
-            d.addCallback(lambda _: client.create_udf(u"~", u"moño"))
+            d.addCallback(lambda _: client.create_udf("~", "moño"))
             d.addCallback(self.save_req, "udf")
             d.addCallback(d3.callback)
 
@@ -220,7 +217,7 @@ class TestManageUDF(TestWithDatabase):
                                  uuid.UUID(self._state.udf.volume_id))
                 self.assertEqual(new_udf.node_id,
                                  uuid.UUID(self._state.udf.node_id))
-                self.assertEqual(new_udf.suggested_path, u"~/moño")
+                self.assertEqual(new_udf.suggested_path, "~/moño")
 
                 # cleanup
                 factory1.timeout.cancel()
@@ -253,7 +250,7 @@ class TestManageUDF(TestWithDatabase):
             d.addCallback(lambda _: reactor.connectTCP(
                 'localhost', self.port, factory2))
             d.addCallback(lambda _: d2)  # will wait second connection
-            d.addCallback(lambda _: client.create_udf(u"~", u"moño"))
+            d.addCallback(lambda _: client.create_udf("~", "moño"))
             d.addCallback(self.save_req, "udf")
             d.addCallback(lambda r: client.delete_volume(r.volume_id))
             d.addCallback(d3.callback)
@@ -302,7 +299,7 @@ class TestUDFsWithData(TestWithDatabase):
         def auth(client):
             """Authenticate and test."""
             d = client.dummy_authenticate("open sesame")
-            d.addCallback(lambda _: client.create_udf(u"~", u"myudf"))
+            d.addCallback(lambda _: client.create_udf("~", "myudf"))
             d.addCallback(lambda r: client.make_file(r.volume_id,
                                                      r.node_id, "test_file"))
             d.addCallbacks(client.test_done, client.test_fail)
@@ -313,7 +310,7 @@ class TestUDFsWithData(TestWithDatabase):
         def auth(client):
             """Authenticate and test."""
             d = client.dummy_authenticate("open sesame")
-            d.addCallback(lambda _: client.create_udf(u"~", u"myudf"))
+            d.addCallback(lambda _: client.create_udf("~", "myudf"))
             d.addCallback(lambda r: client.make_dir(r.volume_id,
                                                     r.node_id, "test_dir"))
             d.addCallbacks(client.test_done, client.test_fail)
@@ -332,7 +329,7 @@ class TestUDFsWithData(TestWithDatabase):
                 self.assertEqual(str(failure.value), 'NO_PERMISSION')
                 client.test_done(True)
 
-            d.addCallback(lambda _: client.create_udf(u"~", u"myudf"))
+            d.addCallback(lambda _: client.create_udf("~", "myudf"))
             d.addCallback(lambda r: client.unlink(r.volume_id, r.node_id))
             d.addCallbacks(client.test_fail, check)
 
@@ -343,7 +340,7 @@ class TestUDFsWithData(TestWithDatabase):
         def auth(client):
             """Authenticate and test."""
             d = client.dummy_authenticate("open sesame")
-            d.addCallback(lambda _: client.create_udf(u"~", u"myudf"))
+            d.addCallback(lambda _: client.create_udf("~", "myudf"))
             d.addCallback(self.save_req, "udf")
             d.addCallback(lambda r: client.make_file(r.volume_id,
                                                      r.node_id, "test_file"))
@@ -359,7 +356,7 @@ class TestUDFsWithData(TestWithDatabase):
             d = client.dummy_authenticate("open sesame")
 
             # create the udf and keep the request for later
-            d.addCallback(lambda _: client.create_udf(u"~", u"myudf"))
+            d.addCallback(lambda _: client.create_udf("~", "myudf"))
             d.addCallback(self.save_req, "udf")
 
             # create a file in the udf, and also a subdir
@@ -385,7 +382,7 @@ class TestUDFsWithData(TestWithDatabase):
             d = client.dummy_authenticate("open sesame")
 
             # create the udf and keep the request for later
-            d.addCallback(lambda _: client.create_udf(u"~", u"myudf"))
+            d.addCallback(lambda _: client.create_udf("~", "myudf"))
             d.addCallback(self.save_req, "udf")
 
             # create a file in the udf
@@ -425,7 +422,7 @@ class TestUDFsWithData(TestWithDatabase):
         def auth(client):
             """Authenticate and test."""
             d = client.dummy_authenticate("open sesame")
-            d.addCallback(lambda _: client.create_udf(u"~", u"myudf"))
+            d.addCallback(lambda _: client.create_udf("~", "myudf"))
             d.addCallback(self.save_req, "udf")
 
             # create a file with content
@@ -458,7 +455,7 @@ class TestUDFsWithData(TestWithDatabase):
         def auth(client):
             """Authenticate and test."""
             d = client.dummy_authenticate("open sesame")
-            d.addCallback(lambda _: client.create_udf(u"~", u"myudf"))
+            d.addCallback(lambda _: client.create_udf("~", "myudf"))
             d.addCallback(self.save_req, "udf")
 
             # create a file with content
@@ -484,7 +481,7 @@ class TestUDFsWithData(TestWithDatabase):
             yield client.dummy_authenticate("open sesame")
             yield reactor.connectTCP('localhost', self.port, factory2)
             yield d2  # wait second connection
-            req = yield client.create_udf(u"~", u"moño")
+            req = yield client.create_udf("~", "moño")
             self._state.udf = req
             yield client.make_file(req.volume_id, req.node_id, "foo")
             d3.callback(True)

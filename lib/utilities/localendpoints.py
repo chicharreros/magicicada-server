@@ -18,8 +18,6 @@
 
 """Utilities for endpoints which are per-development-tree"""
 
-from __future__ import unicode_literals
-
 import os
 import errno
 import socket
@@ -92,7 +90,7 @@ def unregister_local_port(service_name, ssl=False):
     port_file = service_name_to_file(service_name, ssl=ssl)
     try:
         os.unlink(port_file)
-    except OSError, e:
+    except OSError as e:
         if e.errno != errno.ENOENT:
             raise
 
@@ -105,11 +103,11 @@ def allocate_ports(n=1):
     the port, and the time it actually gets used), but for the purposes
     for which this function gets used it isn't a problem in practice.
     """
-    sockets = map(lambda _: socket.socket(), xrange(n))
+    sockets = [socket.socket() for _ in range(n)]
     try:
         for s in sockets:
             s.bind(('localhost', 0))
-        ports = map(lambda s: s.getsockname()[1], sockets)
+        ports = [s.getsockname()[1] for s in sockets]
     finally:
         for s in sockets:
             s.close()

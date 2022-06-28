@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 # Copyright 2015-2018 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
@@ -21,7 +19,7 @@
 
 import os
 import shutil
-import StringIO
+import io
 
 from twisted.internet import defer
 from twisted.trial.unittest import TestCase as TwistedTestCase
@@ -67,7 +65,7 @@ class BaseTestCase(TwistedTestCase):
         # get it
         ds = DiskStorage(self.tmpdir)
         producer = ds.get(node_id)
-        consumer = StringIO.StringIO()
+        consumer = io.StringIO()
         yield producer.startProducing(consumer)
         self.assertEqual(consumer.getvalue(), data)
 

@@ -30,7 +30,7 @@ import logging
 import os
 import sys
 import time
-import xmlrpclib
+import xmlrpc.client
 
 from supervisor import childutils, states
 from supervisor.events import EventTypes, getEventNameByType
@@ -109,8 +109,8 @@ class HeartbeatListener(object):
                     self.tick_count = 0
                     try:
                         self.check_processes()
-                    except Exception, e:
-                        print e
+                    except Exception as e:
+                        print(e)
                         self.logger.exception(
                             "Oops, failed to check the processes.")
             else:
@@ -172,7 +172,7 @@ class HeartbeatListener(object):
         try:
             self.rpc.supervisor.stopProcess(name)
             self.logger.debug("Process %s stopped.", name)
-        except xmlrpclib.Fault, what:
+        except xmlrpc.client.Fault as what:
             self.logger.error(
                 'Failed to stop process %s (last heartbeat: %s), exiting: %s',
                 name, when_client_heartbeat, what)
@@ -180,7 +180,7 @@ class HeartbeatListener(object):
         try:
             self.rpc.supervisor.startProcess(name)
             self.logger.debug("Process %s started.", name)
-        except xmlrpclib.Fault, what:
+        except xmlrpc.client.Fault as what:
             self.logger.error('Failed to start process %s after stopping it, '
                               'exiting: %s', name, what)
             raise
@@ -220,7 +220,7 @@ log_format.help = The logging format
 # main entry point, parse args and start the service.
 if __name__ == '__main__':
     from configglue.inischema.glue import configglue
-    from StringIO import StringIO
+    from io import StringIO
     config_file = StringIO()
     config_file.write(default_config)
     config_file.seek(0)

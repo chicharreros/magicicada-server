@@ -24,9 +24,9 @@ import os
 import shutil
 import struct
 import sys
-from StringIO import StringIO
+from io import StringIO
+from unittest import mock
 
-import mock
 from django.conf import settings
 from magicicadaprotocol import request
 from twisted.internet import reactor, defer
@@ -101,7 +101,7 @@ class TestBasic(TestWithDatabase):
             root_id = yield client.get_root()
             # lock the user:
             StorageUser.objects.filter(id=self.usr0.id).update(locked=True)
-            client.make_dir(request.ROOT, root_id, u"open sesame")
+            client.make_dir(request.ROOT, root_id, "open sesame")
             yield d
             # check we logged a warning about this.
             handler.assert_warning("Shutting down protocol: user locked")
@@ -130,7 +130,7 @@ class TestBasic(TestWithDatabase):
         """Ping should be done in less than 2ms."""
         def ping(client):
             def done(result):
-                self.assert_(result.rtt < 2)
+                self.assertTrue(result.rtt < 2)
                 client.test_done("ok")
             d = client.ping()
             d.addCallbacks(done, client.test_fail)
@@ -387,10 +387,10 @@ class ServerStatusTest(TestWithDatabase):
         """Test the OK status response."""
         status = self.site.resource.children['status']
         # override user_id with a non-existing user
-        status.user_id = sys.maxint
+        status.user_id = sys.maxsize
         try:
             yield client.getPage(self.url)
-        except error.Error, e:
+        except error.Error as e:
             self.assertEqual('500', e.status)
         else:
             self.fail('An error is expected.')
@@ -400,10 +400,10 @@ class ServerStatusTest(TestWithDatabase):
         """Test the OK status response."""
         status = self.site.resource.children['status']
         # override user_id with a non-existing user
-        status.user_id = sys.maxint
+        status.user_id = sys.maxsize
         try:
             yield client.getPage(self.url + "/foo")
-        except error.Error, e:
+        except error.Error as e:
             self.assertEqual('404', e.status)
         else:
             self.fail('An error is expected.')

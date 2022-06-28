@@ -13,5 +13,4 @@ psycopg2-binary
 # certificate/hostname mappings may be rejected.
 service-identity
 supervisor
-Twisted
-
+Twisted==21.7.0

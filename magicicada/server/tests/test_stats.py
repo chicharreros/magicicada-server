@@ -49,7 +49,7 @@ class TestStats(TestWithDatabase):
     def setUp(self):
         """Setup the test."""
         yield super(TestStats, self).setUp()
-        self.make_user(u'test user999', max_storage_bytes=2 ** 20)
+        self.make_user('test user999', max_storage_bytes=2 ** 20)
         self.metrics = FakeMetrics()
         self.patch(metrics, 'get_meter', lambda n: self.metrics)
 

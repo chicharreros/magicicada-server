@@ -22,9 +22,8 @@ import logging
 import os
 import uuid
 import zlib
-from StringIO import StringIO
+from io import StringIO
 
-import mock
 from magicicadaprotocol import (
     request,
     client as sp_client,
@@ -90,7 +89,7 @@ class TestGetContent(TestWithDatabase):
 
     def test_getcontent_no_content(self):
         """Get the contents a file with no content"""
-        file = self.usr0.root.make_file(u"file")
+        file = self.usr0.root.make_file("file")
 
         def auth(client):
             """Do the real work """
@@ -106,7 +105,7 @@ class TestGetContent(TestWithDatabase):
     def test_getcontent_not_owned_file(self):
         """Get the contents of a directory not owned by the user."""
         # create another user
-        dir_id = self.usr1.root.make_subdirectory(u"subdir1").id
+        dir_id = self.usr1.root.make_subdirectory("subdir1").id
 
         # try to get the content of the directory with a different user
         def auth(client):
@@ -658,7 +657,7 @@ class TestPutContent(TestWithDatabase):
     def test_put_content_in_not_owned_file(self):
         """Test putting content in other user file"""
         # create another user
-        file_id = self.usr1.root.make_file(u"a_dile").id
+        file_id = self.usr1.root.make_file("a_dile").id
         # try to put the content in this file, but with other user
         data = os.urandom(300000)
         deflated_data = zlib.compress(data)
@@ -874,7 +873,7 @@ class TestPutContent(TestWithDatabase):
 
     def test_remove_uploadjob_deleted_file(self):
         """make sure we dont raise exceptions on deleted files"""
-        so_file = self.usr0.root.make_file(u"foobar")
+        so_file = self.usr0.root.make_file("foobar")
         upload_job = so_file.make_uploadjob(
             so_file.content_hash, "sha1:100", 0, 100)
         # kill file
@@ -1112,7 +1111,7 @@ class TestPutContent(TestWithDatabase):
             yield client.dummy_authenticate("open sesame")
             root = yield client.get_root()
             mkfile_req = yield client.make_file(
-                request.ROOT, root, u'a_file.txt')
+                request.ROOT, root, 'a_file.txt')
             yield client.put_content(request.ROOT, mkfile_req.new_id,
                                      NO_CONTENT_HASH, hash_value, crc32_value,
                                      size, deflated_size,
@@ -1140,7 +1139,7 @@ class TestPutContent(TestWithDatabase):
         chunk_size = settings.STORAGE_CHUNK_SIZE
         user, content_user = self._get_users(chunk_size ** 2)
         # create the file
-        a_file = user.root.make_file(u"A new file")
+        a_file = user.root.make_file("A new file")
         # build the upload data
         data = os.urandom(int(chunk_size * 1.5))
         size = len(data)
@@ -1497,9 +1496,9 @@ class TestPutContent(TestWithDatabase):
         size = len(data)
         deflated_size = len(deflated_data)
         # create the content blob without a magic hash in a different user.
-        self.make_user(u'my_user', max_storage_bytes=2 ** 20)
+        self.make_user('my_user', max_storage_bytes=2 ** 20)
         self.usr3.make_filepath_with_content(
-            settings.ROOT_USERVOLUME_PATH + u"/file.txt", hash_value,
+            settings.ROOT_USERVOLUME_PATH + "/file.txt", hash_value,
             crc32_value, size, deflated_size, uuid.uuid4())
 
         # overwrite UploadJob method to detect if it
@@ -1889,9 +1888,9 @@ class TestMultipartPutContent(TestWithDatabase):
         size = len(data)
         deflated_size = len(deflated_data)
         # create the content blob without a magic hash in a different user.
-        self.make_user(u'my_user', max_storage_bytes=2 ** 20)
+        self.make_user('my_user', max_storage_bytes=2 ** 20)
         self.usr3.make_filepath_with_content(
-            settings.ROOT_USERVOLUME_PATH + u"/file.txt",
+            settings.ROOT_USERVOLUME_PATH + "/file.txt",
             hash_value, crc32_value, size, deflated_size, uuid.uuid4())
 
         def auth(client):
@@ -1962,7 +1961,7 @@ class TestPutContentInternalError(TestWithDatabase):
             self.service.factory.content, user.id, user.root_volume_id,
             user.username, user.visible_name)
         # create the file
-        a_file = user.root.make_file(u"A new file")
+        a_file = user.root.make_file("A new file")
         # build the upload data
         data = os.urandom(int(chunk_size * 1.5))
         size = len(data)
@@ -2209,7 +2208,7 @@ class UserTest(TestWithDatabase):
         root_id, root_gen = yield self.user.get_root()
         volume_id = yield self.user.get_volume_id(root_id)
         _, generation, _ = yield self.user.make_file(volume_id, root_id,
-                                                     u"name", True)
+                                                     "name", True)
         self.assertEqual(generation, root_gen + 1)
 
     @defer.inlineCallbacks
@@ -2218,7 +2217,7 @@ class UserTest(TestWithDatabase):
         root_id, root_gen = yield self.user.get_root()
         volume_id = yield self.user.get_volume_id(root_id)
         _, generation, _ = yield self.user.make_dir(volume_id, root_id,
-                                                    u"name", True)
+                                                    "name", True)
         self.assertEqual(generation, root_gen + 1)
 
     @defer.inlineCallbacks
@@ -2227,23 +2226,23 @@ class UserTest(TestWithDatabase):
         root_id, root_gen = yield self.user.get_root()
         volume_id = yield self.user.get_volume_id(root_id)
         node_id, generation, _ = yield self.user.make_dir(volume_id, root_id,
-                                                          u"name", True)
+                                                          "name", True)
         new_gen, kind, name, _ = yield self.user.unlink_node(
             volume_id, node_id)
         self.assertEqual(new_gen, generation + 1)
         self.assertEqual(kind, StorageObject.DIRECTORY)
-        self.assertEqual(name, u"name")
+        self.assertEqual(name, "name")
 
     @defer.inlineCallbacks
     def test_move_node_with_gen(self):
         """Test that move returns a node with generation in it."""
         root_id, _ = yield self.user.get_root()
         volume_id = yield self.user.get_volume_id(root_id)
-        yield self.user.make_dir(volume_id, root_id, u"name", True)
+        yield self.user.make_dir(volume_id, root_id, "name", True)
         node_id, generation, _ = yield self.user.make_dir(volume_id, root_id,
-                                                          u"name", True)
+                                                          "name", True)
         new_generation, _ = yield self.user.move(volume_id, node_id,
-                                                 root_id, u"new_name")
+                                                 root_id, "new_name")
         self.assertEqual(new_generation, generation + 1)
 
     @defer.inlineCallbacks
@@ -2252,7 +2251,7 @@ class UserTest(TestWithDatabase):
         root_id, _ = yield self.user.get_root()
         volume_id = yield self.user.get_volume_id(root_id)
         node_id, _, _ = yield self.user.make_file(volume_id, root_id,
-                                                  u"name", True)
+                                                  "name", True)
         size = 1024
         # this will create a new uploadjob
         upload_job = yield self.user.get_upload_job(
@@ -2271,8 +2270,8 @@ class UserTest(TestWithDatabase):
     @defer.inlineCallbacks
     def test_get_free_bytes_own_share(self):
         """Get the user free bytes asking for same user's share."""
-        other_user = self.make_user(username=u'user2')
-        share = self.suser.root.share(other_user.id, u"sharename")
+        other_user = self.make_user(username='user2')
+        share = self.suser.root.share(other_user.id, "sharename")
         StorageUser.objects.filter(id=self.suser.id).update(
             max_storage_bytes=1000)
         fb = yield self.user.get_free_bytes(share.id)
@@ -2281,16 +2280,16 @@ class UserTest(TestWithDatabase):
     @defer.inlineCallbacks
     def test_get_free_bytes_othershare_ok(self):
         """Get the user free bytes for other user's share."""
-        other_user = self.make_user(username=u'user2', max_storage_bytes=500)
-        share = other_user.root.share(self.suser.id, u"sharename")
+        other_user = self.make_user(username='user2', max_storage_bytes=500)
+        share = other_user.root.share(self.suser.id, "sharename")
         fb = yield self.user.get_free_bytes(share.id)
         self.assertEqual(fb, 500)
 
     @defer.inlineCallbacks
     def test_get_free_bytes_othershare_bad(self):
         """Get the user free bytes for a share of a user that is not valid."""
-        other_user = self.make_user(username=u'user2', max_storage_bytes=500)
-        share = other_user.root.share(self.suser.id, u"sharename")
+        other_user = self.make_user(username='user2', max_storage_bytes=500)
+        share = other_user.root.share(self.suser.id, "sharename")
         StorageUser.objects.filter(id=other_user.id).update(is_active=False)
         d = self.user.get_free_bytes(share.id)
         yield self.assertFailure(d, errors.DoesNotExist)
@@ -2301,7 +2300,7 @@ class UserTest(TestWithDatabase):
         root_id, root_gen = yield self.user.get_root()
         volume_id = yield self.user.get_volume_id(root_id)
         node_id, generation, _ = yield self.user.make_file(
-            volume_id, root_id, u"name")
+            volume_id, root_id, "name")
         public_url = yield self.user.change_public_access(
             volume_id, node_id, True)
         self.assertTrue(public_url.startswith(settings.PUBLIC_URL_PREFIX))
@@ -2314,10 +2313,10 @@ class UserTest(TestWithDatabase):
 
         # create three files, make two public
         node_id_1, _, _ = yield self.user.make_file(
-            volume_id, root_id, u"name1")
-        yield self.user.make_file(volume_id, root_id, u"name2")
+            volume_id, root_id, "name1")
+        yield self.user.make_file(volume_id, root_id, "name2")
         node_id_3, _, _ = yield self.user.make_file(
-            volume_id, root_id, u"name3")
+            volume_id, root_id, "name3")
         yield self.user.change_public_access(volume_id, node_id_1, True)
         yield self.user.change_public_access(volume_id, node_id_3, True)
 
@@ -2371,7 +2370,7 @@ class TestUploadJob(TestWithDatabase):
         r = yield self.service.factory.content.rpc_dal.call(
             'make_file_with_content',
             user_id=c_user.id, volume_id=self.user.root_volume_id,
-            parent_id=root, name=u"A new file",
+            parent_id=root, name="A new file",
             node_hash=EMPTY_HASH, crc32=0,
             size=0, deflated_size=0, storage_key=None)
         node_id = r['node_id']
@@ -2697,7 +2696,7 @@ class TestNode(TestWithDatabase):
         r = yield self.service.factory.content.rpc_dal.call(
             'make_file_with_content', user_id=content_user.id,
             volume_id=self.user.root_volume_id, parent_id=root,
-            name=u"A new file", node_hash=EMPTY_HASH, crc32=0,
+            name="A new file", node_hash=EMPTY_HASH, crc32=0,
             size=0, deflated_size=0, storage_key=None)
         node_id = r['node_id']
         node = yield content_user.get_node(user.root_volume_id, node_id, None)
@@ -2776,7 +2775,7 @@ class TestGenerations(TestWithDatabase):
     @defer.inlineCallbacks
     def test_get_delta_from_0(self):
         """Test that User.get_delta works as expected."""
-        nodes = [self.suser.root.make_file(u"name%s" % i) for i in range(5)]
+        nodes = [self.suser.root.make_file("name%s" % i) for i in range(5)]
         delta, end_gen, free_bytes = yield self.user.get_delta(None, 0)
         self.assertEqual(len(delta), len(nodes))
         self.assertEqual(end_gen, nodes[-1].generation)
@@ -2787,8 +2786,8 @@ class TestGenerations(TestWithDatabase):
         """Test that User.get_delta works as expected."""
         # create some nodes
         root = self.suser.root
-        nodes = [root.make_file(u"name%s" % i) for i in range(5)]
-        nodes += [root.make_subdirectory(u"dir%s" % i) for i in range(5)]
+        nodes = [root.make_file("name%s" % i) for i in range(5)]
+        nodes += [root.make_subdirectory("dir%s" % i) for i in range(5)]
         from_generation = nodes[5].generation
         delta, end_gen, free_bytes = yield self.user.get_delta(None,
                                                                from_generation)
@@ -2801,8 +2800,8 @@ class TestGenerations(TestWithDatabase):
         """Test that User.get_delta works as expected."""
         # create some nodes
         root = self.suser.root
-        nodes = [root.make_file(u"name%s" % i) for i in range(5)]
-        nodes += [root.make_subdirectory(u"dir%s" % i) for i in range(5)]
+        nodes = [root.make_file("name%s" % i) for i in range(5)]
+        nodes += [root.make_subdirectory("dir%s" % i) for i in range(5)]
         from_generation = nodes[-1].generation
         delta, end_gen, free_bytes = yield self.user.get_delta(None,
                                                                from_generation)
@@ -2815,8 +2814,8 @@ class TestGenerations(TestWithDatabase):
         """Test User.get_delta with partial delta."""
         # create some nodes
         root = self.suser.root
-        nodes = [root.make_file(u"name%s" % i) for i in range(10)]
-        nodes += [root.make_subdirectory(u"dir%s" % i) for i in range(10)]
+        nodes = [root.make_file("name%s" % i) for i in range(10)]
+        nodes += [root.make_subdirectory("dir%s" % i) for i in range(10)]
         limit = 5
         delta, vol_gen, free_bytes = yield self.user.get_delta(None, 10,
                                                                limit=limit)
@@ -2827,11 +2826,11 @@ class TestGenerations(TestWithDatabase):
     def test_rescan_from_scratch(self):
         """Test User.rescan_from_scratch."""
         root = self.suser.root
-        nodes = [root.make_file(u"name%s" % i) for i in range(5)]
-        nodes += [root.make_subdirectory(u"dir%s" % i) for i in range(5)]
-        for f in [root.make_file(u"name%s" % i) for i in range(5, 10)]:
+        nodes = [root.make_file("name%s" % i) for i in range(5)]
+        nodes += [root.make_subdirectory("dir%s" % i) for i in range(5)]
+        for f in [root.make_file("name%s" % i) for i in range(5, 10)]:
             f.delete()
-        for d in [root.make_subdirectory(u"dir%s" % i) for i in range(5, 10)]:
+        for d in [root.make_subdirectory("dir%s" % i) for i in range(5, 10)]:
             d.delete()
         live_nodes, gen, free_bytes = yield self.user.get_from_scratch(None)
         # nodes + root

@@ -15,8 +15,6 @@
 
 """Pretty API for protocol client."""
 
-from __future__ import with_statement
-
 import logging
 import os
 import sys
@@ -24,10 +22,9 @@ import shutil
 import time
 import uuid
 import zlib
-
-from cStringIO import StringIO
+from io import StringIO
 from logging.handlers import RotatingFileHandler
-from Queue import Queue
+from queue import Queue
 from threading import Lock
 
 from dirspec.basedir import xdg_cache_home
@@ -65,7 +62,7 @@ def log_timing(func):
         ent = func(*arg, **kwargs)
         stop = time.time()
         u1_logger.debug('for %s %0.5f ms elapsed',
-                        func.func_name, stop-start * 1000.0)
+                        func.__name__, stop-start * 1000.0)
         return ent
     return wrapper
 
@@ -103,7 +100,7 @@ class Waiter(object):
         (result, exc_info) = self.queue.get()
         if exc_info:
             try:
-                raise exc_info[0], exc_info[1], exc_info[2]
+                raise exc_info[0](exc_info[1]).with_traceback(exc_info[2])
             finally:
                 exc_info = None
         else:
@@ -295,7 +292,7 @@ class Client(object):
         result, exc_info, failure = self._wait(waiter)
         if exc_info:
             try:
-                raise exc_info[0], exc_info[1], exc_info[2]
+                raise exc_info[0](exc_info[1]).with_traceback(exc_info[2])
             finally:
                 exc_info = None
         elif failure:
@@ -512,7 +509,7 @@ class Client(object):
                     children[entry.name] = child
 
             content_hashes = yield self._get_node_hashes(share_uuid)
-            for child in children.itervalues():
+            for child in children.values():
                 child.content_hash = content_hashes.get(child.uuid, None)
 
             returnValue(children)
@@ -524,7 +521,7 @@ class Client(object):
                 children = self.defer_from_thread(_get_children, node.uuid,
                                                   node.content_hash)
                 node.children = children
-                for child in children.itervalues():
+                for child in children.values():
                     if child.node_type == DIRECTORY:
                         need_children.append(child)
 

@@ -18,7 +18,7 @@
 
 """Test file operations."""
 
-from StringIO import StringIO
+from io import StringIO
 
 from magicicadaprotocol import errors as protocol_errors, request
 from magicicadaprotocol.content_hash import content_hash_factory, crc32
@@ -168,13 +168,13 @@ class TestUnlink(TestWithDatabase):
                 client.test_fail)
             d.addCallback(lambda req: self._save_state("file", req.new_id))
             d.addCallback(lambda _: threads.deferToThread(get_file_status))
-            d.addCallback(lambda status: self.assert_(status == STATUS_LIVE))
+            d.addCallback(lambda status: self.assertEqual(status, STATUS_LIVE))
             d.addCallbacks(
                 lambda mkfile_req: client.unlink(request.ROOT,
                                                  self._state.file),
                 client.test_fail)
             d.addCallback(lambda _: threads.deferToThread(get_file_status))
-            d.addCallback(lambda status: self.assert_(status == STATUS_DEAD))
+            d.addCallback(lambda status: self.assertEqual(status, STATUS_DEAD))
             d.addCallbacks(client.test_done, client.test_fail)
         return self.callback_test(auth)
 
@@ -206,13 +206,13 @@ class TestUnlink(TestWithDatabase):
             d.addCallbacks(lambda r: client.make_dir(request.ROOT, r, "hola"))
             d.addCallback(lambda req: self._save_state("file", req.new_id))
             d.addCallback(lambda _: threads.deferToThread(get_dir_status))
-            d.addCallback(lambda status: self.assert_(status == STATUS_LIVE))
+            d.addCallback(lambda status: self.assertEqual(status, STATUS_LIVE))
             d.addCallbacks(
                 lambda mkfile_req: client.unlink(request.ROOT,
                                                  self._state.file),
                 client.test_fail)
             d.addCallback(lambda _: threads.deferToThread(get_dir_status))
-            d.addCallback(lambda status: self.assert_(status == STATUS_DEAD))
+            d.addCallback(lambda status: self.assertEqual(status, STATUS_DEAD))
             d.addCallbacks(client.test_done, client.test_fail)
         return self.callback_test(auth)
 

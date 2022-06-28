@@ -19,8 +19,7 @@
 """Test cancellation of the action queue's commands."""
 
 import os
-
-from cStringIO import StringIO
+from io import StringIO
 
 from magicicadaclient.syncdaemon.marker import MDMarker as Marker
 from magicicadaprotocol import request
@@ -119,14 +118,14 @@ class TestCancel(AQCancelTestBase):
                       'unlink', worker, lambda: self.connlost_deferred))
 
         parent_path = self.main.fs.get_by_node_id('', self.root).path
-        mdid = self.main.fs.create(os.path.join(parent_path, u"test"), '')
+        mdid = self.main.fs.create(os.path.join(parent_path, "test"), '')
         self.aq.make_file('', self.root, 'hola', 'marker:x', mdid)
         self.assertInQ(d, ('AQ_UNLINK_OK', {'share_id': '',
                                             'node_id': anUUID,
                                             'parent_id': self.root,
                                             'was_dir': False,
                                             'old_path': '',
-                                            'new_generation': 2L}))
+                                            'new_generation': 2}))
         return d
 
     def test_move(self):
@@ -141,12 +140,12 @@ class TestCancel(AQCancelTestBase):
         d.addCallback(lambda _: self.nuke_client_method(
                       'move', worker, lambda: self.connlost_deferred))
         parent_path = self.main.fs.get_by_node_id('', self.root).path
-        mdid = self.main.fs.create(os.path.join(parent_path, u"test"), '')
+        mdid = self.main.fs.create(os.path.join(parent_path, "test"), '')
         self.aq.make_file('', self.root, 'hola', 'marker:x', mdid)
 
         self.assertInQ(d, ('AQ_MOVE_OK', {'share_id': '',
                                           'node_id': anUUID,
-                                          'new_generation': 2L}))
+                                          'new_generation': 2}))
         return d
 
     def test_make_file(self):
@@ -154,14 +153,14 @@ class TestCancel(AQCancelTestBase):
         def worker():
             """Async worker."""
             parent_path = self.main.fs.get_by_node_id('', self.root).path
-            mdid = self.main.fs.create(os.path.join(parent_path, u"test"), '')
+            mdid = self.main.fs.create(os.path.join(parent_path, "test"), '')
             self.aq.make_file('', self.root, 'hola', 'marker:x', mdid)
             return self.hiccup()
         d = self.nuke_client_method('make_file', worker,
                                     lambda: self.connlost_deferred)
         self.assertInQ(d, ('AQ_FILE_NEW_OK', {'new_id': anUUID,
                                               'marker': 'marker:x',
-                                              'new_generation': 1L,
+                                              'new_generation': 1,
                                               'volume_id': request.ROOT}))
         return d
 
@@ -212,7 +211,7 @@ class TestCancel(AQCancelTestBase):
                                    {'share_id': '',
                                     'hash': hash_value,
                                     'node_id': anUUID,
-                                    'new_generation': 2L}))
+                                    'new_generation': 2}))
         yield d
 
 
@@ -258,7 +257,7 @@ class TestCancelMarker(AQCancelTestBase):
                                             'parent_id': self.root,
                                             'was_dir': False,
                                             'old_path': 'dir',
-                                            'new_generation': 2L}))
+                                            'new_generation': 2}))
         return d
 
     def test_move(self):
@@ -274,7 +273,7 @@ class TestCancelMarker(AQCancelTestBase):
         d = self.nuke_client_method('make_dir', worker)
         self.assertInQ(d, ('AQ_MOVE_OK', {'share_id': '',
                                           'node_id': anUUID,
-                                          'new_generation': 2L}))
+                                          'new_generation': 2}))
         return d
 
     def test_make_file(self):
@@ -293,6 +292,6 @@ class TestCancelMarker(AQCancelTestBase):
         d = self.nuke_client_method('make_dir', worker)
         self.assertInQ(d, ('AQ_FILE_NEW_OK', {'new_id': anUUID,
                                               'marker': 'marker:x',
-                                              'new_generation': 2L,
+                                              'new_generation': 2,
                                               'volume_id': request.ROOT}))
         return d

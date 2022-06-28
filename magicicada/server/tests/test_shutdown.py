@@ -55,7 +55,7 @@ class TestShutdown(TwistedTestCase, BaseTestCase):
         # make sure we start with clean state
         yield super(TestShutdown, self).setUp()
         # since storageusers are not automatically created, we need to create
-        self.usr0 = make_storage_user(u"dummy", 2 ** 20)
+        self.usr0 = make_storage_user("dummy", 2 ** 20)
 
     @defer.inlineCallbacks
     def create_service(self):

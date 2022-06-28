@@ -20,8 +20,7 @@
 
 import os
 import zlib
-
-from StringIO import StringIO
+from io import StringIO
 
 from django.db import transaction
 from magicicadaprotocol import request, client
@@ -160,12 +159,12 @@ class TestThrottling(TestWithDatabase):
                 return d
 
             d = client.dummy_authenticate("open sesame")
-            filenames = iter('hola_%d' % i for i in xrange(num_files))
+            filenames = iter('hola_%d' % i for i in range(num_files))
             for i in range(num_files):
                 d.addCallbacks(lambda _: client.get_root(), client.test_fail)
                 d.addCallbacks(
                     lambda root: client.make_file(request.ROOT, root,
-                                                  filenames.next()),
+                                                  next(filenames)),
                     client.test_fail)
                 d.addCallbacks(
                     lambda mkfile_req: client.put_content(

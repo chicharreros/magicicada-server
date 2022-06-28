@@ -17,8 +17,6 @@
 
 """The Storage database model managers."""
 
-from __future__ import unicode_literals
-
 import posixpath
 import re
 import uuid
@@ -55,7 +53,7 @@ def validate_name(value):
     """Validate a StorageObject name."""
     if not value:
         return value
-    if not isinstance(value, unicode):
+    if not isinstance(value, str):
         raise InvalidFilename("Filename is not unicode: %r" % value)
     if value in ILLEGAL_FILENAMES:
         raise InvalidFilename("%s is a reserved filename" % value)
@@ -78,7 +76,7 @@ class DownloadManager(models.Manager):
 
     def create(self, download_key=None, **kwargs):
         if download_key:
-            download_key = unicode(repr(download_key))
+            download_key = repr(download_key)
         return super(DownloadManager, self).create(
             download_key=download_key, **kwargs)
 

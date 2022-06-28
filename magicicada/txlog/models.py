@@ -18,8 +18,6 @@
 
 """Model code for the Transaction Log."""
 
-from __future__ import unicode_literals
-
 import calendar
 import json
 import os
@@ -242,7 +240,7 @@ class TransactionLog(models.Model):
         """
         public_uuid = node.public_uuid
         if public_uuid is not None:
-            public_uuid = unicode(public_uuid)
+            public_uuid = str(public_uuid)
         when_created = get_epoch_secs(node.when_created)
         last_modified = get_epoch_secs(node.when_last_modified)
         d = dict(public_uuid=public_uuid, when_created=when_created,
@@ -253,7 +251,7 @@ class TransactionLog(models.Model):
                 bytes(node.content_blob.hash) if node.content_blob else None)
             d['size'] = getattr(node.content_blob, 'size', None)
             storage_key = getattr(node.content_blob, 'storage_key', None)
-            d['storage_key'] = unicode(storage_key) if storage_key else None
+            d['storage_key'] = str(storage_key) if storage_key else None
         return d
 
     @classmethod

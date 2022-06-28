@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 # Copyright 2008-2015 Canonical
 # Copyright 2015-2018 Chicharreros (https://launchpad.net/~chicharreros)
 #
@@ -54,7 +52,7 @@ class TestListVolumes(TestWithDatabase):
         def auth(client):
             """Authenticate and test."""
             # create a file in order to get a generation > 0
-            self.usr0.root.make_file(u"filename_1")
+            self.usr0.root.make_file("filename_1")
             yield client.dummy_authenticate("open sesame")
             root_node_id = yield client.get_root()
             req = yield client.list_volumes()
@@ -84,7 +82,7 @@ class TestListVolumes(TestWithDatabase):
             d.addCallback(self.save_req, "root")
 
             d.addCallback(lambda r: client.create_share(r, self.usr1.username,
-                                                        u"n1", Share.VIEW))
+                                                        "n1", Share.VIEW))
 
             d.addCallback(lambda _: client.list_volumes())
             d.addCallback(check)
@@ -97,7 +95,7 @@ class TestListVolumes(TestWithDatabase):
             from_id = self.usr1.id
         fromusr = get_storage_user(from_id)
         node = fromusr.root.load()
-        share = node.share(self.usr0.id, u"name", readonly=True)
+        share = node.share(self.usr0.id, "name", readonly=True)
         self._state.subtree_id = node.id
 
         if accept:
@@ -144,7 +142,7 @@ class TestListVolumes(TestWithDatabase):
             # create the share
             _share = self._create_share(client_root, accept=True)
             # create a file in order to get a generation > 0
-            self.usr0.root.make_file(u"filename_1")
+            self.usr0.root.make_file("filename_1")
             # list the volumes and check
             req = yield client.list_volumes()
             # check volumes response.
@@ -178,9 +176,9 @@ class TestListVolumes(TestWithDatabase):
             # create the share
             _share = self._create_share(client_root, accept=True)
             # increae the generation of the share
-            self.usr1.root.make_file(u"filename_1")
+            self.usr1.root.make_file("filename_1")
             # create a file in order to get a generation > 0
-            self.usr0.root.make_file(u"filename_1")
+            self.usr0.root.make_file("filename_1")
             # list the volumes and check
             req = yield client.list_volumes()
             # check volumes response.
@@ -211,14 +209,14 @@ class TestListVolumes(TestWithDatabase):
         def auth(client):
             """Authenticate and test."""
             # increase the generation in the root
-            self.usr0.root.make_file(u"filename_1")
+            self.usr0.root.make_file("filename_1")
             yield client.dummy_authenticate("open sesame")
             client_root = yield client.get_root()
             # create the udf
-            client_udf = yield client.create_udf(u"~/ñ", u"foo")
+            client_udf = yield client.create_udf("~/ñ", "foo")
 
             # increase the generation in the udf
-            self.usr0.volume(client_udf.volume_id).root.make_file(u"file_1")
+            self.usr0.volume(client_udf.volume_id).root.make_file("file_1")
             # list the volumes and check
             req = yield client.list_volumes()
             # check
@@ -233,7 +231,7 @@ class TestListVolumes(TestWithDatabase):
             udf = [v for v in req.volumes if isinstance(v, UDFVolume)][0]
             self.assertEqual(str(udf.volume_id), client_udf.volume_id)
             self.assertEqual(str(udf.node_id), client_udf.node_id)
-            self.assertEqual(udf.suggested_path, u"~/ñ/foo")
+            self.assertEqual(udf.suggested_path, "~/ñ/foo")
             self.assertEqual(udf.generation, 1)
             self.assertEqual(udf.free_bytes, self.usr0.free_bytes)
 
@@ -283,7 +281,7 @@ class TestListVolumes(TestWithDatabase):
             d.addCallback(self.save_req, "root")
 
             # create the udf
-            d.addCallback(lambda _: client.create_udf(u"~/ñ", u"foo"))
+            d.addCallback(lambda _: client.create_udf("~/ñ", "foo"))
             d.addCallback(lambda r: client.delete_volume(r.volume_id))
 
             # list the volumes and check
@@ -308,7 +306,7 @@ class TestListVolumes(TestWithDatabase):
             udf = [v for v in req.volumes if isinstance(v, UDFVolume)][0]
             self.assertEqual(str(udf.volume_id), self._state.udf.volume_id)
             self.assertEqual(str(udf.node_id), self._state.udf.node_id)
-            self.assertEqual(udf.suggested_path, u"~/ñ/foo")
+            self.assertEqual(udf.suggested_path, "~/ñ/foo")
             self.assertEqual(udf.free_bytes, self.usr0.free_bytes)
 
             # test share
@@ -330,9 +328,9 @@ class TestListVolumes(TestWithDatabase):
             self.save_req(root, "root")
 
             # create two udfs, kill one
-            udf = yield client.create_udf(u"~/ñ", u"foo")
+            udf = yield client.create_udf("~/ñ", "foo")
             self.save_req(udf, "udf")
-            result = yield client.create_udf(u"~/moño", u"groovy")
+            result = yield client.create_udf("~/moño", "groovy")
             yield client.delete_volume(result.volume_id)
 
             # create two shares, one dead (the second one should be the live
@@ -362,7 +360,7 @@ class TestDataWithVolumes(TestWithDatabase):
                                                        root, "subdir"))
 
             # create the udf, with a dir of same name
-            d.addCallback(lambda _: client.create_udf(u"~", u"myudf"))
+            d.addCallback(lambda _: client.create_udf("~", "myudf"))
             d.addCallback(lambda r: client.make_dir(r.volume_id,
                                                     r.node_id, "subdir"))
 
@@ -382,7 +380,7 @@ class TestDataWithVolumes(TestWithDatabase):
             d.addCallback(self.save_req, "dir_del")
 
             # create the udf, with two subdirs
-            d.addCallback(lambda _: client.create_udf(u"~", u"myudf"))
+            d.addCallback(lambda _: client.create_udf("~", "myudf"))
             d.addCallback(self.save_req, "udf")
             d.addCallback(lambda r: client.make_dir(r.volume_id,
                                                     r.node_id, "tdir1"))

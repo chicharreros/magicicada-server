@@ -17,8 +17,6 @@
 
 """Factory of objects."""
 
-from __future__ import unicode_literals
-
 import hashlib
 import random
 import string
@@ -44,7 +42,7 @@ from magicicada.filesync.models import (
 from magicicada.txlog.models import TransactionLog
 
 
-BASE_CHARS = string.letters + string.digits
+BASE_CHARS = string.ascii_letters + string.digits
 User = get_user_model()
 
 
@@ -54,11 +52,11 @@ class Factory(object):
 
     def get_unique_integer(self):
         """Return an integer unique to this factory."""
-        return self.counter.next()
+        return next(self.counter)
 
     def get_unique_string(self, extra_length=6, prefix='string-'):
         return prefix + ''.join(
-            random.choice(BASE_CHARS) for i in xrange(extra_length))
+            random.choice(BASE_CHARS) for i in range(extra_length))
 
     get_unique_unicode = get_unique_string
 
@@ -93,7 +91,7 @@ class Factory(object):
         """Create content for a file node."""
         if content is None:
             content = 'Hola Mundo' + self.get_unique_string()
-        if isinstance(content, unicode):
+        if isinstance(content, str):
             content = content.encode('utf-8')
         if hash is None:
             hash = self.get_fake_hash(content)
@@ -226,7 +224,7 @@ class Factory(object):
         if content is None:
             content = self.make_content_blob()
         sub = dirnode.make_subdirectory(name)
-        for i in xrange(amount):
+        for i in range(amount):
             sub.make_file('%s-%s' % (sub.name, i), content_blob=content)
         return sub
 

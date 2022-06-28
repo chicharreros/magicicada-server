@@ -41,7 +41,7 @@ def create(args):
     except User.DoesNotExist:
         pass
     else:
-        print "ERROR: There is already an user with that username"
+        print("ERROR: There is already an user with that username")
         return
 
     # let's create it
@@ -59,7 +59,7 @@ def create(args):
     visible_name = "%s %s" % (user.first_name, user.last_name)
     services.make_storage_user(user.id, username, visible_name, 2 ** 20)
 
-    print "Success: User created ok"
+    print("Success: User created ok")
 
 
 def update(args):
@@ -68,7 +68,7 @@ def update(args):
     try:
         user = User.objects.get(username=username)
     except User.DoesNotExist:
-        print "ERROR: User does not exist"
+        print("ERROR: User does not exist")
         return
 
     if args.email is not None:
@@ -81,7 +81,7 @@ def update(args):
         user.set_password(args.password.decode("utf8"))
     user.save()
 
-    print "Success: User updated ok"
+    print("Success: User updated ok")
 
 
 def delete(args):
@@ -90,11 +90,11 @@ def delete(args):
     try:
         user = User.objects.get(username=username)
     except User.DoesNotExist:
-        print "ERROR: User does not exist"
+        print("ERROR: User does not exist")
         return
 
     user.delete()
-    print "Success: User deleted ok"
+    print("Success: User deleted ok")
 
 
 def show(args):
@@ -103,16 +103,16 @@ def show(args):
     try:
         user = User.objects.get(username=username)
     except User.DoesNotExist:
-        print "ERROR: User does not exist"
+        print("ERROR: User does not exist")
         return
 
-    print "Username:   '%s'" % (user.username,)
-    print "E-mail:     '%s'" % (user.email,)
-    print "Name:       ", user.first_name, user.last_name
-    print "Id:         ", user.id
-    print "Joined:     ", user.date_joined.ctime()
-    print "Last Login: ", user.last_login.ctime()
-    print "Active:     ", user.is_active
+    print("Username:   '%s'" % (user.username,))
+    print("E-mail:     '%s'" % (user.email,))
+    print("Name:       ", user.first_name, user.last_name)
+    print("Id:         ", user.id)
+    print("Joined:     ", user.date_joined.ctime())
+    print("Last Login: ", user.last_login.ctime())
+    print("Active:     ", user.is_active)
 
 
 parser = argparse.ArgumentParser(description="Filesync Server User Manager")

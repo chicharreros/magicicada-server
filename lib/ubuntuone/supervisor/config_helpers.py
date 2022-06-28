@@ -109,7 +109,7 @@ def get_config(environ, config_spec, base_dir):
 
     for k, v in config.items():
         # only apply the env to string values
-        if isinstance(v, basestring) and '%' in v:
+        if isinstance(v, str) and '%' in v:
             config[k] = v % {"env": environ,
                              "host_env": config["host_env"],
                              "base_dir": base_dir}
@@ -137,7 +137,7 @@ def generate_server_config(server_name, env_service_map, config_spec,
     # Generally we have only one env per machine, except when production and
     # edge are colocated. In which case we default everything that doesn't have
     # a env-specific key to "production".
-    envs = env_service_map.keys()
+    envs = list(env_service_map.keys())
     default_env = "production" if "production" in envs else envs[0]
     base_dir = env_service_map[default_env].get("base_dir")
     config_spec = config_spec.copy()
@@ -161,7 +161,7 @@ def generate_server_config(server_name, env_service_map, config_spec,
     if groups and with_heartbeat:
         heartbeat_listener_spec = base_heartbeat_listener_spec.copy()
         heartbeat_listener_spec.update(server_spec)
-        hb_groups = sorted([gn for gn in groups.keys()])
+        hb_groups = sorted(groups.keys())
         heartbeat_listener_spec['groups'] = ','.join(hb_groups)
         procs_to_watch = []
         if "processes_re" in heartbeat_listener_spec:
@@ -212,7 +212,7 @@ def generate_service_config(service_map, config_spec, service_group=None,
         # find nick-specific values in config spec and replace them by non-nick
         # prefixed values.
         service_config_spec = config_spec.copy()
-        for key, value in service_config_spec.items()[:]:
+        for key, value in list(service_config_spec.items()):
             if key.startswith(nick + "."):
                 del service_config_spec[key]
                 key_name = key[len(nick) + 1:]
@@ -275,7 +275,7 @@ def main(instance_map, templates, service_group=None,
                                                 service_group, with_heartbeat,
                                                 with_header=True)
         if options.dry_run:
-            print config_content
+            print(config_content)
         else:
             filename = "configs/supervisor-%s.conf" % (server_name,)
             with open(os.path.join(get_rootdir(), filename), 'w') as f:

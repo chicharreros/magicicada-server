@@ -54,7 +54,7 @@ BASE_DIR = os.path.dirname(
 # See https://docs.djangoproject.com/en/2.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = '%kj2ks+76)v=*@@wbz&b&fe8k$aax41q+6dy((q684uh#ttwa%'
+SECRET_KEY = 'keep the secret key used in production secret!'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
@@ -71,6 +71,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.sites',
+    'magicicada.filesync',
+    'magicicada.txlog',
 ]
 
 MIDDLEWARE = [
@@ -79,10 +82,10 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.auth.middleware.SessionAuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'django.middleware.security.SecurityMiddleware',
-)
+]
 
 ROOT_URLCONF = 'magicicada.urls'
 
@@ -125,19 +128,15 @@ DATABASES = {
 # Password validation
 # https://docs.djangoproject.com/en/2.2/ref/settings/#auth-password-validators
 
+PASSWORD_VALIDATORS = [
+    'UserAttributeSimilarityValidator',
+    'MinimumLengthValidator',
+    'CommonPasswordValidator',
+    'NumericPasswordValidator',
+]
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+    {'NAME': f'django.contrib.auth.password_validation.{validator}'}
+    for validator in PASSWORD_VALIDATORS
 ]
 
 

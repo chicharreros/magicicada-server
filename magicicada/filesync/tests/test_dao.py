@@ -18,12 +18,10 @@
 
 """Test the Data Access Objects."""
 
-from __future__ import unicode_literals
-
 import uuid
 from operator import attrgetter
+from unittest import mock
 
-import mock
 from django.conf import settings
 
 from magicicada.filesync import errors, services, utils
@@ -197,7 +195,7 @@ class DAOInitTestCase(StorageDALTestCase):
         self.assertEqual(dao_download.volume_id, download.volume.id)
         self.assertEqual(dao_download.file_path, 'The Path')
         self.assertEqual(dao_download.download_url, 'The Url')
-        self.assertEqual(dao_download.download_key, "u'Key'")
+        self.assertEqual(dao_download.download_key, "'Key'")
 
 
 class VolumeProxyTestCase(StorageDALTestCase):
@@ -1427,13 +1425,13 @@ class TestSQLStatementCount(StorageDALTestCase):
         """Move a directory with files inside it."""
         directory = self._create_directory_with_five_files()
         new_parent = directory.owner.root.make_subdirectory('test2')
-        with self.assertNumQueries(48):  # XXX 19
+        with self.assertNumQueries(34):  # XXX 19
             directory.move(new_parent.id, directory.name)
 
     def test_delete_directory_with_files(self):
         """Delete a directory with files inside it."""
         directory = self._create_directory_with_five_files()
-        with self.assertNumQueries(41):  # XXX 17
+        with self.assertNumQueries(27):  # XXX 17
             directory.delete(cascade=True)
 
     def test_delete_file(self):

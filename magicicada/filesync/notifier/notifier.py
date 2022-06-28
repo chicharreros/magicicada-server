@@ -18,8 +18,6 @@
 
 """A Notifier that will bind to transaction."""
 
-from __future__ import unicode_literals
-
 import itertools
 import re
 import threading
@@ -61,11 +59,11 @@ class Notification(object):
 
     def __init__(self, *args, **kw):
         """Initializes an object."""
-        values = dict(itertools.izip_longest(self._fields, args))
+        values = dict(itertools.zip_longest(self._fields, args))
         values.update(kw)
         if 'recipient_id' not in values:
             values['recipient_id'] = None
-        for name, value in values.iteritems():
+        for name, value in values.items():
             setattr(self, name, value)
 
         self.recipient_ids = {getattr(self, name)

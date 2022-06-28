@@ -18,8 +18,6 @@
 
 """Database access functions."""
 
-from __future__ import unicode_literals
-
 from django.db import transaction
 from django.db.models import Q
 from django.utils.timezone import now, timedelta
@@ -135,7 +133,7 @@ def get_txn_recs(num_recs, last_id=0,
 def ichunk(iter, chunk):
     i = 0
     while i < chunk:
-        yield iter.next()
+        yield next(iter)
         i += 1
 
 

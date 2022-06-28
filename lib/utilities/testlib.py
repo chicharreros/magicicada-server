@@ -18,8 +18,6 @@
 
 """Library of functions used in tests."""
 
-from __future__ import unicode_literals
-
 import os
 import re
 
@@ -88,14 +86,14 @@ class LogsOnFailureDecorator(TestResultDecorator):
         """Show the logs to stdout since the failed test started."""
         for log in self._abspath_logs:
             prev_pos = self._logs_positions[log]
-            print "\n-------- Dumping log:", repr(log)
+            print("\n-------- Dumping log:", repr(log))
             if os.path.exists(log):
                 with open(log) as fh:
                     fh.seek(prev_pos)
-                    print fh.read(),
-                print "------------ end log:", repr(log)
+                    print(fh.read(), end=' ')
+                print("------------ end log:", repr(log))
             else:
-                print "------------ log not found!"
+                print("------------ log not found!")
 
     def addFailure(self, test, fail):
         """Show the log and forward the failure."""

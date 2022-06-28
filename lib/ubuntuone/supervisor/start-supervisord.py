@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 
 # Copyright 2008-2015 Canonical
 # Copyright 2015-2018 Chicharreros (https://launchpad.net/~chicharreros)
@@ -62,10 +61,10 @@ def main(tpls):
 
     # first, check if it's already running
     if is_running("supervisor", pid_file, port_name):
-        print "Supervisor [%s] already running" % main_name
+        print("Supervisor [%s] already running" % main_name)
         sys.exit(0)
 
-    print "Starting supervisor [%s]" % main_name
+    print("Starting supervisor [%s]" % main_name)
 
     # get port
     inet_http_server_port, = local.allocate_ports(1)

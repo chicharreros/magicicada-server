@@ -115,15 +115,13 @@ if __name__ == "__main__":
         curr.close()
         conn.close()
     if node_cnt:
-        print "Live Files:             % 15d" % node_cnt
-        print "Keywords:               % 15d" % kw_cnt
-        print "Avg Keyword per User:   % 15.2f" % (
-            float(user_kw_cnt) / user_cnt)
-        print "Avg Keyword Length:     % 15.2f" % (float(kw_len) / kw_cnt)
-        print "Avg Volume Path Length: % 15.2f" % (
-            float(volpath_len) / node_cnt)
-        print "Cassandra Row Count:    % 15d" % user_cnt
-        print "Cassandra Max Columns:  % 15d" % cass_row_width_max
-        print "Cassandra Column bytes: % 15d" % cass_col_bytes
+        print("Live Files:             % 15d" % node_cnt)
+        print("Keywords:               % 15d" % kw_cnt)
+        print("Avg Keyword per User:   % 15.2f" % user_kw_cnt / user_cnt)
+        print("Avg Keyword Length:     % 15.2f" % kw_len / kw_cnt)
+        print("Avg Volume Path Length: % 15.2f" % volpath_len / node_cnt)
+        print("Cassandra Row Count:    % 15d" % user_cnt)
+        print("Cassandra Max Columns:  % 15d" % cass_row_width_max)
+        print("Cassandra Column bytes: % 15d" % cass_col_bytes)
     else:
-        print "No files found."
+        print("No files found.")

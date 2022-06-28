@@ -18,8 +18,6 @@
 
 """The DAL entry point as a service."""
 
-from __future__ import unicode_literals
-
 import uuid
 
 from django.contrib.auth import authenticate
@@ -120,9 +118,9 @@ class DAL(object):
              new_parent_id, new_name, session_id=None):
         """Move a node and/or rename it."""
         user = self._get_user(user_id, session_id)
-        # If we get new_parent_id as str/unicode, generate a UUID using it
+        # If we get new_parent_id as str, generate a UUID from it
         # because StorageObject.move() expects it to be either a UUID or None.
-        if isinstance(new_parent_id, basestring):
+        if isinstance(new_parent_id, str):
             new_parent_id = uuid.UUID(new_parent_id)
         node = user.volume(volume_id).node(node_id).move(new_parent_id,
                                                          new_name)

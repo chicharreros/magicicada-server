@@ -20,8 +20,6 @@ the server to correspond to the merged result.
 
 """
 
-from __future__ import with_statement
-
 import os
 
 from magicicadaprotocol import request
@@ -33,8 +31,8 @@ from magicicada.u1sync.utils import safe_mkdir
 
 
 EMPTY_HASH = ""
-UPLOAD_SYMBOL = u"\u25b2".encode("utf-8")
-DOWNLOAD_SYMBOL = u"\u25bc".encode("utf-8")
+UPLOAD_SYMBOL = "▲"
+DOWNLOAD_SYMBOL = "▼"
 CONFLICT_SYMBOL = "!"
 DELETE_SYMBOL = "X"
 
@@ -89,17 +87,17 @@ def sync_tree(merged_tree, original_tree, sync_mode, path, quiet):
                     node_uuid = original_node.uuid
                 else:
                     if not quiet:
-                        print "%s   %s" % (sync_mode.symbol, display_path)
+                        print("%s   %s" % (sync_mode.symbol, display_path))
                     try:
                         create_dir = sync_mode.create_directory
                         node_uuid = create_dir(parent_uuid=parent_uuid,
                                                path=path)
                         synced = True
                     except NodeCreateError as e:
-                        print e
+                        print(e)
             elif merged_node.content_hash is None:
                 if not quiet:
-                    print "?   %s" % display_path
+                    print("?   %s" % display_path)
             elif (original_node is None or
                   original_node.content_hash != merged_node.content_hash or
                   merged_node.conflict_info is not None):
@@ -109,8 +107,8 @@ def sync_tree(merged_tree, original_tree, sync_mode, path, quiet):
                 else:
                     conflict_symbol = " "
                 if not quiet:
-                    print "%s %s %s" % (sync_mode.symbol, conflict_symbol,
-                                        display_path)
+                    print("%s %s %s" % (sync_mode.symbol, conflict_symbol,
+                                        display_path))
                 if original_node is not None:
                     node_uuid = original_node.uuid or merged_node.uuid
                     original_hash = original_node.content_hash or EMPTY_HASH
@@ -126,7 +124,7 @@ def sync_tree(merged_tree, original_tree, sync_mode, path, quiet):
                         node_type=merged_node.node_type)
                     synced = True
                 except NodeSyncError as e:
-                    print e
+                    print(e)
             else:
                 synced = True
 
@@ -140,8 +138,8 @@ def sync_tree(merged_tree, original_tree, sync_mode, path, quiet):
         if merged_node is None:
             assert original_node is not None
             if not quiet:
-                print "%s %s %s" % (sync_mode.symbol, DELETE_SYMBOL,
-                                    display_path)
+                print("%s %s %s" % (sync_mode.symbol, DELETE_SYMBOL,
+                                    display_path))
             try:
                 if original_node.node_type == DIRECTORY:
                     sync_mode.delete_directory(node_uuid=original_node.uuid,
@@ -152,7 +150,7 @@ def sync_tree(merged_tree, original_tree, sync_mode, path, quiet):
                                           path=path)
                 synced = True
             except NodeDeleteError as e:
-                print e
+                print(e)
 
         if synced:
             model_node = merged_node
@@ -161,9 +159,8 @@ def sync_tree(merged_tree, original_tree, sync_mode, path, quiet):
 
         if model_node is not None:
             if model_node.node_type == DIRECTORY:
-                child_iter = child_results.iteritems()
                 merged_children = dict(
-                    (name, child) for (name, child) in child_iter
+                    (name, child) for (name, child) in child_results.items()
                     if child is not None)
             else:
                 # if there are children here it's because they failed to delete
@@ -177,7 +174,7 @@ def sync_tree(merged_tree, original_tree, sync_mode, path, quiet):
 
     return generic_merge(trees=[merged_tree, original_tree],
                          pre_merge=pre_merge, post_merge=post_merge,
-                         partial_parent=(path, "", None, True), name=u"")
+                         partial_parent=(path, "", None, True), name="")
 
 
 def download_tree(merged_tree, local_tree, client, share_uuid, path, dry_run,

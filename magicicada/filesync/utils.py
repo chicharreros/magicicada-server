@@ -18,8 +18,6 @@
 
 """Some utility functions used by the DAL."""
 
-from __future__ import unicode_literals
-
 import base64
 import re
 import unicodedata
@@ -54,7 +52,7 @@ def decode_uuid(encoded, label=''):
     """
     encoded += '=' * (-len(encoded) % 4)
 
-    if isinstance(encoded, unicode):
+    if isinstance(encoded, str):
         try:
             encoded = encoded.encode('ascii')
         except UnicodeEncodeError:
@@ -141,7 +139,7 @@ def encode_base62(value, padded_to=0):
 
 def decode_base62(string, allow_padding=False):
     """Decode a base-62 string to a positive integer."""
-    if isinstance(string, unicode):
+    if isinstance(string, str):
         try:
             string = string.encode('ASCII')
         except UnicodeEncodeError:
@@ -156,7 +154,7 @@ def decode_base62(string, allow_padding=False):
         if digit < 0:
             raise Base62Error('Unknown base62 digit')
         value = value * 62 + digit
-    if not 0 <= value < 1 << 128L:
+    if not 0 <= value < 1 << 128:
         raise Base62Error('Value is out of range for uuid.')
     return value
 

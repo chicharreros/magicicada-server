@@ -18,12 +18,10 @@
 
 """Tests for monitoring dump."""
 
-from __future__ import unicode_literals
-
 import shutil
 import tempfile
+from unittest import mock
 
-import mock
 from django.conf import settings
 from twisted.trial.unittest import TestCase
 

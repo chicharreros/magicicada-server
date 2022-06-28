@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 # Copyright 2008-2015 Canonical
 # Copyright 2015-2018 Chicharreros (https://launchpad.net/~chicharreros)
 #
@@ -20,7 +18,7 @@
 
 """Test the action queue."""
 
-import StringIO
+import io
 import os
 import uuid
 import zlib
@@ -112,7 +110,7 @@ class TestMeta(TestBase):
         d = self._mkfile('hola')
         self.assertInQ(d, ('AQ_FILE_NEW_OK', {'marker': anUUID,
                                               'new_id': anUUID,
-                                              'new_generation': 1L,
+                                              'new_generation': 1,
                                               'volume_id': ''}))
         return d
 
@@ -123,21 +121,21 @@ class TestMeta(TestBase):
         d = defer.DeferredList([d1, d2])
         self.assertInQ(d, ('AQ_FILE_NEW_OK', {'marker': anUUID,
                                               'new_id': anUUID,
-                                              'new_generation': 1L,
+                                              'new_generation': 1,
                                               'volume_id': ''}))
         return d
 
     def test_make_file_kwargs(self):
         """Test we can make files using keyword arguments."""
         parent_path = self.main.fs.get_by_node_id(request.ROOT, self.root).path
-        mdid = self.main.fs.create(os.path.join(parent_path, u"test"),
+        mdid = self.main.fs.create(os.path.join(parent_path, "test"),
                                    request.ROOT)
         self.aq.make_file(share_id=request.ROOT, parent_id=self.root,
                           name='hola', marker='marker:xyzzy', mdid=mdid)
         self.assertInQ(self.wait_for_queue_done,
                        ('AQ_FILE_NEW_OK', {'marker': 'marker:xyzzy',
                                            'new_id': anUUID,
-                                           'new_generation': 1L,
+                                           'new_generation': 1,
                                            'volume_id': ''}))
         return self.wait_for_queue_done
 
@@ -146,7 +144,7 @@ class TestMeta(TestBase):
         d = self._mkdir('hola')
         self.assertInQ(d, ('AQ_DIR_NEW_OK', {'marker': anUUID,
                                              'new_id': anUUID,
-                                             'new_generation': 1L,
+                                             'new_generation': 1,
                                              'volume_id': ''}))
         return d
 
@@ -157,11 +155,11 @@ class TestMeta(TestBase):
         d = defer.DeferredList([d1, d2])
         self.assertInQ(d, ('AQ_DIR_NEW_OK', {'marker': anUUID,
                                              'new_id': anUUID,
-                                             'new_generation': 1L,
+                                             'new_generation': 1,
                                              'volume_id': ''}))
         self.assertInQ(d, ('AQ_DIR_NEW_OK', {'marker': anUUID,
                                              'new_id': anUUID,
-                                             'new_generation': 1L,
+                                             'new_generation': 1,
                                              'volume_id': ''}))
         return d
 
@@ -176,7 +174,7 @@ class TestMeta(TestBase):
         yield wait_for_queue_done
         containee = ('AQ_MOVE_OK', {'share_id': aShareUUID,
                                     'node_id': anUUID,
-                                    'new_generation': 3L})
+                                    'new_generation': 3})
         self.assertIn(containee, self.listener.q)
 
     @defer.inlineCallbacks
@@ -259,7 +257,7 @@ class TestMeta(TestBase):
                                       'parent_id': self.root,
                                       'was_dir': False,
                                       'old_path': '',
-                                      'new_generation': 2L})
+                                      'new_generation': 2})
         self.assertIn(containee, self.listener.q)
 
     @failure_expected('DOES_NOT_EXIST')
@@ -278,11 +276,11 @@ class TestMeta(TestBase):
         dl = []
         parent_path = self.main.fs.get_by_node_id(request.ROOT, self.root).path
         for letter in LETTERS:
-            new_path = os.path.join(parent_path, u'hola_' + letter)
+            new_path = os.path.join(parent_path, 'hola_' + letter)
             mdid = self.main.fs.create(new_path, request.ROOT)
             marker = 'marker:' + letter
             self.aq.make_file(request.ROOT, self.root,
-                              u'hola_' + letter, marker, mdid)
+                              'hola_' + letter, marker, mdid)
             dl.append(self.wait_for('AQ_FILE_NEW_OK', marker=marker))
         d = defer.DeferredList(dl)
 
@@ -296,8 +294,8 @@ class TestMeta(TestBase):
         return d
 
 
-class TestUnicode(TestBase):
-    """Test Unicode handling."""
+class TestNonAscii(TestBase):
+    """Test non-ascii handling."""
 
     @defer.inlineCallbacks
     def test_mkfile_ok(self):
@@ -308,7 +306,7 @@ class TestUnicode(TestBase):
         yield self.aq.rescan_from_scratch(request.ROOT)
         yield wait_for_rescan
         res = self.listener.get_rescan_from_scratch_for(request.ROOT)
-        self.assertIn(u"moño", [dt.name for dt in res['delta_content']])
+        self.assertIn("moño", [dt.name for dt in res['delta_content']])
 
     @defer.inlineCallbacks
     def test_mkdir_ok(self):
@@ -319,7 +317,7 @@ class TestUnicode(TestBase):
         yield self.aq.rescan_from_scratch(request.ROOT)
         yield wait_for_rescan
         res = self.listener.get_rescan_from_scratch_for(request.ROOT)
-        self.assertIn(u"camión", [dt.name for dt in res['delta_content']])
+        self.assertIn("camión", [dt.name for dt in res['delta_content']])
 
 
 class TestDeferredMeta(TestBase):
@@ -436,7 +434,7 @@ class TestContent(TestContentBase):
         self.assertEvent(('AQ_UPLOAD_FINISHED', {'share_id': request.ROOT,
                                                  'node_id': node_id,
                                                  'hash': hash_value,
-                                                 'new_generation': 2L}))
+                                                 'new_generation': 2}))
 
     @defer.inlineCallbacks
     def test_upload_several(self):
@@ -482,7 +480,7 @@ class TestContent(TestContentBase):
             """
             def __init__(self):
                 self.name = 'dummy-will-be-ignored'
-                self.tempfile = StringIO.StringIO()
+                self.tempfile = io.StringIO()
                 commands.append([x for x in outer_self.aq.queue.waiting
                                  if isinstance(x, Upload)][0])
                 self.all_read = 0
@@ -592,7 +590,7 @@ class TestContent(TestContentBase):
     def test_ordered(self):
         """Three commands that if run out of order will throw an exception."""
         parent_path = self.main.fs.get_by_node_id(request.ROOT, self.root).path
-        mdid = self.main.fs.create(os.path.join(parent_path, u"test"),
+        mdid = self.main.fs.create(os.path.join(parent_path, "test"),
                                    request.ROOT)
         marker = Marker(mdid)
         self.aq.make_file(request.ROOT, self.root, 'hola', marker, mdid)
