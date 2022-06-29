@@ -1458,7 +1458,7 @@ class TestSQLStatementCount(StorageDALTestCase):
         user = self.create_user()
         directory = user.root.make_subdirectory('test')
         hash_ = self.factory.get_fake_hash()
-        name = self.factory.get_unique_unicode()
+        name = self.factory.get_unique_string()
         size = self.factory.get_unique_integer()
         crc32 = self.factory.get_unique_integer()
         storage_key = uuid.uuid4()

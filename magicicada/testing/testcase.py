@@ -129,6 +129,8 @@ class BaseTestCase(TransactionTestCase):
     factory = Factory()
     maxDiff = None
 
+    assertItemsEqual = TransactionTestCase.assertCountEqual
+
     def patch(self, obj, attr_name, new_val):
         """Patch!"""
         old_val = getattr(obj, attr_name)
