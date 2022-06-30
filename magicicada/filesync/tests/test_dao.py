@@ -1410,16 +1410,19 @@ class TestSQLStatementCount(StorageDALTestCase):
 
     mimetype = 'image/jpeg'
 
-    def _create_directory_with_five_files(self):
+    def _create_directory_with_files(self, amount=3):
         """Creates a DirectoryNode with 5 files inside it."""
         user = self.create_user()
         directory = user.root.make_subdirectory('test')
-        for i in range(5):
+        for i in range(amount):
             directory.make_file_with_content(
                 file_name='file-%s' % i, hash=b'hash', crc32=0, size=0,
                 deflated_size=0, storage_key=uuid.uuid4(),
                 mimetype=self.mimetype)
         return directory
+
+    def _create_directory_with_five_files(self):
+        return self._create_directory_with_files(amount=5)
 
     def test_move_directory_with_files(self):
         """Move a directory with files inside it."""
