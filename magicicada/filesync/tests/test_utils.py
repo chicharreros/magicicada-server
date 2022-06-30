@@ -54,7 +54,7 @@ class NodeKeyTests(unittest.TestCase):
     def test_make_parse_nodekey(self):
         """Test make and parse_nodekey."""
         key = make_nodekey(VOLUME_UUID, NODE_UUID)
-        self.assertEqual(key, b'%s:%s' % (VOLUME_KEY, NODE_KEY))
+        self.assertEqual(key, '%s:%s' % (VOLUME_KEY, NODE_KEY))
         volume_id, node_id = parse_nodekey(key)
         self.assertEqual(volume_id, VOLUME_UUID)
         self.assertEqual(node_id, NODE_UUID)
@@ -71,14 +71,8 @@ class NodeKeyTests(unittest.TestCase):
         self.assertEqual(volume_id, VOLUME_UUID)
         self.assertEqual(node_id, NODE_UUID)
 
-    def test_parse_nodekey_unicode(self):
-        """parse_nodekey() accepts unicode strings."""
-        volume_id, node_id = parse_nodekey('%s:%s' % (VOLUME_KEY, NODE_KEY))
-        self.assertEqual(volume_id, VOLUME_UUID)
-        self.assertEqual(node_id, NODE_UUID)
-
     def test_parse_nodekey_non_ascii(self):
-        """parse_nodekey() fails on non-ASCII compatible unicode strings."""
+        """parse_nodekey() fails on non-ASCII compatible strings."""
         self.assertRaises(NodeKeyParseError, parse_nodekey, '\u00A0')
 
     def test_parse_nodekey_short_node_id(self):
@@ -210,7 +204,7 @@ class KeywordsTests(unittest.TestCase):
         kw = get_keywords_from_path(
             '~/Do\u0304cuments/is/the path/path!'
             ' fo\u0304r/my%$files/hero\u0304.txt')
-        # unicode character should be normalized
+        # non-ascii character should be normalized
         self.assertEqual(
             sorted(kw),
             sorted(['documents', 'files', 'for', 'is', 'hero', 'path', 'the',
