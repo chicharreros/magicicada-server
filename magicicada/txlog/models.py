@@ -340,7 +340,9 @@ class TransactionLog(models.Model):
             "The given node is not a directory.")
         cls._record_unlink(directory, generation)
         if descendants is None:
-            descendants = directory.descendants
+            descendants = directory.descendants.select_related(
+                'volume', 'volume__owner',
+            )
         # We use this code to explode UDF operations and in those cases we
         # will delete the root of a UDF, so we add this extra clause to
         # avoid the query above picking up the root folder as a descendant
@@ -350,14 +352,17 @@ class TransactionLog(models.Model):
         # Here we construct the extra_data json manually because it's trivial
         # enough and the alternative would be to use a stored procedure, which
         # requires a DB patch.
+        descendants_logs = []
         for node in descendants:
             extra_data = json.dumps(
                 {'kind': node.kind, 'volume_path': node.volume.path})
-            cls.objects.create(
+            descendants_logs.append(cls(
                 node_id=node.id, owner_id=node.volume.owner.id,
                 volume_id=node.volume.id, op_type=cls.OP_DELETE,
                 path=node.full_path, generation=node.generation,
-                mimetype=node.mimetype or None, extra_data=extra_data)
+                mimetype=node.mimetype or None, extra_data=extra_data))
+
+        cls.objects.bulk_create(descendants_logs)
 
         return len(descendants)
 
@@ -365,7 +370,7 @@ class TransactionLog(models.Model):
     def record_move(cls, node, old_name, old_parent, descendants):
         """Create TransactionLog entries representing a move operation.
 
-        The 'descendants' list is the list of descendants from node before
+        The 'descendants' is the list of descendants from node before
         the moving that were affected by path rename.
 
         """
@@ -398,18 +403,21 @@ class TransactionLog(models.Model):
             if node.path == '/':
                 assert node.id not in [d.id for d in descendants]
 
+            descendants_logs = []
             for n in descendants:
                 old_path = n.full_path
                 new_path = old_path.replace(old_parent_path, new_parent_path)
                 extra_data = cls.extra_data_new_node(n)
-                cls.objects.create(
+                descendants_logs.append(cls(
                     node_id=n.id, owner_id=n.volume.owner.id,
                     volume_id=n.volume.id, op_type=cls.OP_MOVE,
                     path=new_path, generation=node.generation,
                     mimetype=n.mimetype or None,
-                    extra_data=json.dumps(extra_data), old_path=old_path)
+                    extra_data=json.dumps(extra_data), old_path=old_path))
 
                 rowcount += 1
+
+            cls.objects.bulk_create(descendants_logs)
 
         return rowcount
 

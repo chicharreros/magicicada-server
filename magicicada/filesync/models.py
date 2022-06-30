@@ -543,7 +543,8 @@ class BaseStorageObject(models.Model):
             # this will be the size of the path parts to replace
             replace_size = len(self.full_path) + 1
             # update the path of all descendants
-            descendants = list(self.descendants)
+            descendants = list(
+                self.descendants.select_related('volume', 'volume__owner'))
             self.descendants.update(
                 path=Concat(models.Value(new_path),
                             Substr('path', replace_size)))
@@ -708,7 +709,8 @@ class BaseStorageObject(models.Model):
             content_changed.send(
                 sender=self.__class__, instance=self, content_added=False,
                 new_size=0 - size_to_remove, enforce_quota=False)
-            descendants = list(self.descendants)  # make a copy before killing
+            descendants = list(  # make a copy before killing
+                self.descendants.select_related('volume', 'volume__owner'))
             self.descendants.update(
                 status=STATUS_DEAD, when_last_modified=right_now)
 
