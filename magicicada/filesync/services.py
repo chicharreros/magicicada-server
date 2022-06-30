@@ -539,7 +539,7 @@ class StorageNode(VolumeObjectBase):
 
     def _load(self, with_content=True):
         """Load the object from the database base on the id."""
-        ob = self._gateway.get_node(self.id, with_content=with_content)
+        ob = self._gateway.get_node(self.id)
         self._copy(ob)
         return self
 
@@ -686,7 +686,7 @@ class FileNode(StorageNode):
     @fsync_readonly
     def get_content(self):
         """Return the FileNodeContent for this file."""
-        self._load()
+        self._load(with_content=True)
         return self._gateway.get_content(self.content_hash)
 
     @retryable_transaction()
@@ -1021,9 +1021,9 @@ class VolumeProxy(object):
         The return value is a tuple of (generation, free_bytes, [nodes])
         """
         volume = self.gateway.get_user_volume()
-        nodes = self.gateway.get_all_nodes(start_from_path=start_from_path,
-                                           limit=limit,
-                                           max_generation=max_generation)
+        nodes = self.gateway.get_all_nodes(
+            start_from_path=start_from_path, limit=limit,
+            max_generation=max_generation, with_content=True)
         return (volume.generation, self.user.free_bytes, nodes)
 
     @retryable_transaction()
@@ -1267,7 +1267,7 @@ class SystemGateway(GatewayBase):
 
         user = self.get_user(node.volume.owner.id, ignore_lock=True)
         gw = ReadWriteVolumeGateway(user)
-        node = gw.get_node(node.id, with_content=True)
+        node = gw.get_node(node.id)
         if not node.is_public:
             # We raise DoesNotExist instead of NoPermission here,
             # since it reveals information to the user that we don't
@@ -1377,7 +1377,8 @@ class SystemGateway(GatewayBase):
     def get_node(self, node_id):
         """Get a node for the specified node_id."""
         node = get_object_or_none(
-            StorageObject, status=STATUS_LIVE, id=node_id)
+            StorageObject.objects.select_related('content_blob'),
+            status=STATUS_LIVE, id=node_id)
         if node is None:
             raise errors.DoesNotExist(self.node_dne_error)
         return StorageNode.factory(None, node, permissions={})
@@ -2195,7 +2196,7 @@ class ReadOnlyVolumeGateway(GatewayBase):
         if id == 'root':
             id = self._get_root_node().id
         nodes = StorageObject.objects.filter(id=id)
-        nodes = self._node_finder(nodes, with_content=with_content)
+        nodes = self._node_finder(nodes, with_content=True)
         node = self._get_node_from_result(nodes)
         if node is None:
             raise errors.DoesNotExist(self.node_dne_error)
@@ -2226,7 +2227,7 @@ class ReadOnlyVolumeGateway(GatewayBase):
         nodes = StorageObject.objects.filter(
             path=path, name=name, volume__id=self.volume_id)
         nodes = self._get_kind(nodes, kind)
-        result = self._node_finder(nodes, with_content)
+        result = self._node_finder(nodes, with_content=True)
         node = self._get_node_from_result(result)
         if node is None:
             raise errors.DoesNotExist(self.node_dne_error)
@@ -2295,7 +2296,7 @@ class ReadOnlyVolumeGateway(GatewayBase):
     @timing_metric
     def get_child_by_name(self, id, name, with_content=True):
         """Get a Child by Name returning a StorageNode."""
-        children = self._get_children(id, with_content=with_content)
+        children = self._get_children(id, with_content=True)
         nodes = children.filter(name=name)
         node = self._get_node_from_result(nodes)
         if node is None:
@@ -2570,7 +2571,8 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
         """Restore a deleted a node."""
         if self.read_only:
             raise errors.NoPermission(self.readonly_error)
-        node = self._get_node_simple(node_id, live_only=False)
+        node = self._get_node_simple(
+            node_id, live_only=False, with_content=True)
         if node.status == STATUS_LIVE:
             return
         node.undelete()
@@ -2628,7 +2630,7 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
         """Move a node to a new parent, or rename it."""
         if self.read_only:
             raise errors.NoPermission(self.readonly_error)
-        node = self._get_node_simple(node_id)
+        node = self._get_node_simple(node_id, with_content=True)
         if node is None:
             raise errors.DoesNotExist(self.node_dne_error)
         is_move = node.parent_id != parent_id
@@ -2793,7 +2795,7 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
 
         If there is no storage_key, we must have an existing content.
         """
-        fnode = self._get_node_simple(file_id)
+        fnode = self._get_node_simple(file_id, with_content=True)
         if fnode is None:
             raise errors.DoesNotExist("The file no longer exists.")
         if fnode.content_hash != original_hash:
@@ -2846,7 +2848,7 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
         if self.share:
             raise errors.NoPermission("Can't make shared files public.")
 
-        fnode = self._get_node_simple(node_id)
+        fnode = self._get_node_simple(node_id, with_content=True)
         if fnode is None:
             raise errors.DoesNotExist(self.node_dne_error)
         if fnode.kind != StorageObject.FILE and allow_directory is False:

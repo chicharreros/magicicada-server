@@ -27,7 +27,6 @@ import uuid
 from django.conf import settings
 from django.utils.timezone import now
 
-from metrics.tests import FakeMetrics
 from magicicada.filesync import errors
 from magicicada.filesync.models import STATUS_LIVE, StorageObject
 from magicicada.filesync.resthelper import (
@@ -40,6 +39,7 @@ from magicicada.filesync.resthelper import (
     logger,
 )
 from magicicada.filesync.services import make_storage_user
+from magicicada.metrics.tests import FakeMetrics
 from magicicada.testing.testcase import BaseTestCase
 
 
@@ -593,8 +593,8 @@ class RestHelperTestCase(BaseTestCase):
         new_file_path = settings.ROOT_USERVOLUME_PATH + "/a/b/c/file.txt"
         info = self.helper.put_node(
             self.user, new_file_path,
-            {'kind': 'file', 'hash': cb.hash, 'magic_hash': 'magic'})
-        node = self.user.get_node_by_path(new_file_path)
+            {'kind': 'file', 'hash': cb.hash, 'magic_hash': cb.magic_hash})
+        node = self.user.get_node_by_path(new_file_path, with_content=True)
         self.assertEqual(node.kind, StorageObject.FILE)
         self.assertEqual(node.full_path, '/a/b/c/file.txt')
         self.assertEqual(info, self.mapper.node_repr(node))
@@ -606,17 +606,17 @@ class RestHelperTestCase(BaseTestCase):
         new_file_path = settings.ROOT_USERVOLUME_PATH + "/a/b/c/file.txt"
         info = self.helper.put_node(
             self.user, new_file_path,
-            {'kind': 'file', 'hash': cb.hash, 'magic_hash': 'magic'})
+            {'kind': 'file', 'hash': cb.hash, 'magic_hash': cb.magic_hash})
         cb = self.factory.make_content_blob(
             content="NewFakeContent", magic_hash=b'magic2')
         info = self.helper.put_node(
             self.user, new_file_path,
-            {'kind': 'file', 'hash': cb.hash, 'magic_hash': 'magic2'})
+            {'kind': 'file', 'hash': cb.hash, 'magic_hash': cb.magic_hash})
         node = self.user.get_node_by_path(new_file_path, with_content=True)
         self.assertEqual(node.kind, StorageObject.FILE)
         self.assertEqual(node.full_path, '/a/b/c/file.txt')
         self.assertEqual(info, self.mapper.node_repr(node))
-        self.assertEqual(node.content.magic_hash, 'magic2')
+        self.assertEqual(node.content.magic_hash, b'magic2')
 
     def test_PUT_node_new_file(self):
         """Test put_node to make a new file."""

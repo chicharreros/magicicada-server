@@ -1233,7 +1233,7 @@ class StorageObjectTestCase(BaseTestCase):
         user.recalculate_used_bytes()
         self.assertEqual(user.used_storage_bytes, expected_used)
 
-        for c in root.children.all():
+        for c in root.children.select_related('content_blob').all():
             c.unlink()
         self.assertEqual(user.used_bytes, expected_used * 2 / 3)
 
@@ -2090,8 +2090,8 @@ class ResumableUploadTest(BaseTestCase):
             10 * (2 ** 20), b'hash context', b'magic hash context', 55)
         self.assertEqual(upload.part_count, 1)
         self.assertEqual(upload.uploaded_bytes, 10 * (2 ** 20))
-        self.assertEqual(upload.hash_context, 'hash context')
-        self.assertEqual(upload.magic_hash_context, 'magic hash context')
+        self.assertEqual(upload.hash_context, b'hash context')
+        self.assertEqual(upload.magic_hash_context, b'magic hash context')
         self.assertEqual(upload.crc_context, 55)
 
 

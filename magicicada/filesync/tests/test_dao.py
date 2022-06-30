@@ -328,9 +328,11 @@ class VolumeProxyTestCase(StorageDALTestCase):
                 mimetype=mime)
 
         files = [mkfile(i) for i in range(10)]
-        nodes = user.volume().get_all_nodes(kind=StorageObject.FILE)
+        nodes = user.volume().get_all_nodes(kind=StorageObject.FILE,
+                                            with_content=True)
         self.assertEqual(nodes, files)
-        nodes = user.volume().get_all_nodes(mimetypes=['xxx'])
+        nodes = user.volume().get_all_nodes(mimetypes=['xxx'],
+                                            with_content=True)
         self.assertEqual(nodes, [])
         nodes = user.volume().get_all_nodes(mimetypes=[mime],
                                             with_content=True)
@@ -750,7 +752,7 @@ class DAOTestCase(StorageDALTestCase):
         deflated_size = 10000
         node = user.make_filepath_with_content(
             path, hash, crc, size, deflated_size, storage_key, mimetype=mime)
-        file = user.get_node(node.id, with_content=True)
+        file = user.get_node(node.id)
         self.assertEqual(file.name, 'filename.txt')
         self.assertEqual(file.full_path, '/a/b/c/filename.txt')
         self.assertEqual(file.mimetype, mime)

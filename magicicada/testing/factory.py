@@ -58,13 +58,13 @@ class Factory(object):
         return prefix + ''.join(
             random.choice(BASE_CHARS) for i in range(extra_length))
 
-    get_unique_unicode = get_unique_string
-
     def get_fake_hash(self, key=None):
         """Return a hashkey."""
         if key is None:
             key = str(uuid.uuid4())
-        return b'sha1:' + hashlib.sha1(key).hexdigest()
+        if isinstance(key, str):
+            key = key.encode('utf-8')
+        return ('sha1:' + hashlib.sha1(key).hexdigest()).encode('utf-8')
 
     def make_user(
             self, username=None, visible_name=None, max_storage_bytes=2 ** 20,
@@ -97,6 +97,9 @@ class Factory(object):
             hash = self.get_fake_hash(content)
         if storage_key is None:
             storage_key = uuid.uuid4()
+        assert content is None or isinstance(content, bytes)
+        assert isinstance(hash, bytes)
+        assert isinstance(magic_hash, bytes)
         return ContentBlob.objects.create(
             hash=hash, magic_hash=magic_hash, crc32=crc32, size=size,
             deflated_size=deflated_size, status=status, content=content,
