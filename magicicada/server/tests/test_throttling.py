@@ -20,7 +20,7 @@
 
 import os
 import zlib
-from io import StringIO
+from io import BytesIO
 
 from django.db import transaction
 from magicicadaprotocol import request, client
@@ -88,7 +88,7 @@ class TestThrottling(TestWithDatabase):
                 lambda mkfile_req: client.put_content(
                     request.ROOT,
                     mkfile_req.new_id, NO_CONTENT_HASH, hash_value,
-                    crc32_value, size, deflated_size, StringIO(deflated_data)),
+                    crc32_value, size, deflated_size, BytesIO(deflated_data)),
                 client.test_fail)
             d.addCallback(lambda _: client.get_content(
                           request.ROOT, self._state.req.new_id, hash_value))
@@ -121,7 +121,7 @@ class TestThrottling(TestWithDatabase):
             yield client.put_content(request.ROOT, mkfile_req.new_id,
                                      NO_CONTENT_HASH, hash_value, crc32_value,
                                      size, deflated_size,
-                                     StringIO(deflated_data))
+                                     BytesIO(deflated_data))
 
             # set the read limit, and get content
             client.factory.factory.readLimit = 1000
@@ -171,7 +171,7 @@ class TestThrottling(TestWithDatabase):
                         request.ROOT,
                         mkfile_req.new_id, NO_CONTENT_HASH, hash_value,
                         crc32_value, size, deflated_size,
-                        StringIO(deflated_data)),
+                        BytesIO(deflated_data)),
                     client.test_fail)
             d.addCallback(check_file)
             d.addCallbacks(client.test_done, client.test_fail)
@@ -222,7 +222,7 @@ class TestThrottling(TestWithDatabase):
                 lambda mkfile_req: client.put_content(
                     request.ROOT, mkfile_req.new_id, NO_CONTENT_HASH,
                     hash_value, crc32_value, size, deflated_size,
-                    StringIO(deflated_data)),
+                    BytesIO(deflated_data)),
                 client.test_fail)
             return d
         d1 = defer.Deferred()

@@ -20,7 +20,7 @@
 
 import uuid
 import zlib
-from io import StringIO
+from io import BytesIO
 
 from magicicadaprotocol import errors as protocol_errors, request
 from magicicadaprotocol.content_hash import content_hash_factory, crc32
@@ -689,7 +689,7 @@ class TestSharesWithData(TestWithDatabase):
 
     def test_get_content_on_share(self):
         """read a file on a share."""
-        data = ""
+        data = b""
         deflated_data = zlib.compress(data)
         hash_object = content_hash_factory()
         hash_object.update(data)
@@ -706,7 +706,7 @@ class TestSharesWithData(TestWithDatabase):
                 lambda r: client.put_content(
                     self.share_modify, self.filerw, NO_CONTENT_HASH,
                     hash_value, crc32_value, size, deflated_size,
-                    StringIO(deflated_data)))
+                    BytesIO(deflated_data)))
             d.addCallback(
                 lambda r: client.get_content(
                     self.share_modify, self.filerw, EMPTY_HASH))
@@ -716,7 +716,7 @@ class TestSharesWithData(TestWithDatabase):
 
     def test_put_content_on_share(self):
         """write a file on a share."""
-        data = "*" * 100000
+        data = b"*" * 100000
         deflated_data = zlib.compress(data)
         hash_object = content_hash_factory()
         hash_object.update(data)
@@ -732,14 +732,14 @@ class TestSharesWithData(TestWithDatabase):
                 lambda r: client.put_content(
                     self.share_modify, self.filerw, NO_CONTENT_HASH,
                     hash_value, crc32_value, size, deflated_size,
-                    StringIO(deflated_data)))
+                    BytesIO(deflated_data)))
             d.addCallbacks(client.test_done, client.test_fail)
 
         return self.callback_test(auth)
 
     def test_put_content_on_share_ro(self):
         """Write a file on a share thats read only."""
-        data = "*" * 100000
+        data = b"*" * 100000
         hash_object = content_hash_factory()
         hash_object.update(data)
         hash_value = hash_object.content_hash()
@@ -752,7 +752,7 @@ class TestSharesWithData(TestWithDatabase):
             d.addCallback(
                 lambda r: client.put_content(
                     self.share, self.filero, NO_CONTENT_HASH, hash_value,
-                    crc32_value, size, StringIO(data)))
+                    crc32_value, size, BytesIO(data)))
             d.addCallbacks(client.test_fail, lambda x: client.test_done())
 
         return self.callback_test(auth)

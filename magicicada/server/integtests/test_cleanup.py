@@ -25,7 +25,7 @@ from twisted.internet import reactor, defer
 
 from magicicada.server.testing.aq_helpers import (
     NO_CONTENT_HASH,
-    NoCloseStringIO,
+    NoCloseBytesIO,
     TestContentBase,
     anEmptyShareList,
     anUUID,
@@ -215,7 +215,7 @@ class TestCleanup(TestContentBase):
         """Download."""
         hash_value, _, _, d = self._mk_file_w_content('hola.txt')
         mdid, node_id = yield d
-        buf = NoCloseStringIO()
+        buf = NoCloseBytesIO()
         self.patch(self.main.fs, 'get_partial_for_writing', lambda s, n: buf)
 
         self.aq.download('', node_id, hash_value, mdid)

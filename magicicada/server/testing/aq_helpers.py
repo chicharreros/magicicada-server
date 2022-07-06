@@ -24,7 +24,7 @@ import shutil
 import time
 import uuid
 from functools import partial, total_ordering
-from io import StringIO
+from io import BytesIO
 
 import dbus
 import dbus.service
@@ -80,8 +80,8 @@ def show_time():
     return "%s,%s" % (p1, p2)
 
 
-class NoCloseStringIO(StringIO):
-    """a stringio subclass that doesnt destroy content on close."""
+class NoCloseBytesIO(BytesIO):
+    """A BytesIO subclass that doesnt destroy content on close."""
     def close(self):
         """do nothing"""
         pass
@@ -698,7 +698,7 @@ class TestContentBase(TestBase):
         hash_value = hash_object.content_hash()
         crc32_value = crc32(data)
         size = len(data)
-        return NoCloseStringIO(data), data, hash_value, crc32_value, size
+        return NoCloseBytesIO(data), data, hash_value, crc32_value, size
 
     def _mk_file_w_content(self, filename='hola', data_len=1000):
         """Make a file and dump some content in it."""

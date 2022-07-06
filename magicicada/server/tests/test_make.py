@@ -20,7 +20,7 @@
 
 import uuid
 import zlib
-from io import StringIO
+from io import BytesIO
 
 from magicicadaprotocol import request, volumes
 from magicicadaprotocol.content_hash import content_hash_factory, crc32
@@ -177,7 +177,7 @@ class TestMakeFile(TestWithDatabase):
             d.addCallback(lambda r: client.make_file(request.ROOT, r, "hola"))
             d.addCallback(lambda req: client.put_content(request.ROOT,
                           req.new_id, NO_CONTENT_HASH, hash_value, crc32_value,
-                          size, deflated_size, StringIO(deflated_data)))
+                          size, deflated_size, BytesIO(deflated_data)))
             d.addCallback(lambda r: client.make_file(request.ROOT,
                                                      self._state.root, "hola"))
             d.addCallbacks(

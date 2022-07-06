@@ -19,7 +19,7 @@
 """Test cancellation of the action queue's commands."""
 
 import os
-from io import StringIO
+from io import BytesIO
 
 from magicicadaclient.syncdaemon.marker import MDMarker as Marker
 from magicicadaprotocol import request
@@ -168,7 +168,7 @@ class TestCancel(AQCancelTestBase):
     def test_download(self):
         """Hiccup the network in the middle of a download."""
         self.patch(self.main.fs, 'get_partial_for_writing',
-                   lambda s, n: StringIO())
+                   lambda s, n: BytesIO())
         hash_value, _, _, d = self._mk_file_w_content()
         mdid, node_id = yield d
 
@@ -195,7 +195,7 @@ class TestCancel(AQCancelTestBase):
         hash_value = hash_object.content_hash()
         crc32_value = crc32(data)
         size = len(data)
-        self.patch(self.main.fs, 'open_file', lambda mdid: StringIO(data))
+        self.patch(self.main.fs, 'open_file', lambda mdid: BytesIO(data))
         mdid, node_id = yield self._mkfile('hola')
 
         def worker():

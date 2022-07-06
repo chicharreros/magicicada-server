@@ -24,7 +24,7 @@ Base classes to do all the testing.
 import logging
 import time
 from functools import wraps
-from io import StringIO
+from io import BytesIO
 
 from magicicadaprotocol import client, request, protocol_pb2
 from magicicadaprotocol.client import StorageClientFactory, StorageClient
@@ -378,7 +378,7 @@ class BufferedConsumer(object):
         """Create a BufferedConsumer."""
         self.producer = bytes_producer
         self.producer.consumer = self
-        self.buffer = StringIO()
+        self.buffer = BytesIO()
 
     def resumeProducing(self):
         """IPushProducer interface."""

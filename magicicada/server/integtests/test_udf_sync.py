@@ -20,7 +20,7 @@
 
 import os
 import subprocess
-from io import StringIO
+from io import BytesIO, StringIO
 
 from twisted.internet import reactor, defer
 from twisted.python.failure import Failure
@@ -149,7 +149,7 @@ class TestUDFServerBase(TestUDFSync, test_sync.TestServerBase):
                                                       parent, filename))
         d.addCallback(lambda mk: self.client.put_content(
             volume_id, mk.new_id, NO_CONTENT_HASH, hash_value, crc32_value, 0,
-            deflated_size, StringIO(deflated_content)))
+            deflated_size, BytesIO(deflated_content)))
         d.addCallback(lambda _:
                       self.main.wait_for_nirvana(last_event_interval=1))
         d.addCallback(lambda _: self.check(udf_name + '_dir',
@@ -245,7 +245,7 @@ class TestUDFServerMove(TestUDFServerBase):
         yield self.client.put_content(self.my_udf_id, req.new_id,
                                       NO_CONTENT_HASH, hash_value, crc32_value,
                                       0, deflated_size,
-                                      StringIO(deflated_content))
+                                      BytesIO(deflated_content))
         yield self.main.wait_for_nirvana(last_event_interval=.5)
         yield self.client.move(self.my_udf_id, req.new_id,
                                self.my_udf.node_id, "test_file_moved")

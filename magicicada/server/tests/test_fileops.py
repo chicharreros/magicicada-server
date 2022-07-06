@@ -18,7 +18,7 @@
 
 """Test file operations."""
 
-from io import StringIO
+from io import BytesIO
 
 from magicicadaprotocol import errors as protocol_errors, request
 from magicicadaprotocol.content_hash import content_hash_factory, crc32
@@ -357,7 +357,7 @@ class TestUnlink(TestWithDatabase):
     def test_putcontent_unlinked(self):
         """Try to put content in an unlinked file."""
         empty_hash = content_hash_factory().content_hash()
-        data = "*"
+        data = b"*"
         size = 1
         hash_object = content_hash_factory()
         hash_object.update(data)
@@ -378,7 +378,7 @@ class TestUnlink(TestWithDatabase):
             # try to put content
             d.addCallback(lambda _: client.put_content(
                 request.ROOT, self._state.file, empty_hash, hash_value,
-                crc32_value, size, StringIO(data)))
+                crc32_value, size, BytesIO(data)))
             d.addCallbacks(client.test_fail, lambda x: client.test_done("ok"))
         return self.callback_test(auth)
 

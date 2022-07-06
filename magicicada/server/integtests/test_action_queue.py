@@ -18,10 +18,10 @@
 
 """Test the action queue."""
 
-import io
 import os
 import uuid
 import zlib
+from io import BytesIO
 
 from magicicadaclient.syncdaemon.states import (
     StateManager, QueueManager, ConnectionManager)
@@ -39,7 +39,7 @@ from twisted.internet import defer, reactor
 from magicicada.server.testing.aq_helpers import (
     FakeFailure,
     NO_CONTENT_HASH,
-    NoCloseStringIO,
+    NoCloseBytesIO,
     TestBase,
     TestContentBase,
     TestWithDatabase,
@@ -422,7 +422,7 @@ class TestContent(TestContentBase):
     @defer.inlineCallbacks
     def test_upload(self):
         """Test we can upload stuff."""
-        buf = NoCloseStringIO()
+        buf = NoCloseBytesIO()
         self.patch(self.main.fs, 'get_partial_for_writing', lambda s, n: buf)
 
         hash_value, _, data, d = self._mk_file_w_content()
@@ -447,7 +447,7 @@ class TestContent(TestContentBase):
             mdid, node_id = node_data
 
             # download it
-            buf = NoCloseStringIO()
+            buf = NoCloseBytesIO()
             self.patch(self.main.fs, 'get_partial_for_writing',
                        lambda s, n: buf)
             yield self.aq.download(request.ROOT, node_id, hash_value, mdid)
@@ -480,7 +480,7 @@ class TestContent(TestContentBase):
             """
             def __init__(self):
                 self.name = 'dummy-will-be-ignored'
-                self.tempfile = io.StringIO()
+                self.tempfile = BytesIO()
                 commands.append([x for x in outer_self.aq.queue.waiting
                                  if isinstance(x, Upload)][0])
                 self.all_read = 0
@@ -608,12 +608,12 @@ class TestContent(TestContentBase):
         outer_self = self
 
         class Foo(object):
-            """A proxy for NoCloseStringIO.
+            """A proxy for NoCloseBytesIO.
 
             Disconnects the network after the second write.
             """
             def __init__(self):
-                self.buf = NoCloseStringIO()
+                self.buf = NoCloseBytesIO()
                 self.writes = 0
 
             def write(self, data):
@@ -733,12 +733,12 @@ class TestCancel(TestContentBase):
         """Test we can cancel downloads."""
         outer_self = self
 
-        class MyFile(NoCloseStringIO):
-            """A NoCloseStringIO that cancels on the first call to write"""
+        class MyFile(NoCloseBytesIO):
+            """A NoCloseBytesIO that cancels on the first call to write"""
             def write(self, data):
                 """Cancel the request, and then go on and write."""
                 outer_self.aq.cancel_download(request.ROOT, self.file_id)
-                NoCloseStringIO.write(self, data)
+                NoCloseBytesIO.write(self, data)
         hash_v, crc32_v, data, d = self._mk_file_w_content(data_len=1024 * 256)
         myfile = MyFile()
         self.patch(self.main.fs, 'get_partial_for_writing',

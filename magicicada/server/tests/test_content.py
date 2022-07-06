@@ -22,7 +22,8 @@ import logging
 import os
 import uuid
 import zlib
-from io import StringIO
+from io import BytesIO
+from unittest import mock
 
 from magicicadaprotocol import (
     request,
@@ -125,7 +126,7 @@ class TestGetContent(TestWithDatabase):
 
     def test_getcontent_empty_file(self):
         """Make sure get content of empty files work."""
-        data = ""
+        data = b""
         deflated_data = zlib.compress(data)
         hash_object = content_hash_factory()
         hash_object.update(data)
@@ -147,7 +148,7 @@ class TestGetContent(TestWithDatabase):
             d.addCallback(self.save_req, 'req')
             d.addCallback(lambda r: client.put_content(
                 request.ROOT, r.new_id, NO_CONTENT_HASH, hash_value,
-                crc32_value, size, deflated_size, StringIO(deflated_data)))
+                crc32_value, size, deflated_size, BytesIO(deflated_data)))
             d.addCallback(lambda _: client.get_content(
                           request.ROOT, self._state.req.new_id, EMPTY_HASH))
             d.addCallback(check_file)
@@ -157,7 +158,7 @@ class TestGetContent(TestWithDatabase):
 
     def test_getcontent_file(self, check_file_content=True):
         """Get the content from a file."""
-        data = "*" * 100000
+        data = b"*" * 100000
         deflated_data = zlib.compress(data)
         hash_object = content_hash_factory()
         hash_object.update(data)
@@ -181,7 +182,7 @@ class TestGetContent(TestWithDatabase):
                 lambda mkfile_req: client.put_content(
                     request.ROOT, mkfile_req.new_id, NO_CONTENT_HASH,
                     hash_value, crc32_value, size, deflated_size,
-                    StringIO(deflated_data)),
+                    BytesIO(deflated_data)),
                 client.test_fail)
             d.addCallback(lambda _: client.get_content(
                           request.ROOT, self._state.req.new_id, hash_value))
@@ -277,7 +278,7 @@ class TestGetContent(TestWithDatabase):
                 lambda mkfile_req: client.put_content(
                     request.ROOT,
                     mkfile_req.new_id, NO_CONTENT_HASH, hash_value,
-                    crc32_value, size, deflated_size, StringIO(deflated_data)),
+                    crc32_value, size, deflated_size, BytesIO(deflated_data)),
                 client.test_fail)
             d.addCallback(lambda _: client.get_content_request(request.ROOT,
                           self._state.req.new_id, hash_value, 0, hc.cancel))
@@ -357,7 +358,7 @@ class TestGetContent(TestWithDatabase):
                 lambda mkfile_req: client.put_content(
                     request.ROOT,
                     mkfile_req.new_id, NO_CONTENT_HASH, hash_value,
-                    crc32_value, size, deflated_size, StringIO(deflated_data)),
+                    crc32_value, size, deflated_size, BytesIO(deflated_data)),
                 client.test_fail)
             d.addCallback(lambda _: client.get_content_request(request.ROOT,
                           self._state.req.new_id, hash_value, 0, hc.cancel))
@@ -366,7 +367,7 @@ class TestGetContent(TestWithDatabase):
 
     def test_getcontent_cancel_after_download(self):
         """Start to get the content from a file, and cancel in the middle"""
-        data = "*" * 100000
+        data = b"*" * 100000
         deflated_data = zlib.compress(data)
         hash_object = content_hash_factory()
         hash_object.update(data)
@@ -411,7 +412,7 @@ class TestGetContent(TestWithDatabase):
                 lambda mkfile_req: client.put_content(
                     request.ROOT,
                     mkfile_req.new_id, NO_CONTENT_HASH, hash_value,
-                    crc32_value, size, deflated_size, StringIO(deflated_data)),
+                    crc32_value, size, deflated_size, BytesIO(deflated_data)),
                 client.test_fail)
             d.addCallback(lambda _: client.get_content_request(request.ROOT,
                           self._state.req.new_id, hash_value, 0, hc.cancel))
@@ -512,7 +513,7 @@ class TestPutContent(TestWithDatabase):
                 lambda mkfile_req: client.put_content_request(
                     request.ROOT, mkfile_req.new_id, NO_CONTENT_HASH,
                     hash_value, crc32_value, size, deflated_size,
-                    StringIO(deflated_data)))
+                    BytesIO(deflated_data)))
             d.addCallback(cancel_it)
 
             def wait_and_trap(req):
@@ -548,7 +549,7 @@ class TestPutContent(TestWithDatabase):
                 lambda mkfile_req: client.put_content_request(
                     request.ROOT, mkfile_req.new_id, NO_CONTENT_HASH,
                     hash_value, crc32_value, size, deflated_size,
-                    StringIO(deflated_data)))
+                    BytesIO(deflated_data)))
             d.addCallback(self.save_req, 'request')
             d.addCallback(lambda _: self._state.request.deferred)
             d.addCallback(lambda _: self._state.request.cancel())
@@ -576,7 +577,7 @@ class TestPutContent(TestWithDatabase):
                 def __init__(innerself):
                     innerself.notifs = 0
                     innerself.request = None
-                    innerself.data = StringIO(deflated_data)
+                    innerself.data = BytesIO(deflated_data)
 
                 def store_request(innerself, request):
                     innerself.request = request
@@ -639,7 +640,7 @@ class TestPutContent(TestWithDatabase):
                 yield client.put_content(request.ROOT, mkfile_req.new_id,
                                          NO_CONTENT_HASH, hash_value,
                                          crc32_value, size, deflated_size,
-                                         StringIO(deflated_data))
+                                         BytesIO(deflated_data))
 
                 try:
                     self.usr0.volume().get_content(hash_value)
@@ -675,7 +676,7 @@ class TestPutContent(TestWithDatabase):
             d.addCallbacks(
                 lambda _: client.put_content(
                     request.ROOT, file_id, NO_CONTENT_HASH, hash_value,
-                    crc32_value, size, deflated_size, StringIO(deflated_data)),
+                    crc32_value, size, deflated_size, BytesIO(deflated_data)),
                 client.test_fail)
             d.addCallbacks(client.test_done, client.test_fail)
             return d
@@ -697,7 +698,7 @@ class TestPutContent(TestWithDatabase):
 
     def test_putcontent_twice_simple(self):
         """Test putting content twice."""
-        data = "*" * 100
+        data = b"*" * 100
         deflated_data = zlib.compress(data)
         hash_object = content_hash_factory()
         hash_object.update(data)
@@ -726,18 +727,18 @@ class TestPutContent(TestWithDatabase):
             d.addCallback(self.save_req, "file")
             d.addCallback(lambda req: client.put_content(
                 request.ROOT, req.new_id, NO_CONTENT_HASH, hash_value,
-                crc32_value, size, deflated_size, StringIO(deflated_data)))
+                crc32_value, size, deflated_size, BytesIO(deflated_data)))
             d.addCallback(lambda _: client.put_content(request.ROOT,
                           self._state.file.new_id, hash_value, hash_value,
                           crc32_value, size, deflated_size,
-                          StringIO(deflated_data)))
+                          BytesIO(deflated_data)))
             d.addCallback(check_file)
             d.addCallbacks(client.test_done, client.test_fail)
         return self.callback_test(auth)
 
     def test_putcontent_twice_samefinal(self):
         """Test putting content twice."""
-        data = "*" * 100
+        data = b"*" * 100
         deflated_data = zlib.compress(data)
         hash_object = content_hash_factory()
         hash_object.update(data)
@@ -766,13 +767,13 @@ class TestPutContent(TestWithDatabase):
             d.addCallback(self.save_req, "file")
             d.addCallback(lambda req: client.put_content(
                 request.ROOT, req.new_id, NO_CONTENT_HASH, hash_value,
-                crc32_value, size, deflated_size, StringIO(deflated_data)))
+                crc32_value, size, deflated_size, BytesIO(deflated_data)))
 
             # don't care about previous hash, as long the final hash is ok
             d.addCallback(lambda _: client.put_content(
                 request.ROOT, self._state.file.new_id, NO_CONTENT_HASH,
                 hash_value, crc32_value, size, deflated_size,
-                StringIO(deflated_data)))
+                BytesIO(deflated_data)))
             d.addCallback(check_file)
             d.addCallbacks(client.test_done, client.test_fail)
         return self.callback_test(auth)
@@ -781,7 +782,7 @@ class TestPutContent(TestWithDatabase):
                hash_value=None, crc32_value=None, size=None):
         """Base function to create tests of wrong hints."""
         if data is None:
-            data = "*" * 1000
+            data = b"*" * 1000
         deflated_data = zlib.compress(data)
         if previous_hash is None:
             previous_hash = content_hash_factory().content_hash()
@@ -804,7 +805,7 @@ class TestPutContent(TestWithDatabase):
             d.addCallbacks(
                 lambda mkfile_req: client.put_content(
                     request.ROOT, mkfile_req.new_id, previous_hash, hash_value,
-                    crc32_value, size, deflated_size, StringIO(deflated_data)),
+                    crc32_value, size, deflated_size, BytesIO(deflated_data)),
                 client.test_fail)
             d.addCallbacks(client.test_fail, lambda r: client.test_done("ok"))
         return auth
@@ -831,7 +832,7 @@ class TestPutContent(TestWithDatabase):
 
     def test_putcontent_notify(self):
         """Make sure put_content generates a notification."""
-        data = "*" * 100000
+        data = b"*" * 100000
         deflated_data = zlib.compress(data)
         hash_object = content_hash_factory()
         hash_object.update(data)
@@ -850,7 +851,7 @@ class TestPutContent(TestWithDatabase):
                 lambda mkfile_req: client.put_content(
                     request.ROOT,
                     mkfile_req.new_id, NO_CONTENT_HASH, hash_value,
-                    crc32_value, size, deflated_size, StringIO(deflated_data)),
+                    crc32_value, size, deflated_size, BytesIO(deflated_data)),
                 client.test_fail)
             d.addCallbacks(client.test_done, client.test_fail)
         return self.callback_test(auth)
@@ -898,7 +899,7 @@ class TestPutContent(TestWithDatabase):
                 def __init__(innerself):
                     innerself.notifs = 0
                     innerself.request = None
-                    innerself.data = StringIO(deflated_data)
+                    innerself.data = BytesIO(deflated_data)
                     innerself.node_id = None
 
                 def save_node(innerself, node):
@@ -974,7 +975,7 @@ class TestPutContent(TestWithDatabase):
                 lambda mkfile_req: client.put_content(
                     request.ROOT, mkfile_req.new_id, NO_CONTENT_HASH,
                     hash_value, crc32_value, size, deflated_size,
-                    StringIO(deflated_data)),
+                    BytesIO(deflated_data)),
                 client.test_fail)
             d.addCallback(check_used_bytes)
             d.addCallbacks(client.test_done, client.test_fail)
@@ -1015,7 +1016,7 @@ class TestPutContent(TestWithDatabase):
 
             # put content and check
             args = (request.ROOT, make_req.new_id, NO_CONTENT_HASH, hash_value,
-                    crc32_value, size, deflated_size, StringIO(deflated_data))
+                    crc32_value, size, deflated_size, BytesIO(deflated_data))
             putc_req = yield client.put_content(*args)
             self.assertEqual(putc_req.new_generation,
                              make_req.new_generation + 1)
@@ -1045,7 +1046,7 @@ class TestPutContent(TestWithDatabase):
 
             # put content and check
             args = (request.ROOT, make_req.new_id, NO_CONTENT_HASH, hash_value,
-                    crc32_value, size, deflated_size, StringIO(deflated_data))
+                    crc32_value, size, deflated_size, BytesIO(deflated_data))
             try:
                 yield client.put_content(*args)
             except Exception as ex:
@@ -1115,7 +1116,7 @@ class TestPutContent(TestWithDatabase):
             yield client.put_content(request.ROOT, mkfile_req.new_id,
                                      NO_CONTENT_HASH, hash_value, crc32_value,
                                      size, deflated_size,
-                                     StringIO(deflated_data))
+                                     BytesIO(deflated_data))
         d = self.callback_test(test, add_default_callbacks=True)
         self.assertFails(d, 'UPLOAD_CORRUPT')
         return d
@@ -1387,7 +1388,7 @@ class TestPutContent(TestWithDatabase):
         """Put content to a file."""
         return client.put_content_request(
             request.ROOT, new_id, NO_CONTENT_HASH, hash_value, crc32_value,
-            size, len(deflated_data), StringIO(deflated_data),
+            size, len(deflated_data), BytesIO(deflated_data),
             magic_hash=magic_hash)
 
     @defer.inlineCallbacks
@@ -1478,7 +1479,7 @@ class TestPutContent(TestWithDatabase):
             yield client.put_content(request.ROOT, mkfile_req.new_id,
                                      NO_CONTENT_HASH, hash_value, crc32_value,
                                      size, deflated_size,
-                                     StringIO(deflated_data))
+                                     BytesIO(deflated_data))
 
             content_blob = self.usr0.volume().get_content(hash_value)
             self.assertEqual(content_blob.magic_hash, magic_hash_value)
@@ -1487,7 +1488,7 @@ class TestPutContent(TestWithDatabase):
 
     def test_putcontent_blob_exists(self):
         """Test putting content with an existing blob (no magic)."""
-        data = "*" * 100
+        data = b"*" * 100
         deflated_data = zlib.compress(data)
         hash_object = content_hash_factory()
         hash_object.update(data)
@@ -1513,7 +1514,7 @@ class TestPutContent(TestWithDatabase):
             req = yield client.make_file(request.ROOT, root_id, "hola")
             yield client.put_content(request.ROOT, req.new_id, NO_CONTENT_HASH,
                                      hash_value, crc32_value, size,
-                                     deflated_size, StringIO(deflated_data))
+                                     deflated_size, BytesIO(deflated_data))
 
             # check it has content ok
             self.usr0.volume().get_content(hash_value)
@@ -1530,7 +1531,7 @@ class TestPutContent(TestWithDatabase):
         crc32_value = crc32(data)
         size = len(data)
         deflated_size = len(deflated_data)
-        file_obj = StringIO(deflated_data)
+        file_obj = BytesIO(deflated_data)
 
         @defer.inlineCallbacks
         def test(client):
@@ -1554,7 +1555,7 @@ class TestPutContent(TestWithDatabase):
         crc32_value = crc32(data)
         size = len(data)
         deflated_size = len(deflated_data)
-        file_obj = StringIO(deflated_data)
+        file_obj = BytesIO(deflated_data)
 
         @defer.inlineCallbacks
         def test(client):
@@ -1622,7 +1623,7 @@ class TestMultipartPutContent(TestWithDatabase):
                 yield client.put_content(request.ROOT, mkfile_req.new_id,
                                          NO_CONTENT_HASH, hash_value,
                                          crc32_value, size, deflated_size,
-                                         StringIO(deflated_data))
+                                         BytesIO(deflated_data))
 
                 try:
                     self.usr0.volume().get_content(hash_value)
@@ -1695,7 +1696,7 @@ class TestMultipartPutContent(TestWithDatabase):
             yield client.put_content(
                 request.ROOT, mkfile_req.new_id, NO_CONTENT_HASH,
                 hash_value, crc32_value, size, deflated_size,
-                StringIO(deflated_data),
+                BytesIO(deflated_data),
                 upload_id_cb=lambda *a: upload_info.append(a))
         except EOFError:
             # check upload stat and log, with the offset sent,
@@ -1735,7 +1736,7 @@ class TestMultipartPutContent(TestWithDatabase):
         req = sp_client.PutContent(
             client, request.ROOT, mkfile_req.new_id, NO_CONTENT_HASH,
             hash_value, crc32_value, size, deflated_size,
-            StringIO(deflated_data), upload_id=str(upload_info[0][0]))
+            BytesIO(deflated_data), upload_id=str(upload_info[0][0]))
         req.start()
         yield req.deferred
 
@@ -1794,7 +1795,7 @@ class TestMultipartPutContent(TestWithDatabase):
             req = client.put_content_request(
                 request.ROOT, mkfile_req.new_id, NO_CONTENT_HASH,
                 hash_value, crc32_value, size, deflated_size,
-                StringIO(deflated_data), upload_id="invalid id",
+                BytesIO(deflated_data), upload_id="invalid id",
                 upload_id_cb=lambda *a: upload_info.append(a))
             yield req.deferred
             self.assertTrue(('UploadJob.upload', 0) in gauge)
@@ -1830,7 +1831,7 @@ class TestMultipartPutContent(TestWithDatabase):
             yield client.put_content(request.ROOT, mkfile_req.new_id,
                                      NO_CONTENT_HASH, hash_value, crc32_value,
                                      size, deflated_size,
-                                     StringIO(deflated_data))
+                                     BytesIO(deflated_data))
 
             content_blob = self.usr0.volume().get_content(hash_value)
             self.assertEqual(content_blob.magic_hash, magic_hash_value)
@@ -1862,7 +1863,7 @@ class TestMultipartPutContent(TestWithDatabase):
 
             # put content and check
             args = (request.ROOT, make_req.new_id, NO_CONTENT_HASH, hash_value,
-                    crc32_value, size, deflated_size, StringIO(deflated_data))
+                    crc32_value, size, deflated_size, BytesIO(deflated_data))
             try:
                 putc_req = client.put_content_request(*args)
                 yield putc_req.deferred
@@ -1906,7 +1907,7 @@ class TestMultipartPutContent(TestWithDatabase):
             d.addCallback(self.save_req, "file")
             d.addCallback(lambda req: client.put_content(
                 request.ROOT, req.new_id, NO_CONTENT_HASH, hash_value,
-                crc32_value, size, deflated_size, StringIO(deflated_data)))
+                crc32_value, size, deflated_size, BytesIO(deflated_data)))
             d.addCallback(check_file)
             d.addCallbacks(client.test_done, client.test_fail)
         return self.callback_test(auth)
@@ -1921,7 +1922,7 @@ class TestMultipartPutContent(TestWithDatabase):
         crc32_value = crc32(data)
         size = len(data)
         deflated_size = len(deflated_data)
-        file_obj = StringIO(deflated_data)
+        file_obj = BytesIO(deflated_data)
 
         @defer.inlineCallbacks
         def test(client):
@@ -2055,7 +2056,7 @@ class TestPutContentInternalError(TestWithDatabase):
 
             d = client.put_content(
                 request.ROOT, mkfile_req.new_id, NO_CONTENT_HASH, hash_value,
-                crc32_value, size, deflated_size, StringIO(deflated_data))
+                crc32_value, size, deflated_size, BytesIO(deflated_data))
             yield self.assertFailure(d, protoerrors.InternalError)
 
         yield self.callback_test(auth, add_default_callbacks=True)
@@ -2128,7 +2129,7 @@ class TestChunkedContent(TestWithDatabase):
             d.addCallback(_get_fail)
             d.addCallback(lambda mkfile_req: client.put_content(
                 request.ROOT, mkfile_req.new_id, NO_CONTENT_HASH, hash_value,
-                crc32_value, size, deflated_size, StringIO(deflated_data)))
+                crc32_value, size, deflated_size, BytesIO(deflated_data)))
             d.addCallback(lambda _: client.get_content(request.ROOT,
                                                        self._state.req.new_id,
                                                        hash_value))
@@ -2180,7 +2181,7 @@ class TestChunkedContent(TestWithDatabase):
             mkfile_req = yield client.make_file(request.ROOT, root, "hola")
             putcontent_req = yield client.put_content_request(
                 request.ROOT, mkfile_req.new_id, NO_CONTENT_HASH, hash_value,
-                crc32_value, size, deflated_size, StringIO(deflated_data))
+                crc32_value, size, deflated_size, BytesIO(deflated_data))
             yield putcontent_req.deferred
 
             # check calls; there should be only 2, as size == chunk size * 2.5
@@ -2898,7 +2899,7 @@ class TestContent(TestWithDatabase):
 
     def test_getcontent(self):
         """Get the content from a file."""
-        data = "*" * 100000
+        data = b"*" * 100000
         deflated_data = zlib.compress(data)
         hash_object = content_hash_factory()
         hash_object.update(data)
@@ -2922,7 +2923,7 @@ class TestContent(TestWithDatabase):
                 lambda mkfile_req: client.put_content(
                     request.ROOT, mkfile_req.new_id, NO_CONTENT_HASH,
                     hash_value, crc32_value, size, deflated_size,
-                    StringIO(deflated_data)),
+                    BytesIO(deflated_data)),
                 client.test_fail)
             d.addCallback(lambda _: client.get_content(
                           request.ROOT, self._state.req.new_id, hash_value))
@@ -2963,7 +2964,7 @@ class TestContent(TestWithDatabase):
                 lambda mkfile_req: client.put_content(
                     request.ROOT, mkfile_req.new_id, NO_CONTENT_HASH,
                     hash_value, crc32_value, size, deflated_size,
-                    StringIO(deflated_data)),
+                    BytesIO(deflated_data)),
                 client.test_fail)
             d.addCallback(check_file)
             d.addCallbacks(client.test_done, client.test_fail)
