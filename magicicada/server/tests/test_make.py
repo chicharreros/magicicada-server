@@ -161,7 +161,7 @@ class TestMakeFile(TestWithDatabase):
     @defer.inlineCallbacks
     def test_mkfile_already_exists_content(self):
         """Create a file on a file that already exists and have content."""
-        data = "*" * 100
+        data = b"*" * 100
 
         client = yield self.get_client_helper(auth_token="open sesame")
         root_id = yield client.get_root()
@@ -285,7 +285,6 @@ class TestMakeDir(TestWithDatabase):
             d = client.make_dir(request.ROOT, root, "surrogate \\udad6")
             res = yield self.assertFailure(d, request.StorageRequestError)
             self.assertEqual(str(res), "INVALID_FILENAME")
-
         return self.callback_test(test, add_default_callbacks=True)
 
     def test_mkdir2(self):

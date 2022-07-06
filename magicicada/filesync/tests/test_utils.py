@@ -73,7 +73,7 @@ class NodeKeyTests(unittest.TestCase):
 
     def test_parse_nodekey_non_ascii(self):
         """parse_nodekey() fails on non-ASCII compatible unicode strings."""
-        self.assertRaises(NodeKeyParseError, parse_nodekey, '\\u00A0')
+        self.assertRaises(NodeKeyParseError, parse_nodekey, '\u00A0')
 
     def test_parse_nodekey_short_node_id(self):
         """paerse_nodekey() fails if the node ID is too short."""

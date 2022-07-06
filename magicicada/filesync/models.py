@@ -174,7 +174,8 @@ class StorageUser(AbstractUser):
         # the correct order
         deleted = StorageObject.objects.filter(
             volume__id=root.volume.id, status=STATUS_DEAD,
-            kind=StorageObject.FILE).order_by('-when_last_modified')
+            kind=StorageObject.FILE,
+        ).select_related('content_blob').order_by('-when_last_modified')
 
         if deleted.exists():
             parent = restore_parent.build_tree_from_path(path)
@@ -224,12 +225,12 @@ class ContentBlob(models.Model):
 
     @property
     def hash(self):
-        return bytes(self._hash)
+        return bytes(self._hash).decode('utf-8')
 
     @property
     def magic_hash(self):
         return (
-            bytes(self._magic_hash)
+            bytes(self._magic_hash).decode('utf-8')
             if self._magic_hash else None)
 
     @magic_hash.setter
@@ -486,7 +487,7 @@ class BaseStorageObject(models.Model):
     def get_child_by_name(self, name):
         """Get the child named name."""
         try:
-            child = StorageObject.objects.get(
+            child = StorageObject.objects.select_related('content_blob').get(
                 parent=self, name=name, status=STATUS_LIVE)
         except DataError as e:
             raise InvalidFilename('Name is not valid: %r (%r)' % (name, e))
@@ -1029,7 +1030,7 @@ class UploadJob(models.Model):
 
     @property
     def hash_hint(self):
-        return bytes(self._hash_hint)
+        return bytes(self._hash_hint).decode('utf-8')
 
     def add_part(self, size):
         """Add a part of size: 'size' and increment the chunk count."""
@@ -1191,7 +1192,7 @@ class ResumableUpload(models.Model):
     @property
     def hash_context(self):
         return (
-            bytes(self._hash_context)
+            bytes(self._hash_context).decode('utf-8')
             if self._hash_context else None)
 
     @hash_context.setter
@@ -1201,7 +1202,7 @@ class ResumableUpload(models.Model):
     @property
     def magic_hash_context(self):
         return (
-            bytes(self._magic_hash_context)
+            bytes(self._magic_hash_context).decode('utf-8')
             if self._magic_hash_context else None)
 
     @magic_hash_context.setter

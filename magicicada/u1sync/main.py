@@ -194,8 +194,6 @@ def do_list_shares(client):
             status = " [not accepted]"
         else:
             status = ""
-        name = name.encode("utf-8")
-        user = user.encode("utf-8")
         logger.debug("%s  %s (from %s) [%s]%s", id, name, user, access, status)
 
 
@@ -217,7 +215,7 @@ def do_diff(client, share_spec, directory, subtree_path, ignore_symlinks=True):
         """Compare nodes and show differences."""
         (local_node, remote_node) = nodes
         (parent_display_path, parent_differs) = partial_parent
-        display_path = os.path.join(parent_display_path, name.encode("UTF-8"))
+        display_path = os.path.join(parent_display_path, name)
         differs = True
         if local_node is None:
             logger.debug("%s missing from client", display_path)

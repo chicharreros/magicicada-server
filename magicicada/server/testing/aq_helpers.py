@@ -23,7 +23,7 @@ import shutil
 import time
 import uuid
 from functools import partial, total_ordering
-from io import StringIO
+from io import BytesIO
 
 import dbus
 import dbus.service
@@ -76,8 +76,15 @@ def show_time():
     return "%s,%s" % (p1, p2)
 
 
-class NoCloseCustomIO(StringIO):
-    """a stringio subclass that doesnt destroy content on close."""
+class NoCloseCustomIO(BytesIO):
+    """A BytesIO subclass that doesnt destroy content on close."""
+
+    # Needed for action_queue's file management
+    # if getattr(self.fileobj, 'fileno', None) is not None:
+    #     # it's a real file, with a fileno! Let's sync its data out to disk
+    #     os.fsync(self.fileobj.fileno())
+    fileno = None
+
     def close(self):
         """do nothing"""
         pass

@@ -53,20 +53,18 @@ def scan_directory(path, display_path=""):
     if link_target is not None:
         # symlink
         sum = hashlib.sha1()
-        sum.update(link_target)
+        sum.update(link_target.encode('utf-8'))
         content_hash = "sha1:%s" % sum.hexdigest()
         return MergeNode(node_type=SYMLINK, content_hash=content_hash)
     elif child_names is not None:
         # directory
-        child_names = [
-            n for n in child_names if should_sync(n.decode("utf-8"))]
+        child_names = [n for n in child_names if should_sync(n)]
         child_paths = [(os.path.join(path, child_name),
                         os.path.join(display_path, child_name))
                        for child_name in child_names]
         children = [scan_directory(child_path, child_display_path)
                     for (child_path, child_display_path) in child_paths]
-        unicode_child_names = [n.decode("utf-8") for n in child_names]
-        children = dict(zip(unicode_child_names, children))
+        children = dict(zip(child_names, children))
         return MergeNode(node_type=DIRECTORY, children=children)
     else:
         # regular file
@@ -78,7 +76,7 @@ def scan_directory(path, display_path=""):
                 """Accumulate bytes."""
                 sum.update(bytes)
 
-        with open(path, "r") as stream:
+        with open(path, "rb") as stream:
             shutil.copyfileobj(stream, HashStream())
         content_hash = "sha1:%s" % sum.hexdigest()
         return MergeNode(node_type=FILE, content_hash=content_hash)

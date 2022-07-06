@@ -95,7 +95,7 @@ class TestGetContent(TestWithDatabase):
     @defer.inlineCallbacks
     def test_getcontent_empty_file(self):
         """Make sure get content of empty files work."""
-        data = ""
+        data = b""
 
         client = yield self.get_client_helper(auth_token="open sesame")
         root_id = yield client.get_root()
@@ -110,7 +110,7 @@ class TestGetContent(TestWithDatabase):
     @defer.inlineCallbacks
     def test_getcontent_file(self, check_file_content=True):
         """Get the content from a file."""
-        data = "*" * 100000
+        data = b"*" * 100000
 
         client = yield self.get_client_helper(auth_token="open sesame")
         root_id = yield client.get_root()
@@ -262,7 +262,7 @@ class TestGetContent(TestWithDatabase):
     @defer.inlineCallbacks
     def test_getcontent_cancel_after_download(self):
         """Start to get the content from a file, and cancel in the middle"""
-        data = "*" * 100000
+        data = b"*" * 100000
 
         client = yield self.get_client_helper(auth_token="open sesame")
 
@@ -401,13 +401,6 @@ class TestPutContent(TestWithDatabase):
         notifs = []
 
         def cancel_and_read(request, amount):
-            """Change the file when this client starts uploading it."""
-            # modify the file and cause a conflict
-            hash_value = get_hash('randomdata')
-            filenode = self.usr0.get_node(params['node'])
-            filenode.make_content(
-                filenode.content_hash, hash_value, 32, 1000, 1000,
-                uuid.uuid4())
             """If second read, cancel and trigger test."""
             notifs.append(amount)
             if len(notifs) == 2:
@@ -477,7 +470,7 @@ class TestPutContent(TestWithDatabase):
     @defer.inlineCallbacks
     def test_putcontent_twice_simple(self):
         """Test putting content twice."""
-        data = "*" * 100
+        data = b"*" * 100
 
         client = yield self.get_client_helper(auth_token="open sesame")
         root_id = yield client.get_root()
@@ -498,7 +491,7 @@ class TestPutContent(TestWithDatabase):
     @defer.inlineCallbacks
     def test_putcontent_twice_samefinal(self):
         """Test putting content twice."""
-        data = "*" * 100
+        data = b"*" * 100
 
         client = yield self.get_client_helper(auth_token="open sesame")
         root_id = yield client.get_root()
@@ -521,7 +514,7 @@ class TestPutContent(TestWithDatabase):
     def _put_content_bad_params(self, error_class, data=None, **kwargs):
         """Base function to create tests of wrong hints."""
         if data is None:
-            data = "*" * 1000
+            data = b"*" * 1000
 
         client = yield self.get_client_helper(auth_token="open sesame")
         root_id = yield client.get_root()
@@ -553,7 +546,7 @@ class TestPutContent(TestWithDatabase):
     @defer.inlineCallbacks
     def test_putcontent_notify(self):
         """Make sure put_content generates a notification."""
-        data = "*" * 100000
+        data = b"*" * 100000
 
         client = yield self.get_client_helper(auth_token="open sesame")
         root_id = yield client.get_root()
@@ -597,7 +590,7 @@ class TestPutContent(TestWithDatabase):
         def make_conflict_and_read(amount):
             """Change the file when this client starts uploading it."""
             # modify the file and cause a conflict
-            hash_value = get_hash('randomdata')
+            hash_value = get_hash(b'randomdata')
             filenode = self.usr0.get_node(params['node'])
             filenode.make_content(
                 filenode.content_hash, hash_value, 32, 1000, 1000,
@@ -719,7 +712,7 @@ class TestPutContent(TestWithDatabase):
         """Test putting bad data to a file."""
         data = os.urandom(300000)
         # insert bad data in the deflated_data
-        deflated_data = 'break it'
+        deflated_data = b'break it'
 
         client = yield self.get_client_helper(auth_token="open sesame")
         root_id = yield client.get_root()
@@ -1005,7 +998,7 @@ class TestPutContent(TestWithDatabase):
     @defer.inlineCallbacks
     def test_putcontent_blob_exists(self):
         """Test putting content with an existing blob (no magic)."""
-        data = "*" * 100
+        data = b"*" * 100
         params = get_put_content_params(data)
         # create the content blob without a magic hash in a different user.
         self.make_user('my_user', max_storage_bytes=2 ** 20)
@@ -1326,7 +1319,7 @@ class TestMultipartPutContentGoodCompression(TestMultipartPutContent):
 
     def get_data(self, size):
         """Return zero data of the specified size."""
-        with open('/dev/zero', 'r') as source:
+        with open('/dev/zero', 'rb') as source:
             return source.read(size) + os.urandom(size)
 
 
@@ -1661,7 +1654,7 @@ class TestUploadJob(TestWithDatabase):
         """Setup the test."""
         yield super(TestUploadJob, self).setUp()
         self.chunk_size = settings.STORAGE_CHUNK_SIZE
-        self.half_size = self.chunk_size / 2
+        self.half_size = self.chunk_size // 2
         self.double_size = self.chunk_size * 2
         self.user = self.make_user(max_storage_bytes=self.chunk_size ** 2)
         self.content_user = User(
@@ -1741,7 +1734,7 @@ class TestUploadJob(TestWithDatabase):
         deflated_data, _, upload_job = yield self.make_upload(size)
         yield upload_job.connect()
         # change the deflated data to trigger a UploadCorrupt error
-        yield upload_job.add_data(deflated_data + '10')
+        yield upload_job.add_data(deflated_data + b'10')
         try:
             yield upload_job.commit()
         except server.errors.UploadCorrupt as e:
@@ -1831,9 +1824,9 @@ class TestUploadJob(TestWithDatabase):
         size = self.half_size
         deflated_data, hash_value, upload_job = yield self.make_upload(size)
         yield upload_job.connect()
-        yield upload_job.add_data('Neque porro quisquam est qui dolorem ipsum')
+        self.addCleanup(upload_job.cancel)
+        yield upload_job.add_data(b'Neque quisquam est qui dolorem ipsum')
         self.assertFailure(upload_job.deferred, server.errors.UploadCorrupt)
-        yield upload_job.cancel()
 
     @defer.inlineCallbacks
     def test_upload_id(self):
@@ -2176,7 +2169,7 @@ class TestContent(TestWithDatabase):
     @defer.inlineCallbacks
     def test_getcontent(self):
         """Get the content from a file."""
-        data = "*" * 100000
+        data = b"*" * 100000
 
         client = yield self.get_client_helper(auth_token="open sesame")
         root_id = yield client.get_root()

@@ -18,9 +18,9 @@
 
 """Test the action queue."""
 
-import io
 import os
 import uuid
+from io import BytesIO
 
 from magicicadaclient.syncdaemon.states import (
     StateManager, QueueManager, ConnectionManager)
@@ -286,25 +286,27 @@ class TestNonAscii(TestBase):
 
     @defer.inlineCallbacks
     def test_mkfile_ok(self):
-        """Test that AQ correctly handles UTF-8 in mkfile."""
-        yield self._mkfile('mo\xc3\xb1o')
+        """Test that AQ correctly handles non-ascii in mkfile."""
+        non_ascii = 'moño'
+        yield self._mkfile(non_ascii)
         wait_for_rescan = self.wait_for('AQ_RESCAN_FROM_SCRATCH_OK',
                                         volume_id=request.ROOT)
         yield self.aq.rescan_from_scratch(request.ROOT)
         yield wait_for_rescan
         res = self.listener.get_rescan_from_scratch_for(request.ROOT)
-        self.assertIn("moño", [dt.name for dt in res['delta_content']])
+        self.assertIn(non_ascii, [dt.name for dt in res['delta_content']])
 
     @defer.inlineCallbacks
     def test_mkdir_ok(self):
-        """Test that AQ correctly handles UTF-8 in mkdir."""
-        yield self._mkdir('cami\xc3\xb3n')
+        """Test that AQ correctly handles non_ascii in mkdir."""
+        non_ascii = 'camión'
+        yield self._mkdir(non_ascii)
         wait_for_rescan = self.wait_for('AQ_RESCAN_FROM_SCRATCH_OK',
                                         volume_id=request.ROOT)
         yield self.aq.rescan_from_scratch(request.ROOT)
         yield wait_for_rescan
         res = self.listener.get_rescan_from_scratch_for(request.ROOT)
-        self.assertIn("camión", [dt.name for dt in res['delta_content']])
+        self.assertIn(non_ascii, [dt.name for dt in res['delta_content']])
 
 
 class TestDeferredMeta(TestBase):
@@ -455,7 +457,7 @@ class TestContent(TestBase):
             """
             def __init__(self):
                 self.name = 'dummy-will-be-ignored'
-                self.tempfile = io.StringIO()
+                self.tempfile = BytesIO()
                 commands.append([x for x in outer_self.aq.queue.waiting
                                  if isinstance(x, Upload)][0])
                 self.all_read = 0

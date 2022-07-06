@@ -20,7 +20,6 @@
 
 import collections
 import logging
-import os
 import time
 import uuid
 import weakref
@@ -133,8 +132,6 @@ class FakedStats(object):
 class FakedFactory(object):
     """A faked factory."""
 
-    auth_provider = None
-
     def __init__(self):
         self.stats = FakedStats()
         self.metrics = metrics.get_meter('metrics')
@@ -142,6 +139,8 @@ class FakedFactory(object):
         self.sli_metrics = metrics.get_meter('sli_metrics')
         self.servername = "fakeservername"
         self.trace_users = []
+        self.auth_provider = mock.Mock(name='factory-auth-provider')
+        self.auth_provider.authenticate.return_value = FakeUser()
 
 
 class FakedPeer(object):
@@ -2360,9 +2359,8 @@ class AuthenticateResponseTestCase(SimpleRequestResponseTestCase):
         """Check that the user is set after auth."""
         user = FakeUser()
         # set up a fake auth
-        auth_provider = mock.Mock()
+        auth_provider = self.response.protocol.factory.auth_provider
         auth_provider.authenticate.return_value = user
-        self.response.protocol.factory.auth_provider = auth_provider
         called = []
         self.response.protocol.set_user = lambda *a, **kw: called.append(a)
 
@@ -2375,9 +2373,8 @@ class AuthenticateResponseTestCase(SimpleRequestResponseTestCase):
         """Test client metadata handling in AuthenticateResponse."""
         user = FakeUser()
         # set up a fake auth
-        auth_provider = mock.Mock()
+        auth_provider = self.response.protocol.factory.auth_provider
         auth_provider.authenticate.return_value = user
-        self.response.protocol.factory.auth_provider = auth_provider
         metrics_called = []
         self.patch(self.response.protocol.factory.metrics, 'meter',
                    lambda *a: metrics_called.append(a))
@@ -2649,14 +2646,8 @@ class NodeInfoLogsTestCase(BaseStorageServerTestCase):
             ('DELETE_SHARE', DeleteShare),
         ]
         for name, klass in data:
-            impl = os.environ.get('PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION')
-            if impl == 'cpp':
-                # the cpp implementation always return unicode.
-                self.check("share: u'foo'", name, klass,
-                           name.lower(), share_id='foo')
-            else:
-                self.check("share: 'foo'", name, klass,
-                           name.lower(), share_id='foo')
+            self.check(
+                "share: 'foo'", name, klass, name.lower(), share_id='foo')
 
     def test_with_volumes(self):
         """Test messages that work on volumes."""

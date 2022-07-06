@@ -54,6 +54,8 @@ class ReactorInspector(threading.Thread):
         if not self.running:
             self.running = True
             super(ReactorInspector, self).start()
+        logger.info(
+            "ReactorInspector: started, reactor thread pid: %s", os.getpid())
 
     def stop(self):
         """Stop the thread."""

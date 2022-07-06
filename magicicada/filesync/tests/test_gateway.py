@@ -972,7 +972,7 @@ class SystemGatewayPublicFileTestCase(BaseTestCase):
         file1 = self.vgw.make_file_with_content(
             self.root.id, name, hash, crc, size, deflated_size, storage_key,
             mimetype='fakemime')
-        self.file = self.vgw._get_node_simple(file1.id)
+        self.file = self.vgw._get_node_simple(file1.id, with_content=True)
 
     def get_get_public_file_DoesNotExist(self):
         """Get get_public_file with unknown key."""
@@ -1803,7 +1803,8 @@ class ReadWriteVolumeGatewayUtilityTests(BaseTestCase):
         all_nodes = self.vgw.get_all_nodes(mimetypes=['mmm'])
         self.assertEqual(len(all_nodes), 0)
         # this will only return the ones with the matching mimetype
-        all_nodes = self.vgw.get_all_nodes(mimetypes=['image/tif'])
+        all_nodes = self.vgw.get_all_nodes(
+            mimetypes=['image/tif'], with_content=True)
         self.assertEqual(len(all_nodes), 10)
         # sort them in the right order
         nodes.sort(key=attrgetter('path', 'name'))
@@ -1811,7 +1812,8 @@ class ReadWriteVolumeGatewayUtilityTests(BaseTestCase):
         # get both mimetypes
         nodes.extend(other_nodes)
         nodes.sort(key=attrgetter('path', 'name'))
-        all_nodes = self.vgw.get_all_nodes(mimetypes=['image/tif', 'fake'])
+        all_nodes = self.vgw.get_all_nodes(
+            mimetypes=['image/tif', 'fake'], with_content=True)
         self.assertEqual(len(all_nodes), 20)
         self.assertEqual(all_nodes, nodes)
 
@@ -2340,7 +2342,7 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
     def test__node_finder(self):
         """Test the _node_finder method."""
         nodes = StorageObject.objects.filter(id=self.file.id)
-        result = self.vgw._node_finder(nodes)
+        result = self.vgw._node_finder(nodes, with_content=True)
         node = self.vgw._get_node_from_result(result)
         self.assertEqual(node.id, self.file.id)
         self.assertEqual(node.content_hash, self.file.content_hash)
@@ -2361,7 +2363,8 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
 
     def test__get_node_with_parent(self):
         nodes = StorageObject.objects.filter(id=self.file.id)
-        result = self.vgw._node_finder(nodes, with_parent=True)
+        result = self.vgw._node_finder(
+            nodes, with_parent=True, with_content=True)
         node = self.vgw._get_node_from_result(result)
         self.assertEqual(node.id, self.file.id)
         self.assertEqual(node.content_hash, self.file.content_hash)
@@ -2413,10 +2416,6 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
     def test_get_child_by_name(self):
         """Test the get_child_by_name method."""
         child = self.vgw.get_child_by_name(self.file.parent_id, self.file.name)
-        self.assertEqual(child.id, self.file.id)
-        # with content...
-        child = self.vgw.get_child_by_name(
-            self.file.parent_id, self.file.name, with_content=True)
         self.assertEqual(child.content_hash, self.file.content_hash)
         # invalid parent_id
         self.assertRaises(
@@ -2438,7 +2437,7 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         # make sure it returns the root node when special 'root' is used:
         root_node = self.vgw.get_node('root')
         self.assertEqual(root_node.id, self.vgw.get_root().id)
-        node = self.vgw.get_node(self.file.id, with_content=True)
+        node = self.vgw.get_node(self.file.id)
         self.assertEqual(node.id, self.file.id)
         self.assertEqual(node.content_hash, self.file.content_hash)
         self.assertEqual(node.mimetype, self.file.mimetype)
@@ -2741,7 +2740,7 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
                               new_storage_key, magic_hash=magic_hash)
 
         # reload the file and make sure it looks correct
-        file_node._load(with_content=True)
+        file_node._load()
         self.assertEqual(file_node.content.hash, new_hash)
         self.assertEqual(file_node.content.size, size)
         self.assertEqual(file_node.content.deflated_size, def_size)
@@ -2777,7 +2776,7 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         assert n.content.magic_hash == magic_hash
 
         # reload the file and make sure it was stored ok
-        filenode._load(with_content=True)
+        filenode._load()
         self.assertEqual(filenode.content.magic_hash, magic_hash)
 
     def test_make_content_enforeces_quota(self):
@@ -2853,7 +2852,7 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         node = self.vgw.make_file_with_content(
             self.root.id, name, hash, crc, size, deflated_size,
             storage_key, mimetype='image/tif', magic_hash=magic_hash)
-        a_file = self.vgw.get_node(node.id, with_content=True)
+        a_file = self.vgw.get_node(node.id)
         self.assertEqual(a_file.name, 'filename')
         self.assertEqual(a_file.mimetype, 'image/tif')
         self.assertEqual(a_file.status, STATUS_LIVE)
@@ -2896,7 +2895,7 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         self.assertNotEqual(newstorage_key, storage_key)
         f(self.root.id, name, newhash, crc, size,
           deflated_size, newstorage_key, magic_hash=magic_hash)
-        node2 = self.vgw.get_node(node1.id, with_content=True)
+        node2 = self.vgw.get_node(node1.id)
         self.assertEqual(node2.id, node2.id)
         self.assertEqual(node2.content_hash, newhash)
         self.assertEqual(node2.content.storage_key, newstorage_key)
@@ -2927,11 +2926,13 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         n = self.vgw.make_file_with_content(self.root.id, name, hash, crc,
                                             size, deflated_size, storage_key,
                                             magic_hash=magic_hash)
-        # XXX
+
+        # import pdb; pdb.set_trace()
+        # assert ContentBlob.objects.get(hash=hash)
         # assert n.content.magic_hash == magic_hash
 
         # check that got stored properly
-        n = self.vgw.get_node(n.id, with_content=True)
+        n = self.vgw.get_node(n.id)
         self.assertEqual(n.content.magic_hash, magic_hash)
 
     def test_make_file_with_content_enforces_quota(self):
@@ -3056,8 +3057,7 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         d3 = self.vgw.get_node_by_path('dir1/dir2/dir3')
         self.assertEqual(d3.id, dir3.id)
         # the standard node finder options work as well
-        f4 = self.vgw.get_node_by_path('/dir1/dir2/dir3/file4.tif',
-                                       with_content=True)
+        f4 = self.vgw.get_node_by_path('/dir1/dir2/dir3/file4.tif')
         self.assertEqual(f4.content.storage_key, key)
         # invalid paths get StorageErrors
         self.assertRaises(errors.StorageError, self.vgw.get_node_by_path, '')
@@ -4259,7 +4259,7 @@ class MetricsTestCase(BaseTestCase):
         """Supervise an op with args and see all is reported ok."""
         root_id = self.gw.get_root().id
         self.gw.make_file(root_id, 'filename')
-        self.gw.get_child_by_name(root_id, 'filename', with_content=False)
+        self.gw.get_child_by_name(root_id, 'filename')
         for informed in self.informed:
             if informed[0] == 'get_child_by_name':
                 self.assertTrue(isinstance(informed[1], float))

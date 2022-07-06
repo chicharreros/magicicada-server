@@ -77,8 +77,13 @@ def get_put_content_params(
     """Return the test data for put_content."""
     if data is None:
         data = os.urandom(1000)  # not terribly compressible
+    assert isinstance(data, bytes), 'data should be bytes, got %s' % type(data)
+
     if deflated_data is None:
         deflated_data = zlib.compress(data)
+    assert isinstance(deflated_data, bytes), (
+        'deflated_data should be bytes, got %s' % type(deflated_data))
+
     params = overrides.copy()
     params.setdefault('share', share)
     params.setdefault('previous_hash', NO_CONTENT_HASH)
@@ -161,7 +166,7 @@ class BaseProtocolTestCase(TwistedTestCase):
         @return: a tuple (deflated_data, hash_value, upload_job)
 
         """
-        data = os.urandom(size)
+        data = os.urandom(int(size))
         deflated_data = zlib.compress(data)
         hash_value = get_hash(data)
         magic_hash_value = get_magic_hash(data)

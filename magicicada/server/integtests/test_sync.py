@@ -701,6 +701,8 @@ class TestServerBase(TestSync):
     @defer.inlineCallbacks
     def put_content(self, share_id, node_id, content, client_name='client'):
         """Upload content to the server."""
+        if isinstance(content, str):
+            content = content.encode('utf-8')
         client = getattr(self, client_name)
         req = yield client.get_delta(share_id, from_scratch=True)
         dt = [dt for dt in req.response
@@ -848,7 +850,7 @@ class TestServerCornerCases(TestServerBase):
         # create file "foo" with some content
         data = os.urandom(100)
         foo_path = os.path.join(self.root_dir, "foo")
-        fh = open(foo_path, "w")
+        fh = open(foo_path, "wb")
         fh.write(data)
         fh.close()
         yield self.main.wait_for_nirvana(.5)
@@ -1240,12 +1242,12 @@ class TestConflict(TestServerBase):
         yield self.put_content(request.ROOT, req.new_id, data_one)
         yield d
 
-        f = open(self.root_dir + "/test_file", "w")
+        f = open(self.root_dir + "/test_file", "wb")
         f.write(data_one)
         f.close()
 
         yield self.main.wait_for_nirvana(0.5)
-        data_one_local = open(self.root_dir + '/test_file').read()
+        data_one_local = open(self.root_dir + '/test_file', 'rb').read()
         self.assertEqual(data_one_local, data_one)
 
     @defer.inlineCallbacks
@@ -1290,23 +1292,23 @@ class TestConflict(TestServerBase):
         Here convergence is also checked.
         """
         data_one = os.urandom(1000000)
-        data_conflict = "hello"
+        data_conflict = b"hello"
 
         yield self.get_client()
         req = yield self.client.make_file(
             request.ROOT, self.root_id, "test_file")
         yield self.put_content(request.ROOT, req.new_id, data_one)
 
-        f = open(self.root_dir + "/test_file", "w")
+        f = open(self.root_dir + "/test_file", "wb")
         f.write(data_conflict)
         f.close()
 
         yield self.main.wait_for_nirvana(last_event_interval=0.5)
 
-        data_one_local = open(self.root_dir + '/test_file').read()
+        data_one_local = open(self.root_dir + '/test_file', 'rb').read()
         try:
             data_conflict_local = open(
-                self.root_dir + '/test_file.u1conflict').read()
+                self.root_dir + '/test_file.u1conflict', 'rb').read()
         except IOError:
             self.assertEqual(data_one_local, data_conflict)
         else:
@@ -1380,7 +1382,7 @@ class TestConflict(TestServerBase):
         nuker.nuke()
 
         # create the file and wait to everything propagate
-        with open(self.root_dir + "/test_file", "w") as fh:
+        with open(self.root_dir + "/test_file", "wb") as fh:
             fh.write(os.urandom(100))
         yield self.wait_for("HQ_HASH_NEW")
 
@@ -1833,7 +1835,7 @@ class TestPartialRecover(TestServerBase):
         yield self.main.lr.scan_dir("mdid", self.root_dir)
         yield self.main.wait_for_nirvana(0)
 
-        content = open(self.root_dir + '/test_file').read()
+        content = open(self.root_dir + '/test_file', 'rb').read()
         self.assertEqual(content, data_one)
 
 
@@ -1890,7 +1892,7 @@ class TestMoveWhileInProgress(TestServerBase):
         wait_for_hash = self.wait_for("HQ_HASH_NEW", path=filepath)
 
         # do the local change
-        f = open(filepath, "w")
+        f = open(filepath, "wb")
         f.write(data_conflict)
         f.close()
         yield wait_for_hash

@@ -260,11 +260,9 @@ class RestHelper(object):
         """
         hash = node_repr.get('hash')
         magic_hash = node_repr.get('magic_hash')
-        hash = bytes(hash) if hash else None
-        magic_hash = bytes(magic_hash) if magic_hash else None
         try:
             self.log_dal("get_node_by_path", user, node_path=node_path)
-            node = user.get_node_by_path(node_path)
+            node = user.get_node_by_path(node_path, with_content=True)
         except errors.DoesNotExist:
             node = None
         if node and node.kind == StorageObject.FILE and hash and magic_hash:

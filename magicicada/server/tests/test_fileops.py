@@ -357,7 +357,7 @@ class TestUnlink(TestWithDatabase):
     @defer.inlineCallbacks
     def test_putcontent_unlinked(self):
         """Try to put content in an unlinked file."""
-        data = "*"
+        data = b"*"
 
         client = yield self.get_client_helper(auth_token="open sesame")
         root_id = yield client.get_root()

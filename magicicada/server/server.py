@@ -253,7 +253,7 @@ class LoopingPing(object):
             self.shutdown.cancel()
         if self.next_loop is not None and self.next_loop.active():
             self.next_loop.cancel()
-        for req in self.request_handler.requests.values():
+        for req in list(self.request_handler.requests.values()):
             # cleanup stalled Ping requests
             if req.started and isinstance(req, request.Ping):
                 req.done()
@@ -269,7 +269,7 @@ class StorageServer(request.RequestHandler):
 
     def __init__(self, session_id=None):
         """Create a network server. The factory does this."""
-        request.RequestHandler.__init__(self)
+        super(StorageServer, self).__init__()
         self.user = None
         self.factory = None
         self.session_id = session_id or uuid.uuid4()
@@ -372,7 +372,7 @@ class StorageServer(request.RequestHandler):
 
     def connectionMade(self):
         """Called when a connection is made."""
-        request.RequestHandler.connectionMade(self)
+        super(StorageServer, self).connectionMade()
         self.factory.protocols.append(self)
         self.log.info('Connection Made')
         msg = b'%d %s.\r\n' % (self.PROTOCOL_VERSION, FILESYNC_STATUS_MSG)
@@ -436,7 +436,7 @@ class StorageServer(request.RequestHandler):
                                 protocol_pb2.Message.PONG):
             self.ping_loop.reset()
         try:
-            result = request.RequestHandler.processMessage(self, message)
+            result = super(StorageServer, self).processMessage(message)
         except Exception as e:
             self._log_error(e, self.processMessage, exc_info=sys.exc_info())
             return
@@ -735,7 +735,7 @@ class StorageServerRequestResponse(BaseRequestResponse):
                 failure = Failure(failure)
             self.log.error('Request error',
                            exc_info=(failure.type, failure.value, None))
-            request.RequestResponse.error(self, failure)
+            super(BaseRequestResponse, self).error(failure)
         except Exception as e:
             msg = 'error() crashed when processing %s: %s'
             self.log.error(msg, failure, e, exc_info=sys.exc_info())
@@ -762,7 +762,7 @@ class StorageServerRequestResponse(BaseRequestResponse):
                 self.log.info('Request done')
             else:
                 self.log.info('Request done: %s', self.operation_data)
-            request.RequestResponse.done(self)
+            super(BaseRequestResponse, self).done()
         except Exception as e:
             self.error(Failure(e))
         else:
@@ -796,7 +796,7 @@ class StorageServerRequestResponse(BaseRequestResponse):
     def sendMessage(self, message):
         """Send a message and trace it."""
         self.log.trace_message('OUT: ', message)
-        request.RequestResponse.sendMessage(self, message)
+        super(BaseRequestResponse, self).sendMessage(message)
 
     def _processMessage(self, message):
         """Locally overridable part of processMessage."""
@@ -1361,7 +1361,7 @@ class ChangePublicAccess(SimpleRequestResponse):
 
         # answer the ok to original user
         response = protocol_pb2.Message()
-        response.public_url = bytes(public_url)
+        response.public_url = str(public_url)
         response.type = protocol_pb2.Message.OK
         self.sendMessage(response)
 
@@ -1621,7 +1621,7 @@ class PutContentResponse(SimpleRequestResponse):
             self.log.warning('%s: called done() finished=%s',
                              call_chain, self.finished)
         else:
-            SimpleRequestResponse.done(self)
+            super(PutContentResponse, self).done()
 
     def _get_node_info(self):
         """Return node info from the message."""
@@ -2229,8 +2229,10 @@ class AuthenticateResponse(SimpleRequestResponse):
         auth_parameters = dict(
             (param.name, param.value)
             for param in self.source_message.auth_parameters)
-        authenticate = self.protocol.factory.auth_provider.authenticate
-        user = yield authenticate(auth_parameters, self.protocol)
+        user = None
+        if self.protocol.factory.auth_provider is not None:
+            authenticate = self.protocol.factory.auth_provider.authenticate
+            user = yield authenticate(auth_parameters, self.protocol)
         self.protocol.check_poison('authenticate_continue')
         if user is None:
             raise errors.AuthenticationError('Authentication failed.')
@@ -2624,7 +2626,7 @@ class StorageServerService(OrderedMultiService):
         @param port: the port to listen on without ssl.
         @param auth_provider_class: the authentication provider.
         """
-        OrderedMultiService.__init__(self)
+        super(StorageServerService, self).__init__()
         self.heartbeat_writer = None
         if heartbeat_interval is None:
             heartbeat_interval = float(settings.HEARTBEAT_INTERVAL)
@@ -2676,7 +2678,7 @@ class StorageServerService(OrderedMultiService):
     def startService(self):
         """Start listening on two ports."""
         logger.info('- - - - - SERVER STARTING')
-        yield OrderedMultiService.startService(self)
+        yield super(StorageServerService, self).startService()
         yield defer.maybeDeferred(self.start_rpc_dal)
         self.factory.content.rpc_dal = self.rpc_dal
         self.factory.rpc_dal = self.rpc_dal
@@ -2694,7 +2696,7 @@ class StorageServerService(OrderedMultiService):
     def stopService(self):
         """Stop listening on both ports."""
         logger.info('- - - - - SERVER STOPPING')
-        yield OrderedMultiService.stopService(self)
+        yield super(StorageServerService, self).stopService()
         yield self.factory.wait_for_shutdown()
         self.metrics.meter('server_stop')
         self.metrics.decrement('services_active')

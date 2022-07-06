@@ -706,7 +706,7 @@ class TestSharesWithData(TestWithDatabase):
     @defer.inlineCallbacks
     def test_put_content_on_share(self):   # XXX: this is the same as above
         """Write a file on a share."""
-        data = "*" * 100000
+        data = b"*" * 100000
 
         client = yield self.get_client_helper(auth_token="open sesame")
         params = get_put_content_params(
@@ -721,7 +721,7 @@ class TestSharesWithData(TestWithDatabase):
     @defer.inlineCallbacks
     def test_put_content_on_share_ro(self):
         """Write a file on a share thats read only."""
-        data = "*" * 100000
+        data = b"*" * 100000
 
         client = yield self.get_client_helper(auth_token="open sesame")
         params = get_put_content_params(

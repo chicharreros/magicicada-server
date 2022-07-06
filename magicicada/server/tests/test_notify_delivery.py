@@ -121,12 +121,12 @@ class TestDelivery(TwistedTestCase):
             # other session, and generations
             protocol = mock.Mock(
                 session_id=uuid.uuid4(), working_caps=['generations'])
-            self.assertTrue(list(filter(protocol)))
+            self.assertTrue(filter(protocol))
 
             # same session, and generations
             protocol = mock.Mock(
                 session_id=session_id, working_caps=['generations'])
-            self.assertFalse(list(filter(protocol)))
+            self.assertFalse(filter(protocol))
 
             deferred.callback(None)
 

@@ -208,8 +208,7 @@ class TestTransactionLog(BaseTransactionLogTestCase):
         f = self.factory.make_file()
         f_extra_data = dict(
             size=f.content.size, storage_key=str(f.content.storage_key),
-            public_uuid=None,
-            content_hash=bytes(f.content_hash).decode('utf-8'),
+            public_uuid=None, content_hash=f.content_hash,
             when_created=get_epoch_secs(f.when_created),
             last_modified=get_epoch_secs(f.when_last_modified),
             kind=f.kind, volume_path=f.volume.path)

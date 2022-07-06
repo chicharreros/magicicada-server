@@ -49,7 +49,7 @@ def get_conflict_path(path, conflict_info):
 
 
 def name_from_path(path):
-    """Return unicode name from last path component."""
+    """Return the name from last path component."""
     return os.path.split(path)[1]
 
 
@@ -78,9 +78,8 @@ def sync_tree(merged_tree, original_tree, sync_mode, path):
         (parent_path, parent_display_path, parent_uuid,
          parent_synced) = partial_parent
 
-        utf8_name = name  # .encode("utf-8")
-        path = os.path.join(parent_path, utf8_name)
-        display_path = os.path.join(parent_display_path, utf8_name)
+        path = os.path.join(parent_path, name)
+        display_path = os.path.join(parent_display_path, name)
         node_uuid = None
 
         synced = False
@@ -111,7 +110,6 @@ def sync_tree(merged_tree, original_tree, sync_mode, path):
                 logger.debug(
                     "%s %s %s",
                     sync_mode.symbol, conflict_symbol, display_path)
-
                 if original_node is not None:
                     node_uuid = original_node.uuid or merged_node.uuid
                     original_hash = original_node.content_hash or EMPTY_HASH

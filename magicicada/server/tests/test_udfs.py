@@ -430,7 +430,7 @@ class TestUDFsWithData(TestWithDatabase):
     @defer.inlineCallbacks
     def test_put_content(self):  # XXX: this is the same as test_get_content
         """Write a file."""
-        data = "*" * 10000
+        data = b"*" * 10000
 
         client = yield self.get_client_helper(auth_token="open sesame")
         udf = yield client.create_udf("~", "myudf")

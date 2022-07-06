@@ -171,7 +171,7 @@ class TestBasic(TestWithDatabase):
         def size_too_big(client):
             def done(result):
                 client.test_done("ok")
-            data = "*" * (2 ** 16 + 1)
+            data = b"*" * (2 ** 16 + 1)
             sz = struct.pack(request.SIZE_FMT, len(data))
             client.transport.write(sz + data)
             client.connectionLostHandler = done
