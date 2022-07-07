@@ -93,11 +93,11 @@ class HeartbeatListener(object):
                 try:
                     data = json.loads(payload_data)
                     event_type = data.pop('type')
-                    method = getattr(self, 'handle_%s' % (event_type,), None)
+                    method = getattr(self, 'handle_%s' % event_type, None)
                     method(payload_headers['processname'],
                            payload_headers['groupname'],
                            payload_headers['pid'], data)
-                except Exception, e:
+                except Exception:
                     # failed to parse the payload or to dispatch the event
                     self.logger.exception(
                         "Unable to handle event type '%s' - %r",
