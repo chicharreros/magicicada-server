@@ -21,7 +21,7 @@
 import logging
 import re
 from io import StringIO
-from unittest import mock
+from unittest import SkipTest, mock
 
 from magicicadaprotocol.client import StorageClientFactory, StorageClient
 from twisted.internet import defer, reactor, error as txerror, ssl
@@ -121,9 +121,10 @@ class BasicSSLProxyTestCase(SSLProxyTestCase):
                                   use_ssl=True)
 
     @defer.inlineCallbacks
-    # @skip('Should fail with connectionDone')
     def test_ssl_handshake_backend_dead(self):
         """No ssl handshake failure if the backend is dead."""
+        raise SkipTest('Should fail with connectionDone')
+
         # turn off the backend
         yield self.service.stopService()
         self.addCleanup(self.service.startService)
