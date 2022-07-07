@@ -32,7 +32,10 @@ import dbus.service
 
 from dbus.mainloop.glib import DBusGMainLoop
 from magicicadaclient import platform
-from magicicadaclient.syncdaemon.action_queue import ActionQueue, ActionQueueCommand
+from magicicadaclient.syncdaemon.action_queue import (
+    ActionQueue,
+    ActionQueueCommand,
+)
 from magicicadaclient.syncdaemon import (
     main,
     volume_manager,

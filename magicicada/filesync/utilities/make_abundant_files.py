@@ -63,12 +63,13 @@ def main(username, sharer, wlist, num):
         progbar = makeStatBar(cols, cols - 2)
         home = curses.tigetstr('cr')
 
-        def progress(l):
+        def progress(ll):
             """progress bar writer."""
-            sys.stdout.write(home + progbar((cols - 2) * (num - len(l)) / num))
+            sys.stdout.write(
+                home + progbar((cols - 2) * (num - len(ll)) / num))
             sys.stdout.flush()
     else:
-        def progress(l): return
+        def progress(ll): return
 
     # UDF
     udf = user.make_udf('~/abundant-files')
