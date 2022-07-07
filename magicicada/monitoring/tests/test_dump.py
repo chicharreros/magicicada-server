@@ -20,17 +20,17 @@
 
 from __future__ import unicode_literals
 
-import gc
 import shutil
 import tempfile
 
+import mock
 from django.conf import settings
-from mocker import MockerTestCase, ANY
+from twisted.trial.unittest import TestCase
 
-from magicicada.monitoring.dump import gc_dump, meliae_dump
+from magicicada.monitoring.dump import gc, gc_dump, meliae_dump, scanner
 
 
-class TestDump(MockerTestCase):
+class TestDump(TestCase):
     """Test dump."""
 
     def setUp(self):
@@ -43,63 +43,48 @@ class TestDump(MockerTestCase):
 
     def test_meliae_dump(self):
         """Check that the dump works."""
-        from meliae import scanner
-
-        collect = self.mocker.replace(gc.collect)
-        dump_all_objects = self.mocker.replace(scanner.dump_all_objects)
-
-        collect()
-        dump_all_objects(ANY)
-        self.mocker.replay()
+        collect = mock.Mock()
+        self.patch(gc, 'collect',  collect)
+        dump_all_objects = mock.Mock()
+        self.patch(scanner, 'dump_all_objects', dump_all_objects)
 
         self.assertIn("Output written to:", meliae_dump())
 
+        collect.assert_called_once_with()
+        dump_all_objects.assert_called_once_with(mock.ANY)
+
     def test_meliae_dump_error(self):
         """Check the error case."""
-        from meliae import scanner
-
-        dump_all_objects = self.mocker.replace(scanner.dump_all_objects)
-        dump_all_objects(ANY)
-        self.mocker.throw(ValueError)
-        self.mocker.replay()
+        dump_all_objects = mock.Mock(side_effect=ValueError())
+        self.patch(scanner, 'dump_all_objects', dump_all_objects)
 
         self.assertIn("Error while trying to dump memory", meliae_dump())
 
+        dump_all_objects.assert_called_once_with(mock.ANY)
+
     def test_gc_dumps_count_ok(self):
         """Check that the count dump works."""
-        get_count = self.mocker.replace(gc.get_count)
-        garbage = self.mocker.replace(gc.garbage)
-
-        get_count()
-        self.mocker.result((400, 20, 3))
-        # we're exercising the mocker
-        [x for x in garbage]
-        self.mocker.result(iter([]))
-        self.mocker.replay()
+        get_count = mock.Mock(return_value=(400, 20, 3))
+        self.patch(gc, 'get_count', get_count)
+        garbage = iter([])
+        self.patch(gc, 'garbage', garbage)
 
         self.assertIn("GC count is (400, 20, 3)", gc_dump())
 
     def test_gc_dumps_garbage_ok(self):
         """Check that the garbage dump works."""
-        get_count = self.mocker.replace(gc.get_count)
-        garbage = self.mocker.replace(gc.garbage)
-
-        get_count()
-        self.mocker.result(0)
-        # we're exercising the mocker
-        [x for x in garbage]
-        self.mocker.result(iter(['foo', 666]))
-        self.mocker.replay()
+        get_count = mock.Mock(return_value=0)
+        self.patch(gc, 'get_count',  get_count)
+        garbage = iter(['foo', 666])
+        self.patch(gc, 'garbage', garbage)
 
         self.assertIn("2 garbage items written", gc_dump())
 
     def test_gc_dump_error_generic(self):
         """Something bad happens when dumping gc."""
-        get_count = self.mocker.replace(gc.get_count)
+        get_count = mock.Mock(side_effect=ValueError())
+        self.patch(gc, 'get_count', get_count)
 
-        get_count()
-        self.mocker.throw(ValueError)
-        self.mocker.replay()
         self.assertIn("Error while trying to dump GC", gc_dump())
 
     def test_gc_dump_error_garbage(self):
@@ -109,9 +94,7 @@ class TestDump(MockerTestCase):
             def __repr__(self):
                 raise ValueError('foo')
 
-        garbage = self.mocker.replace(gc.garbage)
-        # we're exercising the mocker
-        [x for x in garbage]
-        self.mocker.result(iter([Strange()]))
-        self.mocker.replay()
+        garbage = iter([Strange()])
+        self.patch(gc, 'garbage', garbage)
+
         self.assertIn("1 garbage items written", gc_dump())

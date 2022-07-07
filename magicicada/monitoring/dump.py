@@ -23,6 +23,10 @@ import gc
 
 from django.conf import settings
 from django.utils.timezone import now
+try:
+    from meliae import scanner
+except ImportError:
+    scanner = None
 
 
 SIGMELIAE = 44
@@ -30,16 +34,15 @@ SIGMELIAE = 44
 
 def meliae_dump():
     """Dump memory using meliae."""
-    try:
-        from meliae import scanner
+    if scanner is None:
+        return "Meliae not available"
 
+    try:
         dump_dir = settings.LOG_FOLDER
         filename = os.path.join(dump_dir, 'meliae-%s.json' % (
             now().strftime("%Y%m%d%H%M%S",)))
         gc.collect()
         scanner.dump_all_objects(filename)
-    except ImportError as e:
-        return "Meliae not available: %s" % (e,)
     except Exception as e:
         return "Error while trying to dump memory: %s" % (e,)
     else:

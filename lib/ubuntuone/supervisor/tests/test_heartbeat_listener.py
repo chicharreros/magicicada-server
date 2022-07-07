@@ -22,10 +22,9 @@ import json
 import logging
 import time
 import xmlrpclib
-
 from StringIO import StringIO
 
-from mocker import Mocker, expect
+import mock
 from supervisor import states, childutils
 
 from magicicada.testing.testcase import BaseTestCase
@@ -42,8 +41,7 @@ class HeartbeatListenerTestCase(BaseTestCase):
         self.stdin = StringIO()
         self.stdout = StringIO()
         self.stderr = StringIO()
-        self.mocker = Mocker()
-        self.rpc = self.mocker.mock()
+        self.rpc = mock.Mock()
         self.listener = HeartbeatListener(1, 10, ['foo'], [], self.rpc,
                                           stdin=self.stdin, stdout=self.stdout,
                                           stderr=self.stderr)
@@ -54,47 +52,43 @@ class HeartbeatListenerTestCase(BaseTestCase):
             dict(name="heartbeat", group="heartbeat", pid="101", state=RUNNING)
         ]
 
-    def fail_next_stop(self, pname):
-        """Make next stopProcess to fail."""
-        expect(self.rpc.supervisor.stopProcess(pname)).throw(
-            xmlrpclib.Fault(42, "Failed to stop the process."))
-
-    def fail_next_start(self, pname):
-        """Make next startProcess to fail."""
-        expect(self.rpc.supervisor.startProcess(pname)).throw(
-            xmlrpclib.Fault(42, "Failed to start the process."))
-
     def test_restart(self):
         """Test the restart method."""
-        expect(self.rpc.supervisor.stopProcess("foo"))
-        expect(self.rpc.supervisor.startProcess("foo"))
-        with self.mocker:
-            self.listener.restart("foo", "testing")
+        self.listener.restart("foo", "testing")
+
         self.handler.assert_info("Restarting foo (last hearbeat: testing)")
+        self.rpc.supervisor.stopProcess.assert_called_once_with("foo")
+        self.rpc.supervisor.startProcess.assert_called_once_with("foo")
 
     def test_restart_fail_stop(self):
         """Test the restart method failing to stop the process."""
-        self.fail_next_stop("foo")
-        last = time.time()
-        with self.mocker:
-            with self.assertRaises(xmlrpclib.Fault):
-                self.listener.restart("foo", last)
+        self.rpc.supervisor.stopProcess.side_effect = xmlrpclib.Fault(
+            42, "Failed to stop the process.")
 
-            msg = "Failed to stop process %s (last heartbeat: %s), exiting: %s"
-            args = ("foo", last, "<Fault 42: 'Failed to stop the process.'>")
-            self.handler.assert_error(msg % args)
+        last = time.time()
+        with self.assertRaises(xmlrpclib.Fault):
+            self.listener.restart("foo", last)
+
+        msg = "Failed to stop process %s (last heartbeat: %s), exiting: %s"
+        args = ("foo", last, "<Fault 42: 'Failed to stop the process.'>")
+        self.handler.assert_error(msg % args)
+        self.rpc.supervisor.stopProcess.assert_called_once_with("foo")
 
     def test_restart_fail_start(self):
         """Test the restart method failing to start the process."""
-        expect(self.rpc.supervisor.stopProcess("foo"))
-        self.fail_next_start("foo")
+        self.rpc.supervisor.startProcess.side_effect = xmlrpclib.Fault(
+            42, "Failed to start the process.")
+
         last = time.time()
-        with self.mocker:
-            with self.assertRaises(xmlrpclib.Fault):
-                self.listener.restart("foo", last)
-            msg = 'Failed to start process %s after stopping it, exiting: %s'
-            self.handler.assert_error(
-                msg % ("foo", "<Fault 42: 'Failed to start the process.'>"))
+        with self.assertRaises(xmlrpclib.Fault):
+            self.listener.restart("foo", last)
+
+        msg = 'Failed to start process %s after stopping it, exiting: %s'
+        self.handler.assert_error(
+            msg % ("foo", "<Fault 42: 'Failed to start the process.'>"))
+
+        self.rpc.supervisor.stopProcess.assert_called_once_with("foo")
+        self.rpc.supervisor.startProcess.assert_called_once_with("foo")
 
     def test_check_processes(self):
         """Test the check_processes method."""
@@ -111,13 +105,18 @@ class HeartbeatListenerTestCase(BaseTestCase):
             'time': time.time() - (self.listener.timeout + 3)}
         self.listener.data['p-1'] = {
             'time': time.time() - (self.listener.timeout - 1)}
-        expect(self.rpc.supervisor.getAllProcessInfo()).result(self.processes)
-        expect(self.rpc.supervisor.stopProcess("foo:"))
-        expect(self.rpc.supervisor.startProcess("foo:"))
-        expect(self.rpc.supervisor.stopProcess("bar:bar"))
-        expect(self.rpc.supervisor.startProcess("bar:bar"))
-        with self.mocker:
-            self.listener.check_processes()
+        self.rpc.supervisor.getAllProcessInfo.return_value = self.processes
+
+        self.listener.check_processes()
+
+        expected_calls = [
+            mock.call.getAllProcessInfo(),
+            mock.call.stopProcess("foo:"),
+            mock.call.startProcess("foo:"),
+            mock.call.stopProcess("bar:bar"),
+            mock.call.startProcess("bar:bar"),
+        ]
+        self.assertEqual(self.rpc.supervisor.mock_calls, expected_calls)
 
     def test_check_processes_no_data(self):
         """Test the check_processes method with no data of a process."""
@@ -127,20 +126,25 @@ class HeartbeatListenerTestCase(BaseTestCase):
         self.processes.append(dict(name="bar", group="bar", pid="43",
                                    state=RUNNING))
         self.listener.processes = ['bar']
-        expect(self.rpc.supervisor.getAllProcessInfo()).result(self.processes)
-        expect(self.rpc.supervisor.stopProcess("foo:"))
-        expect(self.rpc.supervisor.startProcess("foo:"))
-        expect(self.rpc.supervisor.stopProcess("bar:bar"))
-        expect(self.rpc.supervisor.startProcess("bar:bar"))
-        with self.mocker:
-            # one process to restart
-            self.listener.check_processes()
+        self.rpc.supervisor.getAllProcessInfo.return_value = self.processes
+
+        # one process to restart
+        self.listener.check_processes()
+
         self.handler.assert_warning(
             "Restarting process foo:foo (42), as we never received a hearbeat"
             " event from it")
         self.handler.assert_warning(
             "Restarting process bar:bar (43), as we never received a hearbeat"
             " event from it")
+        expected_calls = [
+            mock.call.getAllProcessInfo(),
+            mock.call.stopProcess("foo:"),
+            mock.call.startProcess("foo:"),
+            mock.call.stopProcess("bar:bar"),
+            mock.call.startProcess("bar:bar"),
+        ]
+        self.assertEqual(self.rpc.supervisor.mock_calls, expected_calls)
 
     def test_check_processes_untracked(self):
         """Test the check_processes method with a untracked proccess."""
@@ -151,13 +155,15 @@ class HeartbeatListenerTestCase(BaseTestCase):
         self.processes.append(dict(name="bar-untracked", group="bar", pid="44",
                                    state=RUNNING))
         self.listener.processes = ['bar']
-        expect(self.rpc.supervisor.getAllProcessInfo()).result(self.processes)
-        with self.mocker:
-            self.listener.check_processes()
+        self.rpc.supervisor.getAllProcessInfo.return_value = self.processes
+
+        self.listener.check_processes()
+
         self.handler.assert_info(
             "Ignoring untracked:foo-untracked (43) as isn't tracked.")
         self.handler.assert_info(
             "Ignoring bar:bar-untracked (44) as isn't tracked.")
+        self.rpc.supervisor.getAllProcessInfo.assert_called_once_with()
 
     def test_check_processes_not_running(self):
         """Test the check_processes method if the proccess isn't running."""
@@ -173,11 +179,13 @@ class HeartbeatListenerTestCase(BaseTestCase):
             'time': time.time() - (self.listener.timeout + 2)}
         self.listener.data['bar'] = {
             'time': time.time() - (self.listener.timeout + 2)}
-        expect(self.rpc.supervisor.getAllProcessInfo()).result(self.processes)
-        with self.mocker:
-            self.listener.check_processes()
+        self.rpc.supervisor.getAllProcessInfo.return_value = self.processes
+
+        self.listener.check_processes()
+
         self.handler.assert_info("Ignoring foo:foo (42) as isn't running.")
         self.handler.assert_info("Ignoring bar:bar (43) as isn't running.")
+        self.rpc.supervisor.getAllProcessInfo.assert_called_once_with()
 
     def test_handle_heartbeat(self):
         """Test handle_heartbeat method."""
@@ -266,11 +274,13 @@ class HeartbeatListenerTestCase(BaseTestCase):
         """Check that we properly check on the specified interval."""
         header = ("ver:3.0 server:supervisor serial:1 pool:heartbeat "
                   "poolserial:1 eventname:TICK_5 len:0\n")
-        expect(self.rpc.supervisor.getAllProcessInfo()).result([])
+        self.rpc.supervisor.getAllProcessInfo.return_value = []
         self.stdin.write(header)
         self.stdin.seek(0)
         self.listener._handle_event()
         self.assertEqual(self.listener.tick_count, 1)
         self.stdin.seek(0)
-        with self.mocker:
-            self.listener._handle_event()
+
+        self.listener._handle_event()
+
+        self.rpc.supervisor.getAllProcessInfo.assert_called_once_with()
