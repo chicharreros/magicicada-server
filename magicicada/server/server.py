@@ -1688,8 +1688,8 @@ class PutContentResponse(SimpleRequestResponse):
             self._log_exception(exc)
             yield self._send_protocol_error(failure)
             yield self.done()
-        except Exception:
-            yield self.internal_error(Failure())
+        except Exception as e:
+            yield self.internal_error(Failure(e))
 
     def _processMessage(self, message):
         """Receive the content for the upload."""

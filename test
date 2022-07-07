@@ -23,13 +23,13 @@
 import os
 import sys
 
+sys.path.insert(0, os.path.abspath('magicicada'))
 sys.path.insert(0, os.path.abspath('lib'))
 
 TESTDIRS = [
+    'lib',
     'magicicada',
 ]
-for td in TESTDIRS:
-    sys.path.insert(0, os.path.abspath(td))
 
 # import unittest first, to break an import loop in the twisted.trial 
 # package: reporter -> unittest -> _asyncrunner -> reporter

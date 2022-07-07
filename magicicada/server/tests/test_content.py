@@ -22,9 +22,9 @@ import logging
 import os
 import uuid
 import zlib
-
 from StringIO import StringIO
 
+import mock
 from magicicadaprotocol import (
     request,
     client as sp_client,
@@ -36,7 +36,6 @@ from magicicadaprotocol.content_hash import (
     crc32,
     magic_hash_factory,
 )
-from mocker import Mocker, expect, ARGS, KWARGS, ANY
 from twisted.internet import defer, reactor, threads, task, address
 from twisted.trial.unittest import TestCase
 from twisted.test.proto_helpers import StringTransport
@@ -441,30 +440,18 @@ class TestGetContent(TestWithDatabase):
     def test_when_to_release(self):
         """GetContent should assign resources before release."""
         storage_server = self.service.factory.buildProtocol('addr')
-        mocker = Mocker()
+        producer = mock.Mock(deferred=defer.Deferred(), name='producer')
+        node = mock.Mock(
+            deflated_size=0, size=0, content_hash='hash', crc32=0, name='node')
+        node.get_content.return_value = defer.succeed(producer)
 
-        producer = mocker.mock()
-        expect(producer.deferred).count(1).result(defer.Deferred())
-        expect(producer.startProducing(ANY))
-
-        node = mocker.mock()
-        expect(node.deflated_size).result(0)
-        expect(node.size).count(2).result(0)
-        expect(node.content_hash).count(2).result('hash')
-        expect(node.crc32).result(0)
-        expect(node.get_content(KWARGS)).result(defer.succeed(producer))
-
-        user = mocker.mock()
-        expect(user.get_node(ARGS)
-               ).result(defer.succeed(node))
-        expect(user.username).result('')
+        user = mock.Mock(username='', name='user')
+        user.get_node.return_value = defer.succeed(node)
         storage_server.user = user
 
-        message = mocker.mock()
-        expect(message.get_content.share).result(str(uuid.uuid4()))
-        expect(message.get_content.node).count(3)
-        expect(message.get_content.hash).count(2)
-        expect(message.get_content.offset)
+        message = mock.Mock(name='message')
+        share_id = uuid.uuid4()
+        message.get_content.share = str(share_id)
 
         self.patch(server.GetContentResponse, 'sendMessage', lambda *a: None)
         gc = server.GetContentResponse(storage_server, message)
@@ -474,9 +461,16 @@ class TestGetContent(TestWithDatabase):
         # must have assigned the producer
         assigned = []
         storage_server.release = lambda a: assigned.append(gc.message_producer)
-        with mocker:
-            yield gc._start()
+        yield gc._start()
+
         self.assertNotEqual(assigned[0], None)
+        user.get_node.assert_called_once_with(
+            share_id, message.get_content.node, message.get_content.hash)
+        node.get_content.assert_called_once_with(
+            user=user, previous_hash=message.get_content.hash,
+            start=message.get_content.offset,
+        )
+        producer.startProducing.assert_called_once_with(mock.ANY)
 
 
 class TestPutContent(TestWithDatabase):
@@ -1064,30 +1058,18 @@ class TestPutContent(TestWithDatabase):
     def test_when_to_release(self):
         """PutContent should assign resources before release."""
         storage_server = self.service.factory.buildProtocol('addr')
-        mocker = Mocker()
+        upload_job = mock.Mock(
+            deferred=defer.succeed(None), offset=0, upload_id="hola",
+            storage_key="storage_key")
+        upload_job.connect.return_value = defer.succeed(None)
 
-        user = mocker.mock()
-        upload_job = mocker.mock()
-        expect(user.get_upload_job(ARGS, KWARGS)).result(
-            defer.succeed(upload_job))
-        expect(upload_job.deferred).result(defer.succeed(None))
-        expect(upload_job.offset).result(0)
-        expect(upload_job.connect()).result(defer.succeed(None))
-        expect(upload_job.upload_id).result("hola")
-        expect(upload_job.storage_key).result("storage_key")
-        expect(user.username).count(2).result('')
+        user = mock.Mock(username='')
+        user.get_upload_job.return_value = defer.succeed(upload_job)
         storage_server.user = user
 
-        message = mocker.mock()
-        expect(message.put_content.share).result(str(uuid.uuid4()))
-        expect(message.put_content.node).count(3)
-        expect(message.put_content.previous_hash)
-        expect(message.put_content.hash).count(2)
-        expect(message.put_content.crc32)
-        expect(message.put_content.size).count(2)
-        expect(message.put_content.deflated_size)
-        expect(message.put_content.magic_hash)
-        expect(message.put_content.upload_id).count(2)
+        share_id = uuid.uuid4()
+        message = mock.Mock()
+        message.put_content.share = str(share_id)
 
         self.patch(server.PutContentResponse, 'sendMessage',
                    lambda *r: None)
@@ -1099,9 +1081,18 @@ class TestPutContent(TestWithDatabase):
         assigned = []
         storage_server.release = lambda r: assigned.append(pc.upload_job)
 
-        with mocker:
-            yield pc._start()
+        yield pc._start()
+
         self.assertEqual(assigned[0], upload_job)
+        user.get_upload_job.assert_called_once_with(
+            share_id, message.put_content.node,
+            message.put_content.previous_hash, message.put_content.hash,
+            message.put_content.crc32, message.put_content.size,
+            message.put_content.deflated_size,
+            session_id=mock.ANY,
+            magic_hash=message.put_content.magic_hash,
+            upload_id=message.put_content.upload_id)
+        upload_job.connect.assert_called_once_with()
 
     def test_putcontent_bad_data(self):
         """Test putting bad data to a file."""
@@ -2569,24 +2560,24 @@ class TestUploadJob(TestWithDatabase):
         """unregisterProducer is never called"""
         size = self.half_size
         deflated_data, _, upload_job = yield self.make_upload(size)
-        mocker = Mocker()
-        producer = mocker.mock()
+        producer = mock.Mock()
         self.patch(upload_job, 'producer', producer)
-        expect(producer.stopProducing())
-        with mocker:
-            yield upload_job.cancel()
+
+        yield upload_job.cancel()
+
+        producer.stopProducing.assert_called_once_with()
 
     @defer.inlineCallbacks
     def test_unregisterProducer_on_stop(self):
         """unregisterProducer isn't called."""
         size = self.half_size
         deflated_data, _, upload_job = yield self.make_upload(size)
-        mocker = Mocker()
-        producer = mocker.mock()
-        expect(producer.stopProducing())
+        producer = mock.Mock()
         self.patch(upload_job, 'producer', producer)
-        with mocker:
-            yield upload_job.stop()
+
+        yield upload_job.stop()
+
+        producer.stopProducing.assert_called_once_with()
 
     @defer.inlineCallbacks
     def test_commit_and_delete_fails(self):
