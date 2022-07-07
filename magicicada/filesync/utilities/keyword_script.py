@@ -110,7 +110,7 @@ if __name__ == "__main__":
                 # 42 is node_id (16 bytes) generation (8 bytes) + overhead
                 cass_col_bytes += kw_bytes + (len(volpath) + 42) * keywords_len
                 if user_kw_cnt > cass_row_width_max:
-                        cass_row_width_max = user_kw_cnt
+                    cass_row_width_max = user_kw_cnt
     finally:
         curr.close()
         conn.close()

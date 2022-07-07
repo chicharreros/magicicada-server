@@ -36,13 +36,13 @@ from distutils.spawn import find_executable
 from twisted.internet import glib2reactor
 glib2reactor.install()  # NOQA: before any reactor import
 
-from django.conf import settings
-from magicicadaclient.platform.linux import tools
-from utilities import utils, dev_launcher
-from twisted.internet import reactor, defer
+from django.conf import settings  # noqa
+from magicicadaclient.platform.linux import tools  # noqa
+from utilities import utils, dev_launcher  # noqa
+from twisted.internet import reactor, defer  # noqa
 
-from magicicada.filesync import services
-from magicicada.server.integration.helpers import debug, retryable
+from magicicada.filesync import services  # noqa
+from magicicada.server.integration.helpers import debug, retryable  # noqa
 
 # to make dbus work
 dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)

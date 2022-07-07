@@ -2200,7 +2200,7 @@ class AuthenticateResponse(SimpleRequestResponse):
     __slots__ = ()
 
     authentication_required = False
-    not_allowed_re = re.compile('[^\w_]')
+    not_allowed_re = re.compile(r'[^\w_]')
 
     user_activity = 'connected'
 

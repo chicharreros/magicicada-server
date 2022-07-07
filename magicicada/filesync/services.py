@@ -1635,8 +1635,8 @@ class StorageUserGateway(GatewayBase):
         nodeids.append(node.id)
         shares = []
         sublist = utils.split_in_list(nodeids)
-        for l in sublist:
-            s = self.get_shares_of_nodes(l, accepted_only=False)
+        for ll in sublist:
+            s = self.get_shares_of_nodes(ll, accepted_only=False)
             shares.extend(list(s))
         for share in shares:
             self.delete_share(share.id)

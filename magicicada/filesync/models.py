@@ -650,7 +650,7 @@ class BaseStorageObject(models.Model):
         # we don't modify the 'path' when unlinking the file, to preserve
         # its location when unlinked
         if self.is_dir and self.live_children.exists():
-                raise NotEmpty("Can't unlink a non empty directory.")
+            raise NotEmpty("Can't unlink a non empty directory.")
 
         if self.parent == ROOT_PARENT:
             raise NoPermission("Can't unlink special files.")

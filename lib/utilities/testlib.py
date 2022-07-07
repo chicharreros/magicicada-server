@@ -71,7 +71,8 @@ class LogsOnFailureDecorator(TestResultDecorator):
     def __init__(self, *a, **k):
         self._logs_positions = {}
         cwd = os.getcwd()
-        self._abspath_logs = [os.path.join(cwd, l) for l in self._logs_to_show]
+        self._abspath_logs = [
+            os.path.join(cwd, ll) for ll in self._logs_to_show]
         TestResultDecorator.__init__(self, *a, **k)
 
     def startTest(self, test):
