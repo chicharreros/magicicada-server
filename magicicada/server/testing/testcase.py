@@ -32,7 +32,7 @@ from magicicadaprotocol.client import StorageClientFactory, StorageClient
 from OpenSSL import crypto
 from twisted.internet import reactor, defer, ssl
 from twisted.internet.protocol import connectionDone
-from twisted.python import failure
+from twisted.python.failure import Failure
 from twisted.trial.unittest import TestCase as TwistedTestCase
 
 from magicicada import settings
@@ -94,13 +94,13 @@ class BaseProtocolTestCase(TwistedTestCase):
             0, auth_provider_class=self.auth_provider_class, status_port=0,
             heartbeat_interval=self.heartbeat_interval)
         yield self.service.startService()
-        self.addCleanup(self.service.stopService)
-        self.addCleanup(logger.info, "finished test %s", self.id())
 
-    def set_debug(self):
-        failure.startDebugMode()
-        defer.setDebugging(True)
-        self.addCleanup(defer.setDebugging, False)
+    @defer.inlineCallbacks
+    def tearDown(self):
+        """Tear down after testing."""
+        yield self.service.stopService()
+        logger.info("finished test %s", self.id())
+        yield super(BaseProtocolTestCase, self).tearDown()
 
     def make_user(self, username=None, **kwargs):
         if username is None:
@@ -322,7 +322,7 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
         def callback(*a):
             """Things worked. This is bad."""
             message = "expected %s failure, but nothing failed" % failure_name
-            return failure.Failure(AssertionError(message))
+            return Failure(AssertionError(message))
 
         def errback(failure):
             """Things broke. Lets see if this is good."""""
