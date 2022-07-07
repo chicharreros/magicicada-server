@@ -21,11 +21,10 @@
 from __future__ import unicode_literals
 
 import uuid
-
 from operator import attrgetter
 
+import mock
 from django.conf import settings
-from mocker import Mocker, expect
 
 from magicicada.filesync import errors, services, utils
 from magicicada.filesync.models import (
@@ -1209,12 +1208,11 @@ class DAOTestCase(StorageDALTestCase):
     def test_reusable_content(self):
         """Test StorageUser.is_reusable_content."""
         user = self.create_user()
-        mocker = Mocker()
-        gw = mocker.mock()
-        expect(gw.is_reusable_content('hash_value', 'magic_hash'))
-        user._gateway = gw
-        with mocker:
-            user.is_reusable_content('hash_value', 'magic_hash')
+        user._gateway = gw = mock.Mock()
+
+        user.is_reusable_content('hash', 'magic_hash')
+
+        gw.is_reusable_content.assert_called_once_with('hash', 'magic_hash')
 
     def test_node_make_content(self):
         """Test the make_content call in the node."""
@@ -1222,29 +1220,24 @@ class DAOTestCase(StorageDALTestCase):
         filenode = user.root.make_file('A new file')
         ohash, nhash, crc32, size = 'old_hash new_hash crc32 size'.split()
         deflated, skey, magic = 'deflated_size storage_key magic_hash'.split()
-        mocker = Mocker()
 
-        # it needs to be reloaded
-        load = mocker.mock()
-        expect(load())
-        filenode._load = load
-
-        # the make content call to the gateway
-        gw = mocker.mock()
+        filenode._load = load = mock.Mock()
         new_node = object()
-        expect(gw.make_content(filenode.id, ohash, nhash, crc32, size,
-                               deflated, skey, magic)).result(new_node)
-        filenode._gateway = gw
+        filenode._gateway = gw = mock.Mock()
+        gw.make_content.return_value = new_node
+        filenode._copy = copy = mock.Mock()
 
+        r = filenode.make_content(
+            ohash, nhash, crc32, size, deflated, skey, magic)
+
+        self.assertIs(r, filenode)
+        # it needs to be reloaded
+        load.assert_called_once_with()
+        # the make content call to the gateway
+        gw.make_content.assert_called_once_with(
+            filenode.id, ohash, nhash, crc32, size, deflated, skey, magic)
         # it needs to copy the stuff to self
-        copy = mocker.mock()
-        expect(copy(new_node))
-        filenode._copy = copy
-
-        with mocker:
-            r = filenode.make_content(ohash, nhash, crc32, size,
-                                      deflated, skey, magic)
-        self.assertTrue(r is filenode)
+        copy.assert_called_once_with(new_node)
 
     def test_get_photo_directories(self):
         """Make file with contentblob."""
