@@ -24,12 +24,11 @@ import os
 import shutil
 import struct
 import sys
-
 from StringIO import StringIO
 
+import mock
 from django.conf import settings
 from magicicadaprotocol import request
-from mocker import Mocker, ANY
 from twisted.internet import reactor, defer
 from twisted.internet.error import ConnectionDone
 from twisted.web import client, error
@@ -112,22 +111,20 @@ class TestBasic(TestWithDatabase):
     @defer.inlineCallbacks
     def test_server_start_stop_metrics(self):
         """Test start/stop metrics."""
-        mocker = Mocker()
+        self.service.metrics = service_meter = mock.Mock(name='meter')
 
-        service_meter = mocker.mock(name='meter')
-        self.service.metrics = service_meter
+        yield self.service.stopService()
+        yield self.service.startService()
 
-        service_meter.meter('server_stop')
-        service_meter.decrement('services_active')
-        service_meter.meter('server_start')
-        service_meter.increment('services_active')
-
-        service_meter.timing("busy.ping", ANY)
-        mocker.count(0, None)
-
-        with mocker:
-            yield self.service.stopService()
-            yield self.service.startService()
+        expected_calls = [
+            mock.call.meter('server_stop'),
+            mock.call.decrement('services_active'),
+            mock.call.meter('server_start'),
+            mock.call.increment('services_active'),
+            # Ping should not be called!
+            # mock.call.timing("busy.ping", mock.ANY),
+        ]
+        self.assertEqual(service_meter.mock_calls, expected_calls)
 
     def test_ping(self):
         """Ping should be done in less than 2ms."""

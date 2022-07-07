@@ -20,13 +20,11 @@
 
 import logging
 import re
-
 from StringIO import StringIO
 
 import OpenSSL
-
+import mock
 from magicicadaprotocol.client import StorageClientFactory, StorageClient
-from mocker import Mocker, expect
 from twisted.internet import defer, reactor, error as txerror, ssl
 from twisted.python import failure
 from twisted.web import client, error as web_error
@@ -75,12 +73,10 @@ class SSLProxyTestCase(TestWithDatabase):
         yield super(SSLProxyTestCase, self).setUp()
         self.handler = self.add_memento_handler(
             ssl_proxy.logger, level=logging.DEBUG)
-        self.ssl_service = ssl_proxy.ProxyService(self.ssl_cert,
-                                                  self.ssl_key,
-                                                  self.ssl_cert_chain,
-                                                  0,  # port
-                                                  "localhost", self.port,
-                                                  "ssl-proxy-test", 0)
+        self.ssl_service = ssl_proxy.ProxyService(
+            self.ssl_cert, self.ssl_key, self.ssl_cert_chain,
+            ssl_port=0, dest_host="localhost", dest_port=self.port,
+            server_name="ssl-proxy-test", status_port=6666)
         # keep metrics in our MetricReceiver
         self.metrics = MetricReceiver()
         self.patch(metrics, 'get_meter', lambda n: self.metrics)
@@ -97,6 +93,9 @@ class SSLProxyTestCase(TestWithDatabase):
 
 class BasicSSLProxyTestCase(SSLProxyTestCase):
     """Basic tests for the ssl proxy service."""
+
+    def get_url(self, url):
+        return client.getPage(url)
 
     def test_server(self):
         """Stop and restart the server."""
@@ -158,8 +157,8 @@ class BasicSSLProxyTestCase(SSLProxyTestCase):
     @defer.inlineCallbacks
     def test_server_status_ok(self):
         """Check that server status page works."""
-        page = yield client.getPage("http://localhost:%i/status" %
-                                    self.ssl_service.status_port)
+        page = yield self.get_url(
+            "http://localhost:%i/status" % self.ssl_service.status_port)
         self.assertEqual("OK", page)
 
     @defer.inlineCallbacks
@@ -167,8 +166,8 @@ class BasicSSLProxyTestCase(SSLProxyTestCase):
         """Check that server status page works."""
         # shutdown the tcp port of the storage server.
         self.service.tcp_service.stopService()
-        d = client.getPage("http://localhost:%i/status" %
-                           (self.ssl_service.status_port,))
+        d = self.get_url(
+            "http://localhost:%i/status" % self.ssl_service.status_port)
         e = yield self.assertFailure(d, web_error.Error)
         self.assertEqual("503", e.status)
         self.assertEqual("Service Unavailable", e.message)
@@ -198,8 +197,8 @@ class SSLProxyHeartbeatTestCase(SSLProxyTestCase):
         d = defer.Deferred()
         reactor.callLater(0.2, d.callback, None)
         yield d
-        self.assertIn('<!--XSUPERVISOR:BEGIN-->', self.stdout.buflist)
-        self.assertIn('<!--XSUPERVISOR:END-->', self.stdout.buflist)
+        self.assertIn('<!--XSUPERVISOR:BEGIN-->', self.stdout.getvalue())
+        self.assertIn('<!--XSUPERVISOR:END-->', self.stdout.getvalue())
 
 
 class ProxyServerTest(TestCase):
@@ -215,34 +214,34 @@ class ProxyServerTest(TestCase):
 
     def test_connectionMade(self):
         """Test connectionMade with handshake done."""
-        mocker = Mocker()
-        metrics = self.server.metrics = mocker.mock()
-        transport = self.server.transport = mocker.mock()
+        metrics = self.server.metrics = mock.Mock()
+        transport = self.server.transport = mock.Mock()
         self.server.factory = ssl_proxy.SSLProxyFactory(0, 'host', 0)
         called = []
         self.patch(reactor, 'connectTCP',
                    lambda *a: called.append('connectTCP'))
-        expect(metrics.meter('frontend_connection_made', 1))
-        expect(transport.getPeer()).result("host:port info").count(1)
-        expect(transport.pauseProducing())
+        transport.getPeer.return_value = "host:port info"
 
-        with mocker:
-            self.server.connectionMade()
-            self.assertEqual(called, ['connectTCP'])
+        self.server.connectionMade()
+
+        self.assertEqual(called, ['connectTCP'])
+        metrics.meter.assert_called_once_with('frontend_connection_made', 1)
+        transport.getPeer.assert_called_once_with()
+        transport.pauseProducing.assert_called_once_with()
 
     def test_connectionLost(self):
         """Test connectionLost method."""
-        mocker = Mocker()
-        metrics = self.server.metrics = mocker.mock()
-        transport = self.server.transport = mocker.mock()
+        metrics = self.server.metrics = mock.Mock()
+        transport = self.server.transport = mock.Mock()
+        transport.getPeer.return_value = "host:port info"
         self.server.peer = self.peer
-        peer_transport = self.peer.transport = mocker.mock()
-        expect(metrics.meter('frontend_connection_lost', 1))
-        expect(transport.getPeer()).result("host:port info").count(1)
-        expect(peer_transport.loseConnection())
+        peer_transport = self.peer.transport = mock.Mock()
 
-        with mocker:
-            self.server.connectionLost()
+        self.server.connectionLost()
+
+        metrics.meter.assert_called_once_with('frontend_connection_lost', 1)
+        transport.getPeer.assert_called_once_with()
+        peer_transport.loseConnection.assert_called_once_with()
 
 
 class MetricReceiver(metrics.FileBasedMeter):

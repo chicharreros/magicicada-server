@@ -21,8 +21,8 @@
 import logging
 import uuid
 
+import mock
 from magicicadaprotocol import protocol_pb2, request
-from mocker import Mocker, expect
 from twisted.internet.defer import inlineCallbacks, succeed
 from twisted.internet import defer, reactor
 from twisted.python.failure import Failure
@@ -62,61 +62,54 @@ class DummyReactor(object):
 
 class TestDelivery(TwistedTestCase):
     """More delivery testing."""
+
     @inlineCallbacks
     def setUp(self):
         """Set up test."""
         yield super(TestDelivery, self).setUp()
-        self.mocker = Mocker()
         self.fake_reactor = DummyReactor()
-        self.content = self.mocker.mock()
+        self.content = mock.Mock()
         self.node_owner_id = 1
         self.node_uuid = uuid.uuid4()
         self.node_hash = "hash:blah"
         self.owner_id = 0
         self.free_bytes = 0
         self.node_volume_id = uuid.uuid4()
-        self.content_node = self.mocker.mock()
+        self.content_node = mock.Mock()
         self.factory = StorageServerFactory(
             content_class=lambda _: self.content, reactor=self.fake_reactor)
 
     @inlineCallbacks
-    def tearDown(self):
-        """Tear down test."""
-        try:
-            self.mocker.verify()
-        finally:
-            yield super(TestDelivery, self).tearDown()
-            self.mocker.restore()
-
-    @inlineCallbacks
     def test_new_volume_generation_ok(self):
         """Test new volume generation delivery ok."""
-        user = self.mocker.mock()
-        expect(self.content.get_user_by_id('user_id')
-               ).count(1).result(succeed(user))
-        expect(user.broadcast).count(1).result(lambda *a, **kw: None)
+        user = mock.Mock()
+        user.broadcast.return_value = None
+        self.content.get_user_by_id.return_value = succeed(user)
 
-        # test
-        self.mocker.replay()
         notif = VolumeNewGeneration('user_id', 'vol_id', 23)
         yield self.factory.deliver_volume_new_generation(notif)
+
+        self.content.get_user_by_id.assert_called_once_with('user_id')
+        user.broadcast.assert_called_once_with(mock.ANY, filter=mock.ANY)
+        [msg] = user.broadcast.call_args.args
+        self.assertEqual(msg.type, protocol_pb2.Message.VOLUME_NEW_GENERATION)
+        self.assertEqual(msg.volume_new_generation.volume, 'vol_id')
+        self.assertEqual(msg.volume_new_generation.generation, 23)
 
     @inlineCallbacks
     def test_new_volume_generation_not_connected(self):
         """Test new volume generation delivery for a not connected user."""
-        expect(self.content.get_user_by_id('user_id')
-               ).count(1).result(succeed(None))
+        self.content.get_user_by_id.return_value = succeed(None)
 
-        # test
-        self.mocker.replay()
         notif = VolumeNewGeneration('user_id', 'vol_id', 23)
         yield self.factory.deliver_volume_new_generation(notif)
+
+        self.content.get_user_by_id.assert_called_once_with('user_id')
 
     @inlineCallbacks
     def test_new_volume_generation_broadcasting_message(self):
         """Test new volume generation delivery with correct message."""
         deferred = defer.Deferred()
-        protocol = self.mocker.mock()
 
         def test(resp, filter):
             """Check that the broadcast message info is ok."""
@@ -126,32 +119,26 @@ class TestDelivery(TwistedTestCase):
             self.assertEqual(resp.volume_new_generation.generation, 66)
 
             # other session, and generations
-            self.mocker.reset()
-            expect(protocol.session_id).count(0, 1).result(uuid.uuid4())
-            expect(protocol.working_caps).count(0, 1).result(['generations'])
-            self.mocker.replay()
+            protocol = mock.Mock(
+                session_id=uuid.uuid4(), working_caps=['generations'])
             self.assertTrue(filter(protocol))
 
             # same session, and generations
-            self.mocker.reset()
-            expect(protocol.session_id).count(0, 1).result(session_id)
-            expect(protocol.working_caps).count(0, 1).result(['generations'])
-            self.mocker.replay()
+            protocol = mock.Mock(
+                session_id=session_id, working_caps=['generations'])
             self.assertFalse(filter(protocol))
 
             deferred.callback(None)
 
-        user = self.mocker.mock()
-        expect(self.content.get_user_by_id('user_id')
-               ).count(1).result(succeed(user))
-        expect(user.broadcast).result(test)
+        user = mock.Mock(broadcast=test)
+        self.content.get_user_by_id.return_value = succeed(user)
 
-        # test
-        self.mocker.replay()
         session_id = uuid.uuid4()
         notif = VolumeNewGeneration('user_id', 'vol_id', 66, session_id)
         yield self.factory.deliver_volume_new_generation(notif)
         yield deferred
+
+        self.content.get_user_by_id.assert_called_once_with('user_id')
 
     @inlineCallbacks
     def test_share_accepted_broadcasting_message(self):
@@ -182,25 +169,16 @@ class TestDelivery(TwistedTestCase):
                              protocol_pb2.Shares.TO_ME)
             deferred_to.callback(None)
 
-        user = self.mocker.mock()
-        user2 = self.mocker.mock()
+        user = mock.Mock(
+            id=from_user, username='from_username', visible_name='from user',
+            broadcast=test_from)
+        user2 = mock.Mock(
+            id=to_user, username='to_username', visible_name='to user name',
+            broadcast=test_to)
+        users = {from_user: user, to_user: user2}
+        self.content.get_user_by_id.side_effect = lambda uid: users[uid]
 
-        for i in range(2):
-            expect(
-                self.content.get_user_by_id(from_user)).result(succeed(user))
-            expect(
-                self.content.get_user_by_id(to_user)).result(succeed(user2))
-
-        expect(user.id).count(2).result(1)
-        expect(user.broadcast).count(1).result(test_from)
-        expect(user.username).count(1).result(u"username")
-        expect(user.visible_name).count(1).result(u"username")
-        expect(user2.id).count(2).result(2)
-        expect(user2.broadcast).count(1).result(test_to)
-
-        # test
-        self.mocker.replay()
-        notif_to = ShareAccepted(share_id, u"name", root_id, from_user,
+        notif_to = ShareAccepted(share_id, "name", root_id, from_user,
                                  to_user, Share.VIEW, True)
         notif_from = ShareAccepted(share_id, u"name", root_id, from_user,
                                    to_user, Share.VIEW, True)
@@ -210,6 +188,14 @@ class TestDelivery(TwistedTestCase):
                                                   recipient_id=from_user)
         yield deferred_from
         yield deferred_to
+
+        expected_calls = [
+            mock.call.get_user_by_id(from_user),
+            mock.call.get_user_by_id(to_user),
+            mock.call.get_user_by_id(from_user),
+            mock.call.get_user_by_id(to_user),
+        ]
+        self.assertEqual(self.content.mock_calls, expected_calls)
 
     @inlineCallbacks
     def test_share_accepted_broadcasting_no_from(self):
@@ -230,21 +216,16 @@ class TestDelivery(TwistedTestCase):
                              protocol_pb2.Shares.TO_ME)
             deferred_to.callback(None)
 
-        user = self.mocker.mock()
-        user2 = self.mocker.mock()
-        for i in range(2):
-            expect(self.content.get_user_by_id(from_user)
-                   ).result(succeed(None))
-            expect(self.content.get_user_by_id(to_user)).result(succeed(user2))
-        expect(self.content.get_user_by_id(from_user, required=True)
-               ).result(succeed(user))
-        expect(user.username).count(1).result(u"username")
-        expect(user.visible_name).count(1).result(u"username")
-        expect(user2.id).count(2).result(2)
-        expect(user2.broadcast).count(1).result(test_to)
-        # test
-        self.mocker.replay()
-        notif = ShareAccepted(share_id, u"name", root_id, from_user, to_user,
+        user = mock.Mock(
+            id=from_user, username='from_username', visible_name='from user',
+            name='from_user')
+        user2 = mock.Mock(
+            id=to_user, username='to_username', visible_name='to user name',
+            broadcast=test_to, name='to_user')
+        self.content.get_user_by_id.side_effect = [
+            None, user2, None, user2, user]
+
+        notif = ShareAccepted(share_id, "name", root_id, from_user, to_user,
                               Share.VIEW, True)
         notif2 = ShareAccepted(share_id, u"name", root_id, from_user, to_user,
                                Share.VIEW, True)
@@ -252,6 +233,15 @@ class TestDelivery(TwistedTestCase):
                                                   recipient_id=from_user)
         yield self.factory.deliver_share_accepted(notif2, recipient_id=to_user)
         yield deferred_to
+
+        expected_calls = [
+            mock.call.get_user_by_id(from_user),
+            mock.call.get_user_by_id(to_user),
+            mock.call.get_user_by_id(from_user),
+            mock.call.get_user_by_id(to_user),
+            mock.call.get_user_by_id(from_user, required=True),
+        ]
+        self.assertEqual(self.content.mock_calls, expected_calls)
 
 
 class NotificationsTestCase(TestWithDatabase):

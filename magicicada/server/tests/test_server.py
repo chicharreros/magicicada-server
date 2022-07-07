@@ -28,9 +28,9 @@ import time
 import uuid
 import weakref
 
+import mock
 from django.utils.timezone import now
 from magicicadaprotocol import protocol_pb2, request
-from mocker import expect, Mocker, MockerTestCase, ARGS, KWARGS, ANY
 from twisted.python.failure import Failure
 from twisted.python import log
 from twisted.internet import defer, task, error as txerror
@@ -200,10 +200,13 @@ class BaseStorageServerTestCase(BaseTestCase, TwistedTestCase):
 
     def assert_correct_comment(self, comment, msg):
         """Ckeck that error sent had `msg' as comment."""
-        self.assertTrue(comment is not None)
+        self.assertIsNotNone(comment)
         self.assertTrue(len(comment) > 0)
-        error_msg = 'msg ("%s") must be in comment field ("%s").'
-        self.assertTrue(unicode(msg) in comment, error_msg % (msg, comment))
+        if isinstance(msg, str):
+            msg = msg.decode('utf-8')
+        else:
+            msg = unicode(msg)
+        self.assertIn(msg, comment)
 
     def fail_please(self, failure):
         """Return a function that raises 'failure'."""
@@ -331,7 +334,8 @@ class StorageServerTestCase(BaseStorageServerTestCase):
         """Test error handling for execute_next_request."""
         failure = Exception(self.msg)
         next_req = (request.Request(None), self.fail_please(failure))
-        self.server.pending_requests = collections.deque([next_req])
+        self.patch(
+            self.server, 'pending_requests', collections.deque([next_req]))
         self.server.execute_next_request()
 
         self.handler.assert_exception(failure, next_req[0].__class__.__name__)
@@ -609,8 +613,8 @@ class StorageServerRequestResponseTestCase(BaseStorageServerTestCase):
     def test_protocol_gone_raise_error(self):
         """Test that ProtocolReferenceError is raised."""
         # patch _protocol_ref to return None, and fake a gc'ed protocol.
-        self.response.use_protocol_weakref = True
-        self.response._protocol_ref = lambda: None
+        self.patch(self.response, 'use_protocol_weakref', True)
+        self.patch(self.response, '_protocol_ref', lambda: None)
         self.assertRaises(errors.ProtocolReferenceError,
                           self.response._get_protocol)
 
@@ -819,24 +823,25 @@ class SimpleRequestResponseTestCase(StorageServerRequestResponseTestCase):
 
     def test_send_protocol_error_try_again_is_metered(self):
         """_send_protocol_error sends metrics on TryAgain errors."""
-        mocker = Mocker()
-        mock_metrics = mocker.mock(metrics.FileBasedMeter)
-        self.response.protocol.factory.metrics = mock_metrics
-        mock_metrics.meter("TRY_AGAIN.ValueError", 1)
-        with mocker:
-            failure = Failure(errors.TryAgain(ValueError(self.msg)))
-            self.response._send_protocol_error(failure=failure)
+        mock_metrics = mock.Mock(metrics.FileBasedMeter)
+        self.patch(self.response.protocol.factory, 'metrics', mock_metrics)
+
+        failure = Failure(errors.TryAgain(ValueError(self.msg)))
+        self.response._send_protocol_error(failure=failure)
+
+        mock_metrics.meter.assert_called_once_with("TRY_AGAIN.ValueError", 1)
 
     def test_send_protocol_error_converted_try_again_is_metered(self):
         """_send_protocol_error sends metrics on convertd TryAgain errors."""
-        mocker = Mocker()
-        mock_metrics = mocker.mock(metrics.FileBasedMeter)
-        self.response.protocol.factory.metrics = mock_metrics
+        mock_metrics = mock.Mock(metrics.FileBasedMeter)
+        self.patch(self.response.protocol.factory, 'metrics', mock_metrics)
         error = self.response.try_again_errors[0]
-        mock_metrics.meter("TRY_AGAIN.%s" % error.__name__, 1)
-        with mocker:
-            failure = Failure(error(self.msg))
-            self.response._send_protocol_error(failure=failure)
+
+        failure = Failure(error(self.msg))
+        self.response._send_protocol_error(failure=failure)
+
+        mock_metrics.meter.assert_called_once_with(
+            "TRY_AGAIN.%s" % error.__name__, 1)
 
     def test_send_protocol_error_locked_user(self):
         """_send_protocol_error handles the LockedUserError"""
@@ -971,6 +976,8 @@ class SimpleRequestResponseTestCase(StorageServerRequestResponseTestCase):
     def test_cancel_filter(self):
         """Test the cancel_filter decorator."""
         self.response_class.fakefunction = cancel_filter(lambda *a: 'hi')
+        self.addCleanup(delattr, self.response_class, 'fakefunction')
+
         self.assertEqual(self.response.fakefunction(self.response), "hi")
         self.response.cancelled = True
         self.assertRaises(request.RequestCancelledError,
@@ -981,16 +988,7 @@ class SimpleRequestResponseTestCase(StorageServerRequestResponseTestCase):
         # remove the default request
         del self.server.requests[42]
         # set a fake user.
-        mocker = Mocker()
-        self.server.user = mocker.mock(count=False)
-        expect(self.server.user.username).result("username")
-        expect(self.server.user.id).result(1)
-        expect(self.server.user.reuse_content).result(noop)
-        expect(self.server.user.get_upload_job).result(
-            lambda *a, **k: defer.Deferred())
-        expect(self.server.user.get_node).result(
-            lambda *a, **k: defer.Deferred())
-        mocker.replay()
+        self.server.user = mock.Mock(username="username", id=1)
 
         cleaned = []
         orig_cleanup = self.response_class.cleanup
@@ -1046,31 +1044,37 @@ class SimpleRequestResponseTestCase(StorageServerRequestResponseTestCase):
 
     def test_sli_informed_on_done_default(self):
         """The SLI is informed when all ok."""
-        mocker = Mocker()
-        mock_metrics = mocker.patch(self.response.protocol.factory.sli_metrics)
-        expect(mock_metrics.timing(self.response_class.__name__, ANY))
+        mock_metrics = mock.Mock()
+        self.patch(self.response.protocol.factory, 'sli_metrics', mock_metrics)
         self.response.start_time = time.time()
-        with mocker:
-            self.response.done()
+
+        self.response.done()
+
+        mock_metrics.timing.assert_called_once_with(
+            self.response_class.__name__, mock.ANY)
 
     def test_sli_informed_on_done_some_value(self):
         """The SLI is informed when all ok."""
-        mocker = Mocker()
-        mock_metrics = mocker.patch(self.response.protocol.factory.sli_metrics)
+        mock_metrics = mock.Mock()
+        self.patch(self.response.protocol.factory, 'sli_metrics', mock_metrics)
         op_length = 12345
-        expect(mock_metrics.timing(self.response_class.__name__, ANY))
         self.response.start_time = time.time()
-        with mocker:
-            self.response.length = op_length
-            self.response.done()
+
+        self.response.length = op_length
+        self.response.done()
+
+        mock_metrics.timing.assert_called_once_with(
+            self.response_class.__name__, mock.ANY)
 
     def test_sli_informed_on_error(self):
         """The SLI is informed after a problem."""
-        mocker = Mocker()
-        mock_metrics = mocker.patch(self.response.protocol.factory.sli_metrics)
-        expect(mock_metrics.report('sli_error', self.response_class.__name__))
-        with mocker:
-            self.response.error(ValueError())
+        mock_metrics = mock.Mock()
+        self.patch(self.response.protocol.factory, 'sli_metrics', mock_metrics)
+
+        self.response.error(ValueError())
+
+        mock_metrics.report.assert_called_once_with(
+            'sli_error', self.response_class.__name__)
 
 
 class ListSharesTestCase(SimpleRequestResponseTestCase):
@@ -1081,29 +1085,29 @@ class ListSharesTestCase(SimpleRequestResponseTestCase):
     @defer.inlineCallbacks
     def test_process_set_length(self):
         """Set length attribute while processing."""
-        mocker = Mocker()
-
         # fake share
         share = dict(id=None, from_me=None, to_me=None, root_id=None,
                      name=u'name', shared_by_username=u'sby', accepted=False,
                      shared_to_username=u'sto', shared_by_visible_name=u'vby',
                      shared_to_visible_name=u'vto', access=Share.VIEW)
-
         # fake user
-        user = mocker.mock()
+        user = mock.Mock(root_volume_id='')
         shared_by = [share] * 3
         shared_to = [share] * 2
-        expect(user.list_shares()
-               ).result((shared_by, shared_to))
-        expect(user.get_volume_id(None)
-               ).count(3).result(None)
-        expect(user.root_volume_id).count(3).result('')
+        user.list_shares.return_value = (shared_by, shared_to)
+        user.get_volume_id.return_value = None
         self.response.protocol.user = user
 
-        with mocker:
-            yield self.response._process()
+        yield self.response._process()
 
         self.assertEqual(self.response.length, 5)
+        expected_calls = [
+            mock.call.list_shares(),
+            mock.call.get_volume_id(None),
+            mock.call.get_volume_id(None),
+            mock.call.get_volume_id(None),
+        ]
+        self.assertEqual(user.mock_calls, expected_calls)
 
 
 class ShareAcceptedTestCase(SimpleRequestResponseTestCase):
@@ -1156,27 +1160,23 @@ class ListVolumesTestCase(SimpleRequestResponseTestCase):
     @defer.inlineCallbacks
     def test_process_set_length(self):
         """Set length attribute while processing."""
-        mocker = Mocker()
-
         # fake share
         share = dict(id=None, root_id=None, name=u'name', path=u"somepath",
                      shared_by_username=u'sby', accepted=False,
                      shared_by_visible_name=u'vby', access=Share.VIEW,
                      generation=9, free_bytes=123)
-
         # fake user
-        user = mocker.mock()
+        user = mock.Mock()
         root = share
         shares = [share] * 3
         udfs = [share] * 2
-        expect(user.list_volumes()
-               ).result((root, shares, udfs, 123))
+        user.list_volumes.return_value = (root, shares, udfs, 123)
         self.response.protocol.user = user
 
-        with mocker:
-            yield self.response._process()
+        yield self.response._process()
 
         self.assertEqual(self.response.length, 6)
+        user.list_volumes.assert_called_once_with()
 
 
 class ChangePublicAccessTestCase(SimpleRequestResponseTestCase):
@@ -1193,19 +1193,17 @@ class ListPublicFilesTestCase(SimpleRequestResponseTestCase):
     @defer.inlineCallbacks
     def test_process_set_values(self):
         """Set length attribute and operation data while processing."""
-        mocker = Mocker()
-
-        user = mocker.mock()
+        user = mock.Mock()
         self.response.protocol.user = user
 
         nodes = [FakeNode(), FakeNode()]
-        expect(user.list_public_files()).result(nodes)
+        user.list_public_files.return_value = nodes
 
-        with mocker:
-            yield self.response._process()
+        yield self.response._process()
 
         self.assertEqual(self.response.length, 2)
         self.assertEqual(self.response.operation_data, "public_files=2")
+        user.list_public_files.assert_called_once_with()
 
 
 class UnlinkTestCase(SimpleRequestResponseTestCase):
@@ -1297,21 +1295,25 @@ class GetContentResponseTestCase(SimpleRequestResponseTestCase):
 
     def test_transferred_informed_on_done(self):
         """The transferred quantity is informed when all ok."""
-        mocker = Mocker()
-        mock_metrics = mocker.patch(self.response.protocol.factory.metrics)
-        expect(mock_metrics.gauge('GetContentResponse.transferred', 123))
-        with mocker:
-            self.response.transferred = 123
-            self.response.done()
+        mock_metrics = mock.Mock()
+        self.patch(self.response.protocol.factory, 'metrics', mock_metrics)
+
+        self.response.transferred = 123
+        self.response.done()
+
+        mock_metrics.gauge.assert_called_once_with(
+            'GetContentResponse.transferred', 123)
 
     def test_transferred_informed_on_error(self):
         """The transferred quantity is informed after a problem."""
-        mocker = Mocker()
-        mock_metrics = mocker.patch(self.response.protocol.factory.metrics)
-        expect(mock_metrics.gauge('GetContentResponse.transferred', 123))
-        with mocker:
-            self.response.transferred = 123
-            self.response.error(ValueError())
+        mock_metrics = mock.Mock()
+        self.patch(self.response.protocol.factory, 'metrics', mock_metrics)
+
+        self.response.transferred = 123
+        self.response.error(ValueError())
+
+        mock_metrics.gauge.assert_called_once_with(
+            'GetContentResponse.transferred', 123)
 
     def test_sli_informed_on_done_default(self):
         """The SLI is NOT informed when all ok."""
@@ -1338,35 +1340,30 @@ class GetContentResponseTestCase(SimpleRequestResponseTestCase):
 
     def test_sli_informed_on_init(self):
         """The SLI is informed after the operation init part."""
-        mocker = Mocker()
-
         # fake producer
-        producer = mocker.mock()
-
+        producer = mock.Mock()
         # some node
-        node = mocker.mock()
-        expect(node.deflated_size).result(3)
-        expect(node.size).count(2).result(2)
-        expect(node.content_hash).count(2).result('hash')
-        expect(node.crc32).result(123)
-        expect(node.get_content(KWARGS)).result(defer.succeed(producer))
-
+        node = mock.Mock(
+            deflated_size=3, size=2, content_hash='hash', crc32=123)
+        node.get_content.return_value = defer.succeed(producer)
         # the user
-        fake_user = mocker.mock()
-        expect(fake_user.get_node(None, '', '')).result(defer.succeed(node))
-        expect(fake_user.username).count(3).result('username')
+        fake_user = mock.Mock(username='username', name='user')
+        fake_user.get_node.return_value = defer.succeed(node)
         self.patch(self.response.protocol, 'user', fake_user)
-
         # the metric itself
-        mock_metrics = mocker.patch(self.response.protocol.factory.sli_metrics)
-        expect(mock_metrics.timing('GetContentResponseInit', ANY))
+        mock_metrics = mock.Mock()
+        self.patch(self.response.protocol.factory, 'sli_metrics', mock_metrics)
 
-        with mocker:
-            self.response._start()
+        self.response._start()
+
+        fake_user.get_node.assert_called_once_with(None, '', '')
+        node.get_content.assert_called_once_with(
+            user=fake_user, previous_hash='', start=0)
+        mock_metrics.timing.assert_called_once_with(
+            'GetContentResponseInit', mock.ANY)
 
 
-class PutContentResponseTestCase(SimpleRequestResponseTestCase,
-                                 MockerTestCase):
+class PutContentResponseTestCase(SimpleRequestResponseTestCase):
     """Test the PutContentResponse class."""
 
     # subclass PutContentResponse so we have a __dict__ and can patch it.
@@ -1386,6 +1383,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
 
         def stop(self):
             """Fake."""
+            self.called.append('stop')
 
         def connect(self):
             """Flag the call."""
@@ -1398,6 +1396,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
         def add_data(self, bytes):
             """Add data."""
             self.bytes += bytes
+            self.called.append({'add_data': bytes})
 
         def registerProducer(self, producer):
             """Register the producer."""
@@ -1435,21 +1434,25 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
 
     def test_transferred_informed_on_done(self):
         """The transferred quantity is informed when all ok."""
-        mocker = Mocker()
-        mock_metrics = mocker.patch(self.response.protocol.factory.metrics)
-        expect(mock_metrics.gauge('PutContentResponse.transferred', 123))
-        with mocker:
-            self.response.transferred = 123
-            self.response.done()
+        mock_metrics = mock.Mock()
+        self.patch(self.response.protocol.factory, 'metrics', mock_metrics)
+
+        self.response.transferred = 123
+        self.response.done()
+
+        mock_metrics.gauge.assert_called_once_with(
+            'PutContentResponse.transferred', 123)
 
     def test_transferred_informed_on_error(self):
         """The transferred quantity is informed after a problem."""
-        mocker = Mocker()
-        mock_metrics = mocker.patch(self.response.protocol.factory.metrics)
-        expect(mock_metrics.gauge('PutContentResponse.transferred', 123))
-        with mocker:
-            self.response.transferred = 123
-            self.response.error(ValueError())
+        mock_metrics = mock.Mock()
+        self.patch(self.response.protocol.factory, 'metrics', mock_metrics)
+
+        self.response.transferred = 123
+        self.response.error(ValueError())
+
+        mock_metrics.gauge.assert_called_once_with(
+            'PutContentResponse.transferred', 123)
 
     def test_sli_informed_on_done_default(self):
         """The SLI is informed when all ok."""
@@ -1477,129 +1480,140 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
     @defer.inlineCallbacks
     def test_sli_informed_on_init(self):
         """The SLI is informed after the operation init part."""
-        mocker = Mocker()
-
         # fake uploadjob
-        uploadjob = mocker.mock()
-        expect(uploadjob.deferred).result(defer.Deferred())
-        expect(uploadjob.connect()).result(defer.succeed(None))
-        expect(uploadjob.stop()).result(defer.succeed(None))
+        uploadjob = mock.Mock(deferred=defer.Deferred())
+        uploadjob.connect.return_value = defer.succeed(None)
+        uploadjob.stop.return_value = defer.succeed(None)
         self.patch(self.response, '_get_upload_job',
                    lambda: defer.succeed(uploadjob))
-
         # the user
-        fake_user = mocker.mock()
-        expect(fake_user.username).count(5).result('username')
+        fake_user = mock.Mock(username='foo')
         self.patch(self.response.protocol, 'user', fake_user)
 
         # the metric itself
-        mock_metrics = mocker.patch(self.response.protocol.factory.sli_metrics)
-        expect(mock_metrics.timing('PutContentResponseInit', ANY))
+        mock_metrics = mock.Mock()
+        self.patch(self.response.protocol.factory, 'sli_metrics', mock_metrics)
 
-        with mocker:
-            yield self.response._start()
+        yield self.response._start()
+
+        mock_metrics.timing.assert_called_once_with(
+            'PutContentResponseInit', mock.ANY)
+
+        uploadjob.connect.assert_called_once_with()
+        uploadjob.stop.assert_called_once_with()
 
     @defer.inlineCallbacks
     def test_sli_informed_on_commit(self):
         """The SLI is informed after the operation commit part."""
-        mocker = Mocker()
         self.response.state = PutContentResponse.states.commiting
         self.patch(self.response, 'queue_action', lambda _: defer.succeed(0))
 
         # the metric itself
-        mock_metrics = mocker.patch(self.response.protocol.factory.sli_metrics)
-        expect(mock_metrics.timing('PutContentResponseCommit', ANY))
+        mock_metrics = mock.Mock()
+        self.patch(self.response.protocol.factory, 'sli_metrics', mock_metrics)
 
-        with mocker:
-            yield self.response._commit_uploadjob('result')
+        yield self.response._commit_uploadjob('result')
+
+        mock_metrics.timing.assert_called_once_with(
+            'PutContentResponseCommit', mock.ANY)
 
     def test_start_authentication_required(self):
         """Test that _start sends the optional comment on errors."""
         assert self.response.protocol.user is None
+        self.response._log_start = mock.Mock()
+        self.response.sendError = mock.Mock()
+        self.response.done = mock.Mock()
 
-        response = self.mocker.patch(self.response)
-        expect(response._log_start())
-        expect(response.sendError(protocol_pb2.Error.AUTHENTICATION_REQUIRED,
-                                  comment=self.response.auth_required_error))
-        expect(response.done())
+        self.response._start()
 
-        self.mocker.replay()
-        response._start()
-        self.assertEqual(response.state, PutContentResponse.states.done)
+        self.assertEqual(self.response.state, PutContentResponse.states.done)
+        self.response._log_start.assert_called_once_with()
+        self.response.sendError.assert_called_once_with(
+            protocol_pb2.Error.AUTHENTICATION_REQUIRED,
+            comment=self.response.auth_required_error)
+        self.response.done.assert_called_once_with()
 
     def test_start_upload_started_ok(self):
         """Test _start starts an upload."""
         self.response.protocol.user = 'user'
+        self.response._log_start = mock.Mock()
+        self.response._start_upload = mock.Mock(return_value=defer.Deferred())
 
-        response = self.mocker.patch(self.response)
-        expect(response._log_start())
-        expect(response._start_upload()).result(defer.Deferred())
+        self.response._start()
 
-        self.mocker.replay()
-        response._start()
-        self.assertEqual(response.state, PutContentResponse.states.init)
+        self.assertEqual(self.response.state, PutContentResponse.states.init)
+        self.response._log_start.assert_called_once_with()
+        self.response._start_upload.assert_called_once_with()
 
     def test_start_upload_started_error(self):
         """Test _start calls to generic error after a failing upload start."""
         self.response.protocol.user = 'user'
 
-        response = self.mocker.patch(self.response)
-        expect(response._log_start())
+        self.response._log_start = mock.Mock()
         failure = Failure(NameError('foo'))
-        expect(response._start_upload()).result(defer.fail(failure))
-        expect(response._generic_error(failure))
+        self.response._start_upload = mock.Mock(
+            return_value=defer.fail(failure))
+        self.response._generic_error = mock.Mock()
 
-        self.mocker.replay()
-        response._start()
+        self.response._start()
+
+        self.response._log_start.assert_called_once_with()
+        self.response._start_upload.assert_called_once_with()
+        self.response._generic_error.assert_called_once_with(failure)
 
     def test_upload_last_good_state(self):
         """Test that last_good_state_ts gets updated as expected."""
         upload_job = self.FakeUploadJob()
         upload_job.offset = 0
         upload_job.upload_id = str(uuid.uuid4())
-        user = self.mocker.mock()
+
+        user = mock.Mock(username='username', name='name')
+        user.get_upload_job.return_value = upload_job
         self.response.protocol.user = user
-        transport = self.mocker.mock()
+
+        transport = mock.Mock(name='transport')
         self.server.transport = transport
-        response = self.mocker.patch(self.response)
+        transport.getPeer.return_value = FakedPeer()
 
-        expect(response._log_start())
-        expect(response.upload_job).result(upload_job).count(1, None)
-        expect(transport.getPeer()).result(FakedPeer()).count(1, None)
-        expect(user.username).result('username').count(1, None)
-        expect(user.get_upload_job(ARGS, KWARGS)).result(upload_job)
-        expect(upload_job.registerProducer(transport))
+        self.response._log_start = mock.Mock()
+        self.response.upload_job = upload_job
 
-        self.mocker.replay()
         before = time.time()
         time.sleep(.1)
-        response.start()
+        self.response.start()
         after = time.time()
-        self.assertTrue(before < response.last_good_state_ts <= after)
+        self.assertTrue(before < self.response.last_good_state_ts <= after)
         time.sleep(.1)
 
         bytes_msg = self.make_protocol_message('BYTES')
         bytes_msg.bytes.bytes = "123"
 
-        response.processMessage(bytes_msg)
+        self.response.processMessage(bytes_msg)
 
-        self.assertTrue(response.last_good_state_ts > after)
+        self.assertTrue(self.response.last_good_state_ts > after)
         self.assertEqual("123", upload_job.bytes)
-        self.assertEqual(response.state, PutContentResponse.states.uploading)
+        self.assertEqual(
+            self.response.state, PutContentResponse.states.uploading)
+
+        user.get_upload_job.assert_called_once_with(
+            None, '', '', '', 0, 0, 0, session_id=self.session_id,
+            magic_hash=None, upload_id=None)
+        self.response._log_start.assert_called_once_with()
+        transport.getPeer.assert_called()
+        expected_calls = [  # XXX: missing 'registerProducer'
+            'connect', {'add_data': '123'}]
+        self.assertEqual(upload_job.called, expected_calls)
 
     def test__cancel_uploadjob_cancelled(self):
         """Test cancel cancelling the upload_job."""
         self.response.state = PutContentResponse.states.canceling
         self.response.cancel_message = self.make_protocol_message(msg_id=123)
+        self.response.upload_job = mock.Mock()
 
-        mocker = Mocker()
-        upload_job = mocker.mock()
-        self.response.upload_job = upload_job
-        expect(upload_job.cancel())
+        self.response._cancel()
 
-        with mocker:
-            self.response._cancel()
         self.handler.assert_debug("Canceling the upload job")
+        self.response.upload_job.cancel.assert_called_once_with()
 
     def test__cancel_uploadjob_cancel_None(self):
         """Test cancel not having an upload_job."""
@@ -1614,14 +1628,12 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
     def test__cancel_uploadjob_stopped(self):
         """Test cancel cancelling the upload_job."""
         assert self.response.state != PutContentResponse.states.canceling
-        mocker = Mocker()
-        upload_job = mocker.mock()
-        self.response.upload_job = upload_job
-        expect(upload_job.stop())
+        self.response.upload_job = mock.Mock()
 
-        with mocker:
-            self.response._cancel()
+        self.response._cancel()
+
         self.handler.assert_debug("Stoping the upload job after a cancel")
+        self.response.upload_job.stop.assert_called_once_with()
 
     def test__cancel_uploadjob_stop_None(self):
         """Test cancel not having an upload_job."""
@@ -1665,10 +1677,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
     def test__cancel_always_move_to_canceling(self):
         """Test that we always move to canceling state."""
         assert self.response.state == PutContentResponse.states.init
-
-        mocker = Mocker()
-        upload_job = mocker.mock()
-        self.response.upload_job = upload_job
+        self.response.upload_job = upload_job = mock.Mock()
 
         # be sure to close the request
         called = []
@@ -1678,16 +1687,16 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
             """Save current state."""
             called.append(self.response.state)
 
-        expect(upload_job.stop()).call(save_state).count(1)
+        upload_job.stop.side_effect = save_state
         # call and check
-        with mocker:
-            self.response._cancel()
+        self.response._cancel()
 
         self.handler.assert_debug("Request canceled (in INIT)")
         self.assertEqual(len(called), 2)
         self.assertEqual(called[0], PutContentResponse.states.canceling)
         self.assertEqual(called[1], True)
         self.assertEqual(self.response.state, PutContentResponse.states.done)
+        upload_job.stop.assert_called_once_with()
 
     def test_genericerror_log_error(self):
         """Generic error logs when called with an error."""
@@ -1727,29 +1736,26 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
 
     def test_genericerror_stop_uploadjob(self):
         """Stop the upload job if has one."""
-        mocker = Mocker()
-        upload_job = mocker.mock()
-        self.response.upload_job = upload_job
-        expect(upload_job.stop())
-        expect(upload_job.inflated_size_hint)
+        self.response.upload_job = mock.Mock()
 
-        with mocker:
-            self.response._generic_error(NameError('foo'))
+        self.response._generic_error(NameError('foo'))
+
         self.handler.assert_debug("Stoping the upload job after an error")
+        self.response.upload_job.stop.assert_called_once_with()
 
     def test_try_again_handling(self):
         """Test how a TRY_AGAIN error is handled."""
         # several patches
         self.response.upload_job = self.FakeUploadJob()
         size_hint = self.response.upload_job.inflated_size_hint
-        mocker = Mocker()
-        metrics = mocker.mock()
+        metrics = mock.Mock()
         self.response.protocol.factory.metrics = metrics
+        # These are commented out since the open source fork was published
         # expect(metrics.gauge("upload_error.TRY_AGAIN.NameError", size_hint))
 
         # call and test
-        with mocker:
-            self.response._log_exception(errors.TryAgain(NameError('foo')))
+        self.response._log_exception(errors.TryAgain(NameError('foo')))
+
         self.handler.assert_debug("TryAgain", "NameError", str(size_hint))
 
     def test_genericerror_requestcancelled_canceling(self):
@@ -1766,61 +1772,78 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
         """Test how a RequestCancelledError error is handled in other state."""
         assert self.response.state != PutContentResponse.states.canceling
         self.response.upload_job = self.FakeUploadJob()
-        response = self.mocker.patch(self.response)
+
         failure = Failure(request.RequestCancelledError("foo"))
+        # These are commented out since the open source fork was published
         # expect(response.protocol.factory.metrics.gauge(
         #     "upload_error.RequestCancelledError", 1000))
-        expect(response._send_protocol_error(failure))
-        expect(response.done())
+        self.response.protocol.factory.metrics = mock.Mock()
+        self.response._send_protocol_error = mock.Mock()
+        self.response.done = mock.Mock()
 
-        self.mocker.replay()
-        response._generic_error(failure)
-        self.assertEqual(response.state, PutContentResponse.states.error)
+        self.response._generic_error(failure)
+
+        self.assertEqual(self.response.state, PutContentResponse.states.error)
         self.handler.assert_debug("RequestCancelledError", str(1000))
+        self.response._send_protocol_error.assert_called_once_with(failure)
+        self.response.done.assert_called_once_with()
 
     def test_genericerror_other_errors_ok(self):
         """Generic error handling."""
         self.response.upload_job = self.FakeUploadJob()
-        response = self.mocker.patch(self.response)
         failure = Failure(NameError("foo"))
+        # These are commented out since the open source fork was published
         # expect(response.protocol.factory.metrics.gauge(
         #     "upload_error.NameError", 1000))
-        expect(response._send_protocol_error(failure))
-        expect(response.done())
+        self.response._send_protocol_error = mock.Mock()
+        self.response.done = mock.Mock()
 
-        self.mocker.replay()
-        response._generic_error(failure)
-        self.assertEqual(response.state, PutContentResponse.states.error)
+        self.response._generic_error(failure)
+
+        self.assertEqual(self.response.state, PutContentResponse.states.error)
         self.handler.assert_debug("NameError", str(1000))
+        self.response._send_protocol_error.assert_called_once_with(failure)
+        self.response.done.assert_called_once_with()
 
     def test_genericerror_other_errors_problem_sendprotocolerror(self):
         """Handle problems in the _send_protocol_error() call."""
-        response = self.mocker.patch(self.response)
-        expect(response._send_protocol_error(ARGS)).throw(Exception("broken"))
+        error = Exception("broken")
+        self.response._send_protocol_error = mock.Mock(side_effect=error)
         internal = []
         self.response.internal_error = internal.append
 
-        self.mocker.replay()
-        response._generic_error(ValueError('error'))
-        self.assertEqual(response.state, PutContentResponse.states.error)
+        real_error = ValueError('error')
+        self.response._generic_error(real_error)
+
+        self.assertEqual(self.response.state, PutContentResponse.states.error)
         error = internal[0].value
         self.assertTrue(isinstance(error, Exception))
         self.assertEqual(str(error), "broken")
+        self.response._send_protocol_error.assert_called_once_with(mock.ANY)
+        [actual] = self.response._send_protocol_error.call_args.args
+        self.assertIsInstance(actual, Failure)
+        self.assertEqual(actual.value, real_error)
 
     def test_genericerror_other_errors_problem_done(self):
         """Handle problems in the done() call."""
-        response = self.mocker.patch(self.response)
-        expect(response._send_protocol_error(ARGS)).result(defer.succeed(True))
-        expect(response.done()).throw(Exception("broken"))
+        self.response._send_protocol_error = mock.Mock(
+            return_value=defer.succeed(True))
+        error = Exception("broken")
+        self.response.done = mock.Mock(side_effect=error)
         internal = []
         self.response.internal_error = internal.append
 
-        self.mocker.replay()
-        response._generic_error(ValueError('error'))
-        self.assertEqual(response.state, PutContentResponse.states.error)
+        real_error = ValueError('error')
+        self.response._generic_error(real_error)
+
+        self.assertEqual(self.response.state, PutContentResponse.states.error)
         error = internal[0].value
         self.assertTrue(isinstance(error, Exception))
         self.assertEqual(str(error), "broken")
+        [actual] = self.response._send_protocol_error.call_args.args
+        self.assertIsInstance(actual, Failure)
+        self.assertEqual(actual.value, real_error)
+        self.response.done.assert_called_once_with()
 
     @defer.inlineCallbacks
     def test__get_upload_job(self):
@@ -1840,43 +1863,47 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
         response = PutContentResponse(self.server, message)
         response.protocol.working_caps = []
         response.protocol.session_id = 'abc'
-        response.protocol.user = self.mocker.mock()
-        response.protocol.user.get_upload_job(
+        response.protocol.user = mock.Mock()
+        response.protocol.user.get_upload_job.return_value = 'TheUploadJob'
+
+        uploadjob = yield response._get_upload_job()
+
+        self.assertEqual(uploadjob, 'TheUploadJob')
+        response.protocol.user.get_upload_job.assert_called_once_with(
             share_id, 'abc', 'p_hash', 'hash', 1, 2, 3,
             session_id='abc', magic_hash='magic', upload_id=upload_id)
-        self.mocker.result('TheUploadJob')
-        self.mocker.replay()
-        uploadjob = yield response._get_upload_job()
-        self.assertEqual(uploadjob, 'TheUploadJob')
 
     def test_processmessage_uploading_ok(self):
         """Process a message while uploading, all ok."""
         self.response.state = PutContentResponse.states.uploading
-        response = self.mocker.patch(self.response)
+        self.response._process_while_uploading = mock.Mock()
 
         # all message types
         all_msgs = []
+        expected_calls = []
         for mtype in "CANCEL_REQUEST EOF BYTES".split():
             message = self.make_protocol_message(msg_type=mtype)
-            expect(response._process_while_uploading(message))
             all_msgs.append(message)
+            expected_calls.append(mock.call(message))
 
-        self.mocker.replay()
         for msg in all_msgs:
-            response._processMessage(msg)
+            self.response._processMessage(msg)
+
+        self.assertEqual(
+            self.response._process_while_uploading.mock_calls, expected_calls)
 
     def test_processmessage_uploading_error(self):
         """Process a message while uploading, explodes."""
         self.response.state = PutContentResponse.states.uploading
-        response = self.mocker.patch(self.response)
-
         message = self.make_protocol_message(msg_type='BYTES')
         failure = Exception('foo')
-        expect(response._process_while_uploading(message)).throw(failure)
-        expect(response._generic_error(failure))
+        self.response._process_while_uploading = mock.Mock(side_effect=failure)
+        self.response._generic_error = mock.Mock()
 
-        self.mocker.replay()
-        response._processMessage(message)
+        self.response._processMessage(message)
+
+        self.response._process_while_uploading.assert_called_once_with(message)
+        self.response._generic_error.assert_called_once_with(failure)
 
     def test_processmessage_uploading_bad_message(self):
         """Process a bad message while uploading."""
@@ -1890,25 +1917,27 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
         """Process a cancel request while in init, all ok."""
         self.response.state = PutContentResponse.states.init
         message = self.make_protocol_message(msg_type='CANCEL_REQUEST')
-        response = self.mocker.patch(self.response)
-        expect(response.cancel())
+        self.response.cancel = mock.Mock()
 
-        self.mocker.replay()
-        response._processMessage(message)
-        self.assertEqual(response.state, PutContentResponse.states.canceling)
-        self.assertEqual(response.cancel_message, message)
+        self.response._processMessage(message)
+
+        self.assertEqual(
+            self.response.state, PutContentResponse.states.canceling)
+        self.assertEqual(self.response.cancel_message, message)
+        self.response.cancel.assert_called_once_with()
 
     def test_processmessage_init_cancel_error(self):
         """Process a cancel request while in init, explodes."""
         self.response.state = PutContentResponse.states.init
         message = self.make_protocol_message(msg_type='CANCEL_REQUEST')
-        response = self.mocker.patch(self.response)
         failure = Exception('foo')
-        expect(response.cancel()).throw(failure)
-        expect(response._generic_error(failure))
+        self.response.cancel = mock.Mock(side_effect=failure)
+        self.response._generic_error = mock.Mock()
 
-        self.mocker.replay()
-        response._processMessage(message)
+        self.response._processMessage(message)
+
+        self.response.cancel.assert_called_once_with()
+        self.response._generic_error.assert_called_once_with(failure)
 
     def test_processmessage_init_not_cancel(self):
         """Process other requests while in init."""
@@ -2031,72 +2060,87 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
     def test_commituploadjob_all_ok(self):
         """Normal commiting behaviour."""
         self.response.state = PutContentResponse.states.commiting
-        response = self.mocker.patch(self.response)
-        expect(response.queue_action(ARGS)).result(defer.succeed(35))
-        expect(response.done())
+        self.response.queue_action = mock.Mock(return_value=defer.succeed(35))
+        self.response.done = mock.Mock()
 
-        self.mocker.replay()
-        response._commit_uploadjob('result')
-        self.assertEqual(response.state, PutContentResponse.states.done)
+        self.response._commit_uploadjob('result')
+
+        self.assertEqual(self.response.state, PutContentResponse.states.done)
         self.assertEqual(self.last_msg.type, protocol_pb2.Message.OK)
         self.assertEqual(self.last_msg.new_generation, 35)
+        self.response.queue_action.assert_called_once_with(mock.ANY)
+        self.response.done.assert_called_once_with()
 
     def test_commituploadjob_ok_but_canceled_by_framework(self):
         """Commit started but was canceled while waiting for queued commit."""
         self.response.state = PutContentResponse.states.commiting
-        response = self.mocker.patch(self.response)
         node = FakeNode()
 
         def state_changed_to_cancel(response):
             """Change state to cancel before proceeding."""
             self.response.state = PutContentResponse.states.canceling
             return defer.succeed(node)
-        expect(response.queue_action(ARGS)).call(state_changed_to_cancel)
-        # Don't expect done() or any response to client
-        expect(response.done()).count(0)
-        expect(response.sendMessage(ANY)).count(0)
 
-        self.mocker.replay()
-        response._commit_uploadjob('result')
-        self.assertEqual(response.state, PutContentResponse.states.canceling)
+        self.response.queue_action = mock.Mock(
+            side_effect=state_changed_to_cancel)
+        self.response.done = mock.Mock()
+        self.response.sendMessage = mock.Mock()
+
+        self.response._commit_uploadjob('result')
+
+        self.assertEqual(
+            self.response.state, PutContentResponse.states.canceling)
+        self.response.queue_action.assert_called_once_with(mock.ANY)
+        # Don't expect done() or any response to client
+        self.response.done.assert_not_called()
+        self.response.sendMessage.assert_not_called()
 
     def test_commit_canceled_in_queued_job(self):
         """Commit called but canceled before queued job executes."""
-        self.response.upload_job = self.mocker.mock()
-        # Actual commit will not be called
-        expect(self.response.upload_job.commit(ANY)).count(0)
+        self.response.upload_job = mock.Mock()
         self.response.state = PutContentResponse.states.commiting
-        response = self.mocker.patch(self.response)
+
         # Patched queue_action changes state then runs the function
 
         def cancel_then_run_callback(f):
             """Change state to cancel, then call the function."""
             self.response.state = PutContentResponse.states.canceling
             f()
-        expect(response.queue_action(ARGS)).call(cancel_then_run_callback)
-        # Don't expect done() or any response to client
-        expect(response.done()).count(0)
-        expect(response.sendMessage(ANY)).count(0)
 
-        self.mocker.replay()
-        response._commit_uploadjob('result')
-        self.assertEqual(response.state, PutContentResponse.states.canceling)
+        self.response.queue_action = mock.Mock(
+            side_effect=cancel_then_run_callback)
+        self.response.done = mock.Mock()
+        self.response.sendMessage = mock.Mock()
+
+        self.response._commit_uploadjob('result')
+
+        self.assertEqual(
+            self.response.state, PutContentResponse.states.canceling)
+        self.response.queue_action.assert_called_once_with(mock.ANY)
+        # Actual commit will not be called
+        self.response.upload_job.commit.assert_not_called()
+        # Don't expect done() or any response to client
+        self.response.done.assert_not_called()
+        self.response.sendMessage.assert_not_called()
 
     def test_startupload_normal(self):
         """Normal behaviour for the start upload."""
         self.response.state = PutContentResponse.states.init
-        response = self.mocker.patch(self.response)
-        upload_job = self.FakeUploadJob()
-        expect(response._get_upload_job()).result(upload_job)
-        expect(response.upload_job.deferred.addErrback(
-            self.response._generic_error))
-        expect(response.upload_job.connect()).result(defer.succeed(True))
-        expect(response.protocol.release(self.response))
-        expect(response._send_begin())
+        upload_job = mock.Mock()
+        self.response._get_upload_job = mock.Mock(return_value=upload_job)
+        self.response.protocol = mock.Mock()
+        self.response._send_begin = mock.Mock()
 
-        self.mocker.replay()
-        response._start_upload()
-        self.assertEqual(response.state, PutContentResponse.states.uploading)
+        self.response._start_upload()
+
+        self.assertEqual(
+            self.response.state, PutContentResponse.states.uploading)
+        self.response._get_upload_job.assert_called_once_with()
+        upload_job.deferred.addErrback.assert_called_once_with(
+            self.response._generic_error)
+        upload_job.connect.assert_called_once_with()
+        self.response.protocol.release.assert_called_once_with(self.response)
+        self.response._send_begin.assert_called_once_with()
 
     def _test_startupload_canceling_while_getting_uploadjob(self, state):
         """State changes while waiting for the upload job."""
@@ -2173,8 +2217,9 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
         self.response.error = called.append
         self.response.done()
         self.assertEqual(called, [])
-        msg = ("runWithWarningsSuppressed -> test_method_wrapper -> "
-               "test_putcontent_double_done: called done() finished=True")
+        msg = (
+            'runWithWarningsSuppressed -> test_putcontent_double_done: '
+            'called done() finished=True')
         self.handler.assert_warning(msg)
 
     def test_putcontent_done_after_error(self):
@@ -2194,8 +2239,9 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase,
         self.response.error = called.append
         self.response.done()
         self.assertEqual(called, [])
-        msg = ("runWithWarningsSuppressed -> test_method_wrapper -> "
-               "test_putcontent_done_after_error: called done() finished=True")
+        msg = (
+            'runWithWarningsSuppressed -> test_putcontent_done_after_error: '
+            'called done() finished=True')
         self.handler.assert_warning(msg)
 
 
@@ -2249,35 +2295,32 @@ class AuthenticateResponseTestCase(SimpleRequestResponseTestCase):
     def test_set_user(self):
         """Check that the user is set after auth."""
         user = FakeUser()
-        mocker = Mocker()
-
         # set up a fake auth
-        auth_provider = mocker.mock()
-        expect(auth_provider.authenticate).result(lambda *a, **kw: user)
+        auth_provider = mock.Mock()
+        auth_provider.authenticate.return_value = user
         self.response.protocol.factory.auth_provider = auth_provider
-
         called = []
         self.response.protocol.set_user = lambda *a, **kw: called.append(a)
 
-        with mocker:
-            self.response._process()
+        self.response._process()
 
         self.assertEqual(called, [(user,)])
+        auth_provider.authenticate.assert_called_once_with({}, self.server)
 
     def _test_client_metadata(self, expected, expected_metrics):
         """Test client metadata handling in AuthenticateResponse."""
         user = FakeUser()
-        mocker = Mocker()
         # set up a fake auth
-        auth_provider = mocker.mock()
-        expect(auth_provider.authenticate).result(lambda *a, **kw: user)
+        auth_provider = mock.Mock()
+        auth_provider.authenticate.return_value = user
         self.response.protocol.factory.auth_provider = auth_provider
         metrics_called = []
         self.patch(self.response.protocol.factory.metrics, 'meter',
                    lambda *a: metrics_called.append(a))
-        with mocker:
-            self.response._process()
+        self.response._process()
+
         self.assertEqual(metrics_called, expected_metrics)
+        auth_provider.authenticate.assert_called_once_with({}, self.server)
 
     def test_client_metadata_valid(self):
         """Test client metadata handling in AuthenticateResponse."""
@@ -2331,6 +2374,7 @@ class GetDeltaResponseTestCase(SimpleRequestResponseTestCase):
             """Intercept the call to task.cooperate."""
             called.append(iterator)
             return real_cooperate(iterator)
+
         self.patch(task, 'cooperate', cooperate)
         self.response.send_delta_info([], '')
         self.assertEqual(len(called), 1)
@@ -2363,24 +2407,21 @@ class GetDeltaResponseTestCase(SimpleRequestResponseTestCase):
     @defer.inlineCallbacks
     def test_process_set_length(self):
         """Set length attribute while processing."""
-        mocker = Mocker()
-
         # fake message
-        message = mocker.mock()
-        expect(message.get_delta.share).count(2).result('')
-        expect(message.get_delta.from_generation).result(10)
+        message = mock.Mock()
+        message.get_delta.share = ''
+        message.get_delta.from_generation = 10
         self.response.source_message = message
-
         # fake user
-        user = mocker.mock()
+        user = mock.Mock()
         nodes = [FakeNode(), FakeNode()]
-        expect(user.get_delta(None, 10, KWARGS)).result((nodes, 12, 123))
+        user.get_delta.return_value = (nodes, 12, 123)
         self.response.protocol.user = user
 
-        with mocker:
-            yield self.response._process()
+        yield self.response._process()
 
         self.assertEqual(self.response.length, 2)
+        user.get_delta.assert_called_once_with(None, 10, limit=1000)
 
 
 class RescanFromScratchResponseTestCase(SimpleRequestResponseTestCase):
@@ -2405,6 +2446,7 @@ class RescanFromScratchResponseTestCase(SimpleRequestResponseTestCase):
             """Intercept the call to task.cooperate."""
             called.append(iterator)
             return real_cooperate(iterator)
+
         self.patch(task, 'cooperate', cooperate)
         self.response.send_delta_info([], '')
         self.assertEqual(len(called), 1)
@@ -2434,47 +2476,54 @@ class RescanFromScratchResponseTestCase(SimpleRequestResponseTestCase):
             nodes.append(node)
         # set required caps
         self.response.protocol.working_caps = PREFERRED_CAP
-        mocker = Mocker()
-        user = mocker.mock()
+        user = mock.Mock()
         self.patch(self.response, "send_delta_info", lambda *a: None)
         self.response.protocol.user = user
         # expect 3 calls to get_from_scratch
-        expect(user.get_from_scratch(
-            None, limit=5)
-        ).count(1).result((nodes[:10], 20, 100))
-        expect(user.get_from_scratch(
-            None, limit=5, max_generation=20,
-            start_from_path=("/", "node_9"))
-        ).count(1).result((nodes[10:], 20, 100))
-        expect(user.get_from_scratch(
-            None, limit=5, max_generation=20,
-            start_from_path=("/", "node_19"))
-        ).count(1).result(([], 20, 100))
+        user.get_from_scratch.side_effect = [
+            (nodes[:10], 20, 100),
+            (nodes[10:], 20, 100),
+            ([], 20, 100),
+        ]
 
-        mocker.replay()
         yield self.response._process()
+
+        expected_calls = [
+            mock.call.get_from_scratch(None, limit=5),
+            mock.call.get_from_scratch(
+                None, limit=5, max_generation=20,
+                start_from_path=("/", "node_9")),
+            mock.call.get_from_scratch(
+                None, limit=5, max_generation=20,
+                start_from_path=("/", "node_19")),
+        ]
+        self.assertEqual(user.mock_calls, expected_calls)
 
     @defer.inlineCallbacks
     def test_process_set_length(self):
         """Set length attribute while processing."""
-        mocker = Mocker()
-
         # fake message
-        message = mocker.mock()
-        expect(message.get_delta.share).count(2).result('')
+        message = mock.Mock()
+        message.get_delta.share = ''
         self.response.source_message = message
 
         # fake user
-        user = mocker.mock()
+        user = mock.Mock()
         nodes = [[FakeNode(), FakeNode()], []]
-        action = expect(user.get_from_scratch(None, KWARGS))
-        action.count(2).call(lambda *a, **k: (nodes.pop(0), 12, 123))
+        user.get_from_scratch.side_effect = (
+            lambda *a, **k: (nodes.pop(0), 12, 123))
         self.response.protocol.user = user
 
-        with mocker:
-            yield self.response._process()
+        yield self.response._process()
 
         self.assertEqual(self.response.length, 2)
+        expected_calls = [
+            mock.call.get_from_scratch(None, limit=2000),
+            mock.call.get_from_scratch(
+                None, start_from_path=('path', 'name'), limit=2000,
+                max_generation=12),
+        ]
+        self.assertEqual(user.mock_calls, expected_calls)
 
 
 class NodeInfoLogsTestCase(BaseStorageServerTestCase):

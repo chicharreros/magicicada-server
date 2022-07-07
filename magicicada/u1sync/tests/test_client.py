@@ -15,7 +15,7 @@
 
 """Test the client code."""
 
-from mocker import Mocker
+import mock
 from twisted.trial.unittest import TestCase
 
 from magicicada.u1sync import client
@@ -31,18 +31,15 @@ class SyncStorageClientTest(TestCase):
         self.patch(client.StorageClient, 'connectionMade',
                    lambda s: called.append(True))
         c = client.SyncStorageClient()
-        mocker = Mocker()
-        obj = mocker.mock()
-        obj.current_protocol
-        mocker.result(None)
-        obj.current_protocol = c
-        obj.observer.connected()
+        obj = mock.Mock()
+        obj.current_protocol.return_value = c
         c.factory = obj
 
         # call and test
-        with mocker:
-            c.connectionMade()
+        c.connectionMade()
+
         self.assertTrue(called)
+        obj.observer.connected.assert_called_once_with()
 
     def test_conn_lost_call_parent(self):
         """The connectionLost method should call the parent."""
@@ -51,13 +48,12 @@ class SyncStorageClientTest(TestCase):
         self.patch(client.StorageClient, 'connectionLost',
                    lambda s, r: called.append(True))
         c = client.SyncStorageClient()
-        mocker = Mocker()
-        obj = mocker.mock()
-        obj.current_protocol
-        mocker.result(None)
+        obj = mock.Mock()
+        obj.current_protocol.return_value = None
         c.factory = obj
 
         # call and test
-        with mocker:
-            c.connectionLost()
+        c.connectionLost()
+
         self.assertTrue(called)
+        obj.observer.connected.assert_not_called()
