@@ -260,7 +260,7 @@ class TestBrokenNode(TestSync):
         afile = root.get_child_by_name("test_file")
         # create a "invalid" content blob
         content = self.factory.make_content_blob(
-            hash="", magic_hash="", storage_key=uuid.uuid4(), crc32=1, size=1,
+            hash=b"", magic_hash=b"", storage_key=uuid.uuid4(), crc32=1, size=1,
             deflated_size=1)
 
         # change the node

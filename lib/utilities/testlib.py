@@ -24,9 +24,10 @@ import re
 from unittest import TestSuite, TestLoader, defaultTestLoader
 
 import django
-
 from django.test.runner import DiscoverRunner
+from twisted.internet import defer
 from twisted.internet.base import DelayedCall
+from twisted.python import failure
 from twisted.trial.reporter import (
     TreeReporter, TestResultDecorator, SubunitReporter)
 from twisted.trial.runner import TrialRunner
@@ -35,7 +36,11 @@ from twisted.trial.runner import TrialRunner
 COVERAGE_DIR = "./tmp/coverage"
 WORKING_DIR = "./tmp/trial"
 
-django.setup()
+
+def set_twisted_debug():
+    DelayedCall.debug = True
+    failure.startDebugMode()
+    defer.setDebugging(True)
 
 
 class StopOnFailureDecorator(TestResultDecorator):
@@ -146,12 +151,14 @@ def load_unittest(relpath, loader=None):
 
 class MagicicadaRunner(DiscoverRunner):
 
-    def __init__(self, factory, filter_test, verbosity=1):
+    def __init__(self, factory, filter_test, verbosity=1, debug=False):
         self.factory = factory
         self.loader = RegexTestLoader(filter_test)
         self.server_suite = TestSuite()
         self.non_server_suite = TestSuite()
         super(MagicicadaRunner, self).__init__(verbosity=verbosity)
+        if debug:
+            set_twisted_debug()
 
     def add_tests_for_dir(self, testdir, testpaths, topdir):
         """Helper for build_suite; searches a particular testdir for tests.
@@ -237,9 +244,6 @@ def test_with_trial(options, topdir, testdirs, testpaths):
     if options.ignore:
         exclude_re = re.compile('.*%s.*' % options.ignore)
 
-    if options.debug:
-        DelayedCall.debug = True
-
     def filter_test(t):
         result = True
         try:
@@ -253,7 +257,10 @@ def test_with_trial(options, topdir, testdirs, testpaths):
                 result = False
         return result
 
+    django.setup()
+
     runner = MagicicadaRunner(
-        factory, filter_test, verbosity=options.verbosity)
+        factory, filter_test, verbosity=options.verbosity,
+        debug=options.debug)
     result = runner.run_tests(test_labels=(topdir, testdirs, testpaths))
     return not result.wasSuccessful()

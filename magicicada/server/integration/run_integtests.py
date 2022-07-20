@@ -30,6 +30,7 @@ from optparse import OptionParser
 
 import dbus
 import dbus.mainloop.glib  # this is black magic. DO NOT REMOVE!
+dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)  # to make dbus work
 
 from distutils.spawn import find_executable
 
@@ -43,9 +44,6 @@ from twisted.internet import reactor, defer  # noqa
 
 from magicicada.filesync import services  # noqa
 from magicicada.server.integration.helpers import debug, retryable  # noqa
-
-# to make dbus work
-dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
 
 LIB_DIR = os.path.abspath("lib")
 CLIENT_DIR = os.path.abspath(os.path.join('.sourcecode', 'magicicada-client'))

@@ -618,7 +618,7 @@ class User(object):
         """
         node = yield self.rpc_dal.call('get_node', user_id=self.id,
                                        volume_id=volume_id, node_id=node_id)
-        if content_hash and content_hash != node['content_hash']:
+        if content_hash and content_hash != node['content_hash'].decode('utf-8'):
             msg = "Node is not available due to hash mismatch."
             raise errors.NotAvailable(msg)
 

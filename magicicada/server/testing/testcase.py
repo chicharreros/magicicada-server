@@ -46,6 +46,10 @@ server_crt = settings.CRT
 server_crt_chain = settings.CRT_CHAIN
 
 
+def show_error(*a, **kw):
+    print('\n\n\n+++ testcase ERROR ERROR ERROR', a, kw)
+
+
 class FakeTimestampChecker(object):
     """Fake timestamp checker."""
 
@@ -66,7 +70,7 @@ class BaseProtocolTestCase(TwistedTestCase):
     """Reusable part of ProtocolTestCase."""
 
     heartbeat_interval = 0
-    timeout = 120
+    timeout = 10
 
     @property
     def port(self):
@@ -95,11 +99,6 @@ class BaseProtocolTestCase(TwistedTestCase):
         yield self.service.startService()
         self.addCleanup(self.service.stopService)
         self.addCleanup(logger.info, "finished test %s", self.id())
-
-    def set_debug(self):
-        failure.startDebugMode()
-        defer.setDebugging(True)
-        self.addCleanup(defer.setDebugging, False)
 
     def make_user(self, username=None, **kwargs):
         if username is None:
@@ -218,6 +217,7 @@ class FactoryHelper(object):
         self.test_failed = False
         self.pending_notifications = wait_notifications
         self.test_deferred = defer.Deferred()
+        self.test_deferred.addErrback(show_error)
         self.protocols = []
         self.timeout = reactor.callLater(timeout, self.error_shutdown)
 

@@ -91,13 +91,15 @@ def write_pickle_file(filename, value):
 
 
 def write_string_file(filename, value):
-    """Writes a string to a file with an added line feed, or
-    deletes the file if value is None.
+    """Write content to a file with an added line feed.
+
+    If value is None, delete the file.
+
     """
     if value is not None:
         with atomic_update_file(filename) as stream:
             stream.write(value)
-            stream.write('\n')
+            stream.write(b'\n')
     else:
         safe_unlink(filename)
 
@@ -145,7 +147,7 @@ def atomic_update_file(filename):
     """Returns a context manager for atomically updating a file."""
     temp_filename = "%s.%s" % (filename, uuid.uuid4())
     try:
-        with open(temp_filename, "w") as stream:
+        with open(temp_filename, "wb") as stream:
             yield stream
         os.rename(temp_filename, filename)
     finally:

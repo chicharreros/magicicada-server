@@ -34,19 +34,13 @@ from magicicada.server.testing.aq_helpers import (
 class RequiredCapsDecoratorTests(TestCase):
     """Tests for required_caps decorator"""
 
-    _original_required_caps = syncdaemon.REQUIRED_CAPS
-
-    @defer.inlineCallbacks
-    def tearDown(self):
-        """tearDown"""
-        syncdaemon.REQUIRED_CAPS = self._original_required_caps
-        yield super(RequiredCapsDecoratorTests, self).tearDown()
+    timeout = 3
 
     def test_mismatch(self):
         """Test that a test is correctly skipped."""
         result = TestResult()
 
-        syncdaemon.REQUIRED_CAPS = set(['supercalifragilistico'])
+        self.patch(syncdaemon, 'REQUIRED_CAPS', set(['supercalifragilistico']))
 
         class FakeTest(TestCase):
             """Testcase to test the decorator"""
@@ -62,7 +56,7 @@ class RequiredCapsDecoratorTests(TestCase):
         """Check that a test is executed when the caps match."""
         result = TestResult()
 
-        syncdaemon.REQUIRED_CAPS = server_module.MIN_CAP
+        self.patch(syncdaemon, 'REQUIRED_CAPS', server_module.MIN_CAP)
 
         class FakeTest(TestCase):
             """Testcase to test the decorator"""
@@ -81,7 +75,7 @@ class RequiredCapsDecoratorTests(TestCase):
         """
         result = TestResult()
 
-        syncdaemon.REQUIRED_CAPS = set(['supercalifragilistico'])
+        self.patch(syncdaemon, 'REQUIRED_CAPS', set(['supercalifragilistico']))
 
         class FakeTest(TestCase):
             """Testcase to test the decorator"""
@@ -116,7 +110,9 @@ class RequiredCapsDecoratorTests(TestCase):
 
 class TestClientCapabilities(TestWithDatabase):
     """Test the client side of query/set capabilities"""
+
     client = None
+    timeout = 5
 
     # just to restore original values
     _original_supported_caps = server_module.SUPPORTED_CAPS
@@ -124,11 +120,25 @@ class TestClientCapabilities(TestWithDatabase):
 
     def tearDown(self):
         """cleanup the mess"""
+        print('\n** tearDown 1')
         server_module.SUPPORTED_CAPS = self._original_supported_caps
-        syncdaemon.REQUIRED_CAPS = self._original_required_caps
+        print('\n** tearDown 2')
+        self.patch(syncdaemon, 'REQUIRED_CAPS', self._original_required_caps)
+        print('\n** tearDown 3')
         if self.aq.connector is not None:
+            print('\n** tearDown 4')
             self.aq.disconnect()
+        print('\n** tearDown 5')
         return super(TestClientCapabilities, self).tearDown()
+
+    def assert_message(self, containee, msg=None):
+        """Ensure that the containee is in the event queue.
+
+        containee can be callable, in which case it's called before
+        asserting.
+        """
+        ce = containee() if callable(containee) else containee
+        self.assertIn(ce, self.listener.q, msg)
 
     def assertInQ(self, deferred, containee, msg=None):
         """
@@ -139,8 +149,7 @@ class TestClientCapabilities(TestWithDatabase):
         """
         def check_queue(_):
             "the check itself"
-            ce = containee() if callable(containee) else containee
-            self.assertIn(ce, self.listener.q, msg)
+            self.assert_message(containee, msg)
         deferred.addCallback(check_queue)
 
     def connect(self):
@@ -153,19 +162,37 @@ class TestClientCapabilities(TestWithDatabase):
         self.eq.push('SYS_NET_CONNECTED')
         return d
 
+    @defer.inlineCallbacks
     def test_query_set_capabilities(self):
         """After connecting the server uses the caps specified by client."""
-        needed_event = self.wait_for('SYS_SET_CAPABILITIES_OK')
-        d = self.connect()
-        d.addCallback(lambda _: needed_event)
-        return d
+        # self.set_debug()
+        print('\n== 1')
+        yield self.connect()
+        print('\n== 2')
+        yield self.wait_for('SYS_SET_CAPABILITIES_OK')
+        print('\n== 3')
+        # import pdb; pdb.set_trace()
+
+    @defer.inlineCallbacks
+    def test_query_bad_capabilities(self):
+        """The client handles errors when setting invalid capabilities."""
+        # self.set_debug()
+        print('\n== 1')
+        self.patch(syncdaemon, 'REQUIRED_CAPS', frozenset(['foo']))
+        print('\n== 2')
+        yield self.connect()
+        print('\n== 3')
+        yield self.wait_for('SYS_SET_CAPABILITIES_ERROR')
+        print('\n== 4')
+        self.assert_message(
+            ('SYS_SET_CAPABILITIES_ERROR',
+             {'error': "The server doesn't have the requested capabilities"}))
 
     @failure_expected("The server doesn't have the requested capabilities")
-    def test_query_bad_capabilities(self):
-        """Test how the client hanlde trying to set capabilities that the
-        server don't have.
-        """
-        syncdaemon.REQUIRED_CAPS = frozenset(['foo'])
+    def _test_query_bad_capabilities(self):
+        """The client handles errors when setting invalid capabilities."""
+        self.set_debug()
+        self.patch(syncdaemon, 'REQUIRED_CAPS', frozenset(['foo']))
         needed_event = self.wait_for('SYS_SET_CAPABILITIES_ERROR')
         d = self.connect()
         d.addCallback(lambda _: needed_event)

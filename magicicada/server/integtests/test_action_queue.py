@@ -67,12 +67,21 @@ class TestBasic(TestWithDatabase):
     def test_connect(self):
         """Try to connect."""
         connected = self.wait_for('SYS_CONNECTION_MADE')
+        print('\n\n test_connect 1', connected, connected.called)
         self.eq.push('SYS_INIT_DONE')
+        print('\n\n test_connect 2', connected, connected.called)
         self.eq.push('SYS_LOCAL_RESCAN_DONE')
+        print('\n\n test_connect 3', connected, connected.called)
         self.eq.push('SYS_USER_CONNECT',
                      access_token=self.access_tokens['jack'])
+        print('\n\n test_connect 4', connected, connected.called)
         self.eq.push('SYS_NET_CONNECTED')
+        print('\n\n test_connect 5 (wait_for_nirvana)', connected, connected.called)
+        yield self.wait_for_nirvana()
+        print('\n\n test_connect 6 (nirvana reached)', connected, connected.called)
         yield connected
+        print('\n\n test_connect 7', connected, connected.called)
+        # import pdb; pdb.set_trace()
 
     @failure_expected('UNSUPPORTED_VERSION')
     @defer.inlineCallbacks

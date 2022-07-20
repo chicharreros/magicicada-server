@@ -1359,7 +1359,7 @@ class ChangePublicAccess(SimpleRequestResponse):
 
         # answer the ok to original user
         response = protocol_pb2.Message()
-        response.public_url = bytes(public_url)
+        response.public_url = public_url
         response.type = protocol_pb2.Message.OK
         self.sendMessage(response)
 
@@ -2391,7 +2391,8 @@ class StorageServerFactory(Factory):
             msg = failure.getTraceback()
 
         # log
-        logger.error('Unhandled error in deferred! %s', msg)
+        logger.error(
+            'Unhandled error in deferred! %s\nGot data:\n%r', msg, data)
 
     def event_callback_handler(self, func):
         """Wrap the event callback in an error handler."""

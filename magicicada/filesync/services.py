@@ -1805,7 +1805,7 @@ class StorageUserGateway(GatewayBase):
             WHERE o.id = t.parent_id::UUID AND
                   o.volume_id=u.id AND u.status = %s ;
             """
-        empty_hash = 'sha1:da39a3ee5e6b4b0d3255bfef95601890afd80709'
+        empty_hash = b'sha1:da39a3ee5e6b4b0d3255bfef95601890afd80709'
         params = (self.user.id, STATUS_LIVE, empty_hash, self.user.id,
                   STATUS_LIVE, empty_hash, STATUS_LIVE)
         gws = {}
@@ -1849,6 +1849,10 @@ class StorageUserGateway(GatewayBase):
 
     def _get_reusable_content(self, hash_value, magic_hash):
         """Get a contentblob for reusable content."""
+        if isinstance(hash_value, str):
+            hash_value = hash_value.encode('utf-8')
+        if isinstance(magic_hash, str):
+            magic_hash = magic_hash.encode('utf-8')
 
         # check to see if we have the content blob for that hash
         try:
@@ -2193,6 +2197,8 @@ class ReadOnlyVolumeGateway(GatewayBase):
     @timing_metric
     def get_node(self, id, verify_hash=None, with_content=True):
         """Get one of the user's nodes."""
+        if isinstance(verify_hash, str):
+            verify_hash = verify_hash.encode('utf-8')
         if id == 'root':
             id = self._get_root_node().id
         nodes = StorageObject.objects.filter(id=id)
@@ -2306,6 +2312,8 @@ class ReadOnlyVolumeGateway(GatewayBase):
     @timing_metric
     def get_content(self, content_hash):
         """Get the ContentBlob."""
+        if isinstance(content_hash, str):
+            content_hash = content_hash.encode('utf-8')
         content = get_object_or_none(
             ContentBlob, hash=content_hash, status=STATUS_LIVE)
         if content is None:
@@ -2341,6 +2349,8 @@ class ReadOnlyVolumeGateway(GatewayBase):
     def get_user_multipart_uploadjob(self, node_id, upload_id, hash_hint=None,
                                      crc32_hint=None):
         """Get multipart uploadjob."""
+        if isinstance(hash_hint, str):
+            hash_hint = hash_hint.encode('utf-8')
         jobs = UploadJob.objects.filter(
             status=STATUS_LIVE, multipart_key=upload_id,
             node__volume__owner__id=self.owner.id, node__id=node_id)
@@ -2405,6 +2415,10 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
     def _make_content(self, hash, crc32, size, deflated_size,
                       storage_key, magic_hash):
         """Make a content blob."""
+        if isinstance(hash, str):
+            hash = hash.encode('utf-8')
+        if isinstance(magic_hash, str):
+            magic_hash = magic_hash.encode('utf-8')
         content = ContentBlob.objects.create(
             hash=hash, magic_hash=magic_hash, crc32=crc32, size=size,
             deflated_size=deflated_size, status=STATUS_LIVE,
@@ -2432,6 +2446,10 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
     @timing_metric
     def make_file(self, parent_id, name, hash=None, magic_hash=None):
         """Make a file."""
+        if isinstance(hash, str):
+            hash = hash.encode('utf-8')
+        if isinstance(magic_hash, str):
+            magic_hash = magic_hash.encode('utf-8')
         reusable = None
         blob = None
         make_new = False
@@ -2698,6 +2716,10 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
     def make_uploadjob(self, node_id, node_hash, new_hash, crc32,
                        inflated_size, enforce_quota=True, multipart_key=None):
         """Create an upload job for a FileNode."""
+        if isinstance(node_hash, str):
+            node_hash = node_hash.encode('utf-8')
+        if isinstance(new_hash, str):
+            new_hash = new_hash.encode('utf-8')
         if self.read_only:
             raise errors.NoPermission(self.readonly_error)
         node = self._get_node_simple(node_id)
@@ -2750,6 +2772,12 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
         If a file node with name == name as a child of parent_id it will get
         updated with the new content.
         """
+        if isinstance(hash, str):
+            hash = hash.encode('utf-8')
+        if isinstance(previous_hash, str):
+            previous_hash = previous_hash.encode('utf-8')
+        if isinstance(magic_hash, str):
+            magic_hash = magic_hash.encode('utf-8')
         if mimetype is None:
             mime = mimetypes.guess_type(name)[0]
             mimetype = str(mime) if mime else ''
@@ -2795,6 +2823,13 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
 
         If there is no storage_key, we must have an existing content.
         """
+        if isinstance(original_hash, str):
+            original_hash = original_hash.encode('utf-8')
+        if isinstance(hash_hint, str):
+            hash_hint = hash_hint.encode('utf-8')
+        if isinstance(magic_hash, str):
+            magic_hash = magic_hash.encode('utf-8')
+
         fnode = self._get_node_simple(file_id, with_content=True)
         if fnode is None:
             raise errors.DoesNotExist("The file no longer exists.")

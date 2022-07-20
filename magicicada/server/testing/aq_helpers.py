@@ -69,7 +69,8 @@ logger = logging.getLogger(__name__)
 NO_CONTENT_HASH = ""
 
 
-TESTS_DIR = os.getcwd() + "/tmp/sync_tests"
+TMP_DIR = os.getcwd() + "/tmp"
+TESTS_DIR = TMP_DIR + "sync_tests"
 
 
 def show_time():
@@ -78,6 +79,10 @@ def show_time():
     p1 = time.strftime("%H:%M:%S", time.localtime(t))
     p2 = ("%.3f" % (t % 1))[2:]
     return "%s,%s" % (p1, p2)
+
+
+def show_error(*a, **kw):
+    print('\n\n\n+++ aq_helpers ERROR ERROR ERROR', a, kw)
 
 
 class NoCloseBytesIO(BytesIO):
@@ -238,15 +243,18 @@ class WaitingHelpingHandler(object):
 
     def __init__(self, event_queue, waiting_events, waiting_kwargs,
                  result=None):
-        self.deferred = defer.Deferred()
         self.event_queue = event_queue
+        event_queue.subscribe(self)
+        self.deferred = defer.Deferred()
+        self.deferred.addErrback(show_error)
         self.result = result
         self.waiting_events = waiting_events
         self.waiting_kwargs = waiting_kwargs
-        event_queue.subscribe(self)
+        print('\n\n\n+++ WaitingHelpingHandler.__init__', self.waiting_events, self.waiting_kwargs)
 
     def handle_default(self, event, *args, **kwargs):
         """Got an event: fire if it's one we want"""
+        print('\n\n\n+++ WaitingHelpingHandler.handle_default', event, args, kwargs)
         if event in self.waiting_events:
             if args:
                 for wv in self.waiting_kwargs.values():
@@ -258,10 +266,17 @@ class WaitingHelpingHandler(object):
                         return
             self.fire()
 
+    def finish_ok(self):
+        print('\n\n\n+++ WaitingHelpingHandler.finish_ok before callback', self.deferred, self.result)
+        self.deferred.callback(self.result)
+        print('\n\n\n+++ WaitingHelpingHandler.finish_ok called?', self.deferred.called)
+
     def fire(self):
         """start fire the callback"""
+        print('\n\n\n+++ WaitingHelpingHandler.fire 1')
         self.event_queue.unsubscribe(self)
-        reactor.callLater(0, lambda: self.deferred.callback(self.result))
+        reactor.callLater(1, self.finish_ok)
+        print('\n\n\n+++ WaitingHelpingHandler.fire 2')
 
 
 # The following class is a duplicated from
@@ -281,13 +296,24 @@ class FakeNetworkManager(dbus.service.Object):
                               dbus.bus.NAME_FLAG_ALLOW_REPLACEMENT)
         self.busName = dbus.service.BusName('org.freedesktop.NetworkManager',
                                             bus=self.bus)
-        dbus.service.Object.__init__(self, bus_name=self.busName,
-                                     object_path=self.path)
+        super().__init__(bus_name=self.busName, object_path=self.path)
 
     def shutdown(self):
         """Shutdown the fake NetworkManager."""
         self.busName.get_bus().release_name(self.busName.get_name())
         self.remove_from_connection()
+
+    @dbus.service.signal('org.freedesktop.NetworkManager', signature='i')
+    def StateChanged(self, state):
+        """Fire DBus signal StatusChanged."""
+
+    def emit_connected(self):
+        """Emits the signal StateChanged(3)."""
+        self.StateChanged(70)
+
+    def emit_disconnected(self):
+        """Emits the signal StateChanged(4)."""
+        self.StateChanged(20)
 
     @dbus.service.method(dbus.PROPERTIES_IFACE,
                          in_signature='ss', out_signature='v',
@@ -298,6 +324,11 @@ class FakeNetworkManager(dbus.service.Object):
             reply_handler(getattr(self, propname, None))
         except Exception as e:
             error_handler(e)
+
+    @dbus.service.method('org.freedesktop.NetworkManager')
+    def state(self):
+        """Fake the state."""
+        return 70
 
 
 class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
@@ -321,9 +352,12 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
         # Set up the main loop and bus connection
         self.loop = DBusGMainLoop(set_as_default=True)
         bus_address = os.environ.get('DBUS_SESSION_BUS_ADDRESS', None)
+        logger.info('%s: using DBus at %r', self.id(), bus_address)
+        print(self.id(), 'using DBus at', repr(bus_address))
         self.bus = dbus.bus.BusConnection(address_or_type=bus_address,
                                           mainloop=self.loop)
 
+        print(self.id(), 'bus created at', self.bus)
         # Monkeypatch the dbus.SessionBus/SystemBus methods, to ensure we
         # always point at our own private bus instance.
         self.patch(dbus, 'SessionBus', lambda: self.bus)
@@ -344,6 +378,7 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
 
         if os.path.exists(self.tmpdir):
             self.rmtree(self.tmpdir)
+            # self.addCleanup(self.rmtree, self.tmpdir)
 
         _user_data = [
             ('jack', 'jackpass'),
@@ -361,8 +396,7 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
             self.storage_users[username] = user
 
         # override and cleanup user config
-        self.old_get_config_files = main.config.get_config_files
-        main.config.get_config_files = lambda: SD_CONFIGS
+        self.patch(main.config, 'get_config_files', lambda: SD_CONFIGS)
         main.config._user_config = None
         user_config = main.config.get_user_config()
         for section in user_config.sections():
@@ -373,8 +407,7 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
 
         # logging can not be configured dinamically, touch the general logger
         # to get one big file and be able to get the logs if failure
-        syncdaemon_logger.init()
-        syncdaemon_logger.set_max_bytes(0)
+        syncdaemon_logger.init(base_dir=TMP_DIR, max_bytes=0)
         yield self.client_setup()
 
     @property
@@ -382,15 +415,26 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
         """Override default tmpdir property."""
         return TESTS_DIR
 
+    @defer.inlineCallbacks
     def tearDown(self):
         """Tear down."""
-        main.config.get_config_files = self.old_get_config_files
-        d = super(TestWithDatabase, self).tearDown()
-        d.addCallback(lambda _: self.ssl_service.stopService())
+        print('\n\n\n!!! tearDown 1')
+        yield super(TestWithDatabase, self).tearDown()
+        print('\n\n\n!!! tearDown 2')
+        yield self.ssl_service.stopService()
+        print('\n\n\n!!! tearDown 3')
+
+        print('\n\n\n!!! tearDown 4')
         if self._do_teardown_eq:
-            d.addCallback(lambda _: self.eq.shutdown())
-        d.addCallback(lambda _: self.main.state_manager.shutdown())
-        d.addCallback(lambda _: self.main.db.shutdown())
+            print('\n\n\n!!! tearDown 5')
+            yield self.eq.shutdown()
+
+        print('\n\n\n!!! tearDown 6')
+        yield self.main.state_manager.shutdown()
+        print('\n\n\n!!! tearDown 7')
+        yield self.main.db.shutdown()
+        print('\n\n\n!!! tearDown 8')
+
         test_method = getattr(self, self._testMethodName)
         failure_expected = getattr(test_method, 'failure_expected', False)
         if failure_expected and failure_expected != self.failed:
@@ -400,21 +444,16 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
                 msg += 'instead failed with: %s' % (self.failed,)
             else:
                 msg += "didn't"
-            d.addCallback(lambda _: Failure(AssertionError(msg)))
+            raise AssertionError(msg)
+
+        print('\n\n\n!!! tearDown 9')
         if self.failed and failure_expected != self.failed:
             failure_ignore = getattr(test_method, 'failure_ignore', ())
             if self.failed and self.failed not in failure_ignore:
                 msg = "test method %r failed with: %s" \
                       % (self._testMethodName, self.failed)
-                d.addCallback(lambda _: Failure(AssertionError(msg)))
-
-        def temp_dir_cleanup(_):
-            """Clean up tmpdir."""
-            if os.path.exists(self.tmpdir):
-                self.rmtree(self.tmpdir)
-
-        d.addBoth(temp_dir_cleanup)
-        return d
+                raise AssertionError(msg)
+        print('\n\n\n!!! tearDown 10')
 
     def mktemp(self, name='temp'):
         """ Customized mktemp that accepts an optional name argument. """
@@ -492,12 +531,12 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
                                                     result).deferred
 
     def handle_default(self, event, *args, **kwargs):
-        """
-        Handle events. In particular, catch errors and store them
-        under the 'failed' attribute
+        """Handle events.
+
+        In particular, catch errors and store them under the 'failed' attribute
         """
         if 'error' in kwargs:
-            self.failed = kwargs['error']
+            self.failed = kwargs
 
     def handle_AQ_DOWNLOAD_CANCELLED(self, *args, **kwargs):
         """handle the case of CANCEL"""
@@ -629,6 +668,7 @@ class TestBase(TestWithDatabase):
             ce = containee() if callable(containee) else containee
             self.assertIn(ce, self.listener.q, msg)
         deferred.addCallback(check_queue)
+        deferred.addErrback(show_error)
 
     def assertOneInQ(self, deferred, containees, msg=None):
         """Deferredly assert that one of the containee is in the event queue.
@@ -646,6 +686,7 @@ class TestBase(TestWithDatabase):
                     msg = 'None of %s were found in %s' % (ce, self.listener.q)
                 raise AssertionError(msg)
         deferred.addCallback(check_queue)
+        deferred.addErrback(show_error)
 
     def assertNotInQ(self, deferred, containee, msg=None):
         """Deferredly assert that the containee is not in the event queue.
@@ -657,6 +698,7 @@ class TestBase(TestWithDatabase):
             ce = containee() if callable(containee) else containee
             self.assertNotIn(ce, self.listener.q, msg)
         deferred.addCallback(check_queue)
+        deferred.addErrback(show_error)
 
     @defer.inlineCallbacks
     def _gmk(self, what, name, parent, default_id, path):
@@ -797,6 +839,7 @@ class MethodInterferer(object):
         """Pauses a method execution that can be played later."""
         self.old = getattr(self.obj, self.meth)
         play = defer.Deferred()
+        play.addErrback(show_error)
 
         @defer.inlineCallbacks
         def middle(*a, **k):
@@ -844,6 +887,7 @@ class FakeGetContent(object):
     def __init__(self, deferred, share, node, hash):
         """initialize it"""
         self.deferred = deferred
+        deferred.addErrback(show_error)
         self.share_id = share
         self.node_id = node
         self.server_hash = hash

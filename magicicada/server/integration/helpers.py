@@ -83,7 +83,9 @@ def create_file_and_add_content(filepath, content=None):
 
 def _is_retry_exception(err):
     """Check if the exception is a retry one."""
+    print('\n\n\n\n _is_retry_exception', err)
     if isinstance(err, dbus.exceptions.DBusException):
+        print('_is_retry_exception', err.get_dbus_name())
         if err.get_dbus_name() == 'org.freedesktop.DBus.Error.NoReply':
             return True
     return False
@@ -98,6 +100,7 @@ def retryable(func):
         opportunities = 10
         while opportunities:
             try:
+                print('\n\n\n\n retryable', func, a, kw)
                 res = yield func(*a, **k)
             except Exception as err:
                 opportunities -= 1

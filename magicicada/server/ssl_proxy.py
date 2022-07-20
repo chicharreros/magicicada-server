@@ -243,8 +243,8 @@ class ProxyService(MultiService):
         self.status_service = create_status_service(self.factory, status_port)
         self.status_service.setServiceParent(self)
         # disable ssl compression
-        if settings.DISABLE_SSL_COMPRESSION:
-            disable_ssl_compression(logger)
+        # if settings.DISABLE_SSL_COMPRESSION:
+        #     disable_ssl_compression(logger)
 
     @property
     def port(self):
