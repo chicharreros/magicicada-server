@@ -23,9 +23,8 @@ import os
 import shutil
 import time
 import uuid
-
+from functools import partial, total_ordering
 from StringIO import StringIO
-from functools import partial
 
 import dbus
 import dbus.service
@@ -38,9 +37,9 @@ from magicicadaclient.syncdaemon.action_queue import (
 )
 from magicicadaclient.syncdaemon import (
     main,
-    volume_manager,
-    tritcask,
     logger as syncdaemon_logger,
+    tritcask,
+    volume_manager,
 )
 from magicicadaclient.syncdaemon.event_queue import EventQueue
 from magicicadaclient.syncdaemon.filesystem_manager import FileSystemManager
@@ -297,7 +296,7 @@ class FakeNetworkManager(dbus.service.Object):
         """Fake dbus's Get method to get at the State property."""
         try:
             reply_handler(getattr(self, propname, None))
-        except Exception, e:
+        except Exception as e:
             error_handler(e)
 
 
@@ -568,6 +567,7 @@ class _TypedPlaceholder(_Placeholder):
         return isinstance(other, self.type)
 
 
+@total_ordering
 class _ShareListPlaceholder(_Placeholder):
     """A placeholder for a list of shares"""
 
@@ -575,8 +575,18 @@ class _ShareListPlaceholder(_Placeholder):
         super(_ShareListPlaceholder, self).__init__(label)
         self.shares = shares
 
-    def __cmp__(self, other):
-        return cmp(self.shares, other.shares)
+    # To avoid the hassle of providing all six functions, you can implement
+    # __eq__, __ne__, and only one of the ordering operators, and use the
+    # functools.total_ordering() decorator to fill in the rest.
+
+    def __eq__(self, other):
+        return self.shares == other.shares
+
+    def __ne__(self, other):
+        return self.shares != other.shares
+
+    def __le__(self, other):
+        return self.shares <= other.shares
 
 
 aHash = _HashPlaceholder('a hash')

@@ -303,7 +303,6 @@ class StorageServerTestCase(BaseStorageServerTestCase):
         self.assertEqual(protocol_pb2.Message.ERROR, self.last_msg.type)
         self.assertEqual(protocol_pb2.Error.UNSUPPORTED_VERSION,
                          self.last_msg.error.type)
-
         self.assert_correct_comment(comment=self.last_msg.error.comment,
                                     msg=message.protocol.version)
 
@@ -795,8 +794,8 @@ class SimpleRequestResponseTestCase(StorageServerRequestResponseTestCase):
 
     def test_send_protocol_error_sends_comment(self):
         """_send_protocol_error sends the optional comment on errors."""
-        self.response.__class__.expected_errors = \
-            self.response.protocol_errors.keys()
+        errors = self.response.protocol_errors
+        self.response.__class__.expected_errors = errors.keys()
         for error in self.response.protocol_errors:
             msg = 'Failing with %s' % error
             if error == dataerror.QuotaExceeded:
@@ -1040,7 +1039,7 @@ class SimpleRequestResponseTestCase(StorageServerRequestResponseTestCase):
         self.assertFalse(self.server.requests, self.server.requests)
 
         # verify that all the requests were properly cleaned
-        self.assertEqual(sorted(cleaned), range(5), cleaned)
+        self.assertEqual(sorted(cleaned), list(range(5)), cleaned)
 
     def test_sli_informed_on_done_default(self):
         """The SLI is informed when all ok."""
@@ -1366,9 +1365,10 @@ class GetContentResponseTestCase(SimpleRequestResponseTestCase):
 class PutContentResponseTestCase(SimpleRequestResponseTestCase):
     """Test the PutContentResponse class."""
 
-    # subclass PutContentResponse so we have a __dict__ and can patch it.
-    response_class = types.ClassType(PutContentResponse.__name__,
-                                     (PutContentResponse,), {})
+    class PutContentResponse(PutContentResponse):
+        """Subclass so we have a __dict__ and can patch it."""
+
+    response_class = PutContentResponse
 
     class FakeUploadJob(object):
         """Fake an UploadJob."""
@@ -1498,7 +1498,6 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase):
 
         mock_metrics.timing.assert_called_once_with(
             'PutContentResponseInit', mock.ANY)
-
         uploadjob.connect.assert_called_once_with()
         uploadjob.stop.assert_called_once_with()
 
@@ -2427,9 +2426,10 @@ class GetDeltaResponseTestCase(SimpleRequestResponseTestCase):
 class RescanFromScratchResponseTestCase(SimpleRequestResponseTestCase):
     """Test the RescanFromScratchResponse class."""
 
-    # subclass so we have a __dict__ and can patch it.
-    response_class = types.ClassType(RescanFromScratchResponse.__name__,
-                                     (RescanFromScratchResponse,), {})
+    class RescanFromScratchResponse(RescanFromScratchResponse):
+        """Subclass so we have a __dict__ and can patch it."""
+
+    response_class = RescanFromScratchResponse
 
     def test_cooperative_send_delta_info(self):
         """Test that send_delta_info isn't blocking."""
@@ -2537,7 +2537,7 @@ class NodeInfoLogsTestCase(BaseStorageServerTestCase):
         # optionally, has content!
         if mes_name is not None:
             inner = getattr(message, mes_name)
-            for name, value in attrs.iteritems():
+            for name, value in attrs.items():
                 setattr(inner, name, value)
 
         # put it in the request, get node info, and check
@@ -2718,11 +2718,11 @@ class VersionInfoTestCase(TwistedTestCase):
 
     def testInfo(self):
         """Validate the available data."""
-        self.assert_(version_info['revno'], "Revison Number")
-        self.assert_(version_info['branch_nick'], "Branch Nickname")
-        self.assert_(version_info['date'], "Date of last update")
-        self.assert_(version_info['build_date'], "Date of last Build")
-        self.assert_(version_info['revision_id'], "ID of revision")
+        self.assertEqual(version_info['revno'], "Revison Number")
+        self.assertEqual(version_info['branch_nick'], "Branch Nickname")
+        self.assertEqual(version_info['date'], "Date of last update")
+        self.assertEqual(version_info['build_date'], "Date of last Build")
+        self.assertEqual(version_info['revision_id'], "ID of revision")
 
     if version_info is None:
         testInfo.skip = 'No version info in this system, bzr probably missing.'

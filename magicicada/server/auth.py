@@ -94,7 +94,7 @@ class SimpleAuthProvider(AuthenticationProvider):
         try:
             resp = yield self.factory.rpc_dal.call(
                 'get_userid_from_token', auth_parameters=auth_parameters)
-        except backend.FailedAuthentication, exc:
+        except backend.FailedAuthentication as exc:
             logger.info("Failed auth: %s", exc)
             return
 

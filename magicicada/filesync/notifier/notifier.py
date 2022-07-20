@@ -65,7 +65,7 @@ class Notification(object):
         values.update(kw)
         if 'recipient_id' not in values:
             values['recipient_id'] = None
-        for name, value in values.iteritems():
+        for name, value in values.items():
             setattr(self, name, value)
 
         self.recipient_ids = {getattr(self, name)

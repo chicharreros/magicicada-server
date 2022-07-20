@@ -512,7 +512,7 @@ class Client(object):
                     children[entry.name] = child
 
             content_hashes = yield self._get_node_hashes(share_uuid)
-            for child in children.itervalues():
+            for child in children.values():
                 child.content_hash = content_hashes.get(child.uuid, None)
 
             returnValue(children)
@@ -524,7 +524,7 @@ class Client(object):
                 children = self.defer_from_thread(_get_children, node.uuid,
                                                   node.content_hash)
                 node.children = children
-                for child in children.itervalues():
+                for child in children.values():
                     if child.node_type == DIRECTORY:
                         need_children.append(child)
 

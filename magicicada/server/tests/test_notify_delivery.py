@@ -262,7 +262,7 @@ class NotificationsTestCase(TestWithDatabase):
 
             try:
                 yield self.service.factory.deliver_volume_new_generation(notif)
-            except Exception, e:
+            except Exception as e:
                 client.test_fail(e)
             else:
                 volume_id, new_generation = yield d

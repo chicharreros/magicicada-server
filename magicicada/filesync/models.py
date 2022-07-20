@@ -24,8 +24,6 @@ import os
 import posixpath
 import uuid
 
-from types import NoneType
-
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.db import DataError, models, transaction
@@ -480,7 +478,7 @@ class BaseStorageObject(models.Model):
 
     def move(self, new_parent, new_name):
         """Move the node to another parent and/or to a different name."""
-        if not isinstance(new_parent, (StorageObject, NoneType)):
+        if not isinstance(new_parent, (StorageObject, type(None))):
             # It feels weird to accept None for new_parent, but there's an
             # explicit check for that below (new_parent == ROOT_PARENT)
             # so we can leave None through as well.

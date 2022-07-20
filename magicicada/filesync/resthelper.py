@@ -169,7 +169,7 @@ class RestHelper(object):
 
     def log_dal(self, operation, user=None, **kwargs):
         """Log a dal operation, user_id, and optional other arguments."""
-        params = sorted(["%s=%r" % (k, v) for k, v in kwargs.iteritems()])
+        params = sorted("%s=%r" % (k, v) for k, v in kwargs.items())
         if user:
             params.insert(0, 'user_id=%r' % user.id)
         msg = "Performing dal operation: %s(%s)"
@@ -235,7 +235,7 @@ class RestHelper(object):
     def get_public_files(self, user):
         """GET a list of Node Representations for the user's public files."""
         self.log_dal("get_public_files", user)
-        return map(self.map.node_repr, user.get_public_files())
+        return [self.map.node_repr(node) for node in user.get_public_files()]
 
     def delete_node(self, user, node_path):
         """DELETE a node."""

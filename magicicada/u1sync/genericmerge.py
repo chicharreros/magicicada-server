@@ -71,7 +71,7 @@ def generic_merge(trees, pre_merge, post_merge, partial_parent, name):
         return tree.children if tree is not None else None
 
     child_dicts = [tree_children(t) or {} for t in trees]
-    child_names = set(chain(*[cs.iterkeys() for cs in child_dicts]))
+    child_names = set(chain(*[cs.keys() for cs in child_dicts]))
     child_results = {}
     for child_name in child_names:
         subtrees = [cs.get(child_name, None) for cs in child_dicts]

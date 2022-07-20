@@ -45,8 +45,8 @@ def debug(prefix, msg, *args, **kwargs):
     t = time.time()
     tstamp = time.strftime("%H:%M:%S", time.localtime(t)) + str(t % 1)[1:5]
     if 'previous_newline' in kwargs and kwargs['previous_newline']:
-        print
-    print tstamp, prefix, msg, ' '.join(map(str, args))
+        print()
+    print(tstamp, prefix, msg, ' '.join(map(str, args)))
 
 
 def walk_and_list_dir(directory, with_dirname=False):
@@ -101,7 +101,7 @@ def retryable(func):
         while opportunities:
             try:
                 res = yield func(*a, **k)
-            except Exception, err:
+            except Exception as err:
                 opportunities -= 1
                 if opportunities == 0 or not _is_retry_exception(err):
                     raise

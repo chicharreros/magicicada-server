@@ -72,7 +72,7 @@ class ProxyHashingProducerTest(UploadTestCase):
         producer = upload.ProxyHashingProducer(consumer, True)
 
         chunk_sz = 10
-        for part in xrange(0, len(message), chunk_sz):
+        for part in range(0, len(message), chunk_sz):
             yield producer.dataReceived(message[part:part + chunk_sz])
         producer.stopProducing()
         yield producer.flush_decompressor()
@@ -102,7 +102,7 @@ class ProxyHashingProducerTest(UploadTestCase):
 
         # add chunks, but see that nothing is really being calculated
         chunk_sz = 10
-        for part in xrange(0, len(message), chunk_sz):
+        for part in range(0, len(message), chunk_sz):
             yield producer.dataReceived(message[part:part + chunk_sz])
             self.assertEqual(producer.deflated_size, 0)
             self.assertEqual(producer.inflated_size, 0)

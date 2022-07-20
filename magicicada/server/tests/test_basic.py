@@ -130,7 +130,7 @@ class TestBasic(TestWithDatabase):
         """Ping should be done in less than 2ms."""
         def ping(client):
             def done(result):
-                self.assert_(result.rtt < 2)
+                self.assertTrue(result.rtt < 2)
                 client.test_done("ok")
             d = client.ping()
             d.addCallbacks(done, client.test_fail)
@@ -387,10 +387,10 @@ class ServerStatusTest(TestWithDatabase):
         """Test the OK status response."""
         status = self.site.resource.children['status']
         # override user_id with a non-existing user
-        status.user_id = sys.maxint
+        status.user_id = sys.maxsize
         try:
             yield client.getPage(self.url)
-        except error.Error, e:
+        except error.Error as e:
             self.assertEqual('500', e.status)
         else:
             self.fail('An error is expected.')
@@ -400,10 +400,10 @@ class ServerStatusTest(TestWithDatabase):
         """Test the OK status response."""
         status = self.site.resource.children['status']
         # override user_id with a non-existing user
-        status.user_id = sys.maxint
+        status.user_id = sys.maxsize
         try:
             yield client.getPage(self.url + "/foo")
-        except error.Error, e:
+        except error.Error as e:
             self.assertEqual('404', e.status)
         else:
             self.fail('An error is expected.')
@@ -512,5 +512,5 @@ class TestServerHeartbeat(TestWithDatabase):
         d = defer.Deferred()
         reactor.callLater(0.2, d.callback, None)
         yield d
-        self.assertIn('<!--XSUPERVISOR:BEGIN-->', self.stdout.buflist)
-        self.assertIn('<!--XSUPERVISOR:END-->', self.stdout.buflist)
+        self.assertIn('<!--XSUPERVISOR:BEGIN-->', self.stdout.getvalue())
+        self.assertIn('<!--XSUPERVISOR:END-->', self.stdout.getvalue())

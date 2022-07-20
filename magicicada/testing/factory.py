@@ -58,7 +58,7 @@ class Factory(object):
 
     def get_unique_string(self, extra_length=6, prefix='string-'):
         return prefix + ''.join(
-            random.choice(BASE_CHARS) for i in xrange(extra_length))
+            random.choice(BASE_CHARS) for i in range(extra_length))
 
     get_unique_unicode = get_unique_string
 
@@ -226,7 +226,7 @@ class Factory(object):
         if content is None:
             content = self.make_content_blob()
         sub = dirnode.make_subdirectory(name)
-        for i in xrange(amount):
+        for i in range(amount):
             sub.make_file('%s-%s' % (sub.name, i), content_blob=content)
         return sub
 

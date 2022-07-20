@@ -113,7 +113,7 @@ class TestEventNotifier(BaseTestCase):
         """Test getter and setter for notify handler."""
         handler = object()
         self.notifier.on_node_update = handler
-        self.assert_(self.notifier.on_node_update is handler)
+        self.assertIs(self.notifier.on_node_update, handler)
 
     def test_broadcast_share_created(self):
         """Test broadcast of an share creation."""

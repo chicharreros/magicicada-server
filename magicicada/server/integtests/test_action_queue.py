@@ -296,8 +296,8 @@ class TestMeta(TestBase):
         return d
 
 
-class TestUnicode(TestBase):
-    """Test Unicode handling."""
+class TestNonAscii(TestBase):
+    """Test non-ascii handling."""
 
     @defer.inlineCallbacks
     def test_mkfile_ok(self):

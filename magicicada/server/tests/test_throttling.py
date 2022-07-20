@@ -160,7 +160,7 @@ class TestThrottling(TestWithDatabase):
                 return d
 
             d = client.dummy_authenticate("open sesame")
-            filenames = iter('hola_%d' % i for i in xrange(num_files))
+            filenames = iter('hola_%d' % i for i in range(num_files))
             for i in range(num_files):
                 d.addCallbacks(lambda _: client.get_root(), client.test_fail)
                 d.addCallbacks(

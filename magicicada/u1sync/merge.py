@@ -51,7 +51,7 @@ def merge_trees(old_local_tree, local_tree, old_remote_tree, remote_tree,
         (path, node_type) = partial_result
         if node_type == DIRECTORY:
             merged_children = dict(
-                (name, child) for (name, child) in child_results.iteritems()
+                (name, child) for (name, child) in child_results.items()
                 if child is not None)
         else:
             merged_children = None

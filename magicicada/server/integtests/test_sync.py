@@ -183,7 +183,7 @@ class TestSync(TestWithDatabase):
             if not output:
                 return True
             else:
-                print "****\n", output, "****"
+                print("****\n", output, "****")
                 return False
         return deferToThread(_compare)
 
@@ -2048,7 +2048,7 @@ class TestStupendous(TestServerBase):
     def client_setup(self):
         """Do the file creation before hooking up the client."""
         d = self.get_client()
-        for i in xrange(0x600):
+        for i in range(0x600):
             d.addCallback(lambda _, i=i: self.client.make_file(
                 request.ROOT, self.root_id, 'test_%03x' % i))
             d.addCallback(lambda mk: self.put_content(request.ROOT,

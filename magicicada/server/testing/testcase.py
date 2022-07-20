@@ -23,7 +23,6 @@ Base classes to do all the testing.
 
 import logging
 import time
-
 from functools import wraps
 from StringIO import StringIO
 

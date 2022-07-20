@@ -91,10 +91,10 @@ class HeartbeatGeneratorTestCase(BaseTestCase):
         """Test that we actually send the heartbeat."""
         gen = heartbeat_generator(2, out=self.stdout, time=self.timer)
         gen.next()
-        self.assertFalse(self.stdout.buflist)
+        self.assertFalse(self.stdout.getvalue())
         self.timer.advance(2)
         gen.next()
-        output = self.stdout.buflist
+        output = self.stdout.getvalue()
         self.assertTrue('<!--XSUPERVISOR:BEGIN-->' in output)
         self.assertTrue('<!--XSUPERVISOR:END-->' in output)
 
@@ -102,22 +102,22 @@ class HeartbeatGeneratorTestCase(BaseTestCase):
         """Test that we don't send the heartbeat."""
         gen = heartbeat_generator(2, out=self.stdout, time=self.timer)
         gen.next()
-        self.assertFalse(self.stdout.buflist)
+        self.assertFalse(self.stdout.getvalue())
         self.timer.advance(0.5)
         gen.next()
-        self.assertFalse(self.stdout.buflist)
+        self.assertFalse(self.stdout.getvalue())
         self.timer.advance(0.5)
         gen.next()
-        self.assertFalse(self.stdout.buflist)
+        self.assertFalse(self.stdout.getvalue())
 
     def test_interval_None(self):
         """Test generator with interval=None"""
         gen = heartbeat_generator(None, out=self.stdout, time=self.timer)
         gen.next()
-        self.assertFalse(self.stdout.buflist)
+        self.assertFalse(self.stdout.getvalue())
         self.timer.advance(5)
         gen.next()
-        self.assertFalse(self.stdout.buflist)
+        self.assertFalse(self.stdout.getvalue())
         self.timer.advance(5)
 
 

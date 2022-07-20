@@ -36,7 +36,7 @@ def safe_mkdir(path):
     """Creates a directory if it does not already exist."""
     try:
         os.mkdir(path)
-    except OSError, e:
+    except OSError as e:
         if e.errno != EEXIST:
             raise
 
@@ -45,6 +45,6 @@ def safe_unlink(path):
     """Unlinks a file if it exists."""
     try:
         os.remove(path)
-    except OSError, e:
+    except OSError as e:
         if e.errno != ENOENT:
             raise
