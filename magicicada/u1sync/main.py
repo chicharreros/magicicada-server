@@ -265,7 +265,7 @@ def do_diff(client, share_spec, directory, quiet, subtree_path,
     def post_merge(nodes, partial_result, child_results):
         """Aggregates 'differs' flags."""
         (display_path, differs) = partial_result
-        return differs or any(child_results.itervalues())
+        return differs or any(child_results.values())
 
     differs = generic_merge(trees=[local_tree, remote_tree],
                             pre_merge=pre_merge, post_merge=post_merge,

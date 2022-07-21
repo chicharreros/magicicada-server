@@ -57,7 +57,7 @@ class TestTransactionLog(BaseTransactionLogTestCase):
         # self.assertEqual(txlog.node_id, expected['node_id'])
         # self.assertEqual(txlog.owner_id, expected['owner_id'])
         msg = 'Value for %r must be %r (got %r instead).'
-        for k, v in expected.iteritems():
+        for k, v in expected.items():
             actual = getattr(txlog, k)
             self.assertEqual(actual, v, msg % (k, v, actual))
 

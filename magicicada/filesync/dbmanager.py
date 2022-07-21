@@ -116,7 +116,7 @@ def retryable_transaction(max_time=4.0, max_retries=3, variance=0.5,
                 time.sleep(delay_time(count))
                 try:
                     value = function(*args, **kwargs)
-                except exceptions, e:
+                except exceptions as e:
                     info = sys.exc_info()
                     try:
                         if isinstance(e, InternalError):

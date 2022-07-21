@@ -161,7 +161,7 @@ def sync_tree(merged_tree, original_tree, sync_mode, path, quiet):
 
         if model_node is not None:
             if model_node.node_type == DIRECTORY:
-                child_iter = child_results.iteritems()
+                child_iter = child_results.items()
                 merged_children = dict(
                     (name, child) for (name, child) in child_iter
                     if child is not None)

@@ -57,7 +57,7 @@ class TestServerScan(TestServerBase):
             request.ROOT, mk.new_id, NO_CONTENT_HASH, hash_value,
             crc32_value, 0, deflated_size, StringIO(deflated_content))
 
-        for i in xrange(self.N):
+        for i in range(self.N):
             mk = yield self.client.make_file(request.ROOT, self.root_id,
                                              "test_%03x%s" % (i, suffix))
             yield self.client.put_content(request.ROOT, mk.new_id,

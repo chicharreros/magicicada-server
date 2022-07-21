@@ -1558,7 +1558,7 @@ class StorageObjectTestCase(BaseTestCase):
         parent2 = self.factory.make_user_volume().root_node
 
         expected = []
-        for i in xrange(4):
+        for i in range(4):
             expected.append(parent1.id)
             same_name = 'dir-%s' % i
             parent1 = parent1.make_subdirectory(same_name)

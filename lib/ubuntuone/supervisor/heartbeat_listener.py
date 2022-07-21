@@ -109,8 +109,8 @@ class HeartbeatListener(object):
                     self.tick_count = 0
                     try:
                         self.check_processes()
-                    except Exception, e:
-                        print e
+                    except Exception as e:
+                        print(e)
                         self.logger.exception(
                             "Oops, failed to check the processes.")
             else:
@@ -172,7 +172,7 @@ class HeartbeatListener(object):
         try:
             self.rpc.supervisor.stopProcess(name)
             self.logger.debug("Process %s stopped.", name)
-        except xmlrpclib.Fault, what:
+        except xmlrpclib.Fault as what:
             self.logger.error(
                 'Failed to stop process %s (last heartbeat: %s), exiting: %s',
                 name, when_client_heartbeat, what)
@@ -180,7 +180,7 @@ class HeartbeatListener(object):
         try:
             self.rpc.supervisor.startProcess(name)
             self.logger.debug("Process %s started.", name)
-        except xmlrpclib.Fault, what:
+        except xmlrpclib.Fault as what:
             self.logger.error('Failed to start process %s after stopping it, '
                               'exiting: %s', name, what)
             raise

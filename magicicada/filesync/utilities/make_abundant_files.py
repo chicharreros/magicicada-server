@@ -53,7 +53,8 @@ def main(username, sharer, wlist, num):
     user = get_storage_user(None, username=utf2unicode(username))
     sharer = get_storage_user(None, username=utf2unicode(sharer))
     folders = [user.root]
-    names = [utf2unicode(i.strip()) for i in file(wlist) if i.strip()]
+    with open(wlist) as f:
+        names = [utf2unicode(i.strip()) for i in f.readlines() if i.strip()]
     sample = random.sample(names, num)
 
     if sys.stdout.isatty():

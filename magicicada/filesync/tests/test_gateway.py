@@ -756,7 +756,7 @@ class SystemGatewayTestCase(BaseTestCase):
         download = self.gw.get_download(
             user.id, udf.id, file_path, download_url)
         self.assertEqual(download.id, db_download.id)
-        self.assertEqual(download.download_key, None)
+        self.assertIsNone(download.download_key)
 
     def test_get_old_song_with_multiple_download_records(self):
         """Old songs may have multiple download records. Get the latest."""
@@ -1008,7 +1008,7 @@ class SystemGatewayPublicFileTestCase(BaseTestCase):
         self.assertEqual(file2.id, self.file.id)
         self.assertEqual(file2.mimetype, 'fakemime')
         # this file was created with content, the content must be returned
-        self.assertNotEquals(file2.content, None)
+        self.assertIsNotNone(file2.content)
 
         # DoesNotExist is raised if that file is made private.
         file_dao = self.vgw.change_public_access(self.file.id, False)
@@ -1119,12 +1119,12 @@ class StorageUserGatewayTestCase(BaseTestCase):
     def test_get_udf_gateway_None(self):
         """Make sure method returns None and no Error."""
         vgw = self.gw.get_udf_gateway(uuid.uuid4())
-        self.assertEqual(vgw, None)
+        self.assertIsNone(vgw)
 
     def test_get_share_gateway_None(self):
         """Make sure method returns None and no Error."""
         vgw = self.gw.get_share_gateway(uuid.uuid4())
-        self.assertEqual(vgw, None)
+        self.assertIsNone(vgw)
 
     def test_accept_share(self):
         """Test accepting a direct share."""
@@ -1237,7 +1237,7 @@ class StorageUserGatewayTestCase(BaseTestCase):
         udf = self.gw.make_udf('~/path/name')
         self.assertEqual(udf.owner_id, self.user.id)
         self.assertEqual(udf.path, '~/path/name')
-        self.assertNotEqual(udf.when_created, None)
+        self.assertIsNotNone(udf.when_created)
         # make sure the same UDF is created
         udf2 = self.gw.make_udf('~/path/name')
         self.assertEqual(udf.id, udf2.id)
@@ -1359,7 +1359,7 @@ class StorageUserGatewayTestCase(BaseTestCase):
         vgw = self.gw.get_root_gateway()
         dir1 = vgw.make_subdirectory(vgw.get_root().id, 'shared1')
         # make lots of children
-        for i in xrange(300):
+        for i in range(300):
             vgw.make_subdirectory(dir1.id, 'd%s' % i)
         usera = make_storage_user(username='sharee1')
         sharea = vgw.make_share(dir1.id, 'sharea', user_id=usera.id)
@@ -1406,9 +1406,9 @@ class StorageUserGatewayTestCase(BaseTestCase):
 
         def create_files(root):
             """Create a 5 dirs with 5 files each in the specified root."""
-            for dname in ['dir_%s' % i for i in xrange(5)]:
+            for dname in ['dir_%s' % i for i in range(5)]:
                 d = root.make_subdirectory(dname)
-                for fname, j in [('file_%s' % j, j) for j in xrange(10)]:
+                for fname, j in [('file_%s' % j, j) for j in range(10)]:
                     f = d.make_file(fname, mimetype='fakemime')
                     if j % 2:
                         continue
@@ -1438,7 +1438,7 @@ class StorageUserGatewayTestCase(BaseTestCase):
         self.assertEqual(node.id, nodes[0].id)
         self.assertEqual(node.volume_id, nodes[0].volume_id)
         self.assertIsNotNone(nodes[0].public_uuid)
-        for dname in ['dir_%s' % i for i in xrange(5)]:
+        for dname in ['dir_%s' % i for i in range(5)]:
             d = root.make_subdirectory(dname)
             vgw.change_public_access(d.id, True, allow_directory=True)
         nodes = list(self.gw.get_public_folders())
@@ -1480,7 +1480,7 @@ class StorageUserGatewayTestCase(BaseTestCase):
         blobexists, storage_key = self.gw._get_reusable_content(
             b'hash_value', b'magic')
         self.assertFalse(blobexists)
-        self.assertEqual(storage_key, None)
+        self.assertIsNone(storage_key)
 
     def _make_file_with_content(self, hash_value, magic_hash=None, gw=None):
         """Make a file with some content."""
@@ -1525,7 +1525,7 @@ class StorageUserGatewayTestCase(BaseTestCase):
         self._make_file_with_content(hash_value, gw=user2._gateway)
         blobexists, storage_key = self.gw.is_reusable_content(hash_value, None)
         self.assertTrue(blobexists)
-        self.assertEqual(storage_key, None)
+        self.assertIsNone(storage_key)
 
     def test_reusable_content_different_owner_with_magic(self):
         """Test update_content will reuse someone elses content with magic."""
@@ -1547,7 +1547,7 @@ class StorageUserGatewayTestCase(BaseTestCase):
         blobexists, blob = self.gw._get_reusable_content(
             b'hash_value', b'magic')
         self.assertFalse(blobexists)
-        self.assertEqual(blob, None)
+        self.assertIsNone(blob)
 
     def test__get_reusable_content_same_owner_no_magic(self):
         """Test update_content will reuse owned content, even with no magic."""
@@ -1575,7 +1575,7 @@ class StorageUserGatewayTestCase(BaseTestCase):
         self._make_file_with_content(hash_value, gw=user2._gateway)
         blobexists, blob = self.gw._get_reusable_content(hash_value, None)
         self.assertTrue(blobexists)
-        self.assertEqual(blob, None)
+        self.assertIsNone(blob)
 
     def test__get_reusable_content_different_owner_with_magic(self):
         """Test update_content will reuse someone elses content with magic."""
@@ -1659,7 +1659,7 @@ class ReadWriteVolumeGatewayUtilityTests(BaseTestCase):
         all_nodes = self.vgw.get_all_nodes()
         self.assertEqual(len(all_nodes), 21)
         # the lists are not sorted so not equal
-        self.assertNotEquals(all_nodes, nodes)
+        self.assertNotEqual(all_nodes, nodes)
         # sort them in the right order
         nodes.sort(key=attrgetter('path', 'name'))
         self.assertEqual(all_nodes, nodes)
@@ -1725,7 +1725,7 @@ class ReadWriteVolumeGatewayUtilityTests(BaseTestCase):
         all_nodes = self.vgw.get_all_nodes()
         self.assertEqual(len(all_nodes), 21)
         # the lists are not sorted so not equal
-        self.assertNotEquals(all_nodes, nodes)
+        self.assertNotEqual(all_nodes, nodes)
         # sort them in the right order
         nodes.sort(key=attrgetter('path', 'name'))
         self.assertEqual(all_nodes, nodes)
@@ -1979,7 +1979,7 @@ class ReadWriteVolumeGatewayUtilityTests(BaseTestCase):
         all_nodes = udf_vgw.get_all_nodes()
         self.assertEqual(len(all_nodes), 21)
         # the lists are not sorted so not equal
-        self.assertNotEquals(all_nodes, nodes)
+        self.assertNotEqual(all_nodes, nodes)
         # sort them in the right order
         nodes.sort(key=attrgetter('path', 'name'))
         self.assertEqual(all_nodes, nodes)
@@ -2335,7 +2335,7 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         self.file.status = STATUS_DEAD
         self.file.save()
         node = self.vgw._get_node_simple(self.file.id, live_only=True)
-        self.assertEqual(node, None)
+        self.assertIsNone(node)
         node = self.vgw._get_node_simple(self.file.id, live_only=False)
         self.assertEqual(node, self.file)
 
@@ -2359,7 +2359,7 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         nodes = StorageObject.objects.filter(id=self.file.id)
         result = self.vgw._node_finder(nodes, with_content=True)
         node = self.vgw._get_node_from_result(result)
-        self.assertEqual(node, None)
+        self.assertIsNone(node)
 
     def test__get_node_with_parent(self):
         nodes = StorageObject.objects.filter(id=self.file.id)
@@ -2467,8 +2467,8 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         self.assertEqual(node.name, 'the file name')
         self.assertEqual(node.parent_id, self.root.id)
         self.assertEqual(node.volume_id, self.root.volume_id)
-        self.assertNotEqual(node.when_created, None)
-        self.assertNotEqual(node.when_last_modified, None)
+        self.assertIsNotNone(node.when_created)
+        self.assertIsNotNone(node.when_last_modified)
         self.vgw.make_subdirectory(self.root.id, 'duplicatename')
         self.assertRaises(errors.AlreadyExists,
                           self.vgw.make_file, self.root.id, 'duplicatename')
@@ -2502,8 +2502,8 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         self.assertEqual(node.name, 'the file name')
         self.assertEqual(node.parent_id, self.root.id)
         self.assertEqual(node.volume_id, self.root.volume_id)
-        self.assertNotEqual(node.when_created, None)
-        self.assertNotEqual(node.when_last_modified, None)
+        self.assertIsNotNone(node.when_created)
+        self.assertIsNotNone(node.when_last_modified)
         self.vgw.make_file(self.root.id, 'duplicatename')
         self.assertRaises(
             errors.AlreadyExists,
@@ -2878,7 +2878,7 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         node = f(self.root.id, name, hash, crc, size, deflated_size,
                  storage_key, is_public=True)
         a_file = self.vgw.get_node(node.id, with_content=True)
-        self.assertNotEquals(a_file.public_url, None)
+        self.assertIsNotNone(a_file.public_url)
 
     def test_make_file_with_content_overwrite(self):
         """Make file with contentblob and overwite its existing content."""
@@ -3242,10 +3242,10 @@ class RootReadWriteVolumeGatewayTestCase(BaseTestCase):
         vgw = ReadWriteVolumeGateway(self.user)
         self.assertEqual(vgw.user, self.user)
         self.assertEqual(vgw.owner, self.user)
-        self.assertEqual(vgw.root_id, None)
+        self.assertIsNone(vgw.root_id)
         self.assertEqual(vgw.read_only, False)
-        self.assertEqual(vgw.udf, None)
-        self.assertEqual(vgw.share, None)
+        self.assertIsNone(vgw.udf)
+        self.assertIsNone(vgw.share)
         # make sure we have the correct root
         node = StorageObject.objects.get_root(self.user._user)
         root = vgw.get_root()
@@ -3260,7 +3260,7 @@ class RootReadWriteVolumeGatewayTestCase(BaseTestCase):
         vgw = self.user._gateway.get_root_gateway()
         self.assertEqual(vgw.user, self.user)
         self.assertEqual(vgw.owner, self.user)
-        self.assertEqual(vgw.root_id, None)
+        self.assertIsNone(vgw.root_id)
         self.assertEqual(vgw.session_id, 'QWERTY')
         # error conditions
         # the only error for a root is if the root doesn't exist or is Dead
@@ -3287,8 +3287,8 @@ class RootReadWriteVolumeGatewayTestCase(BaseTestCase):
         self.assertEqual(share.root_id, a_dir.id)
         self.assertEqual(share.accepted, False)
         self.assertEqual(share.shared_to_id, sharer.id)
-        self.assertNotEqual(share.when_shared, None)
-        self.assertNotEqual(share.when_last_changed, None)
+        self.assertIsNotNone(share.when_shared)
+        self.assertIsNotNone(share.when_last_changed)
 
     def test_make_share_offer(self):
         """Test make_share."""
@@ -3300,7 +3300,7 @@ class RootReadWriteVolumeGatewayTestCase(BaseTestCase):
                                email='fake@email.com')
         self.assertEqual(share.root_id, a_dir.id)
         self.assertEqual(share.accepted, False)
-        self.assertEqual(share.shared_to_id, None)
+        self.assertIsNone(share.shared_to_id)
         self.assertEqual(share.offered_to_email, 'fake@email.com')
 
     def test_undelete_volume(self):
@@ -3339,12 +3339,12 @@ class UDFReadWriteVolumeGatewayTestCase(BaseTestCase):
         self.assertEqual(vgw.root_id, udf.root_node.id)
         self.assertEqual(vgw.read_only, False)
         self.assertEqual(vgw.udf, udf_dao)
-        self.assertEqual(vgw.share, None)
+        self.assertIsNone(vgw.share)
         node = udf.root_node
         root = vgw.get_root()
         self.assertEqual(root.id, node.id)
         self.assertEqual(root.volume_id, udf.id)
-        self.assertNotEqual(root.volume_id, None)
+        self.assertIsNotNone(root.volume_id)
         self.assertEqual(root.owner, self.user)
         self.assertEqual(root.can_read, True)
         self.assertEqual(root.can_write, True)
@@ -3400,7 +3400,7 @@ class UDFReadWriteVolumeGatewayTestCase(BaseTestCase):
                                     email='fake@email.com')
         self.assertEqual(share.root_id, a_dir.id)
         self.assertEqual(share.accepted, False)
-        self.assertEqual(share.shared_to_id, None)
+        self.assertIsNone(share.shared_to_id)
         self.assertEqual(share.offered_to_email, 'fake@email.com')
 
     def test_root_access_fail(self):
@@ -3466,7 +3466,7 @@ class ShareGatewayTestCase(BaseTestCase):
         self.assertEqual(vgw.user, self.user)
         self.assertEqual(vgw.owner, self.sharer)
         self.assertEqual(vgw.root_id, self.r_share.subtree.id)
-        self.assertEqual(vgw.udf, None)
+        self.assertIsNone(vgw.udf)
         self.assertEqual(vgw.share, share_dao)
         self.assertEqual(vgw.get_root().id, self.r_node.id)
         self.assertEqual(vgw.get_root().owner, self.sharer)
@@ -3515,7 +3515,7 @@ class ShareGatewayTestCase(BaseTestCase):
             subtree=self.r_node, name='offer', email='fake@example.com')
         so = self.sharer._gateway.get_share(shareoffer.id, accepted_only=False)
         self.assertEqual(so.id, shareoffer.id)
-        self.assertEqual(so.shared_to, None)
+        self.assertIsNone(so.shared_to, None)
         self.assertEqual(so.shared_by.id, self.sharer.id)
         self.assertEqual(so.offered_to_email, shareoffer.email)
         rw_share = self.user._gateway.get_share(self.rw_share.id)

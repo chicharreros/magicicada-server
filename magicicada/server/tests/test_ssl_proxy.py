@@ -21,6 +21,7 @@
 import logging
 import re
 from StringIO import StringIO
+from unittest import SkipTest
 
 import OpenSSL
 import mock
@@ -124,6 +125,8 @@ class BasicSSLProxyTestCase(SSLProxyTestCase):
     @defer.inlineCallbacks
     def test_ssl_handshake_backend_dead(self):
         """No ssl handshake failure if the backend is dead."""
+        raise SkipTest('Should fail with connectionDone')
+
         # turn off the backend
         yield self.service.stopService()
         self.addCleanup(self.service.startService)

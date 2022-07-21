@@ -84,7 +84,7 @@ def launch(progname, username, params=None, environ=None, verbose=False,
                                        "logging.conf")
         if not os.path.exists(log_config_file):
             msg = "Please run: cd %s && ./setup.py build; cd -\n"
-            print msg % progname_root
+            print(msg % progname_root)
             return
         extra_args.insert(0, config_file)
         extra_args.insert(1, dev_config_file)
@@ -100,5 +100,5 @@ def launch(progname, username, params=None, environ=None, verbose=False,
         env.update(environ)
 
     if verbose:
-        print "Executing:", " ".join(args)
+        print("Executing:", " ".join(args))
     os.execvpe(progname, args, env)

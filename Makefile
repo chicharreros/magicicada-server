@@ -87,11 +87,8 @@ ci-test:
 clean:
 	rm -rf tmp/* _trial_temp $(ENV)
 
-check-readme:
-	$(ENV)/bin/rst2html5 README.rst  --exit-status=warning > /dev/null && echo "README.rst OK"|| ( echo "ERROR: README.rst format is incorrect!!!!!" && exit 1)
-
-lint: $(ENV) check-readme
-	$(ENV)/bin/flake8 --filename='*.py' --exclude='migrations' $(SRC_DIR)
+lint: $(ENV)
+	$(ENV)/bin/flake8 --exclude='migrations' $(SRC_DIR)
 
 start: $(ENV) start-base start-filesync-server-group publish-api-port
 
@@ -146,4 +143,4 @@ admin:
 
 .PHONY: sourcedeps clean lint test ci-test clean-sourcedeps \
 	start stop publish-api-port start-supervisor stop-supervisor \
-	start-dbus stop-dbus start-heapy check-readme
+	start-dbus stop-dbus start-heapy

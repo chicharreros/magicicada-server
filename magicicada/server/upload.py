@@ -86,7 +86,7 @@ class ProxyHashingProducer(object):
         self.deflated_size += len(data)
         chunk_size = len(data) // self.chunks
         buf = StringIO(data)
-        for i in xrange(self.chunks):  # split the data in 10 chunks
+        for i in range(self.chunks):  # split the data in 10 chunks
             self.add_inflated_data(self.decompress(buf.read(chunk_size)))
         if buf.tell() < len(data):
             self.add_inflated_data(self.decompress(buf.read()))

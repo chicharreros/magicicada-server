@@ -96,12 +96,12 @@ def deps_missing():
     """
     couchdb_port = os.path.join(TMP_DIR, "couchdb-master0.port")
     if not os.path.exists(couchdb_port):
-        print "Not ready! Hint: did you run...?:\nmake start"
+        print("Not ready! Hint: did you run...?:\nmake start")
         return True
 
     log_conf = os.path.join(CLIENT_DIR, "data", "logging.conf")
     if not os.path.exists(log_conf):
-        print "Not ready! Hint: did you do...?:\n" + DEP_BUILDCLIENT
+        print("Not ready! Hint: did you do...?:\n" + DEP_BUILDCLIENT)
         return True
 
 
@@ -323,7 +323,7 @@ def execute_tests(all_tests, sd1, sd2, sd3):
 
         try:
             yield test(test_name, sd1, sd2, sd3, testprefix)
-        except Exception, e:
+        except Exception as e:
             debug(testprefix, 'Crushing failure and despair, :( -- ', str(e))
             raise
         else:
@@ -433,10 +433,10 @@ def main(test_filter, repeat=False):
         else:
             yield execute_tests(all_tests, sd1, sd2, sd3)
             debug(prefix, 'Tests executed.')
-    except Exception, e:
-        print '\n', '!' * 20, 'There was a problem. Failure below.', '!' * 20
-        print e
-        print '!' * 20, 'There was a problem. Failure above.', '!' * 20
+    except Exception as e:
+        print('\n', '!' * 20, 'There was a problem. Failure below.', '!' * 20)
+        print(e)
+        print('!' * 20, 'There was a problem. Failure above.', '!' * 20)
 
     debug(prefix, 'End.')
     yield sd1.stop()

@@ -2608,7 +2608,7 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
         # get the paths that can see this node now.
         see_now = []
         see_after = []
-        for path, share_ids in shared_paths.iteritems():
+        for path, share_ids in shared_paths.items():
             if old_parent.full_path.startswith(path):
                 see_now.extend(share_ids)
             if new_parent.full_path.startswith(path):

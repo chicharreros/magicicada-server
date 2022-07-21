@@ -387,8 +387,8 @@ class StorageServer(request.RequestHandler):
         self.transport.loseConnection()
         self.pending_requests.clear()
 
-        # stop all the pending requests
-        for req in self.requests.values():
+        # stop all the pending requests, make a copy of the values
+        for req in list(self.requests.values()):
             req.stop()
 
         if self.connection_time is not None:
@@ -2036,9 +2036,9 @@ class QuerySetCapsResponse(SimpleRequestResponse):
 
             # get the redirecting info
             redirect = SUGGESTED_REDIRS.get(caps, {})
-            red_host, red_port, red_srvr = [redirect.get(x, '')
-                                            for x in 'hostname', 'port',
-                                            'srvrecord']
+            red_host, red_port, red_srvr = [
+                redirect.get(x, '')
+                for x in ('hostname', 'port', 'srvrecord')]
         else:
             accepted = False
             red_host = red_port = red_srvr = ''
@@ -2201,7 +2201,6 @@ class AuthenticateResponse(SimpleRequestResponse):
 
     authentication_required = False
     not_allowed_re = re.compile(r'[^\w_]')
-
     user_activity = 'connected'
 
     @inlineCallbacks

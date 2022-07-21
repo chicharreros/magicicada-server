@@ -66,7 +66,7 @@ class ReactorInspector(threading.Thread):
         """Dump frames info to log file."""
         current = threading.currentThread().ident
         frames = sys._current_frames()
-        for frame_id, frame in frames.iteritems():
+        for frame_id, frame in frames.items():
             if frame_id == current:
                 continue
 

@@ -102,7 +102,7 @@ class StatsWorker(object):
         This includes: reactor readers/writers and buffers size.
         """
         reactor_report = self._get_reactor_stats()
-        for key, value in reactor_report.iteritems():
+        for key, value in reactor_report.items():
             self.metrics.gauge(key, value)
 
         self.log("reactor readers: %(reactor.readers)s "
