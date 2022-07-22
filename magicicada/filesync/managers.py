@@ -35,6 +35,7 @@ from magicicada.filesync.errors import (
     NoPermission,
     StorageError,
 )
+from magicicada.filesync.utils import encode_hash
 
 
 ROOT_NAME = ''
@@ -70,6 +71,74 @@ def validate_volume_path(value):
         raise InvalidVolumePath(
             'Path must start with ~/ and must not end with / (got %r)' % value)
     return value
+
+
+def encode_hashes(kwargs):
+    hash_fields = [
+        field for field in kwargs.keys()
+        if 'hash' in field and not field.startswith('_')]
+    for field in hash_fields:
+        kwargs['_' + field] = encode_hash(kwargs.pop(field))
+
+
+class ContentBlobQuerySet(models.QuerySet):
+
+    """A custom manager for ContentBlob model."""
+
+    def create(self, **kwargs):
+        encode_hashes(kwargs)
+        return super(ContentBlobQuerySet, self).create(**kwargs)
+
+    def filter(self, **kwargs):
+        encode_hashes(kwargs)
+        return super(ContentBlobQuerySet, self).filter(**kwargs)
+
+    def get(self, **kwargs):
+        encode_hashes(kwargs)
+        return super(ContentBlobQuerySet, self).get(**kwargs)
+
+
+ContentBlobManager = ContentBlobQuerySet.as_manager
+
+
+class ResumableUploadQuerySet(models.QuerySet):
+
+    """A custom manager for ResumableUpload model."""
+
+    def create(self, **kwargs):
+        encode_hashes(kwargs)
+        return super(ResumableUploadQuerySet, self).create(**kwargs)
+
+    def filter(self, **kwargs):
+        encode_hashes(kwargs)
+        return super(ResumableUploadQuerySet, self).filter(**kwargs)
+
+    def get(self, **kwargs):
+        encode_hashes(kwargs)
+        return super(ResumableUploadQuerySet, self).get(**kwargs)
+
+
+ResumableUploadManager = ResumableUploadQuerySet.as_manager
+
+
+class UploadJobQuerySet(models.QuerySet):
+
+    """A custom manager for UploadJob model."""
+
+    def create(self, **kwargs):
+        encode_hashes(kwargs)
+        return super(UploadJobQuerySet, self).create(**kwargs)
+
+    def filter(self, **kwargs):
+        encode_hashes(kwargs)
+        return super(UploadJobQuerySet, self).filter(**kwargs)
+
+    def get(self, **kwargs):
+        encode_hashes(kwargs)
+        return super(UploadJobQuerySet, self).get(**kwargs)
+
+
+UploadJobManager = UploadJobQuerySet.as_manager
 
 
 class DownloadManager(models.Manager):

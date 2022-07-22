@@ -250,7 +250,7 @@ class TransactionLog(models.Model):
                  volume_path=node.volume.path)
         if node.kind == StorageObject.FILE:
             d['content_hash'] = (
-                bytes(node.content_blob.hash) if node.content_blob else None)
+                node.content_blob.hash if node.content_blob else None)
             d['size'] = getattr(node.content_blob, 'size', None)
             storage_key = getattr(node.content_blob, 'storage_key', None)
             d['storage_key'] = unicode(storage_key) if storage_key else None

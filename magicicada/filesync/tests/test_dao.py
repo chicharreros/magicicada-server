@@ -49,7 +49,7 @@ class StorageDALTestCase(BaseTestCase):
     def create_files(self, parent, amount=10):
         result = [
             parent.make_file_with_content(
-                'file-%s' % i, hash=b'', crc32=10, size=100, deflated_size=50,
+                'file-%s' % i, hash='', crc32=10, size=100, deflated_size=50,
                 storage_key=uuid.uuid4())
             for i in range(amount)]
         return result
@@ -242,7 +242,7 @@ class VolumeProxyTestCase(StorageDALTestCase):
         self.assertEqual(root.volume_id, dir.volume_id)
         hash = self._make_content_on_volume(root)
         content = user.volume().get_content(hash)
-        self.assertEqual(bytes(content.hash), hash)
+        self.assertEqual(content.hash, hash)
 
     def test_VolumeProxy_udf(self):
         """Test the VolumeProxy."""
@@ -261,7 +261,7 @@ class VolumeProxyTestCase(StorageDALTestCase):
         self.assertEqual(root.volume_id, udf.id)
         hash = self._make_content_on_volume(root)
         content = user.volume(udf.id).get_content(hash)
-        self.assertEqual(bytes(content.hash), hash)
+        self.assertEqual(content.hash, hash)
 
     def test_VolumeProxy_share(self):
         """Test the VolumeProxy."""
@@ -278,7 +278,7 @@ class VolumeProxyTestCase(StorageDALTestCase):
         self.assertEqual(dir.vol_share.id, share.id)
         hash = self._make_content_on_volume(root)
         content = user2.volume(share.id).get_content(hash)
-        self.assertEqual(bytes(content.hash), hash)
+        self.assertEqual(content.hash, hash)
 
     def test_VolumeProxy_get_root_and_volume(self):
         """Test the get_root method."""
@@ -337,7 +337,7 @@ class VolumeProxyTestCase(StorageDALTestCase):
         nodes = user.volume().get_all_nodes(mimetypes=[mime],
                                             with_content=True)
         self.assertEqual(nodes, files)
-        self.assertEqual(bytes(nodes[0].content.hash), hash)
+        self.assertEqual(nodes[0].content.hash, hash)
 
     def test_get_deleted_files(self):
         """Test get_deleted_files."""
@@ -757,7 +757,7 @@ class DAOTestCase(StorageDALTestCase):
         self.assertEqual(file.full_path, '/a/b/c/filename.txt')
         self.assertEqual(file.mimetype, mime)
         self.assertEqual(file.status, STATUS_LIVE)
-        self.assertEqual(bytes(file.content.hash), hash)
+        self.assertEqual(file.content.hash, hash)
         self.assertEqual(file.content.crc32, crc)
         self.assertEqual(file.content.size, size)
         self.assertEqual(file.content.deflated_size, deflated_size)
@@ -798,14 +798,14 @@ class DAOTestCase(StorageDALTestCase):
         self.assertEqual(file.name, name)
         self.assertEqual(file.mimetype, mime)
         self.assertEqual(file.status, STATUS_LIVE)
-        self.assertEqual(bytes(file.content.hash), hash)
+        self.assertEqual(file.content.hash, hash)
         self.assertEqual(file.content.crc32, crc)
         self.assertEqual(file.content.size, size)
         self.assertEqual(file.content.deflated_size, deflated_size)
         self.assertEqual(file.content.storage_key, storage_key)
         # make sure the user can get the content
         content = user.volume().get_content(hash)
-        self.assertEqual(bytes(content.hash), hash)
+        self.assertEqual(content.hash, hash)
         self.assertEqual(content.crc32, crc)
         self.assertEqual(content.size, size)
         self.assertEqual(content.deflated_size, deflated_size)
@@ -824,7 +824,7 @@ class DAOTestCase(StorageDALTestCase):
         self.assertEqual(file.name, name)
         self.assertEqual(file.mimetype, mime)
         self.assertEqual(file.status, STATUS_LIVE)
-        self.assertEqual(bytes(file.content.hash), new_hash)
+        self.assertEqual(file.content.hash, new_hash)
         self.assertEqual(file.content.crc32, new_crc)
         self.assertEqual(file.content.size, new_size)
         self.assertEqual(file.content.deflated_size, new_deflated_size)
@@ -1418,7 +1418,7 @@ class TestSQLStatementCount(StorageDALTestCase):
         directory = user.root.make_subdirectory('test')
         for i in range(5):
             directory.make_file_with_content(
-                file_name='file-%s' % i, hash=b'hash', crc32=0, size=0,
+                file_name='file-%s' % i, hash='hash', crc32=0, size=0,
                 deflated_size=0, storage_key=uuid.uuid4(),
                 mimetype=self.mimetype)
         return directory

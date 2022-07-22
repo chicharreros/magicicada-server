@@ -710,14 +710,11 @@ class FileNodeContent(object):
     """A ContentBlob for a File."""
 
     def __init__(self, contentblob):
-        self.hash = bytes(contentblob.hash)
+        self.hash = contentblob.hash
         self.crc32 = contentblob.crc32
         self.size = contentblob.size
         self.status = contentblob.status
-        if contentblob.magic_hash:
-            self.magic_hash = bytes(contentblob.magic_hash)
-        else:
-            self.magic_hash = None
+        self.magic_hash = contentblob.magic_hash
         if contentblob.size == 0:
             self.deflated_size = 0
             self.storage_key = None
@@ -1863,13 +1860,13 @@ class StorageUserGateway(GatewayBase):
 
         # if we have content have the same magic hash is reusable!
         if (magic_hash is not None and contentblob.magic_hash is not None and
-                bytes(contentblob.magic_hash) == bytes(magic_hash)):
+                contentblob.magic_hash == magic_hash):
             return True, contentblob
 
         # if not, but the user owns the blob, still can be reusable
-        nodes = StorageObject.objects.filter(
-            content_blob__hash=hash_value, volume__owner__id=self.user.id)
-        if nodes.exists():
+        owned_by_user = contentblob.storageobject_set.filter(
+            volume__owner__id=self.user.id).exists()
+        if owned_by_user:
             return True, contentblob
 
         # exists, but it's not reusable
@@ -2671,7 +2668,7 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
         # reload node from DB
         fnode = StorageObject.objects.get(id=fnode.id)
         old_content = fnode.content
-        if fnode.content_hash == bytes(content.hash):
+        if fnode.content_hash == content.hash:
             return StorageNode.factory(
                 self, fnode, content=FileNodeContent(old_content),
                 owner=self.owner, permissions=self._get_node_perms(fnode))

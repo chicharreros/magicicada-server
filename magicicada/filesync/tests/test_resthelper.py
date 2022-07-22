@@ -591,7 +591,7 @@ class RestHelperTestCase(BaseTestCase):
     def test_PUT_node_new_file_magic(self):
         """Test put_node to make a new file with content."""
         cb = self.factory.make_content_blob(
-            content="FakeContent", magic_hash=b'magic')
+            content="FakeContent", magic_hash='magic')
         new_file_path = settings.ROOT_USERVOLUME_PATH + "/a/b/c/file.txt"
         info = self.helper.put_node(
             self.user, new_file_path,
@@ -604,13 +604,13 @@ class RestHelperTestCase(BaseTestCase):
     def test_PUT_node_update_file_magic(self):
         """Test put_node to make a new file with content."""
         cb = self.factory.make_content_blob(
-            content="FakeContent", magic_hash=b'magic')
+            content="FakeContent", magic_hash='magic')
         new_file_path = settings.ROOT_USERVOLUME_PATH + "/a/b/c/file.txt"
         info = self.helper.put_node(
             self.user, new_file_path,
             {'kind': 'file', 'hash': cb.hash, 'magic_hash': 'magic'})
         cb = self.factory.make_content_blob(
-            content="NewFakeContent", magic_hash=b'magic2')
+            content="NewFakeContent", magic_hash='magic2')
         info = self.helper.put_node(
             self.user, new_file_path,
             {'kind': 'file', 'hash': cb.hash, 'magic_hash': 'magic2'})
