@@ -60,8 +60,6 @@ class Factory(object):
         return prefix + ''.join(
             random.choice(BASE_CHARS) for i in range(extra_length))
 
-    get_unique_unicode = get_unique_string
-
     def get_fake_hash(self, key=None):
         """Return a hashkey."""
         if key is None:

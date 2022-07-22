@@ -57,11 +57,11 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         txlog3 = self.factory.make_transaction_log()
 
         self._create_db_worker_last_row_entry(
-            self.factory.get_unique_unicode(), txlog3)
+            self.factory.get_unique_string(), txlog3)
         self._create_db_worker_last_row_entry(
-            self.factory.get_unique_unicode(), txlog1)
+            self.factory.get_unique_string(), txlog1)
         self._create_db_worker_last_row_entry(
-            self.factory.get_unique_unicode(), txlog2)
+            self.factory.get_unique_string(), txlog2)
 
         self.assertEqual(
             (txlog1.id, txlog1.timestamp), utils.get_last_row('some worker'))
@@ -73,12 +73,12 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         txlog2 = self.factory.make_transaction_log()
         txlog3 = self.factory.make_transaction_log()
 
-        worker_name = self.factory.get_unique_unicode()
+        worker_name = self.factory.get_unique_string()
         self._create_db_worker_last_row_entry(worker_name, txlog3)
         self._create_db_worker_last_row_entry(
-            self.factory.get_unique_unicode(), txlog1)
+            self.factory.get_unique_string(), txlog1)
         self._create_db_worker_last_row_entry(
-            self.factory.get_unique_unicode(), txlog2)
+            self.factory.get_unique_string(), txlog2)
 
         self.assertEqual(
             (txlog3.id, txlog3.timestamp), utils.get_last_row(worker_name))
@@ -86,7 +86,7 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
     def test_update_last_row_with_no_data(self):
         """Test the update_last_row function when no data is present."""
         txlog = self.factory.make_transaction_log()
-        worker_name = self.factory.get_unique_unicode()
+        worker_name = self.factory.get_unique_string()
         utils.update_last_row(worker_name=worker_name, txlog=txlog)
 
         result = DBWorkerLastRow.objects.get(worker_id=worker_name)
@@ -99,7 +99,7 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         """
         txlog = self.factory.make_transaction_log()
         txlog2 = self.factory.make_transaction_log()
-        worker_name = self.factory.get_unique_unicode()
+        worker_name = self.factory.get_unique_string()
         self._create_db_worker_last_row_entry(worker_name, txlog)
         utils.update_last_row(worker_name=worker_name, txlog=txlog2)
 
@@ -221,7 +221,7 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         owner = self.make_user_without_txlog()
         txlogs = [self.factory.make_transaction_log(owner=owner),
                   self.factory.make_transaction_log(owner=owner)]
-        worker_id = self.factory.get_unique_unicode()
+        worker_id = self.factory.get_unique_string()
         txlist = utils.get_txn_recs(num_recs=3, worker_id=worker_id)
 
         self.assertEqual([t.as_dict() for t in txlogs], txlist)
@@ -241,7 +241,7 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         t3 = self.factory.make_transaction_log(owner=owner)
         t2.delete()
 
-        worker_id = self.factory.get_unique_unicode()
+        worker_id = self.factory.get_unique_string()
         txlist = utils.get_txn_recs(num_recs=3, worker_id=worker_id)
         self.assertEqual([t1.as_dict(), t3.as_dict()], txlist)
         txlist = utils.get_txn_recs(
