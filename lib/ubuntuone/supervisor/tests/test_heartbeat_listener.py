@@ -21,8 +21,8 @@
 import json
 import logging
 import time
-import xmlrpclib
 from StringIO import StringIO
+from xmlrpclib import Fault
 
 import mock
 from supervisor import states, childutils
@@ -62,11 +62,11 @@ class HeartbeatListenerTestCase(BaseTestCase):
 
     def test_restart_fail_stop(self):
         """Test the restart method failing to stop the process."""
-        self.rpc.supervisor.stopProcess.side_effect = xmlrpclib.Fault(
+        self.rpc.supervisor.stopProcess.side_effect = Fault(
             42, "Failed to stop the process.")
 
         last = time.time()
-        with self.assertRaises(xmlrpclib.Fault):
+        with self.assertRaises(Fault):
             self.listener.restart("foo", last)
 
         msg = "Failed to stop process %s (last heartbeat: %s), exiting: %s"
@@ -76,11 +76,11 @@ class HeartbeatListenerTestCase(BaseTestCase):
 
     def test_restart_fail_start(self):
         """Test the restart method failing to start the process."""
-        self.rpc.supervisor.startProcess.side_effect = xmlrpclib.Fault(
+        self.rpc.supervisor.startProcess.side_effect = Fault(
             42, "Failed to start the process.")
 
         last = time.time()
-        with self.assertRaises(xmlrpclib.Fault):
+        with self.assertRaises(Fault):
             self.listener.restart("foo", last)
 
         msg = 'Failed to start process %s after stopping it, exiting: %s'

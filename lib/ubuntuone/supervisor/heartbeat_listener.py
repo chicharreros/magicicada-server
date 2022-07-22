@@ -30,7 +30,7 @@ import logging
 import os
 import sys
 import time
-import xmlrpclib
+from xmlrpclib import Fault
 
 from supervisor import childutils, states
 from supervisor.events import EventTypes, getEventNameByType
@@ -172,7 +172,7 @@ class HeartbeatListener(object):
         try:
             self.rpc.supervisor.stopProcess(name)
             self.logger.debug("Process %s stopped.", name)
-        except xmlrpclib.Fault as what:
+        except Fault as what:
             self.logger.error(
                 'Failed to stop process %s (last heartbeat: %s), exiting: %s',
                 name, when_client_heartbeat, what)
@@ -180,7 +180,7 @@ class HeartbeatListener(object):
         try:
             self.rpc.supervisor.startProcess(name)
             self.logger.debug("Process %s started.", name)
-        except xmlrpclib.Fault as what:
+        except Fault as what:
             self.logger.error('Failed to start process %s after stopping it, '
                               'exiting: %s', name, what)
             raise
