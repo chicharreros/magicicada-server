@@ -226,12 +226,12 @@ class ContentBlob(models.Model):
 
     @property
     def hash(self):
-        return bytes(self._hash).decode('utf-8')
+        return bytes(self._hash)
 
     @property
     def magic_hash(self):
         return (
-            bytes(self._magic_hash).decode('utf-8')
+            bytes(self._magic_hash)
             if self._magic_hash else None)
 
     @magic_hash.setter
@@ -1017,7 +1017,7 @@ class UploadJob(models.Model):
 
     @property
     def hash_hint(self):
-        return bytes(self._hash_hint).decode('utf-8')
+        return bytes(self._hash_hint)
 
     def add_part(self, size):
         """Add a part of size: 'size' and increment the chunk count."""
@@ -1175,7 +1175,7 @@ class ResumableUpload(models.Model):
     @property
     def hash_context(self):
         return (
-            bytes(self._hash_context).decode('utf-8')
+            bytes(self._hash_context)
             if self._hash_context else None)
 
     @hash_context.setter
@@ -1185,7 +1185,7 @@ class ResumableUpload(models.Model):
     @property
     def magic_hash_context(self):
         return (
-            bytes(self._magic_hash_context).decode('utf-8')
+            bytes(self._magic_hash_context)
             if self._magic_hash_context else None)
 
     @magic_hash_context.setter
