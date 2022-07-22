@@ -243,17 +243,19 @@ class BaseStorageObject(models.Model):
 
     # The directory node containing the object, or NULL if the object is
     # a volume root (only directories should be volume roots).
-    parent = models.ForeignKey('self', related_name='children', null=True)
+    parent = models.ForeignKey(
+        'self', related_name='children', null=True, on_delete=models.CASCADE)
 
     # The UserVolume containing this object, NULL for the Root volume.
-    volume = models.ForeignKey('UserVolume')
+    volume = models.ForeignKey('UserVolume', on_delete=models.CASCADE)
 
     # The object's name within its containing directory.
     # Ignored for volume roots.
     name = models.TextField(validators=[validate_name])
 
     # The content of the object, represented with a blob.
-    content_blob = models.ForeignKey(ContentBlob, null=True)
+    content_blob = models.ForeignKey(
+        ContentBlob, null=True, on_delete=models.CASCADE)
 
     # The kind of the object: directory, file, or symbolic link.
     kind = models.CharField(
@@ -829,7 +831,8 @@ class MoveFromShare(BaseStorageObject):
     share_id = models.UUIDField()
     node_id = models.UUIDField()
     old_parent = models.ForeignKey(
-        StorageObject, related_name='old_children', null=True)
+        StorageObject, related_name='old_children', null=True,
+        on_delete=models.CASCADE)
     objects = MoveFromShareManager()
 
     class Meta:
@@ -861,15 +864,17 @@ class Share(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
 
     # node that is root of the shared subtree
-    subtree = models.ForeignKey(StorageObject)
+    subtree = models.ForeignKey(StorageObject, on_delete=models.CASCADE)
 
     # user who shares
     shared_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, related_name='sharedby_folders')
+        settings.AUTH_USER_MODEL, related_name='sharedby_folders',
+        on_delete=models.CASCADE)
 
     # user to whom the subtree is shared
     shared_to = models.ForeignKey(
-        settings.AUTH_USER_MODEL, related_name='sharedto_folders', null=True)
+        settings.AUTH_USER_MODEL, related_name='sharedto_folders', null=True,
+        on_delete=models.CASCADE)
     email = models.TextField(blank=True)
 
     # name of the sharing. The pair (shared_to, name) is unique.
@@ -963,7 +968,7 @@ class UploadJob(models.Model):
     """Pending blob Uploads."""
 
     # The storage object this blob upload is linked to
-    node = models.ForeignKey(StorageObject)
+    node = models.ForeignKey(StorageObject, on_delete=models.CASCADE)
 
     # A simple sanity check count for how many chunks have been
     # recorded for this blob upload
@@ -1007,7 +1012,8 @@ class UserVolume(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
 
     # The object's owner, for access control and accounting purposes.
-    owner = models.ForeignKey(settings.AUTH_USER_MODEL)
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
 
     # suggested path (it's not enforced to the client)
     path = models.TextField(validators=[validate_volume_path])
@@ -1081,9 +1087,10 @@ class Download(models.Model):
     )
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    volume = models.ForeignKey(UserVolume)
+    volume = models.ForeignKey(UserVolume, on_delete=models.CASCADE)
     # The node of the download after it has completed.
-    node = models.ForeignKey(StorageObject, null=True)
+    node = models.ForeignKey(
+        StorageObject, null=True, on_delete=models.CASCADE)
     file_path = models.TextField()
     download_url = models.TextField()
     download_key = models.TextField(null=True)
@@ -1104,7 +1111,8 @@ class ResumableUpload(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
 
     # the owner of this upload
-    owner = models.ForeignKey(settings.AUTH_USER_MODEL)
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
 
     # the volume path of the file when this upload completes
     volume_path = models.TextField()
