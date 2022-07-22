@@ -73,69 +73,59 @@ def validate_volume_path(value):
     return value
 
 
-def encode_hashes(kwargs):
-    hash_fields = [
-        field for field in kwargs.keys()
-        if 'hash' in field and not field.startswith('_')]
-    for field in hash_fields:
-        kwargs['_' + field] = encode_hash(kwargs.pop(field))
+class HashFieldHandlerQuerySet(models.QuerySet):
+
+    """A custom queryset for models with BinaryFields storing hashes."""
+
+    hash_fields = None
+
+    @classmethod
+    def encode_hashes(cls, kwargs):
+        fields = cls.hash_fields or []
+        result = kwargs.copy()
+        for f in kwargs.keys():
+            if f in fields:
+                result['_' + f] = encode_hash(result.pop(f))
+        return result
+
+    def create(self, **kwargs):
+        kwargs = self.encode_hashes(kwargs)
+        return super(HashFieldHandlerQuerySet, self).create(**kwargs)
+
+    def filter(self, **kwargs):
+        kwargs = self.encode_hashes(kwargs)
+        return super(HashFieldHandlerQuerySet, self).filter(**kwargs)
+
+    def get(self, **kwargs):
+        kwargs = self.encode_hashes(kwargs)
+        return super(HashFieldHandlerQuerySet, self).get(**kwargs)
 
 
-class ContentBlobQuerySet(models.QuerySet):
+class ContentBlobQuerySet(HashFieldHandlerQuerySet):
 
     """A custom manager for ContentBlob model."""
 
-    def create(self, **kwargs):
-        encode_hashes(kwargs)
-        return super(ContentBlobQuerySet, self).create(**kwargs)
-
-    def filter(self, **kwargs):
-        encode_hashes(kwargs)
-        return super(ContentBlobQuerySet, self).filter(**kwargs)
-
-    def get(self, **kwargs):
-        encode_hashes(kwargs)
-        return super(ContentBlobQuerySet, self).get(**kwargs)
+    hash_fields = ['hash', 'magic_hash']
 
 
 ContentBlobManager = ContentBlobQuerySet.as_manager
 
 
-class ResumableUploadQuerySet(models.QuerySet):
+class ResumableUploadQuerySet(HashFieldHandlerQuerySet):
 
     """A custom manager for ResumableUpload model."""
 
-    def create(self, **kwargs):
-        encode_hashes(kwargs)
-        return super(ResumableUploadQuerySet, self).create(**kwargs)
-
-    def filter(self, **kwargs):
-        encode_hashes(kwargs)
-        return super(ResumableUploadQuerySet, self).filter(**kwargs)
-
-    def get(self, **kwargs):
-        encode_hashes(kwargs)
-        return super(ResumableUploadQuerySet, self).get(**kwargs)
+    hash_fields = ['hash_context', 'magic_hash_context']
 
 
 ResumableUploadManager = ResumableUploadQuerySet.as_manager
 
 
-class UploadJobQuerySet(models.QuerySet):
+class UploadJobQuerySet(HashFieldHandlerQuerySet):
 
     """A custom manager for UploadJob model."""
 
-    def create(self, **kwargs):
-        encode_hashes(kwargs)
-        return super(UploadJobQuerySet, self).create(**kwargs)
-
-    def filter(self, **kwargs):
-        encode_hashes(kwargs)
-        return super(UploadJobQuerySet, self).filter(**kwargs)
-
-    def get(self, **kwargs):
-        encode_hashes(kwargs)
-        return super(UploadJobQuerySet, self).get(**kwargs)
+    hash_fields = ['hash_hint']
 
 
 UploadJobManager = UploadJobQuerySet.as_manager
