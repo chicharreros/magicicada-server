@@ -39,6 +39,12 @@ def split_in_list(inlist, max=MAX_IS_IN_SIZE):
         return [inlist]
 
 
+def encode_hash(hash_value):
+    if hash_value is not None and isinstance(hash_value, unicode):
+        hash_value = hash_value.encode('utf-8')
+    return hash_value
+
+
 def encode_uuid(uuid_value):
     """Encode a UUID, or any string value."""
     if uuid_value:

@@ -2005,7 +2005,7 @@ class UploadJobTestCase(BaseTestCase):
         u = self.factory.make_user()
         obj = self.factory.make_file(owner=u, name='file.ext')
         job = UploadJob.objects.create(
-            node=obj, multipart_key=uuid.uuid4(), hash_hint=b'bar',
+            node=obj, multipart_key=uuid.uuid4(), hash_hint='bar',
             crc32_hint=0)
         job.add_part(10)
         self.assertEqual(job.chunk_count, 1)
@@ -2019,7 +2019,7 @@ class UploadJobTestCase(BaseTestCase):
         u = self.factory.make_user()
         obj = self.factory.make_file(owner=u, name='file.ext')
         job = UploadJob.objects.create(
-            node=obj, multipart_key=uuid.uuid4(), hash_hint=b'bar',
+            node=obj, multipart_key=uuid.uuid4(), hash_hint='bar',
             crc32_hint=0)
         job.add_part(10)
         same_job = UploadJob.objects.get(id=job.id)
@@ -2089,7 +2089,7 @@ class ResumableUploadTest(BaseTestCase):
             owner=user, volume_path=vol_path, size=size,
             storage_key=storage_key)
         upload.add_part(
-            10 * (2 ** 20), b'hash context', b'magic hash context', 55)
+            10 * (2 ** 20), 'hash context', 'magic hash context', 55)
         self.assertEqual(upload.part_count, 1)
         self.assertEqual(upload.uploaded_bytes, 10 * (2 ** 20))
         self.assertEqual(upload.hash_context, 'hash context')

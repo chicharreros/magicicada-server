@@ -342,7 +342,7 @@ class EventNotificationTest(BaseTestCase):
     def test_make_file_with_magic_content(self):
         """Make sure make_file with magic content sends a notification."""
         cb = self.factory.make_content_blob(
-            content='FakeContent', magic_hash=b'magic')
+            content='FakeContent', magic_hash='magic')
         with fsync_commit():
             f = self.vgw.make_file(self.root.id, 'filename', hash=cb.hash,
                                    magic_hash='magic')
@@ -496,7 +496,7 @@ class EventNotificationTest(BaseTestCase):
         crc = 12345
         size = 111111111
         deflated_size = 10000
-        magic_hash = b'magic_hash'
+        magic_hash = 'magic_hash'
         with fsync_commit():
             n = self.vgw.make_file_with_content(
                 self.root.id, name, hash, crc, size, deflated_size,
@@ -1478,7 +1478,7 @@ class StorageUserGatewayTestCase(BaseTestCase):
     def test_reusable_content_no_blob(self):
         """No blob at all, can not reuse."""
         blobexists, storage_key = self.gw._get_reusable_content(
-            b'hash_value', b'magic')
+            'hash_value', 'magic')
         self.assertFalse(blobexists)
         self.assertIsNone(storage_key)
 
@@ -1509,7 +1509,7 @@ class StorageUserGatewayTestCase(BaseTestCase):
     def test_reusable_content_same_owner_with_magic(self):
         """Test update_content will reuse owned content."""
         hash_value = self.factory.get_fake_hash()
-        node = self._make_file_with_content(hash_value, magic_hash=b'magic')
+        node = self._make_file_with_content(hash_value, magic_hash='magic')
         blobexists, storage_key = self.gw.is_reusable_content(hash_value,
                                                               'magic')
         self.assertTrue(blobexists)
@@ -1535,7 +1535,7 @@ class StorageUserGatewayTestCase(BaseTestCase):
 
         hash_value = self.factory.get_fake_hash()
         node = self._make_file_with_content(
-            hash_value, gw=user2._gateway, magic_hash=b'magic')
+            hash_value, gw=user2._gateway, magic_hash='magic')
         self.assertTrue(self.gw.is_reusable_content(hash_value, 'magic'))
         blobexists, storage_key = self.gw.is_reusable_content(hash_value,
                                                               'magic')
@@ -1545,7 +1545,7 @@ class StorageUserGatewayTestCase(BaseTestCase):
     def test__get_reusable_content_no_blob(self):
         """No blob at all, can not reuse."""
         blobexists, blob = self.gw._get_reusable_content(
-            b'hash_value', b'magic')
+            'hash_value', 'magic')
         self.assertFalse(blobexists)
         self.assertIsNone(blob)
 
@@ -1555,15 +1555,15 @@ class StorageUserGatewayTestCase(BaseTestCase):
         node = self._make_file_with_content(hash_value)
         blobexists, blob = self.gw._get_reusable_content(hash_value, None)
         self.assertTrue(blobexists)
-        self.assertEqual(bytes(blob.hash), node.content_hash)
+        self.assertEqual(blob.hash, node.content_hash)
 
     def test__get_reusable_content_same_owner_with_magic(self):
         """Test update_content will reuse owned content."""
         hash_value = self.factory.get_fake_hash()
-        node = self._make_file_with_content(hash_value, magic_hash=b'magic')
+        node = self._make_file_with_content(hash_value, magic_hash='magic')
         blobexists, blob = self.gw._get_reusable_content(hash_value, 'magic')
         self.assertTrue(blobexists)
-        self.assertEqual(bytes(blob.hash), node.content_hash)
+        self.assertEqual(blob.hash, node.content_hash)
 
     def test__get_reusable_content_different_owner_no_magic(self):
         """Test update_content will not reuse someone elses content."""
@@ -1585,11 +1585,11 @@ class StorageUserGatewayTestCase(BaseTestCase):
 
         hash_value = self.factory.get_fake_hash()
         node = self._make_file_with_content(
-            hash_value, gw=user2._gateway, magic_hash=b'magic')
+            hash_value, gw=user2._gateway, magic_hash='magic')
         self.assertTrue(self.gw._get_reusable_content(hash_value, 'magic'))
         blobexists, blob = self.gw._get_reusable_content(hash_value, 'magic')
         self.assertTrue(blobexists)
-        self.assertEqual(bytes(blob.hash), node.content_hash)
+        self.assertEqual(blob.hash, node.content_hash)
 
     def test_get_photo_directories(self):
         """Get the get_photo_directories method."""
@@ -2476,7 +2476,7 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
     def test_make_file_with_magic(self):
         """Test make_file method."""
         cb = self.factory.make_content_blob(
-            content='FakeContent', magic_hash=b'magic')
+            content='FakeContent', magic_hash='magic')
         # make enough room
         self.tweak_users_quota(self.owner, cb.deflated_size)
         node = self.vgw.make_file(self.root.id, 'the file name',
@@ -2487,13 +2487,13 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         """Test make_file method with a bad hash raises an exception."""
         # make a content blob with a magic hash
         cb = self.factory.make_content_blob(
-            content='FakeContent', magic_hash=b'magic')
+            content='FakeContent', magic_hash='magic')
         self.assertRaises(errors.HashMismatch,
                           self.vgw.make_file, self.root.id, 'name.txt',
-                          hash=b'wronghash')
+                          hash='wronghash')
         self.assertRaises(errors.HashMismatch,
                           self.vgw.make_file, self.root.id, 'name.txt',
-                          hash=cb.hash, magic_hash=b'wrong')
+                          hash=cb.hash, magic_hash='wrong')
 
     def test_make_subdirectory(self):
         """Test make_subdirectory method."""
@@ -2665,7 +2665,7 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         self.assertRaises(errors.DoesNotExist,
                           self.vgw.get_user_multipart_uploadjob,
                           file1.id, upj1.multipart_key,
-                          hash_hint=b'sha1:foobar')
+                          hash_hint='sha1:foobar')
 
     def test_add_uploadjob_part(self):
         """Test add_uploadjob_part."""
@@ -2734,7 +2734,7 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         crc = 12345
         size = 100
         def_size = 10000
-        magic_hash = b'magic_hash'
+        magic_hash = 'magic_hash'
 
         # fix their quota and clear former contents...
         original_free_bytes = self.owner.free_bytes
@@ -2766,7 +2766,7 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         crc = 12345
         size = 100
         def_size = 10000
-        magic_hash = b'magic_hash'
+        magic_hash = 'magic_hash'
 
         # call it without the magic hash, as before
         n = self.vgw.make_content(filenode.id, filenode.content_hash, new_hash,
@@ -2801,7 +2801,7 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         crc = 12345
         size = 100
         def_size = 10000
-        magic_hash = b'magic_hash'
+        magic_hash = 'magic_hash'
         content = self.vgw._make_content(hash, crc, size, def_size, key,
                                          magic_hash)
         content = self.vgw.get_content(content.hash)
@@ -2851,7 +2851,7 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         crc = 12345
         size = 100
         deflated_size = 1
-        magic_hash = b'magic_hash'
+        magic_hash = 'magic_hash'
         node = self.vgw.make_file_with_content(
             self.root.id, name, hash, crc, size, deflated_size,
             storage_key, mimetype='image/tif', magic_hash=magic_hash)
@@ -2888,7 +2888,7 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         crc = 12345
         size = 100
         deflated_size = 10000
-        magic_hash = b'magic_hash'
+        magic_hash = 'magic_hash'
         f = self.vgw.make_file_with_content
         node1 = f(self.root.id, name, hash, crc, size, deflated_size,
                   storage_key, mimetype='image/tif')
@@ -2918,7 +2918,7 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         crc = 12345
         size = 100
         deflated_size = 10000
-        magic_hash = b'magic_hash'
+        magic_hash = 'magic_hash'
 
         # create it without magic hash, as old times
         n = self.vgw.make_file_with_content(self.root.id, name, hash, crc,

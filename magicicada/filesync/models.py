@@ -46,11 +46,14 @@ from magicicada.filesync.managers import (
     ROOT_PARENT,
     STATUS_LIVE,
     STATUS_DEAD,
+    ContentBlobManager,
     DownloadManager,
     MoveFromShareManager,
+    ResumableUploadManager,
     ShareManager,
     StorageObjectManager,
     StorageUserManager,
+    UploadJobManager,
     UserVolumeManager,
     validate_name,
     validate_volume_path,
@@ -189,7 +192,7 @@ class ContentBlob(models.Model):
     """Associates a hash with a specific storage key."""
 
     # The hash for the raw file content represented by this record.
-    hash = models.BinaryField(primary_key=True)
+    _hash = models.BinaryField(primary_key=True)
 
     # The crc32 for the raw file content represented by this record.
     crc32 = models.BigIntegerField(default=0)
@@ -214,10 +217,26 @@ class ContentBlob(models.Model):
         max_length=128, choices=LIFECYCLE_STATUS_CHOICES, default=STATUS_LIVE)
 
     # The magic hash of the content
-    magic_hash = models.BinaryField(null=True)
+    _magic_hash = models.BinaryField(null=True)
 
     # timestamp at which the blob was first created
     when_created = models.DateTimeField(default=now)
+
+    objects = ContentBlobManager()
+
+    @property
+    def hash(self):
+        return bytes(self._hash)
+
+    @property
+    def magic_hash(self):
+        return (
+            bytes(self._magic_hash)
+            if self._magic_hash else None)
+
+    @magic_hash.setter
+    def magic_hash(self, value):
+        self._magic_hash = utils.encode_hash(value)
 
 
 class BaseStorageObject(models.Model):
@@ -428,17 +447,14 @@ class BaseStorageObject(models.Model):
         """Get the hash value for this node's content."""
         if self.is_dir:
             raise DirectoriesHaveNoContent("Directory has no content.")
-        return bytes(self.content_blob.hash) if self.content_blob else None
+        return self.content_blob.hash if self.content_blob else None
 
     @property
     def magic_hash(self):
         """Get the magic hash for this node's content."""
         if self.is_dir:
             raise DirectoriesHaveNoContent("Directory has no content.")
-        result = None
-        if self.content_blob and self.content_blob.magic_hash:
-            result = bytes(self.content_blob.magic_hash)
-        return result
+        return self.content_blob.magic_hash if self.content_blob else None
 
     def get_content(self):
         """Return this object ContentBlob"""
@@ -975,7 +991,7 @@ class UploadJob(models.Model):
     chunk_count = models.IntegerField(default=0)
 
     # The hash the client claims that the completely uploaded file should have.
-    hash_hint = models.BinaryField()
+    _hash_hint = models.BinaryField()
 
     # The crc32 the client claims that the completely uploaded
     # file should have.
@@ -996,6 +1012,12 @@ class UploadJob(models.Model):
 
     # the number of the uploaded bytes so far.
     uploaded_bytes = models.BigIntegerField(default=0)
+
+    objects = UploadJobManager()
+
+    @property
+    def hash_hint(self):
+        return bytes(self._hash_hint)
 
     def add_part(self, size):
         """Add a part of size: 'size' and increment the chunk count."""
@@ -1140,13 +1162,35 @@ class ResumableUpload(models.Model):
     uploaded_bytes = models.BigIntegerField(default=0)
 
     # the hash context of this resumable upload
-    hash_context = models.BinaryField(null=True)
+    _hash_context = models.BinaryField(null=True)
 
     # the magic hash context of this resumable upload
-    magic_hash_context = models.BinaryField(null=True)
+    _magic_hash_context = models.BinaryField(null=True)
 
     # the crc context from compressing content
     crc_context = models.IntegerField(null=True)
+
+    objects = ResumableUploadManager()
+
+    @property
+    def hash_context(self):
+        return (
+            bytes(self._hash_context)
+            if self._hash_context else None)
+
+    @hash_context.setter
+    def hash_context(self, value):
+        self._hash_context = utils.encode_hash(value)
+
+    @property
+    def magic_hash_context(self):
+        return (
+            bytes(self._magic_hash_context)
+            if self._magic_hash_context else None)
+
+    @magic_hash_context.setter
+    def magic_hash_context(self, value):
+        self._magic_hash_context = utils.encode_hash(value)
 
     def add_part(self, size, hash_context, magic_hash_context, crc_context):
         """Updated when a part is added."""
