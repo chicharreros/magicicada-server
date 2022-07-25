@@ -372,7 +372,7 @@ class ServerStatusTest(TestWithDatabase):
     def status_resource(self):
         # get the site instance from the service
         site = self.service.status_service.args[1]
-        return site.resource.children['status']
+        return site.resource.children[b'status']
 
     @defer.inlineCallbacks
     def test_status_OK(self):
