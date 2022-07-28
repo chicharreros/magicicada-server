@@ -23,12 +23,10 @@ import re
 from StringIO import StringIO
 from unittest import SkipTest
 
-import OpenSSL
 import mock
 from magicicadaprotocol.client import StorageClientFactory, StorageClient
 from twisted.internet import defer, reactor, error as txerror, ssl
 from twisted.python import failure
-from twisted.web import client, error as web_error
 from twisted.trial.unittest import TestCase
 from ubuntuone.supervisor import utils as supervisor_utils
 
@@ -95,9 +93,6 @@ class SSLProxyTestCase(TestWithDatabase):
 class BasicSSLProxyTestCase(SSLProxyTestCase):
     """Basic tests for the ssl proxy service."""
 
-    def get_url(self, url):
-        return client.getPage(url)
-
     def test_server(self):
         """Stop and restart the server."""
         d = self.ssl_service.stopService()
@@ -146,35 +141,27 @@ class BasicSSLProxyTestCase(SSLProxyTestCase):
             "localhost", self.ssl_port, f, ssl.ClientContextFactory())
         storage_client = yield client_d
         # try to do anything and fail with ConnectionDone
-        try:
-            yield storage_client.set_caps(PREFERRED_CAP)
-        except txerror.ConnectionDone:
-            pass
-        except OpenSSL.SSL.Error as e:
-            self.fail("Got %s" % e)
-        else:
-            self.fail("Should get a ConnectionDone.")
-
-    test_ssl_handshake_backend_dead.skip = 'Should fail with connectionDone'
+        yield self.assertFailure(
+            storage_client.set_caps(PREFERRED_CAP), txerror.ConnectionDone)
 
     @defer.inlineCallbacks
     def test_server_status_ok(self):
         """Check that server status page works."""
         page = yield self.get_url(
             "http://localhost:%i/status" % self.ssl_service.status_port)
-        self.assertEqual("OK", page)
+        self.assertEqual("OK", page['response'])
 
     @defer.inlineCallbacks
     def test_server_status_fail(self):
         """Check that server status page works."""
         # shutdown the tcp port of the storage server.
         self.service.tcp_service.stopService()
-        d = self.get_url(
+        result = yield self.get_url(
             "http://localhost:%i/status" % self.ssl_service.status_port)
-        e = yield self.assertFailure(d, web_error.Error)
-        self.assertEqual("503", e.status)
-        self.assertEqual("Service Unavailable", e.message)
-        self.assertIn('Connection was refused by other side: 111', e.response)
+        self.assertEqual(503, result['status'])
+        self.assertEqual("Service Unavailable", result['message'])
+        self.assertIn(
+            'Connection was refused by other side: 111', result['response'])
 
     def test_heartbeat_disabled(self):
         """Test that the hearbeat is disabled."""

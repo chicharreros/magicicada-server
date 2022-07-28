@@ -26,13 +26,15 @@ import time
 from functools import wraps
 from StringIO import StringIO
 
-from magicicadaprotocol import client, request, protocol_pb2
+from magicicadaprotocol import client as protocol_client, request, protocol_pb2
 from magicicadaprotocol.client import StorageClientFactory, StorageClient
 from OpenSSL import crypto
 from twisted.internet import reactor, defer, ssl
 from twisted.internet.protocol import connectionDone
 from twisted.python.failure import Failure
 from twisted.trial.unittest import TestCase as TwistedTestCase
+from twisted.web.error import Error
+from twisted.web.client import getPage
 
 from magicicada import settings
 from magicicada.filesync import services
@@ -55,7 +57,7 @@ class FakeTimestampChecker(object):
 
 
 # need to patch this timestamp checker so it doesn't go to the real server
-client.tx_timestamp_checker = FakeTimestampChecker()
+protocol_client.tx_timestamp_checker = FakeTimestampChecker()
 
 
 class State(object):
@@ -201,9 +203,7 @@ class SimpleFactory(StorageClientFactory):
 
 
 class FactoryHelper(object):
-    """A StorageClientFactory wrapped with useful helper methods for testing
-    different clients.
-    """
+    """A StorageClientFactory with helper methods for testing clients."""
 
     def __init__(self, cb_func, factory=SimpleFactory(), timeout=None,
                  wait_notifications=0, caps=None, **kwargs):
@@ -341,6 +341,21 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
     def buildFactory(self, *args, **kwargs):
         """build self.factory with the specified args and kwargs"""
         return self.factory_class(*args, **kwargs)
+
+    @defer.inlineCallbacks
+    def get_url(self, url):
+        logger.debug('Getting URL at: %s', url)
+        try:
+            result = yield getPage(url.encode('utf-8'))
+        except Error as e:
+            result = {
+                'status': int(e.status),
+                'message': e.message.decode('utf-8'),
+                'response': e.response.decode('utf-8'),
+            }
+        else:
+            result = {'status': 200, 'response': result.decode('utf-8')}
+        defer.returnValue(result)
 
     @defer.inlineCallbacks
     def setUp(self):
