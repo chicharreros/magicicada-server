@@ -132,19 +132,6 @@ class TestClientCapabilities(TestWithDatabase):
             self.aq.disconnect()
         return super(TestClientCapabilities, self).tearDown()
 
-    def assertInQ(self, deferred, containee, msg=None):
-        """
-        deferredly assert that the containee is in the event queue.
-
-        containee can be callable, in which case it's called before
-        asserting.
-        """
-        def check_queue(_):
-            "the check itself"
-            ce = containee() if callable(containee) else containee
-            self.assertIn(ce, self.listener.q, msg)
-        deferred.addCallback(check_queue)
-
     def connect(self):
         """Connect the client"""
         d = self.wait_for('SYS_CONNECTION_MADE')
@@ -155,13 +142,14 @@ class TestClientCapabilities(TestWithDatabase):
         self.eq.push('SYS_NET_CONNECTED')
         return d
 
+    @defer.inlineCallbacks
     def test_query_set_capabilities(self):
         """After connecting the server uses the caps specified by client."""
         needed_event = self.wait_for('SYS_SET_CAPABILITIES_OK')
-        d = self.connect()
-        d.addCallback(lambda _: needed_event)
-        return d
+        yield self.connect()
+        yield needed_event
 
+    @defer.inlineCallbacks
     @failure_expected("The server doesn't have the requested capabilities")
     def test_query_bad_capabilities(self):
         """Test how the client hanlde trying to set capabilities that the
@@ -169,9 +157,8 @@ class TestClientCapabilities(TestWithDatabase):
         """
         syncdaemon.REQUIRED_CAPS = frozenset(['foo'])
         needed_event = self.wait_for('SYS_SET_CAPABILITIES_ERROR')
-        d = self.connect()
-        d.addCallback(lambda _: needed_event)
-        self.assertInQ(d, ('SYS_SET_CAPABILITIES_ERROR',
-                           {'error': "The server doesn't have the requested "
-                            "capabilities"}))
-        return d
+        yield self.connect()
+        yield needed_event
+        self.assertInListenerEvents(
+            'SYS_SET_CAPABILITIES_ERROR',
+            {'error': "The server doesn't have the requested capabilities"})

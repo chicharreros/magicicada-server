@@ -79,7 +79,7 @@ $(ENV)/bin/activate: requirements.txt requirements-devel.txt
 raw-test:
 	$(PYTHON) test $(TESTFLAGS)
 
-test: start-db start-base start-dbus raw-test stop
+test: lint start-db start-base start-dbus raw-test stop
 
 ci-test:
 	$(MAKE) test TESTFLAGS="-1 $(TESTFLAGS)"

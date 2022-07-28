@@ -1037,18 +1037,14 @@ class TestServerMove2(TestServerBase):
 class TestClientMove(TestSync):
     """move on the server"""
 
+    @defer.inlineCallbacks
     def test_simple_move_file(self):
         """Test rename a file."""
         fname = self.root_dir + "/test_file"
         open(fname, "w").close()
-
-        def rename():
-            "doit"
-            os.rename(fname, fname + "_new")
-        d = self.main.wait_for_nirvana(last_event_interval=0.2)
-        d.addCallback(lambda _: rename())
-        d.addCallback(lambda _: self.check())
-        return d
+        yield self.main.wait_for_nirvana(last_event_interval=0.2)
+        os.rename(fname, fname + "_new")
+        yield self.check()
 
     @defer.inlineCallbacks
     def test_simple_move_nowait_file(self):
@@ -1058,18 +1054,14 @@ class TestClientMove(TestSync):
         os.rename(fname, fname + "_new")
         yield self.check()
 
+    @defer.inlineCallbacks
     def test_simple_move_dir(self):
         """Test rename a dir."""
         fname = self.root_dir + "/test_dir"
         os.mkdir(fname)
-
-        def rename():
-            """do it"""
-            os.rename(fname, fname + "_new")
-        d = self.main.wait_for_nirvana(last_event_interval=0.2)
-        d.addCallback(lambda _: rename())
-        d.addCallback(lambda _: self.check())
-        return d
+        yield self.main.wait_for_nirvana(last_event_interval=0.2)
+        os.rename(fname, fname + "_new")
+        yield self.check()
 
     @defer.inlineCallbacks
     def test_simple_move_nowait_dir(self):
@@ -1144,24 +1136,13 @@ class TestClientMove(TestSync):
 
         yield self.compare_server()
 
+    @defer.inlineCallbacks
     def test_syncs_get_file_hash_in_moved_dir(self):
         """At the time the hash arrives to Sync, the full dir was moved."""
         dir1 = os.path.join(self.root_dir, "dir1")
         dir2 = os.path.join(self.root_dir, "dir2")
         filepath1 = os.path.join(dir1, "test_file")
         filepath2 = os.path.join(dir2, "test_file")
-
-        def create_testing_dir(_):
-            """Creates a dir."""
-            os.mkdir(dir1)
-            return _
-
-        def create_local(_):
-            """Creates a file in the dir."""
-            fh = open(filepath1, "w")
-            fh.write("foo")
-            fh.close()
-            return _
 
         def move_dir(event, *args, **kwargs):
             """Moves the dir when HQ_HASH_NEW is received."""
@@ -1172,37 +1153,38 @@ class TestClientMove(TestSync):
             # for the original function to be called
             return True
 
-        def local_check(_):
-            """Check that everything is ok"""
-            # it should only be our file in the directory
-            files = os.listdir(dir2)
-            self.assertEqual(files, ["test_file"])
-
-            # our file should have the correct content
-            f = open(filepath2)
-            content = f.read()
-            f.close()
-            self.assertEqual(content, "foo")
-
-        #
         # Recipe:
         #   1. open a file, write it, close it
         #   2. a HQ_HASH_NEW should happen
         #   3. in the moment we see the OK, move the dir
         #   4. sync should miss the file
         #   5. wait for nirvana, it should be hashed ok
-        #
         methinterf = MethodInterferer(self.main.event_q, 'push')
         methinterf.insert_before(None, move_dir)
 
-        d = self.main.wait_for_nirvana()
-        d.addCallback(create_testing_dir)
-        d.addCallback(lambda _: self.main.wait_for_nirvana(.5))
-        d.addCallback(create_local)
-        d.addCallback(lambda _: self.main.wait_for_nirvana(.5))
-        d.addCallback(local_check)
-        d.addCallback(lambda _: self.compare_server())
-        return d
+        yield self.main.wait_for_nirvana()
+
+        # Create a testing dir
+        os.mkdir(dir1)
+        yield self.main.wait_for_nirvana(.5)
+
+        # Creates a file in the dir
+        with open(filepath1, "w") as fh:
+            fh.write("foo")
+        yield self.main.wait_for_nirvana(.5)
+
+        def local_check(_):
+            """Check that everything is ok"""
+        # it should only be our file in the directory
+        files = os.listdir(dir2)
+        self.assertEqual(files, ["test_file"])
+
+        # our file should have the correct content
+        with open(filepath2) as f:
+            content = f.read()
+        self.assertEqual(content, "foo")
+
+        yield self.compare_server()
 
     @defer.inlineCallbacks
     def test_syncs_get_changed_file_hash(self):

@@ -23,7 +23,6 @@
 import collections
 import logging
 import os
-import types
 import time
 import uuid
 import weakref
