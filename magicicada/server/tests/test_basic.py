@@ -31,7 +31,6 @@ from django.conf import settings
 from magicicadaprotocol import request
 from twisted.internet import reactor, defer
 from twisted.internet.error import ConnectionDone
-from twisted.web import client, error
 from ubuntuone.supervisor import utils as supervisor_utils
 
 from magicicada.filesync.models import StorageUser
@@ -365,48 +364,41 @@ class ServerPingTest(TestWithDatabase):
 class ServerStatusTest(TestWithDatabase):
     """Test the server status service."""
 
-    @defer.inlineCallbacks
-    def setUp(self):
-        """Setup the test."""
-        yield super(ServerStatusTest, self).setUp()
-        self.url = "http://localhost:%s/status" % self.service.status_port
+    @property
+    def url(self):
+        return "http://localhost:%s/status" % self.service.status_port
+
+    @property
+    def status_resource(self):
         # get the site instance from the service
-        self.site = self.service.status_service.args[1]
+        site = self.service.status_service.args[1]
+        return site.resource.children['status']
 
     @defer.inlineCallbacks
     def test_status_OK(self):
         """Test the OK status response."""
-        status = self.site.resource.children['status']
         # override user_id with a existing user
-        status.user_id = self.usr0.id
-        response = yield client.getPage(self.url)
-        self.assertEqual(response, 'Status OK\n')
+        self.status_resource.user_id = self.usr0.id
+        result = yield self.get_url(self.url)
+        self.assertEqual(result['response'], 'Status OK\n')
 
     @defer.inlineCallbacks
     def test_status_ERROR(self):
         """Test the OK status response."""
-        status = self.site.resource.children['status']
         # override user_id with a non-existing user
-        status.user_id = sys.maxsize
-        try:
-            yield client.getPage(self.url)
-        except error.Error as e:
-            self.assertEqual('500', e.status)
-        else:
-            self.fail('An error is expected.')
+        self.status_resource.user_id = sys.maxsize
+        result = yield self.get_url(self.url)
+        self.assertEqual(500, result['status'])
+        self.assertEqual('Internal Server Error', result['message'])
 
     @defer.inlineCallbacks
     def test_status_not_found(self):
         """Test the OK status response."""
-        status = self.site.resource.children['status']
         # override user_id with a non-existing user
-        status.user_id = sys.maxsize
-        try:
-            yield client.getPage(self.url + "/foo")
-        except error.Error as e:
-            self.assertEqual('404', e.status)
-        else:
-            self.fail('An error is expected.')
+        self.status_resource.user_id = sys.maxsize
+        result = yield self.get_url(self.url + "/foo")
+        self.assertEqual(404, result['status'])
+        self.assertEqual('Not Found', result['message'])
 
 
 class DumpTest(TestWithDatabase):
@@ -423,6 +415,14 @@ class DumpTest(TestWithDatabase):
         os.makedirs(settings.LOG_FOLDER)
         self.addCleanup(shutil.rmtree, tmp_dir)
 
+    @property
+    def meliae_url(self):
+        return "http://localhost:%i/+meliae" % self.service.status_port
+
+    @property
+    def gc_stats_url(self):
+        return "http://localhost:%i/+gc-stats" % self.service.status_port
+
     @defer.inlineCallbacks
     def test_meliae_dump(self):
         """Check that the dump works."""
@@ -430,9 +430,8 @@ class DumpTest(TestWithDatabase):
         collect_called = []
         self.patch(gc, 'collect', lambda: collect_called.append(True))
         self.patch(scanner, 'dump_all_objects', lambda _: None)
-        page = yield client.getPage("http://localhost:%i/+meliae" %
-                                    (self.service.status_port))
-        self.assertIn("Output written to:", page)
+        page = yield self.get_url(self.meliae_url)
+        self.assertIn("Output written to:", page['response'])
         self.assertTrue(collect_called)
 
     @defer.inlineCallbacks
@@ -445,27 +444,24 @@ class DumpTest(TestWithDatabase):
             raise ValueError('foo')
 
         self.patch(scanner, 'dump_all_objects', broken_meliae_dump)
-        page = yield client.getPage("http://localhost:%i/+meliae" %
-                                    (self.service.status_port))
-        self.assertIn("Error while trying to dump memory", page)
+        page = yield self.get_url(self.meliae_url)
+        self.assertIn("Error while trying to dump memory", page['response'])
 
     @defer.inlineCallbacks
     def test_gc_dumps_count_ok(self):
         """Check that the count dump works."""
         self.patch(gc, 'get_count', lambda: (400, 20, 3))
         self.patch(gc, 'garbage', [])
-        page = yield client.getPage("http://localhost:%i/+gc-stats" %
-                                    (self.service.status_port,))
-        self.assertIn("GC count is (400, 20, 3)", page)
+        page = yield self.get_url(self.gc_stats_url)
+        self.assertIn("GC count is (400, 20, 3)", page['response'])
 
     @defer.inlineCallbacks
     def test_gc_dumps_garbage_ok(self):
         """Check that the garbage dump works."""
         self.patch(gc, 'get_count', lambda: None)
         self.patch(gc, 'garbage', ['foo', 666])
-        page = yield client.getPage("http://localhost:%i/+gc-stats" %
-                                    (self.service.status_port,))
-        self.assertIn("2 garbage items written", page)
+        page = yield self.get_url(self.gc_stats_url)
+        self.assertIn("2 garbage items written", page['response'])
 
     @defer.inlineCallbacks
     def test_gc_dump_error_generic(self):
@@ -476,9 +472,8 @@ class DumpTest(TestWithDatabase):
             raise ValueError('foo')
 
         self.patch(gc, 'get_count', fail)
-        page = yield client.getPage("http://localhost:%i/+gc-stats" %
-                                    (self.service.status_port,))
-        self.assertIn("Error while trying to dump GC", page)
+        page = yield self.get_url(self.gc_stats_url)
+        self.assertIn("Error while trying to dump GC", page['response'])
 
     @defer.inlineCallbacks
     def test_gc_dump_error_garbage(self):
@@ -489,9 +484,8 @@ class DumpTest(TestWithDatabase):
                 raise ValueError('foo')
 
         self.patch(gc, 'garbage', [Strange()])
-        page = yield client.getPage("http://localhost:%i/+gc-stats" %
-                                    (self.service.status_port,))
-        self.assertIn("1 garbage items written", page)
+        page = yield self.get_url(self.gc_stats_url)
+        self.assertIn("1 garbage items written", page['response'])
 
 
 class TestServerHeartbeat(TestWithDatabase):
