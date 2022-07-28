@@ -100,10 +100,10 @@ class TestCancel(AQCancelTestBase):
             share_id = self.listener.get_id_for_marker('marker:x')
             self.aq.answer_share(share_id, 'Yes')
             return self.hiccup()
-        d = self.wait_for_nirvana()
+
         self.aq.create_share(self.root, 'jack', '', 'View', 'marker:x', '')
 
-        yield d
+        yield self.wait_for_nirvana()
         yield self.nuke_client_method(
             'accept_share', worker, lambda: self.connlost_deferred)
 

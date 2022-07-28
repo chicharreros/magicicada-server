@@ -50,7 +50,6 @@ from magicicadaprotocol.content_hash import content_hash_factory, crc32
 from twisted.internet import defer, reactor
 from twisted.names import dns
 from twisted.names.common import ResolverBase
-from twisted.python.failure import Failure
 
 from magicicada import settings
 from magicicada.server import ssl_proxy
@@ -361,8 +360,7 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
             self.storage_users[username] = user
 
         # override and cleanup user config
-        self.old_get_config_files = main.config.get_config_files
-        main.config.get_config_files = lambda: SD_CONFIGS
+        self.patch(main.config, 'get_config_files', lambda: SD_CONFIGS)
         main.config._user_config = None
         user_config = main.config.get_user_config()
         for section in user_config.sections():
@@ -382,41 +380,36 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
         """Override default tmpdir property."""
         return TESTS_DIR
 
+    @defer.inlineCallbacks
     def tearDown(self):
         """Tear down."""
-        main.config.get_config_files = self.old_get_config_files
-        d = super(TestWithDatabase, self).tearDown()
-        d.addCallback(lambda _: self.ssl_service.stopService())
+        yield super(TestWithDatabase, self).tearDown()
+        yield self.ssl_service.stopService()
         if self._do_teardown_eq:
-            d.addCallback(lambda _: self.eq.shutdown())
-        d.addCallback(lambda _: self.main.state_manager.shutdown())
-        d.addCallback(lambda _: self.main.db.shutdown())
+            yield self.eq.shutdown()
+        yield self.main.state_manager.shutdown()
+        yield self.main.db.shutdown()
+
         test_method = getattr(self, self._testMethodName)
         failure_expected = getattr(test_method, 'failure_expected', False)
         if failure_expected and failure_expected != self.failed:
-            msg = "test method %r should've failed with %s and " \
-                % (self._testMethodName, failure_expected)
+            msg = "test method %r should've failed with %s and " % (
+                self._testMethodName, failure_expected)
             if self.failed:
-                msg += 'instead failed with: %s' % (self.failed,)
+                msg += 'instead failed with: %s' % self.failed
             else:
                 msg += "didn't"
-            d.addCallback(lambda _: Failure(AssertionError(msg)))
+            self.fail(msg)
+
         if self.failed and failure_expected != self.failed:
             failure_ignore = getattr(test_method, 'failure_ignore', ())
             if self.failed and self.failed not in failure_ignore:
-                msg = "test method %r failed with: %s" \
-                      % (self._testMethodName, self.failed)
-                d.addCallback(lambda _: Failure(AssertionError(msg)))
+                msg = "test method %r failed with: %s" % (
+                    self._testMethodName, self.failed)
+                self.failed(msg)
 
-        def temp_dir_cleanup(result=None):
-            """Clean up tmpdir."""
-            if os.path.exists(self.tmpdir):
-                self.rmtree(self.tmpdir)
-            # propagate result/errors if any
-            return result
-
-        d.addBoth(temp_dir_cleanup)
-        return d
+        if os.path.exists(self.tmpdir):
+            self.rmtree(self.tmpdir)
 
     def mktemp(self, name='temp'):
         """ Customized mktemp that accepts an optional name argument. """
