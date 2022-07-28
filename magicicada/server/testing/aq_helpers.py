@@ -408,10 +408,12 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
                       % (self._testMethodName, self.failed)
                 d.addCallback(lambda _: Failure(AssertionError(msg)))
 
-        def temp_dir_cleanup(_):
+        def temp_dir_cleanup(result=None):
             """Clean up tmpdir."""
             if os.path.exists(self.tmpdir):
                 self.rmtree(self.tmpdir)
+            # propagate result/errors if any
+            return result
 
         d.addBoth(temp_dir_cleanup)
         return d
@@ -452,7 +454,9 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
         self.eq = self.main.event_q
         self.listener = ReallyAttentiveListener()
         self.eq.subscribe(self.listener)
+        self.addCleanup(self.eq.unsubscribe, self.listener)
         self.eq.subscribe(self)
+        self.addCleanup(self.eq.unsubscribe, self)
         self.aq = self.main.action_q
 
     @property
@@ -492,17 +496,16 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
                                                     result).deferred
 
     def handle_default(self, event, *args, **kwargs):
-        """
-        Handle events. In particular, catch errors and store them
-        under the 'failed' attribute
+        """Default event handler.
+
+        Specifically, catch every single errors and store them under the
+        'failed' attribute.
+
         """
         if 'error' in kwargs:
             self.failed = kwargs['error']
-
-    def handle_AQ_DOWNLOAD_CANCELLED(self, *args, **kwargs):
-        """handle the case of CANCEL"""
-        if not self._ignore_cancelled_downloads:
-            self.failed = 'CANCELLED'
+        elif 'failure' in kwargs:
+            self.failed = kwargs['failure'].value.message
 
     def wait_for_nirvana(self, last_event_interval=.5):
         """Get a deferred that will fire when there are no more
@@ -519,6 +522,21 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
         if do_connect:
             self.eq.push('SYS_NET_CONNECTED')
         return d
+
+    def assertEvent(self, event, msg=None):
+        """Check if an event happened."""
+        self.assertIn(event, self.listener.q, msg)
+
+    def assertInListenerEvents(self, event_name, event_kwargs):
+        """Ensure that `event_name` was sent with `event_kwargs`."""
+        self.assertIn((event_name, event_kwargs), self.listener.q)
+
+    def assertAnyInListenerEvents(self, events_and_kwargs):
+        """Ensure that `event_name` was sent with `event_kwargs`."""
+        msg = 'None of %s were found in %s'
+        self.assertTrue(
+            any(e in self.listener.q for e in events_and_kwargs),
+            msg % (events_and_kwargs, self.listener.q))
 
 
 class _Placeholder(object):
@@ -614,49 +632,6 @@ class TestBase(TestWithDatabase):
         self.assertFalse(self.client.factory.connector is None)
         self.root = yield self.client.get_root()
         yield self.wait_for_nirvana(.5)
-
-    def assertEvent(self, event, msg=None):
-        """Check if an event happened."""
-        self.assertIn(event, self.listener.q, msg)
-
-    def assertInQ(self, deferred, containee, msg=None):
-        """Deferredly assert that the containee is in the event queue.
-
-        Containee can be callable, in which case it's called before asserting.
-        """
-        def check_queue(_):
-            """The check itself."""
-            ce = containee() if callable(containee) else containee
-            self.assertIn(ce, self.listener.q, msg)
-        deferred.addCallback(check_queue)
-
-    def assertOneInQ(self, deferred, containees, msg=None):
-        """Deferredly assert that one of the containee is in the event queue.
-
-        Containee can be callable, in which case it's called before asserting.
-        """
-        def check_queue(_, msg=msg):
-            """The check itself."""
-            ce = containees() if callable(containees) else containees
-            for i in ce:
-                if i in self.listener.q:
-                    break
-            else:
-                if msg is None:
-                    msg = 'None of %s were found in %s' % (ce, self.listener.q)
-                raise AssertionError(msg)
-        deferred.addCallback(check_queue)
-
-    def assertNotInQ(self, deferred, containee, msg=None):
-        """Deferredly assert that the containee is not in the event queue.
-
-        Containee can be callable, in which case it's called before asserting.
-        """
-        def check_queue(_):
-            """The check itself."""
-            ce = containee() if callable(containee) else containee
-            self.assertNotIn(ce, self.listener.q, msg)
-        deferred.addCallback(check_queue)
 
     @defer.inlineCallbacks
     def _gmk(self, what, name, parent, default_id, path):

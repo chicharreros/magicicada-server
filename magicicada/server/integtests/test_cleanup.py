@@ -43,6 +43,7 @@ class TestCleanup(TestContentBase):
         self.eq.push('SYS_USER_DISCONNECT')
         return TestContentBase.tearDown(self)
 
+    @defer.inlineCallbacks
     def test_cleanup_pre_make_file(self):
         """Queue a command before connected, and process it when connect."""
         self.eq.push('SYS_NET_DISCONNECTED')
@@ -52,12 +53,14 @@ class TestCleanup(TestContentBase):
         mdid = self.main.fs.create(file_path, request.ROOT)
         self.aq.make_file('', self.root, 'foo', 'marker:foo', mdid)
         reactor.callLater(0.2, self.eq.push, 'SYS_NET_CONNECTED')
-        self.assertInQ(d, ('AQ_FILE_NEW_OK', {'marker': 'marker:foo',
-                                              'new_id': anUUID,
-                                              'new_generation': 1L,
-                                              'volume_id': request.ROOT}))
-        return d
 
+        yield d
+        self.assertInListenerEvents(
+            'AQ_FILE_NEW_OK',
+            {'marker': 'marker:foo', 'new_id': anUUID, 'new_generation': 1,
+             'volume_id': request.ROOT})
+
+    @defer.inlineCallbacks
     @failure_ignore('ALREADY_EXISTS')
     def test_make_file_cleanup(self):
         """Cleanup the make file.
@@ -77,17 +80,20 @@ class TestCleanup(TestContentBase):
         self.eq.push('SYS_CONNECTION_LOST')
         d = self.wait_for('SYS_QUEUE_DONE')
         reactor.callLater(0.2, self.eq.push, 'SYS_NET_CONNECTED')
-        d.addCallback(lambda _: self.wait_for_nirvana())
+
+        yield d
+        yield self.wait_for_nirvana()
+
         events = []
         events.append(('AQ_FILE_NEW_ERROR', {'marker': 'marker:foo',
                                              'error': 'ALREADY_EXISTS'}))
         events.append(('AQ_FILE_NEW_OK', {'marker': 'marker:foo',
                                           'new_id': anUUID,
-                                          'new_generation': 1L,
+                                          'new_generation': 1,
                                           'volume_id': request.ROOT}))
-        self.assertOneInQ(d, events)
-        return d
+        self.assertAnyInListenerEvents(events)
 
+    @defer.inlineCallbacks
     @failure_ignore('ALREADY_EXISTS')
     def test_make_dir_cleanup(self):
         """Cleanup the make dir.
@@ -101,86 +107,82 @@ class TestCleanup(TestContentBase):
         self.eq.push('SYS_CONNECTION_LOST')
         d = self.wait_for('SYS_QUEUE_DONE')
         reactor.callLater(0.2, self.eq.push, 'SYS_NET_CONNECTED')
-        d.addCallback(lambda _: self.wait_for_nirvana())
+
+        yield d
+        yield self.wait_for_nirvana()
+
         events = []
         events.append(('AQ_DIR_NEW_ERROR',
                        {'marker': 'marker:foo', 'error': 'ALREADY_EXISTS'}))
         events.append(('AQ_DIR_NEW_OK', {'marker': 'marker:foo',
                                          'new_id': anUUID,
-                                         'new_generation': 1L,
+                                         'new_generation': 1,
                                          'volume_id': request.ROOT}))
-        self.assertOneInQ(d, events)
-        return d
+        self.assertAnyInListenerEvents(events)
 
+    @defer.inlineCallbacks
     @failure_ignore('ALREADY_EXISTS', 'DOES_NOT_EXIST')
     def test_move(self):
         """Ditto ditto."""
+        d = self.wait_for('SYS_QUEUE_DONE')
         dir_path = os.path.join(self.main.root_dir, 'foo')
         mdid = self.main.fs.create(dir_path, request.ROOT)
         self.aq.make_dir('', self.root, 'foo', 'marker:foo', mdid)
-        d = self.wait_for('SYS_QUEUE_DONE')
 
-        def _worker(_):
-            """Start the move, jigger the network."""
-            new_id = self.listener.get_id_for_marker('marker:foo')
-            self.aq.move('', new_id, self.root, self.root, 'bar', 'f', 't')
-            self.eq.push('SYS_NET_DISCONNECTED')
-            self.eq.push('SYS_CONNECTION_LOST')
-            d1 = self.wait_for('SYS_QUEUE_DONE')
-            reactor.callLater(0.2, self.eq.push, 'SYS_NET_CONNECTED')
-            d1.addCallback(lambda _: self.wait_for_nirvana())
-            events = []
-            events.append(('AQ_MOVE_ERROR', {'new_name': 'bar',
-                                             'share_id': '',
-                                             'old_parent_id': self.root,
-                                             'new_parent_id': self.root,
-                                             'node_id': new_id,
-                                             'error': 'ALREADY_EXISTS'}))
-            events.append(('AQ_MOVE_ERROR', {'new_name': 'bar',
-                                             'share_id': '',
-                                             'old_parent_id': self.root,
-                                             'new_parent_id': self.root,
-                                             'node_id': new_id,
-                                             'error': 'DOES_NOT_EXIST'}))
-            events.append(('AQ_MOVE_OK', {'share_id': '',
-                                          'node_id': new_id,
-                                          'new_generation': 2L}))
-            self.assertOneInQ(d, events)
-            return d1
+        yield d
+        new_id = self.listener.get_id_for_marker('marker:foo')
+        self.aq.move('', new_id, self.root, self.root, 'bar', 'f', 't')
+        self.eq.push('SYS_NET_DISCONNECTED')
+        self.eq.push('SYS_CONNECTION_LOST')
+        d1 = self.wait_for('SYS_QUEUE_DONE')
+        reactor.callLater(0.2, self.eq.push, 'SYS_NET_CONNECTED')
 
-        d.addCallback(_worker)
-        return d
+        yield d1
+        yield self.wait_for_nirvana()
+        events = [
+            ('AQ_MOVE_ERROR',
+             {'new_name': 'bar', 'share_id': '', 'old_parent_id': self.root,
+              'new_parent_id': self.root, 'node_id': new_id,
+              'error': 'ALREADY_EXISTS'}),
+            ('AQ_MOVE_ERROR',
+             {'new_name': 'bar', 'share_id': '', 'old_parent_id': self.root,
+              'new_parent_id': self.root, 'node_id': new_id,
+              'error': 'DOES_NOT_EXIST'}),
+            ('AQ_MOVE_OK',
+             {'share_id': '', 'node_id': new_id, 'new_generation': 2}),
+        ]
+        self.assertAnyInListenerEvents(events)
 
+    @defer.inlineCallbacks
     @failure_ignore('DOES_NOT_EXIST')
     def test_unlink(self):
         """We should be able to unlink, no problem :)."""
+        d = self.wait_for('SYS_QUEUE_DONE')
         dir_path = os.path.join(self.main.root_dir, 'foo')
         mdid = self.main.fs.create(dir_path, request.ROOT)
         self.aq.make_dir('', self.root, 'foo', 'marker:foo', mdid)
-        d = self.wait_for('SYS_QUEUE_DONE')
 
-        def _worker(_):
-            """Start the unlink, jigger the network."""
-            new_id = self.listener.get_id_for_marker('marker:foo')
-            self.aq.unlink('', self.root, new_id, '', False)
-            d1 = self.wait_for('SYS_QUEUE_DONE')
-            self.eq.push('SYS_NET_DISCONNECTED')
-            self.eq.push('SYS_CONNECTION_LOST')
-            reactor.callLater(0.2, self.eq.push, 'SYS_NET_CONNECTED')
-            d1.addCallback(lambda _: self.wait_for_nirvana())
-            self.assertOneInQ(d, [('AQ_UNLINK_OK', {'share_id': '',
-                                                    'parent_id': self.root,
-                                                    'node_id': new_id}),
-                                  ('AQ_UNLINK_ERROR', {
-                                      'share_id': '',
-                                      'parent_id': self.root,
-                                      'node_id': new_id,
-                                      'error': 'DOES_NOT_EXIST'})],)
-            return d1
+        yield d
+        # Start the unlink, jigger the network."""
+        new_id = self.listener.get_id_for_marker('marker:foo')
+        self.aq.unlink('', self.root, new_id, '', False)
+        d1 = self.wait_for('SYS_QUEUE_DONE')
+        self.eq.push('SYS_NET_DISCONNECTED')
+        self.eq.push('SYS_CONNECTION_LOST')
+        reactor.callLater(0.2, self.eq.push, 'SYS_NET_CONNECTED')
 
-        d.addCallback(_worker)
-        return d
+        yield d1
+        yield self.wait_for_nirvana()
 
+        self.assertAnyInListenerEvents([
+            ('AQ_UNLINK_OK',
+             {'share_id': '', 'parent_id': self.root, 'node_id': new_id}),
+            ('AQ_UNLINK_ERROR',
+             {'share_id': '', 'parent_id': self.root, 'node_id': new_id,
+              'error': 'DOES_NOT_EXIST'}),
+        ])
+
+    @defer.inlineCallbacks
     def test_list_shares(self):
         """And list_shares."""
         self.aq.list_shares()
@@ -188,11 +190,14 @@ class TestCleanup(TestContentBase):
         self.eq.push('SYS_CONNECTION_LOST')
         d = self.wait_for('SYS_QUEUE_DONE')
         reactor.callLater(0.2, self.eq.push, 'SYS_NET_CONNECTED')
-        d.addCallback(lambda _: self.wait_for_nirvana())
-        self.assertInQ(d, ('AQ_SHARES_LIST',
-                           {'shares_list': anEmptyShareList}))
-        return d
 
+        yield d
+        yield self.wait_for_nirvana()
+
+        self.assertInListenerEvents(
+            'AQ_SHARES_LIST', {'shares_list': anEmptyShareList})
+
+    @defer.inlineCallbacks
     @failure_ignore('ALREADY_EXISTS')
     def test_create_share(self):
         """Create share..."""
@@ -201,14 +206,16 @@ class TestCleanup(TestContentBase):
         self.eq.push('SYS_NET_DISCONNECTED')
         self.eq.push('SYS_CONNECTION_LOST')
         reactor.callLater(0.2, self.eq.push, 'SYS_NET_CONNECTED')
-        d.addCallback(lambda _: self.wait_for_nirvana())
-        self.assertOneInQ(d, [
+
+        yield d
+        yield self.wait_for_nirvana()
+
+        self.assertAnyInListenerEvents([
             ('AQ_CREATE_SHARE_ERROR',
                 {'marker': 'marker:x', 'error': 'ALREADY_EXISTS'}),
             ('AQ_CREATE_SHARE_OK',
                 {'marker': 'marker:x', 'share_id': anUUID}),
         ])
-        return d
 
     @defer.inlineCallbacks
     def test_download(self):
@@ -248,5 +255,5 @@ class TestCleanup(TestContentBase):
         yield self.wait_for_nirvana(1)
         self.assertEvent(('AQ_UPLOAD_FINISHED', {'share_id': '',
                                                  'node_id': anUUID,
-                                                 'new_generation': 2L,
+                                                 'new_generation': 2,
                                                  'hash': hash_value}))
