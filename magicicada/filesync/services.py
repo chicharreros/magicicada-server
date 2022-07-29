@@ -2409,13 +2409,15 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
             storage_key=storage_key)
         return content
 
-    def _get_directory_node(self, id, for_write=True):
+    def _get_directory_node(self, id, for_write=True, with_parent=False):
         """Get a directory node so it can be modified."""
         if self.read_only and for_write:
             raise errors.NoPermission(self.cannot_write_error)
 
         nodes = StorageObject.objects.filter(
             volume__owner__id=self.owner.id, status=STATUS_LIVE, id=id)
+        if with_parent:
+            nodes = nodes.select_related('parent')
         nodes = self._is_on_volume(nodes)
         if nodes.count() == 0:
             raise errors.DoesNotExist(self.node_dne_error)
@@ -2749,7 +2751,7 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
             mime = mimetypes.guess_type(name)[0]
             mimetype = unicode(mime) if mime else ''
 
-        parent = self._get_directory_node(parent_id)
+        parent = self._get_directory_node(parent_id, with_parent=True)
         fnode = parent.get_child_by_name(name)
         is_new = False
         if fnode is None:

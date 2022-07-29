@@ -158,14 +158,14 @@ class TransactionLog(models.Model):
         the generation of its children are not, so we use the UserVolume's
         generation in all TransactionLogs created.
         """
-        rows = [cls(
+        logs = [cls(
             node_id=None, owner_id=udf.owner.id, volume_id=udf.id,
             op_type=cls.OP_UDF_DELETED, path=udf.path,
             generation=udf.generation)]
-        rows += cls._record_unlink_tree(
+        logs += cls._record_unlink_tree(
             udf.root_node, udf.generation, save=False)
-        cls.objects.bulk_create(rows)
-        return len(rows)
+        cls.objects.bulk_create(logs)
+        return len(logs)
 
     @classmethod
     def record_user_created(cls, user):
@@ -323,7 +323,9 @@ class TransactionLog(models.Model):
     @classmethod
     def record_unlink_tree(cls, directory, descendants):
         """See _record_unlink_tree."""
-        cls._record_unlink_tree(directory, directory.generation, descendants)
+        logs = cls._record_unlink_tree(
+            directory, directory.generation, descendants)
+        return len(logs)
 
     @classmethod
     def _record_unlink_tree(
@@ -368,7 +370,7 @@ class TransactionLog(models.Model):
         if save:
             cls.objects.bulk_create(logs)
 
-        return len(logs)
+        return logs
 
     @classmethod
     def record_move(cls, node, old_name, old_parent, descendants):

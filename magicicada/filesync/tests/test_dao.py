@@ -1430,7 +1430,7 @@ class TestSQLStatementCount(StorageDALTestCase):
         """Move a directory with files inside it."""
         directory = self.create_directory_with_files(amount=5)
         new_parent = directory.owner.root.make_subdirectory('test2')
-        with self.assertNumQueries(23):  # XXX 19
+        with self.assertNumQueries(26):  # XXX 19
             directory.move(new_parent.id, directory.name)
 
     def test_move_directory_stable_queries(self):
@@ -1452,7 +1452,7 @@ class TestSQLStatementCount(StorageDALTestCase):
     def test_delete_directory_with_files(self):
         """Delete a directory with files inside it."""
         directory = self.create_directory_with_files(amount=5)
-        with self.assertNumQueries(25):  # XXX 17
+        with self.assertNumQueries(26):  # XXX 17
             directory.delete(cascade=True)
 
     def test_delete_directory_stable_queries(self):
@@ -1510,7 +1510,7 @@ class TestSQLStatementCount(StorageDALTestCase):
         size = self.factory.get_unique_integer()
         crc32 = self.factory.get_unique_integer()
         storage_key = uuid.uuid4()
-        with self.assertNumQueries(31):  # XXX 21
+        with self.assertNumQueries(34):  # XXX 21
             directory.make_file_with_content(
                 name, hash_, crc32, size, size, storage_key,
                 mimetype=self.mimetype)
