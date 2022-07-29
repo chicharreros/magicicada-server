@@ -211,6 +211,10 @@ class StorageObjectManager(models.Manager):
 
     """A custom manager for StorageObject model."""
 
+    def get_queryset(self):
+        return super(StorageObjectManager, self).get_queryset().select_related(
+            'parent', 'volume')
+
     def create(
             self, name, parent=None, path=None, volume=None, generation=0,
             generation_created=0, validate_path=True, **kwargs):

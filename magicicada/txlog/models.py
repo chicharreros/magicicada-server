@@ -25,7 +25,7 @@ import json
 import os
 
 from django.db import models
-from django.db.models.signals import post_save
+from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 from django.utils.timezone import now
 
@@ -158,13 +158,14 @@ class TransactionLog(models.Model):
         the generation of its children are not, so we use the UserVolume's
         generation in all TransactionLogs created.
         """
-        rows = 1
-        cls.objects.create(
+        rows = [cls(
             node_id=None, owner_id=udf.owner.id, volume_id=udf.id,
             op_type=cls.OP_UDF_DELETED, path=udf.path,
-            generation=udf.generation)
-        rows += cls._record_unlink_tree(udf.root_node, udf.generation)
-        return rows
+            generation=udf.generation)]
+        rows += cls._record_unlink_tree(
+            udf.root_node, udf.generation, save=False)
+        cls.objects.bulk_create(rows)
+        return len(rows)
 
     @classmethod
     def record_user_created(cls, user):
@@ -297,7 +298,7 @@ class TransactionLog(models.Model):
         cls._record_unlink(node, node.generation)
 
     @classmethod
-    def _record_unlink(cls, node, generation):
+    def _record_unlink(cls, node, generation, save=True):
         """Create a TransactionLog entry representing an unlink operation.
 
         If the given node is a file and its mimetype is not in
@@ -310,11 +311,13 @@ class TransactionLog(models.Model):
         """
         extra_data = json.dumps({
             'kind': node.kind, 'volume_path': node.volume.path})
-        txlog = cls.objects.create(
+        txlog = cls(
             node_id=node.id, owner_id=node.volume.owner.id,
             volume_id=node.volume.id, op_type=cls.OP_DELETE,
             path=node.full_path, mimetype=node.mimetype or None,
             generation=generation, extra_data=extra_data)
+        if save:
+            txlog.save()
         return txlog
 
     @classmethod
@@ -323,7 +326,8 @@ class TransactionLog(models.Model):
         cls._record_unlink_tree(directory, directory.generation, descendants)
 
     @classmethod
-    def _record_unlink_tree(cls, directory, generation, descendants=None):
+    def _record_unlink_tree(
+            cls, directory, generation, descendants=None, save=True):
         """Create TransactionLog entries representing an unlink_tree operation.
 
         We create one TransactionLog entry for the given directory and each of
@@ -338,7 +342,7 @@ class TransactionLog(models.Model):
         """
         assert directory.kind == StorageObject.DIRECTORY, (
             "The given node is not a directory.")
-        cls._record_unlink(directory, generation)
+        logs = [cls._record_unlink(directory, generation, save=False)]
         if descendants is None:
             descendants = directory.descendants.select_related(
                 'volume', 'volume__owner',
@@ -352,19 +356,19 @@ class TransactionLog(models.Model):
         # Here we construct the extra_data json manually because it's trivial
         # enough and the alternative would be to use a stored procedure, which
         # requires a DB patch.
-        descendants_logs = []
         for node in descendants:
             extra_data = json.dumps(
                 {'kind': node.kind, 'volume_path': node.volume.path})
-            descendants_logs.append(cls(
+            logs.append(cls(
                 node_id=node.id, owner_id=node.volume.owner.id,
                 volume_id=node.volume.id, op_type=cls.OP_DELETE,
                 path=node.full_path, generation=node.generation,
                 mimetype=node.mimetype or None, extra_data=extra_data))
 
-        cls.objects.bulk_create(descendants_logs)
+        if save:
+            cls.objects.bulk_create(logs)
 
-        return len(descendants)
+        return len(logs)
 
     @classmethod
     def record_move(cls, node, old_name, old_parent, descendants):
@@ -380,18 +384,16 @@ class TransactionLog(models.Model):
 
         old_parent_path = os.path.join(old_parent.full_path, old_name)
         new_parent_path = node.full_path
-        rowcount = 0
 
         # First, create a TransactionLog for the actual file/directory
         # being moved.
         extra_data = cls.extra_data_new_node(node)
-        cls.objects.create(
+        logs = [cls(
             node_id=node.id, owner_id=node.volume.owner.id,
             volume_id=node.volume.id, op_type=cls.OP_MOVE,
             path=new_parent_path, old_path=old_parent_path,
             mimetype=node.mimetype or None, generation=node.generation,
-            extra_data=json.dumps(extra_data))
-        rowcount += 1
+            extra_data=json.dumps(extra_data))]
 
         if node.is_dir:
             # Now we generate a TransactionLog for every interesting
@@ -403,23 +405,20 @@ class TransactionLog(models.Model):
             if node.path == '/':
                 assert node.id not in [d.id for d in descendants]
 
-            descendants_logs = []
             for n in descendants:
                 old_path = n.full_path
                 new_path = old_path.replace(old_parent_path, new_parent_path)
                 extra_data = cls.extra_data_new_node(n)
-                descendants_logs.append(cls(
+                logs.append(cls(
                     node_id=n.id, owner_id=n.volume.owner.id,
                     volume_id=n.volume.id, op_type=cls.OP_MOVE,
                     path=new_path, generation=node.generation,
                     mimetype=n.mimetype or None,
                     extra_data=json.dumps(extra_data), old_path=old_path))
 
-                rowcount += 1
+        cls.objects.bulk_create(logs)
 
-            cls.objects.bulk_create(descendants_logs)
-
-        return rowcount
+        return len(logs)
 
     def as_dict(self):
         result = dict(
@@ -489,6 +488,16 @@ def user_volume_post_kill_handler(sender, instance, **kwargs):
 @receiver(post_kill, sender=StorageObject)
 def storage_object_post_kill(sender, instance, **kwargs):
     TransactionLog.record_unlink(instance)
+
+
+@receiver(post_delete, sender=StorageObject)
+def storage_object_post_delete_tree(sender, instance, **kwargs):
+    TransactionLog.record_unlink(instance)
+
+
+@receiver(post_delete, sender=UserVolume)
+def user_volume_post_delete_handler(sender, instance, **kwargs):
+    TransactionLog.record_udf_deleted(instance)
 
 
 @receiver(public_access_changed, sender=StorageObject)

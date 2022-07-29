@@ -310,6 +310,8 @@ class BaseStorageObject(models.Model):
         abstract = True
         unique_together = (
             ('volume', 'generation'),
+            # CREATE UNIQUE INDEX object_parent_name_uk
+            #     ON object(parent_id, name) WHERE (status = 'Live');
             # ('parent', 'name') when status == 'Live',
         )
 
@@ -544,7 +546,8 @@ class BaseStorageObject(models.Model):
             replace_size = len(self.full_path) + 1
             # update the path of all descendants
             descendants = list(
-                self.descendants.select_related('volume', 'volume__owner'))
+                self.descendants.select_related(
+                    'volume', 'volume__owner', 'content_blob'))
             self.descendants.update(
                 path=Concat(models.Value(new_path),
                             Substr('path', replace_size)))
@@ -686,6 +689,8 @@ class BaseStorageObject(models.Model):
             self.parent.when_last_modified = now()
             self.parent.save(update_fields=['when_last_modified'])
         post_kill.send(sender=self.__class__, instance=self)
+
+    delete = unlink
 
     def unlink_tree(self):
         """Unlink and entire directory and it's subdirectories"""
@@ -917,6 +922,11 @@ class Share(models.Model):
     objects = ShareManager()
 
     # class Meta:
+    #     CREATE UNIQUE INDEX share_shared_to_key
+    #         ON Share(shared_to, name) WHERE status='Live'
+    #     CREATE UNIQUE INDEX share_shared_to_shared_by_subtree
+    #         ON Share(shared_to, shared_by, subtree)
+    #         WHERE status='Live' AND shared_to IS NOT NULL
     #     unique_together = (
     #         ('shared_to', 'shared_by', 'subtree'),
     #         ('shared_to', 'name'),
@@ -936,6 +946,8 @@ class Share(models.Model):
         self.status = STATUS_DEAD
         self.save(update_fields=['status'])
         post_kill.send(sender=self.__class__, instance=self)
+
+    delete = kill
 
     def accept(self):
         """Marks itself as accepted."""
@@ -1055,6 +1067,8 @@ class UserVolume(models.Model):
     objects = UserVolumeManager()
 
     # class Meta:
+    #     CREATE UNIQUE INDEX udf_owner_path_uk
+    #         ON userdefinedfolder(owner_id, path) WHERE (status = 'Live');
     #     unique_together = (('owner', 'path'),)
 
     @property
@@ -1078,6 +1092,8 @@ class UserVolume(models.Model):
         self.status = STATUS_DEAD
         self.save(update_fields=['generation', 'status'])
         post_kill.send(sender=self.__class__, instance=self)
+
+    delete = kill
 
     def volume_size(self):
         """Get the size of the entire volume"""

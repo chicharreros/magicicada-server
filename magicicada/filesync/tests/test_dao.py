@@ -1412,48 +1412,91 @@ class TestSQLStatementCount(StorageDALTestCase):
 
     mimetype = 'image/jpeg'
 
-    def _create_directory_with_files(self, amount=3):
-        """Creates a DirectoryNode with 5 files inside it."""
-        user = self.create_user()
-        directory = user.root.make_subdirectory('test')
+    def add_files_to_directory(self, directory, amount=3):
         for i in range(amount):
             directory.make_file_with_content(
                 file_name='file-%s' % i, hash='hash', crc32=0, size=0,
                 deflated_size=0, storage_key=uuid.uuid4(),
                 mimetype=self.mimetype)
-        return directory
 
-    def _create_directory_with_five_files(self):
-        return self._create_directory_with_files(amount=5)
+    def create_directory_with_files(self, name='test', amount=3):
+        """Creates a DirectoryNode with 5 files inside it."""
+        user = self.create_user()
+        directory = user.root.make_subdirectory(name)
+        self.add_files_to_directory(directory, amount)
+        return directory
 
     def test_move_directory_with_files(self):
         """Move a directory with files inside it."""
-        directory = self._create_directory_with_five_files()
+        directory = self.create_directory_with_files(amount=5)
         new_parent = directory.owner.root.make_subdirectory('test2')
-        with self.assertNumQueries(48):  # XXX 19
+        with self.assertNumQueries(23):  # XXX 19
             directory.move(new_parent.id, directory.name)
+
+    def test_move_directory_stable_queries(self):
+        """Move a directory with files inside it."""
+        directory = self.create_directory_with_files(amount=1)
+        parents = [
+            directory.owner.root.make_subdirectory('test1').id,
+            directory.owner.root.make_subdirectory('test2').id,
+        ]
+
+        def make_more():
+            return self.add_files_to_directory(directory, 10)
+
+        def move_dir():
+            return directory.move(parents.pop(0), directory.name)
+
+        self.assert_stable_queries(make_more, move_dir)
 
     def test_delete_directory_with_files(self):
         """Delete a directory with files inside it."""
-        directory = self._create_directory_with_five_files()
-        with self.assertNumQueries(41):  # XXX 17
+        directory = self.create_directory_with_files(amount=5)
+        with self.assertNumQueries(25):  # XXX 17
             directory.delete(cascade=True)
+
+    def test_delete_directory_stable_queries(self):
+        """Move a directory with files inside it."""
+        targets = [
+            self.create_directory_with_files(amount=1),
+            self.create_directory_with_files(amount=10),
+        ]
+
+        def delete_dir():
+            return targets.pop(0).delete(cascade=True)
+
+        self.assert_stable_queries(make_more=lambda: None, f=delete_dir)
 
     def test_delete_file(self):
         """Delete a file."""
         f = self.factory.make_file(mimetype=self.mimetype)
-        # SELECT * FROM "filesync_storageobject"
-        #     WHERE "filesync_storageobject"."parent_id" IN ('...'::uuid)
-        # SELECT * FROM "filesync_share" WHERE "filesync_share"."subtree_id"
-        #     IN ('...'::uuid)
-        # DELETE FROM "filesync_uploadjob"
-        #     WHERE "filesync_uploadjob"."node_id" IN ('...'::uuid)
-        # DELETE FROM "filesync_storageobject" WHERE id IN ('...'::uuid)
-        # SELECT * FROM "filesync_storageuser" WHERE id = 49
-        # INSERT INTO "txlog_transactionlog" VALUES ('...')
-        #     RETURNING "txlog_transactionlog"."id"
-        with self.assertNumQueries(6):
+        # This is the same as unlink
+        with self.assertNumQueries(8):
             f.delete()
+
+    def test_unlink_file(self):
+        """Unlink a file."""
+        f = self.factory.make_file(mimetype=self.mimetype)
+        # SELECT * FROM "filesync_uservolume"
+        #     WHERE "filesync_uservolume"."id" = ('...'::uuid)
+        # UPDATE "filesync_uservolume" SET "generation" = 2
+        #     WHERE "filesync_uservolume"."id" = ('...'::uuid)
+        # UPDATE "filesync_storageobject"
+        #     SET "when_last_modified" = TT, "status" = 'Dead',
+        #     "generation" = 2
+        #     WHERE "filesync_storageobject"."id" = ('...'::uuid)
+        # SELECT * FROM "filesync_storageuser"
+        #     WHERE "filesync_storageuser"."id" = 8
+        # SELECT * FROM "filesync_storageuser"
+        #     WHERE "filesync_storageuser"."id" = 8 FOR UPDATE NOWAIT
+        # UPDATE "filesync_storageuser" SET "used_storage_bytes" = 0
+        #     WHERE "filesync_storageuser"."id" = 8
+        # UPDATE "filesync_storageobject" SET "when_last_modified" = TT
+        #     WHERE "filesync_storageobject"."id" = ('...'::uuid)
+        # INSERT INTO "txlog_transactionlog" VALUES (...)
+        #     RETURNING "txlog_transactionlog"."id"
+        with self.assertNumQueries(8):
+            f.unlink()
 
     # TODO: Optimize dao.DirectoryNode.make_file_with_content(); there should
     # be lots of low-hanging fruit there that would allow us to reduce the
@@ -1467,7 +1510,7 @@ class TestSQLStatementCount(StorageDALTestCase):
         size = self.factory.get_unique_integer()
         crc32 = self.factory.get_unique_integer()
         storage_key = uuid.uuid4()
-        with self.assertNumQueries(37):  # XXX 21
+        with self.assertNumQueries(31):  # XXX 21
             directory.make_file_with_content(
                 name, hash_, crc32, size, size, storage_key,
                 mimetype=self.mimetype)

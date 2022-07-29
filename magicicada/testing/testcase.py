@@ -24,8 +24,10 @@ import logging
 
 from collections import defaultdict
 
+from django.db import connection
 from django.test import TransactionTestCase
 from django.test.client import RequestFactory
+from django.test.utils import CaptureQueriesContext
 
 from magicicada import settings
 from magicicada.testing.factory import Factory
@@ -146,4 +148,55 @@ class BaseTestCase(TransactionTestCase):
             self.addCleanup(logger.setLevel, original)
         logger.addHandler(result)
         self.addCleanup(logger.removeHandler, result)
+        return result
+
+    def assert_stable_queries(self, make_more, f, *args, **kwargs):
+        """Ensure stable queries for a given function.
+
+        The amount of queries executed when running `f(*args, **kwargs)` should
+        be stable even after adding more elements to the database by calling
+        `make_more`.
+
+        The main goal is to ensure queries do not increase even if the DB
+        rows/matches increase.
+
+        Usage:
+
+        expected = [self.factory.make_user()]
+
+        users = self.backend.get_all_users()
+        self.assertEqual(users, expected)
+
+        def make_more():
+            expected.extend(self.factory.make_user() for i in range(3))
+
+        users = self.assert_stable_queries(
+            make_more, self.backend.get_all_users)
+        self.assertEqual(users, expected)
+
+        """
+        with CaptureQueriesContext(connection) as before:
+            f(*args, **kwargs)
+
+        make_more()
+
+        with CaptureQueriesContext(connection) as after:
+            result = f(*args, **kwargs)
+
+        msg = (
+            "Amount of queries differ between executions (%s != %s)\n\n"
+            "*** Before queries:\n\n%s\n\n"
+            "*** After queries:\n\n%s"
+        )
+
+        def str_queries(queries):
+            return '\n\n'.join(i['sql'] for i in queries)
+
+        if len(before) != len(after):
+            self.fail(msg % (
+                len(before), len(after),
+                str_queries(before.captured_queries),
+                str_queries(after.captured_queries)
+            ))
+
         return result
