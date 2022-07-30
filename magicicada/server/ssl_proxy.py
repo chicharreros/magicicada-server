@@ -33,7 +33,6 @@ from twisted.web import server, resource
 
 from magicicada import metrics, settings
 from magicicada.server.server import FILESYNC_STATUS_MSG, get_service_port
-from magicicada.server.ssl import disable_ssl_compression
 from ubuntuone.supervisor import utils as supervisor_utils
 
 
@@ -204,6 +203,8 @@ class ProxyContextFactory:
         if self._context is None:
             ctx = SSL.Context(SSL.SSLv23_METHOD)
             ctx.use_certificate(self.cert)
+            # disable ssl compression
+            ctx.set_options(SSL.OP_NO_COMPRESSION)
             if self.cert_chain:
                 ctx.add_extra_chain_cert(self.cert_chain)
             ctx.use_privatekey(self.key)
@@ -242,9 +243,6 @@ class ProxyService(MultiService):
         # setup the status service
         self.status_service = create_status_service(self.factory, status_port)
         self.status_service.setServiceParent(self)
-        # disable ssl compression
-        if settings.DISABLE_SSL_COMPRESSION:
-            disable_ssl_compression(logger)
 
     @property
     def port(self):
