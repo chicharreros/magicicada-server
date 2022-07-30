@@ -1510,7 +1510,7 @@ class TestSQLStatementCount(StorageDALTestCase):
         size = self.factory.get_unique_integer()
         crc32 = self.factory.get_unique_integer()
         storage_key = uuid.uuid4()
-        with self.assertNumQueries(34):  # XXX 21
+        with self.assertNumQueries(35):  # XXX 21
             directory.make_file_with_content(
                 name, hash_, crc32, size, size, storage_key,
                 mimetype=self.mimetype)
