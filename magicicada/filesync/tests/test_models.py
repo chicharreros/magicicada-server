@@ -1,3 +1,5 @@
+# coding: utf-8
+
 # Copyright 2008-2015 Canonical
 # Copyright 2015-2018 Chicharreros (https://launchpad.net/~chicharreros)
 #
@@ -647,14 +649,15 @@ class StorageObjectTestCase(BaseTestCase):
     def test_path_move_dir_grandparent(self):
         """Tests a move to grandparent."""
         root = self.factory.make_root_volume().root_node
-        subdir1 = root.make_subdirectory('dir')
-        subdir2 = subdir1.make_subdirectory('dir')
-        subdir3 = subdir2.make_subdirectory('dir')
+        subdir1 = root.make_subdirectory('dir1')
+        subdir2 = subdir1.make_subdirectory('dir2')
+        subdir3 = subdir2.make_subdirectory('dir3')
+        assert subdir3.full_path, '/dir1/dir2/dir3'
 
         subdir3.move(subdir1, 'newname')
-        self.assertEqual(subdir3.path, '/dir')
+        self.assertEqual(subdir3.path, '/dir1')
         self.assertEqual(subdir3.name, 'newname')
-        self.assertEqual(subdir3.full_path, '/dir/newname')
+        self.assertEqual(subdir3.full_path, '/dir1/newname')
 
     def test_path_move_deeptree(self):
         """Tests a very deep inside move."""
@@ -667,6 +670,54 @@ class StorageObjectTestCase(BaseTestCase):
 
         grand_parent = all_dirs[-3]  # -1 is the tree's leaf, -2 is parent
         subdir.move(grand_parent, 'y')
+
+    def test_path_move_deeptree_stable_queries(self):
+        """Queries are stable when moving a node with many descendants."""
+        root = self.factory.make_root_volume().root_node
+        folder = root.make_subdirectory('folder')
+        folder1 = folder.make_subdirectory('folder-1')
+        folder1.make_file(
+            'file-1',
+            content_blob=self.factory.make_content_blob(content='foo-1'))
+        # folder
+        # └── folder-1
+        #     └── file1.txt
+        future_parents = [
+            root.make_subdirectory('parent-before'),
+            root.make_subdirectory('parent-after'),
+        ]
+
+        def make_more():
+            # folder
+            # ├── folder-1
+            # │   ├── file1.txt
+            # │   ├── file2.txt
+            # │   ├── folder-1-1
+            # │   │   └── folder-1-1-1
+            # │   └── folder-1-2
+            # ├── folder-2
+            # └── folder-3
+            #     └── file3.txt
+            folder1.make_file(
+                'file-2',
+                content_blob=self.factory.make_content_blob(content='foo-2'))
+            folder11 = folder1.make_subdirectory('folder-1-1')
+            folder11.make_subdirectory('folder-1-1-1')
+            folder1.make_subdirectory('folder-1-2')
+
+            folder.make_subdirectory('folder-2')
+
+            folder3 = folder.make_subdirectory('folder-3')
+            folder3.make_file(
+                'file-3',
+                content_blob=self.factory.make_content_blob(content='foo-3'))
+
+        def do_move():
+            new_parent = future_parents[0]
+            folder.move(new_parent, 'moved-to-%s' % new_parent.name)
+            future_parents.pop(0)
+
+        self.assert_stable_queries(make_more, do_move)
 
     def test_path_move_dir_udf(self):
         """Tests that the path changes when moving the dir in an UDF."""

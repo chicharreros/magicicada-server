@@ -69,6 +69,7 @@ class BaseProtocolTestCase(TwistedTestCase):
 
     heartbeat_interval = 0
     timeout = 120
+    maxDiff = None
 
     @property
     def port(self):

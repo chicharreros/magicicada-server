@@ -2409,13 +2409,18 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
             storage_key=storage_key)
         return content
 
-    def _get_directory_node(self, id, for_write=True):
+    def _get_directory_node(
+            self, id, for_write=True, with_parent=False, with_volume=False):
         """Get a directory node so it can be modified."""
         if self.read_only and for_write:
             raise errors.NoPermission(self.cannot_write_error)
 
         nodes = StorageObject.objects.filter(
             volume__owner__id=self.owner.id, status=STATUS_LIVE, id=id)
+        if with_parent:
+            nodes = nodes.select_related('parent')
+        if with_volume:
+            nodes = nodes.select_related('volume')
         nodes = self._is_on_volume(nodes)
         if nodes.count() == 0:
             raise errors.DoesNotExist(self.node_dne_error)
@@ -2628,7 +2633,8 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
         """Move a node to a new parent, or rename it."""
         if self.read_only:
             raise errors.NoPermission(self.readonly_error)
-        node = self._get_node_simple(node_id)
+        node = self._get_node_simple(
+            node_id, with_parent=True, with_volume=True)
         if node is None:
             raise errors.DoesNotExist(self.node_dne_error)
         is_move = node.parent_id != parent_id
@@ -2638,7 +2644,8 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
                 permissions=self._get_node_perms(node))
         new_parent = self._get_directory_node(parent_id)
         if is_move:
-            old_parent = self._get_directory_node(node.parent_id)
+            old_parent = self._get_directory_node(
+                node.parent_id, with_parent=True, with_volume=True)
             if not self._get_node_perms(node)["can_delete"]:
                 raise errors.NoPermission(self.cannot_delete_error)
             if (node.kind == StorageObject.DIRECTORY and
@@ -2749,7 +2756,8 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
             mime = mimetypes.guess_type(name)[0]
             mimetype = unicode(mime) if mime else ''
 
-        parent = self._get_directory_node(parent_id)
+        parent = self._get_directory_node(
+            parent_id, with_parent=True, with_volume=True)
         fnode = parent.get_child_by_name(name)
         is_new = False
         if fnode is None:
