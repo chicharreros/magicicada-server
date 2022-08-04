@@ -154,10 +154,6 @@ class TestShareClientMove(TestSharesSync, test_sync.TestClientMove):
         yield super(TestShareClientMove, self).setUp()
         self.root_dir = self.jane_share_dir
 
-    def tearDown(self):
-        """Cleanup the test."""
-        return super(TestShareClientMove, self).tearDown()
-
 
 class TestShareServerBase(TestSharesSync, test_sync.TestServerBase):
     """ Base test case for server-side share related tests. """
@@ -265,14 +261,11 @@ class TestReadOnlyShares(TestShareServerBase):
         self.jane_ro_share_dir = vm.shares[str(self.jane_ro_share_id)].path
         yield vm.subscribe_share(self.jane_ro_share_id)
 
+    @defer.inlineCallbacks
     def test_new_dir(self):
         """ adds a new (server-side) in a RO share (local)"""
-        d = self.get_client_by_user('jane')
-        d.addCallback(lambda _: self.client.make_dir(
-            request.ROOT, self.jane_ro_share_subtree.id, "test_dir"))
-        d.addCallback(self.save("request"))
-        d.addCallback(lambda _:
-                      self.main.wait_for_nirvana(last_event_interval=1))
-        d.addCallback(lambda _: self.check('jane_ro_share_dir',
-                                           'jane_ro_share_id'))
-        return d
+        yield self.get_client_by_user('jane')
+        yield self.client.make_dir(
+            request.ROOT, self.jane_ro_share_subtree.id, "test_dir")
+        yield self.main.wait_for_nirvana(last_event_interval=1)
+        yield self.check('jane_ro_share_dir', 'jane_ro_share_id')
