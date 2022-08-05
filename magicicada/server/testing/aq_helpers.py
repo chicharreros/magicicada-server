@@ -478,16 +478,6 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
                                      waiting_events,
                                      waiting_kwargs).deferred
 
-    def wait_for_cb(self, *waiting_events, **waiting_kwargs):
-        """
-        Returns a callable that returns a deferred that fires when an event
-        happens
-        """
-        return lambda result: WaitingHelpingHandler(self.main.event_q,
-                                                    waiting_events,
-                                                    waiting_kwargs,
-                                                    result).deferred
-
     def handle_default(self, event, *args, **kwargs):
         """Default event handler.
 
@@ -721,7 +711,7 @@ class MethodInterferer(object):
         self.meth = meth
         self.old = None
 
-    def insert_after(self, info, func):
+    def insert_after(self, func):
         """Runs func after running the replaced method."""
         self.old = getattr(self.obj, self.meth)
 
@@ -731,9 +721,8 @@ class MethodInterferer(object):
             func(*args, **kwargs)
             return r
         setattr(self.obj, self.meth, middle)
-        return info
 
-    def insert_before(self, info, func):
+    def insert_before(self, func):
         """Runs func before running the replaced method."""
         self.old = getattr(self.obj, self.meth)
 
@@ -742,24 +731,21 @@ class MethodInterferer(object):
             if func(*args, **kwargs):
                 return self.old(*args, **kwargs)
         setattr(self.obj, self.meth, middle)
-        return info
 
-    def nuke(self, info, func=None):
+    def nuke(self, func=None):
         """Nukes the method"""
         self.old = getattr(self.obj, self.meth)
         if func is None:
             def func(*args, **kwargs):
                 return None
         setattr(self.obj, self.meth, func)
-        return info
 
-    def restore(self, info=None):
+    def restore(self):
         """Restores the original method."""
         if self.old is None:
             m = "the old method is None (hint: called restore before nuke)"
             raise ValueError(m)
         setattr(self.obj, self.meth, self.old)
-        return info
 
     def pause(self, func=None):
         """Pauses a method execution that can be played later."""
@@ -788,23 +774,21 @@ class NukeAQClient(object):
         self.meth = meth
         self.old = None
 
-    def nuke(self, info, func=None):
+    def nuke(self, func=None):
         """Nukes the method"""
         self.old = getattr(self.aq.client, self.meth)
         if func is None:
             def func(*args, **kwargs):
                 return defer.Deferred
         setattr(self.aq.client, self.meth, func)
-        return info
 
-    def restore(self, info):
+    def restore(self):
         """Restores the original method."""
         if self.old is None:
             m = "the old method is None (hint: called restore before nuke)"
             raise ValueError(m)
         if self.aq.client is not None:
             setattr(self.aq.client, self.meth, self.old)
-        return info
 
 
 class FakeGetContent(object):

@@ -29,11 +29,9 @@ import subprocess
 import threading
 import uuid
 import zlib
-
 from StringIO import StringIO
 
 from twisted.internet import reactor, defer
-from twisted.python.failure import Failure
 
 from magicicadaclient.platform import tools
 from magicicadaclient.syncdaemon import REQUIRED_CAPS, hash_queue
@@ -55,8 +53,7 @@ from magicicada.server.testing.aq_helpers import (
 from magicicada.server.testing.caps_helpers import required_caps
 from magicicada.server.testing.testcase import logger
 from magicicada.u1sync import client as u1sync_client
-from magicicada.u1sync.main import do_diff, do_init, do_sync
-
+from magicicada.u1sync.main import TreesDiffer, do_diff, do_init, do_sync
 
 U1SYNC_QUIET = True
 NO_CONTENT_HASH = ""
@@ -289,33 +286,32 @@ class TestBrokenNode(TestSync):
 class TestBasic(TestSync):
     """Basic tests"""
 
+    @defer.inlineCallbacks
     def test_u1sync_compare(self):
         """everything matches on empty"""
         # wait for SD nirvana, as this test doesn't use it and we need
         # not to leave the reactor dirty with SD dance
-        d = self.main.wait_for_nirvana(last_event_interval=0.5)
-        d.addCallback(lambda _: self.compare_server())
-        return d
+        yield self.main.wait_for_nirvana(last_event_interval=0.5)
+        yield self.compare_server()
 
+    @defer.inlineCallbacks
     def test_u1sync_upload(self):
         """upload nothing and works"""
         # wait for SD nirvana, as this test doesn't use it and we need
         # not to leave the reactor dirty with SD dance
-        d = self.main.wait_for_nirvana(last_event_interval=0.5)
-        d.addCallback(lambda _: self.upload_server())
-        return d
+        yield self.main.wait_for_nirvana(last_event_interval=0.5)
+        yield self.upload_server()
 
+    @defer.inlineCallbacks
     def test_u1sync_failed_compare(self):
         """make sure compare fails if different"""
         open(self.source_dir + "/file", "w").close()
-        d = self.compare_server(self.source_dir)
-        d.addCallbacks(lambda _: Failure(Exception("dirs matched, they dont")),
-                       lambda _: True)
+        self.assertFailure(
+            self.compare_server(self.source_dir), TreesDiffer)
 
         # wait for SD nirvana, as this test doesn't use it and we need
         # not to leave the reactor dirty with SD dance
-        d.addCallback(lambda _: self.wait_for_nirvana(last_event_interval=0.5))
-        return d
+        yield self.wait_for_nirvana(last_event_interval=0.5)
 
     def test_sync_a_file(self):
         """Sync one file."""
@@ -344,23 +340,21 @@ class TestBasic(TestSync):
         os.mkdir(self.source_dir + "/test_dir")
         return self.sync_and_check()
 
+    @defer.inlineCallbacks
     def test_sync_a_dir_and_subdir(self):
         """Sync one directory and then a sub directory."""
         os.mkdir(self.source_dir + "/test_dir")
-        d = self.sync_and_check()
-        d.addCallback(lambda _: os.mkdir(
-            self.source_dir + "/test_dir/test_dir2"))
-        d.addCallback(lambda _: self.sync_and_check())
-        return d
+        yield self.sync_and_check()
+        os.mkdir(self.source_dir + "/test_dir/test_dir2")
+        yield self.sync_and_check()
 
+    @defer.inlineCallbacks
     def test_sync_a_dir_and_subfile(self):
         """Sync one directory and a sub file."""
         os.mkdir(self.source_dir + "/test_dir")
-        d = self.sync_and_check()
-        d.addCallback(lambda _: open(
-            self.source_dir + "/test_dir/test_file", "w").close())
-        d.addCallback(lambda _: self.sync_and_check())
-        return d
+        yield self.sync_and_check()
+        open(self.source_dir + "/test_dir/test_file", "w").close()
+        yield self.sync_and_check()
 
     # we cant test with multiple files, becase each time u1sync creates
     # a file we get a new hash for the directory, and we need cancel
@@ -373,14 +367,12 @@ class TestBasic2(TestSync):
     def test_sync_a_dir(self):
         """Sync one directory."""
         os.mkdir(self.root_dir + "/test_dir")
-        d = self.check()
-        return d
+        return self.check()
 
     def test_sync_a_file(self):
         """Sync one file."""
         open(self.root_dir + "/test_file", "w").close()
-        d = self.check()
-        return d
+        return self.check()
 
     @defer.inlineCallbacks
     def test_sync_a_file_with_content(self):
@@ -419,6 +411,7 @@ class TestBasic2(TestSync):
             fd.write("HELLO WORLD2")
             fd.close()
             d.callback(True)
+
         reactor.callLater(0, cont)
 
         d.addCallback(lambda _: self.check())
@@ -457,36 +450,29 @@ class TestBasic2(TestSync):
         fd.write("X")
         fd.close()
 
+    @defer.inlineCallbacks
     def test_sync_a_dir_and_subfile(self):
         """Sync one directory and a sub file."""
         os.mkdir(self.root_dir + "/test_dir")
-        d = self.check()
-        d.addCallback(lambda _:
-                      open(self.root_dir + "/test_dir/test_file", "w").close())
-        d.addCallback(lambda _: self.check())
-        return d
+        yield self.check()
+        open(self.root_dir + "/test_dir/test_file", "w").close()
+        yield self.check()
 
+    @defer.inlineCallbacks
     def test_sync_a_dir_and_subdir(self):
         """Sync one directory and a sub dir."""
         os.mkdir(self.root_dir + "/test_dir")
-        d = self.check()
-        d.addCallback(lambda _: os.mkdir(
-            self.root_dir + "/test_dir/test_subdir"))
-        d.addCallback(lambda _: self.check())
-        return d
+        yield self.check()
+        os.mkdir(self.root_dir + "/test_dir/test_subdir")
+        yield self.check()
 
     def test_sync_a_symlink(self):
         """Fail to sync one symlink (sync nothing!)."""
         a_file = os.path.join(self.tmpdir, "file")
         open(a_file, "w").close()
         os.symlink(a_file, os.path.join(self.root_dir, 'a_symlink'))
-        d = self.sync_and_check()
-
-        def cleanup(r):
-            """remove the file"""
-            os.remove(a_file)
-        d.addBoth(cleanup)
-        return d
+        self.addCleanup(os.remove, a_file)
+        return self.sync_and_check()
 
     @defer.inlineCallbacks
     def test_delete_dir_new_same_name(self):
@@ -546,64 +532,47 @@ class TestBasic2(TestSync):
 
 
 class TestServerDelete(TestSync):
-    """test deleting on the server and downloading the changes."""
+    """Test deleting on the server and downloading the changes."""
 
+    @defer.inlineCallbacks
     def test_sync_a_file_and_delete(self):
         """Sync one file with content."""
         open(self.source_dir + "/file", "w").close()
-        d = self.sync_and_check()
+        yield self.sync_and_check()
+        os.remove(self.source_dir + "/file")
+        yield self.sync_and_check()
 
-        def remove(_):
-            """put content on the file"""
-            os.remove(self.source_dir + "/file")
-
-        d.addCallback(remove)
-        d.addCallback(lambda _: self.sync_and_check())
-        return d
-
+    @defer.inlineCallbacks
     def test_sync_a_dir_and_delete(self):
         """Sync one file with content."""
         os.mkdir(self.source_dir + "/test_dir")
-        d = self.sync_and_check()
+        yield self.sync_and_check()
+        os.rmdir(self.source_dir + "/test_dir")
+        yield self.sync_and_check()
 
-        def remove(_):
-            """put content on the file"""
-            os.rmdir(self.source_dir + "/test_dir")
-
-        d.addCallback(remove)
-        d.addCallback(lambda _: self.sync_and_check())
-        return d
-
+    @defer.inlineCallbacks
     def test_sync_a_dir_and_subfile_and_delete(self):
         """Sync one file with content."""
         os.mkdir(self.source_dir + "/test_dir")
         open(self.source_dir + "/test_dir/file", "w").close()
-        d = self.sync_and_check()
+        yield self.sync_and_check()
 
-        def remove(_):
-            """put content on the file"""
-            os.remove(self.source_dir + "/test_dir/file")
-            os.rmdir(self.source_dir + "/test_dir")
+        os.remove(self.source_dir + "/test_dir/file")
+        os.rmdir(self.source_dir + "/test_dir")
 
-        d.addCallback(remove)
-        d.addCallback(lambda _: self.sync_and_check())
-        return d
+        yield self.sync_and_check()
 
 
 class TestClientDelete(TestSync):
     """Test deleting locally and uploading the changes"""
 
+    @defer.inlineCallbacks
     def test_sync_a_file_and_delete(self):
         """Sync one file."""
         open(self.root_dir + "/test_file", "w").close()
-        d = self.check()
-
-        def remove(_):
-            """remove it"""
-            os.remove(self.root_dir + "/test_file")
-        d.addCallback(remove)
-        d.addCallback(lambda _: self.check())
-        return d
+        yield self.check()
+        os.remove(self.root_dir + "/test_file")
+        yield self.check()
 
     def test_sync_a_file_and_delete_nowait(self):
         """Sync one file."""
@@ -611,17 +580,13 @@ class TestClientDelete(TestSync):
         os.remove(self.root_dir + "/test_file")
         return self.check()
 
+    @defer.inlineCallbacks
     def test_sync_a_dir_and_delete(self):
         """Sync one dir."""
         os.mkdir(self.root_dir + "/test_dir")
-        d = self.check()
-
-        def remove(_):
-            """remove it"""
-            os.rmdir(self.root_dir + "/test_dir")
-        d.addCallback(remove)
-        d.addCallback(lambda _: self.check())
-        return d
+        yield self.check()
+        os.rmdir(self.root_dir + "/test_dir")
+        yield self.check()
 
     def test_sync_a_dir_and_delete_nowait(self):
         """Sync one dir."""
@@ -629,39 +594,30 @@ class TestClientDelete(TestSync):
         os.rmdir(self.root_dir + "/test_dir")
         return self.check()
 
+    @defer.inlineCallbacks
     def test_sync_a_dir_and_subfile_and_delete(self):
         """Sync one dir and subfile."""
         os.mkdir(self.root_dir + "/test_dir")
         open(self.root_dir + "/test_dir/file", "w").close()
-        d = self.check()
+        yield self.check()
+        os.remove(self.root_dir + "/test_dir/file")
+        os.rmdir(self.root_dir + "/test_dir")
+        yield self.check()
 
-        def remove(_):
-            """put content on the file"""
-            os.remove(self.root_dir + "/test_dir/file")
-            os.rmdir(self.root_dir + "/test_dir")
-        d.addCallback(remove)
-        d.addCallback(lambda _: self.check())
-        return d
-
+    @defer.inlineCallbacks
     def test_sync_a_symlink_and_delete(self):
         """fail to sync+delete one symlink (sync/delete nothing!)"""
         a_file = os.path.join(self.tmpdir, "file")
         open(a_file, "w").close()
-        os.symlink(a_file, os.path.join(self.root_dir, 'a_symlink'))
-        d = self.check()
+        self.addCleanup(os.remove, a_file)
+        a_symlink = os.path.join(self.root_dir, 'a_symlink')
+        os.symlink(a_file, a_symlink)
 
-        def remove(_):
-            """remove it"""
-            os.remove(self.root_dir + "/test_file")
-        d.addCallback(remove)
-        d.addCallback(lambda _: self.check())
+        yield self.check()
+        os.remove(a_symlink)
+        yield self.check()
 
-        def cleanup(r):
-            """remove the file"""
-            os.remove(a_file)
-        d.addBoth(cleanup)
-        return d
-
+    @defer.inlineCallbacks
     def test_delete_check_middle_state(self):
         """MD should be in "deleted" state in the middle of the process.
 
@@ -671,39 +627,29 @@ class TestClientDelete(TestSync):
         filepath = os.path.join(self.root_dir, "test_file")
         _node = []
 
-        def create_local(_):
-            """Creates a file."""
-            open(filepath, "w").close()
-            return _
-
-        def remove_local(_):
-            """Removes the file."""
-            os.remove(filepath)
-            mdobj = self.main.fs.get_by_path(filepath)
-            _node.append((mdobj.share_id, mdobj.node_id))
-            return _
+        yield self.main.wait_for_nirvana()
+        open(filepath, "w").close()
 
         def middle_check(*_):
             """Called before the delete gets to the server."""
             self.assertFalse(self.main.fs.has_metadata(path=filepath))
-            self.assertTrue(_node[0] in self.main.fs.trash)
+            self.assertIn(_node[0], self.main.fs.trash)
 
-        def final_check(_):
-            """Check that everything is ok"""
-            # it should only be our file in the directory
-            self.assertFalse(_node[0] in self.main.fs.trash)
-
+        yield self.main.wait_for_nirvana(.5)
         methinterf = MethodInterferer(self.main.fs, 'delete_to_trash')
+        methinterf.insert_after(middle_check)
 
-        d = self.main.wait_for_nirvana()
-        d.addCallback(create_local)
-        d.addCallback(lambda _: self.main.wait_for_nirvana(.5))
-        d.addCallback(methinterf.insert_after, middle_check)
-        d.addCallback(remove_local)
-        d.addBoth(methinterf.restore)
-        d.addCallback(lambda _: self.main.wait_for_nirvana(.5))
-        d.addCallback(final_check)
-        return d
+        try:
+            os.remove(filepath)
+            mdobj = self.main.fs.get_by_path(filepath)
+            _node.append((mdobj.share_id, mdobj.node_id))
+        finally:
+            methinterf.restore()
+
+        yield self.main.wait_for_nirvana(.5)
+
+        # it should only be our file in the directory
+        self.assertNotIn(_node[0], self.main.fs.trash)
 
 
 class Client(StorageClient):
@@ -737,14 +683,6 @@ class ClientFactory(StorageClientFactory):
 class TestServerBase(TestSync):
     """Utility for interacting with the server."""
 
-    def save(self, name):
-        "utility method to save deferred results"
-        def saver(value):
-            "inner"
-            setattr(self, name, value)
-            return value
-        return saver
-
     @defer.inlineCallbacks
     def get_client(self, username='jack', root_id_name='root_id',
                    client_name='client'):
@@ -754,6 +692,7 @@ class TestServerBase(TestSync):
         factory = ClientFactory(d)
         reactor.connectTCP("localhost", self.port, factory)
         client = yield d
+        self.addCleanup(client.transport.loseConnection)
 
         # connected!
         setattr(self, client_name, client)
@@ -798,13 +737,6 @@ class TestServerBase(TestSync):
                 if match(name):
                     os.remove(os.path.join(root, name))
 
-    def tearDown(self):
-        "cleanup"
-        if hasattr(self, "clients"):
-            for client in self.clients:
-                client.transport.loseConnection()
-        return super(TestServerBase, self).tearDown()
-
     def get_put_content_data(self):
         """Returns the test data for put_content."""
         ho = content_hash_factory()
@@ -816,100 +748,86 @@ class TestServerBase(TestSync):
 
 
 class TestServerMove(TestServerBase):
-    """move on the server"""
+    """Move on the server."""
 
+    @defer.inlineCallbacks
     def test_simple_move(self):
         """test rename"""
-        d = self.get_client()
-        d.addCallback(lambda _: self.client.make_file(
-            request.ROOT, self.root_id, "test_file"))
-        d.addCallback(self.save("request"))
-        d.addCallback(lambda r: self.put_content(request.ROOT, r.new_id, ""))
-        d.addCallback(lambda _:
-                      self.main.wait_for_nirvana(last_event_interval=1))
-        d.addCallback(lambda _: self.client.move(
-            request.ROOT, self.request.new_id,
-            self.root_id, "test_file_moved"))
-        d.addCallback(lambda _: self.check())
-        return d
+        yield self.get_client()
+        req = yield self.client.make_file(
+            request.ROOT, self.root_id, "test_file")
+        yield self.put_content(request.ROOT, req.new_id, "")
+        yield self.main.wait_for_nirvana(last_event_interval=1)
+        yield self.client.move(
+            request.ROOT, req.new_id, self.root_id, "test_file_moved")
+        yield self.check()
 
+    @defer.inlineCallbacks
     def test_simple_dir_move(self):
         """test rename dir"""
-        d = self.get_client()
-        d.addCallback(lambda _: self.client.make_dir(
-            request.ROOT, self.root_id, "test_dir"))
-        d.addCallback(self.save("request"))
-        d.addCallback(lambda _:
-                      self.main.wait_for_nirvana(last_event_interval=1))
-        d.addCallback(lambda _: self.client.move(
-            request.ROOT, self.request.new_id, self.root_id, "test_dir_moved"))
-        d.addCallback(lambda _: self.check())
-        return d
+        yield self.get_client()
+        req = yield self.client.make_dir(
+            request.ROOT, self.root_id, "test_dir")
+        yield self.main.wait_for_nirvana(last_event_interval=1)
+        yield self.client.move(
+            request.ROOT, req.new_id, self.root_id, "test_dir_moved")
+        yield self.check()
 
+    @defer.inlineCallbacks
     def test_change_parent(self):
         """test rename"""
-        d = self.get_client()
-        d.addCallback(lambda _: self.client.make_dir(
-            request.ROOT, self.root_id, "test_dir1"))
-        d.addCallback(self.save("request1"))
-        d.addCallback(lambda _:
-                      self.main.wait_for_nirvana(last_event_interval=1))
-        d.addCallback(lambda _: self.client.make_dir(
-            request.ROOT, self.root_id, "test_dir2"))
-        d.addCallback(self.save("request2"))
-        d.addCallback(lambda _: self.client.make_file(
-            request.ROOT, self.request1.new_id, "test_file"))
-        d.addCallback(self.save("request3"))
-        d.addCallback(lambda r: self.put_content(request.ROOT, r.new_id, ""))
-        d.addCallback(lambda _:
-                      self.main.wait_for_nirvana(last_event_interval=1))
-        d.addCallback(lambda _: self.client.move(
-            request.ROOT, self.request3.new_id,
-            self.request2.new_id, "test_file_moved"))
-        d.addCallback(lambda _: self.check())
-        return d
+        yield self.get_client()
+        req1 = yield self.client.make_dir(
+            request.ROOT, self.root_id, "test_dir1")
+        yield self.main.wait_for_nirvana(last_event_interval=1)
+
+        req2 = yield self.client.make_dir(
+            request.ROOT, self.root_id, "test_dir2")
+        req3 = yield self.client.make_file(
+            request.ROOT, req1.new_id, "test_file")
+        yield self.put_content(request.ROOT, req3.new_id, "")
+        yield self.main.wait_for_nirvana(last_event_interval=1)
+        yield self.client.move(
+            request.ROOT, req3.new_id, req2.new_id, "test_file_moved")
+        yield self.check()
 
 
 class TestServerCornerCases(TestServerBase):
     """Test corner cases."""
 
+    @defer.inlineCallbacks
     def test_dir_reget(self):
         """Two simultaneous changes on a dir."""
-        d = self.get_client()
-        d.addCallback(lambda _: self.client.make_dir(
-            request.ROOT, self.root_id, "test_dir"))
-        d.addCallback(lambda _: self.client.make_dir(
-            request.ROOT, self.root_id, "test_dir2"))
-        d.addCallback(lambda _: self.check())
-        return d
+        yield self.get_client()
+        yield self.client.make_dir(request.ROOT, self.root_id, "test_dir")
+        yield self.client.make_dir(request.ROOT, self.root_id, "test_dir2")
+        yield self.check()
 
+    @defer.inlineCallbacks
     def test_dir_reget_w_files(self):
         """Two simultaneous changes on a dir."""
-        d = self.get_client()
-        d.addCallback(lambda _: self.client.make_file(
-            request.ROOT, self.root_id, "test_file"))
-        d.addCallback(lambda r: self.put_content(request.ROOT, r.new_id, ""))
-        d.addCallback(lambda _: self.client.make_file(
-            request.ROOT, self.root_id, "test_file2"))
-        d.addCallback(lambda r: self.put_content(request.ROOT, r.new_id, ""))
-        d.addCallback(lambda _: self.check())
-        return d
+        yield self.get_client()
+        req = yield self.client.make_file(
+            request.ROOT, self.root_id, "test_file")
+        yield self.put_content(request.ROOT, req.new_id, "")
 
-    # PQM fails on this, i dont know why
+        req = yield self.client.make_file(
+            request.ROOT, self.root_id, "test_file2")
+        yield self.put_content(request.ROOT, req.new_id, "")
+
+        yield self.check()
+
+    @defer.inlineCallbacks
     def test_file_reget_content(self):
         """Test dont download data we dont need."""
-        d = self.get_client()
+        yield self.get_client()
         data_one = os.urandom(1000000)
         data_two = os.urandom(1000)
-        d.addCallback(lambda _: self.client.make_file(
-            request.ROOT, self.root_id, "test_file"))
-        d.addCallback(self.save("req"))
-        d.addCallback(lambda _: self.put_content(
-            request.ROOT, self.req.new_id, data_one))
-        d.addCallback(lambda _: self.put_content(
-            request.ROOT, self.req.new_id, data_two))
-        d.addCallback(lambda _: self.check())
-        return d
+        req = yield self.client.make_file(
+            request.ROOT, self.root_id, "test_file")
+        yield self.put_content(request.ROOT, req.new_id, data_one)
+        yield self.put_content(request.ROOT, req.new_id, data_two)
+        yield self.check()
 
     @defer.inlineCallbacks
     def test_file_new_content_dont_reget(self):
@@ -934,16 +852,14 @@ class TestServerCornerCases(TestServerBase):
         yield self.client.unlink(request.ROOT, req.new_id)
         yield self.check()
 
+    @defer.inlineCallbacks
     def test_dir_upload_delete(self):
         """Upload a dir and delete."""
-        d = self.get_client()
-        d.addCallback(lambda _: self.client.make_dir(
-            request.ROOT, self.root_id, "test_dir"))
-        d.addCallback(self.save("req"))
-        d.addCallback(lambda _: self.client.unlink(
-            request.ROOT, self.req.new_id))
-        d.addCallback(lambda _: self.check())
-        return d
+        yield self.get_client()
+        req = yield self.client.make_dir(
+            request.ROOT, self.root_id, "test_dir")
+        yield self.client.unlink(request.ROOT, req.new_id)
+        yield self.check()
 
     @defer.inlineCallbacks
     def test_quick_server_mess(self):
@@ -984,54 +900,44 @@ class TestServerCornerCases(TestServerBase):
 class TestServerMove2(TestServerBase):
     """move on the server"""
 
+    @defer.inlineCallbacks
     def test_simple_move(self):
         """test rename"""
-        d = self.get_client()
-        d.addCallback(lambda _: self.client.make_file(
-            request.ROOT, self.root_id, "test_file"))
-        d.addCallback(self.save("request"))
-        d.addCallback(lambda r: self.put_content(request.ROOT, r.new_id, ""))
-        d.addCallback(lambda _: self.client.move(
-            request.ROOT, self.request.new_id,
-            self.root_id, "test_file_moved"))
-        d.addCallback(lambda _: self.check())
-        return d
+        yield self.get_client()
+        req = yield self.client.make_file(
+            request.ROOT, self.root_id, "test_file")
+        yield self.put_content(request.ROOT, req.new_id, "")
+        yield self.client.move(
+            request.ROOT, req.new_id, self.root_id, "test_file_moved")
+        yield self.check()
 
+    @defer.inlineCallbacks
     def test_simple_dir_move(self):
         """test rename dir"""
-        d = self.get_client()
-        d.addCallback(lambda _: self.client.make_dir(
-            request.ROOT, self.root_id, "test_dir"))
-        d.addCallback(self.save("request"))
-        d.addCallback(lambda _:
-                      self.main.wait_for_nirvana(last_event_interval=1))
-        d.addCallback(lambda _: self.client.move(
-            request.ROOT, self.request.new_id, self.root_id, "test_dir_moved"))
-        d.addCallback(lambda _: self.check())
-        return d
+        yield self.get_client()
+        req = yield self.client.make_dir(
+            request.ROOT, self.root_id, "test_dir")
+        yield self.main.wait_for_nirvana(last_event_interval=1)
+        yield self.client.move(
+            request.ROOT, req.new_id, self.root_id, "test_dir_moved")
+        yield self.check()
 
+    @defer.inlineCallbacks
     def test_change_parent(self):
-        """test rename"""
-        d = self.get_client()
-        d.addCallback(lambda _: self.client.make_dir(
-            request.ROOT, self.root_id, "test_dir1"))
-        d.addCallback(self.save("request1"))
-        d.addCallback(lambda _:
-                      self.main.wait_for_nirvana(last_event_interval=1))
-        d.addCallback(lambda _: self.client.make_dir(
-            request.ROOT, self.root_id, "test_dir2"))
-        d.addCallback(self.save("request2"))
-        d.addCallback(lambda _: self.client.make_file(
-            request.ROOT, self.request1.new_id, "test_file"))
-        d.addCallback(self.save("request3"))
-        d.addCallback(lambda r: self.put_content(request.ROOT, r.new_id, ""))
-        d.addCallback(lambda _:
-                      self.main.wait_for_nirvana(last_event_interval=1))
-        d.addCallback(lambda _: self.client.move(
-            request.ROOT, self.request3.new_id,
-            self.request2.new_id, "test_file_moved"))
-        d.addCallback(lambda _: self.check())
-        return d
+        """test change parent"""
+        yield self.get_client()
+        req1 = yield self.client.make_dir(
+            request.ROOT, self.root_id, "test_dir1")
+        yield self.main.wait_for_nirvana(last_event_interval=1)
+        req2 = yield self.client.make_dir(
+            request.ROOT, self.root_id, "test_dir2")
+        req3 = yield self.client.make_file(
+            request.ROOT, req1.new_id, "test_file")
+        yield self.put_content(request.ROOT, req3.new_id, "")
+        yield self.main.wait_for_nirvana(last_event_interval=1)
+        yield self.client.move(
+            request.ROOT, req3.new_id, req2.new_id, "test_file_moved")
+        yield self.check()
 
 
 class TestClientMove(TestSync):
@@ -1160,7 +1066,7 @@ class TestClientMove(TestSync):
         #   4. sync should miss the file
         #   5. wait for nirvana, it should be hashed ok
         methinterf = MethodInterferer(self.main.event_q, 'push')
-        methinterf.insert_before(None, move_dir)
+        methinterf.insert_before(move_dir)
 
         yield self.main.wait_for_nirvana()
 
@@ -1208,7 +1114,7 @@ class TestClientMove(TestSync):
             return True  # for the original function to be called
 
         methinterf = MethodInterferer(self.main.event_q, 'push')
-        methinterf.insert_before(None, change_file)
+        methinterf.insert_before(change_file)
 
         # wait to start, and create the file, that should trigger all events
         yield self.main.wait_for_nirvana()
@@ -1313,66 +1219,50 @@ class TestTimings(TestServerBase):
 class TestConflict(TestServerBase):
     """Test corner cases."""
 
+    @defer.inlineCallbacks
     def test_delete_conflict(self):
         """Delete locally while putting content in the server."""
         data_one = os.urandom(1000000)
 
-        def change_local(_):
-            """do the local change"""
-            os.remove(self.root_dir + '/test_file')
-
-        def content_check(_):
-            """check that everything is in sync"""
-            self.assertRaises(IOError, lambda:
-                              open(self.root_dir + '/test_file'))
-
-        d = self.get_client()
-        d.addCallback(lambda _: self.client.make_file(
-            request.ROOT, self.root_id, "test_file"))
-        d.addCallback(self.save("req"))
-        d.addCallback(lambda _: self.main.wait_for_nirvana(0.5))
+        yield self.get_client()
+        req = yield self.client.make_file(
+            request.ROOT, self.root_id, "test_file")
+        yield self.main.wait_for_nirvana(0.5)
 
         # let's put some content, for later have something to delete
-        d.addCallback(lambda _: self.put_content(request.ROOT,
-                                                 self.req.new_id, ":)"))
-        d.addCallback(lambda _: self.main.wait_for_nirvana(0.5))
+        yield self.put_content(request.ROOT, req.new_id, ":)")
+        yield self.main.wait_for_nirvana(0.5)
 
-        d.addCallback(lambda _: (
-            self.put_content(request.ROOT, self.req.new_id, data_one),
-            None)[1])
-        d.addCallback(self.wait_for_cb("AQ_DELTA_OK"))
-        d.addCallback(change_local)
-        d.addCallback(lambda _: self.main.wait_for_nirvana(0.5))
-        d.addCallback(content_check)
-        return d
+        d = self.wait_for("AQ_DELTA_OK")
+        yield self.put_content(request.ROOT, req.new_id, data_one)
+        yield d
 
+        os.remove(self.root_dir + '/test_file')
+        yield self.main.wait_for_nirvana(0.5)
+
+        self.assertRaises(IOError, open, self.root_dir + '/test_file')
+
+    @defer.inlineCallbacks
     def test_converge_conflict(self):
         """Write something locally while other content is put in server."""
         data_one = os.urandom(1000000)
 
-        def change_local():
-            """Do the local change."""
-            f = open(self.root_dir + "/test_file", "w")
-            f.write(data_one)
-            f.close()
+        yield self.get_client()
+        req = yield self.client.make_file(
+                  request.ROOT, self.root_id, "test_file")
+        yield self.main.wait_for_nirvana(0.5)
 
-        def content_check():
-            """Check that everything is in sync."""
-            data_one_local = open(self.root_dir + '/test_file').read()
-            self.assertTrue(data_one_local == data_one)
+        d = self.wait_for("AQ_DELTA_OK")
+        yield self.put_content(request.ROOT, req.new_id, data_one)
+        yield d
 
-        d = self.get_client()
-        d.addCallback(lambda _: self.client.make_file(
-                      request.ROOT, self.root_id, "test_file"))
-        d.addCallback(self.save("req"))
-        d.addCallback(lambda _: self.main.wait_for_nirvana(0.5))
-        d.addCallback(lambda _: (self.put_content(
-                      request.ROOT, self.req.new_id, data_one), None)[1])
-        d.addCallback(self.wait_for_cb("AQ_DELTA_OK"))
-        d.addCallback(lambda _: change_local())
-        d.addCallback(lambda _: self.main.wait_for_nirvana(0.5))
-        d.addCallback(lambda _: content_check())
-        return d
+        f = open(self.root_dir + "/test_file", "w")
+        f.write(data_one)
+        f.close()
+
+        yield self.main.wait_for_nirvana(0.5)
+        data_one_local = open(self.root_dir + '/test_file').read()
+        self.assertEqual(data_one_local, data_one)
 
     @defer.inlineCallbacks
     def test_delete_changed_local_file_conflict(self):
@@ -1409,6 +1299,7 @@ class TestConflict(TestServerBase):
         yield self.main.wait_for_nirvana(last_event_interval=0.5)
         yield content_check()
 
+    @defer.inlineCallbacks
     def test_simple_conflict(self):
         """Write something locally while other content is put in server.
 
@@ -1417,115 +1308,82 @@ class TestConflict(TestServerBase):
         data_one = os.urandom(1000000)
         data_conflict = "hello"
 
-        def change_local():
-            """do the local change"""
-            f = open(self.root_dir + "/test_file", "w")
-            f.write(data_conflict)
-            f.close()
+        yield self.get_client()
+        req = yield self.client.make_file(
+            request.ROOT, self.root_id, "test_file")
+        yield self.put_content(request.ROOT, req.new_id, data_one)
 
-        def content_check():
-            """check that everything is in sync"""
-            data_one_local = open(self.root_dir + '/test_file').read()
-            try:
-                data_conflict_local = open(
-                    self.root_dir + '/test_file.u1conflict').read()
-            except IOError:
-                self.assertTrue(data_one_local == data_conflict)
-            else:
-                self.assertTrue(data_one_local == data_one)
-                self.assertTrue(data_conflict_local == data_conflict)
+        f = open(self.root_dir + "/test_file", "w")
+        f.write(data_conflict)
+        f.close()
 
-        d = self.get_client()
-        d.addCallback(lambda _: self.client.make_file(
-            request.ROOT, self.root_id, "test_file"))
-        d.addCallback(self.save("req"))
-        d.addCallback(lambda _: self.put_content(
-            request.ROOT, self.req.new_id, data_one))
-        d.addCallback(lambda _: change_local())
-        d.addCallback(lambda _:
-                      self.main.wait_for_nirvana(last_event_interval=0.5))
-        d.addCallback(lambda _: content_check())
-        return d
+        yield self.main.wait_for_nirvana(last_event_interval=0.5)
 
+        data_one_local = open(self.root_dir + '/test_file').read()
+        try:
+            data_conflict_local = open(
+                self.root_dir + '/test_file.u1conflict').read()
+        except IOError:
+            self.assertEqual(data_one_local, data_conflict)
+        else:
+            self.assertEqual(data_one_local, data_one)
+            self.assertEqual(data_conflict_local, data_conflict)
+
+    @defer.inlineCallbacks
     def test_double_make_no_conflict(self):
         """local change after server change waiting for download."""
         data = "server"
 
-        def change_local():
-            """do the local change"""
-            f = open(self.root_dir + "/test_file", "w")
-            f.write(data)
-            f.close()
+        yield self.get_client()
+        yield self.client.make_file(request.ROOT, self.root_id, "test_file")
+        yield self.main.wait_for_nirvana(last_event_interval=0.5)
 
-        def local_check(_):
-            """check that everything is in sync"""
-            files = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
-            self.assertEqual(files, ["test_file"])
+        f = open(self.root_dir + "/test_file", "w")
+        f.write(data)
+        f.close()
 
-            final_data = open(self.root_dir + '/test_file').read()
-            self.assertEqual(data, final_data)
+        yield self.main.wait_for_nirvana(last_event_interval=0.5)
 
-        d = self.get_client()
-        d.addCallback(lambda _: self.client.make_file(
-                      request.ROOT, self.root_id, "test_file"))
-        d.addCallback(lambda _:
-                      self.main.wait_for_nirvana(last_event_interval=0.5))
-        d.addCallback(lambda _: change_local())
-        d.addCallback(lambda _:
-                      self.main.wait_for_nirvana(last_event_interval=0.5))
-        d.addCallback(local_check)
-        d.addCallback(lambda _: self.compare_server())
-        return d
+        files = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
+        self.assertEqual(files, ["test_file"])
 
+        final_data = open(self.root_dir + '/test_file').read()
+        self.assertEqual(data, final_data)
+
+        yield self.compare_server()
+
+    @defer.inlineCallbacks
     def test_double_make_conflict_w_dir_only(self):
         """Try to make dir in server when it's already there."""
+        yield self.get_client()
+        os.mkdir(self.root_dir + '/test_dir')
+        yield self.client.make_dir(request.ROOT, self.root_id, "test_dir")
 
-        def change_local(_):
-            """Do the local change."""
-            os.mkdir(self.root_dir + '/test_dir')
-            d = self.client.make_dir(request.ROOT, self.root_id, "test_dir")
-            return d
-
-        def content_check(_):
-            """Check that everything is in sync."""
-            files = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
-            self.assertEqual(files, ["test_dir"])
-            self.assertTrue(stat.S_ISDIR(
+        yield self.main.wait_for_nirvana(0.5)
+        files = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
+        self.assertEqual(files, ["test_dir"])
+        self.assertTrue(stat.S_ISDIR(
                 os.stat(self.root_dir + '/test_dir')[stat.ST_MODE]))
 
-        d = self.get_client()
-        d.addCallback(change_local)
-        d.addCallback(lambda _: self.main.wait_for_nirvana(0.5))
-        d.addCallback(content_check)
-        return d
-
+    @defer.inlineCallbacks
     def test_double_make_conflict_w_dir_and_file(self):
         """Make with same name a dir in server and file locally."""
         data_conflict = "local"
 
-        def change_local():
-            """do the local change"""
-            f = open(self.root_dir + "/test_file", "w")
-            f.write(data_conflict)
-            f.close()
-            d = self.client.make_dir(request.ROOT, self.root_id, "test_file")
-            return d
+        yield self.get_client()
 
-        def content_check():
-            """check that everything is in sync"""
-            self.assertTrue(stat.S_ISDIR(
-                os.stat(self.root_dir + '/test_file')[stat.ST_MODE]))
-            data_in_conflict = open(
-                self.root_dir + '/test_file.u1conflict').read()
-            self.assertEqual(data_in_conflict, data_conflict)
+        f = open(self.root_dir + "/test_file", "w")
+        f.write(data_conflict)
+        f.close()
+        yield self.client.make_dir(request.ROOT, self.root_id, "test_file")
 
-        d = self.get_client()
-        d.addCallback(lambda _: change_local())
-        d.addCallback(self.save("req"))
-        d.addCallback(lambda _:
-                      self.main.wait_for_nirvana(last_event_interval=0.5))
-        d.addCallback(lambda _: content_check())
-        return d
+        yield self.main.wait_for_nirvana(last_event_interval=0.5)
+
+        self.assertTrue(stat.S_ISDIR(
+            os.stat(self.root_dir + '/test_file')[stat.ST_MODE]))
+        data_in_conflict = open(
+            self.root_dir + '/test_file.u1conflict').read()
+        self.assertEqual(data_in_conflict, data_conflict)
 
     @defer.inlineCallbacks
     def test_makefile_problem_retry(self):
@@ -1535,16 +1393,16 @@ class TestConflict(TestServerBase):
 
         # nuke the client's method
         nuker = NukeAQClient(self.aq, 'put_content_request')
-        nuker.nuke(None)
+        nuker.nuke()
 
         # create the file and wait to everything propagate
         with open(self.root_dir + "/test_file", "w") as fh:
             fh.write(os.urandom(100))
-        yield self.wait_for_cb("HQ_HASH_NEW")
+        yield self.wait_for("HQ_HASH_NEW")
 
         # disconnect, restore the client's method, and connect again
         self.eq.push('SYS_NET_DISCONNECTED')
-        nuker.restore(None)
+        nuker.restore()
         self.eq.push('SYS_NET_CONNECTED')
         yield self.main.wait_for_nirvana(.5)
 
@@ -1649,7 +1507,7 @@ class TestConflictOnServerSideDelete(TestServerBase):
     dir_name_conflict = dir_name + u'.u1conflict'
     file_name = u'bar.txt'
 
-    def create_and_check(self, _):
+    def create_and_check(self, _=None):
         """Create initial directory hierarchy."""
         self.local_dir = os.path.join(self.root_dir, self.dir_name)
         self.local_dir_conflict = os.path.join(self.root_dir,
@@ -1662,7 +1520,7 @@ class TestConflictOnServerSideDelete(TestServerBase):
         open(self.local_file, 'w').close()  # touch local_file
         assert os.path.exists(self.local_file)
 
-    def unlink_dir_tree(self, _):
+    def unlink_dir_tree(self, _=None):
         """Remove the tree below foo/ directly on server."""
         u = self.storage_users['jack']
         root = u.root_node
@@ -1676,32 +1534,30 @@ class TestConflictOnServerSideDelete(TestServerBase):
         # does not propagate the removal to the client
         dir_tree.unlink_tree()
 
-    def update_state(self, _):
+    def update_state(self, _=None):
         """Update the local state by triggering a Query to the server."""
         # foo/bar.txt still exists on local FS
         assert os.path.exists(self.local_dir)
         assert os.path.exists(self.local_file)
         return self.aq.rescan_from_scratch(request.ROOT)
 
+    @defer.inlineCallbacks
     def test_no_conflict_if_no_local_changes(self):
         """Don't conflict if no local changes after server tree deletion."""
 
         def no_conflict_check(_):
             """Check the absence of conflict, and the deletion of the node."""
-            files = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
-            self.assertEqual(files, [])
+        yield self.get_client()
+        yield self.create_and_check()
+        yield self.main.wait_for_nirvana(.5)
 
-        d = self.get_client()
-        d.addCallback(self.create_and_check)
-        d.addCallback(lambda _: self.main.wait_for_nirvana(.5))
+        yield self.unlink_dir_tree()
 
-        d.addCallback(self.unlink_dir_tree)
+        yield self.update_state()
+        yield self.main.wait_for_nirvana(.5)
 
-        d.addCallback(self.update_state)
-        d.addCallback(lambda _: self.main.wait_for_nirvana(.5))
-
-        d.addCallback(no_conflict_check)
-        return d
+        files = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
+        self.assertEqual(files, [])
 
     @defer.inlineCallbacks
     def test_conflict_if_local_changes(self):
@@ -1759,7 +1615,7 @@ class TestConflict2(TestServerBase):
                                            "test_file")
         yield self.main.wait_for_nirvana(last_event_interval=0.5)
         yield self.client.unlink(request.ROOT, req2.new_id)
-        yield self.wait_for_cb("AQ_DELTA_OK")
+        yield self.wait_for("AQ_DELTA_OK")
         shutil.rmtree(self.root_dir + "/test_dir")
         yield self.main.wait_for_nirvana(last_event_interval=0.5)
         yield self.clean_partials_and_conflicts()
@@ -1789,7 +1645,7 @@ class TestConflict2(TestServerBase):
 
         # nuke the real method to get in the middle
         mi = MethodInterferer(self.aq.client, 'put_content_request')
-        mi.nuke(None, fake_put_content)
+        mi.nuke(fake_put_content)
 
         # generate first change and wait for the fake put content to be called
         with open(fname, 'w') as fh:
@@ -1976,7 +1832,7 @@ class TestPartialRecover(TestServerBase):
 
         # set up the trap: remove the partial before commiting the download
         nuker = MethodInterferer(self.main.fs, 'commit_partial')
-        nuker.insert_before(None, remove_partial)
+        nuker.insert_before(remove_partial)
 
         make_req = yield self.client.make_file(request.ROOT,
                                                self.root_id, "test_file")
@@ -2000,23 +1856,16 @@ class TestPartialRecover(TestServerBase):
 class TestInotify(TestServerBase):
     """try to recover from a removed partial"""
 
+    @defer.inlineCallbacks
     def test_add_file_in_server_folder(self):
-        """add a file in a server created folder"""
-        def change_local():
-            """do the local change"""
-            open(self.root_dir + '/test_dir/file', 'w').close()
+        """Add a file in a server created folder."""
+        yield self.get_client()
+        yield self.client.make_dir(request.ROOT, self.root_id, "test_dir")
+        yield self.main.wait_for_nirvana(last_event_interval=0.5)
 
-        d = self.get_client()
-        d.addCallback(lambda _: self.client.make_dir(
-            request.ROOT, self.root_id, "test_dir"))
-        d.addCallback(self.save("req"))
-        d.addCallback(lambda _:
-                      self.main.wait_for_nirvana(last_event_interval=0.5))
-        d.addCallback(lambda _: change_local())
-        d.addCallback(lambda _:
-                      self.main.wait_for_nirvana(last_event_interval=0.5))
-        d.addCallback(lambda _: self.check())
-        return d
+        open(self.root_dir + '/test_dir/file', 'w').close()
+        yield self.main.wait_for_nirvana(last_event_interval=0.5)
+        yield self.check()
 
 
 class TestStupendous(TestServerBase):
@@ -2029,15 +1878,12 @@ class TestStupendous(TestServerBase):
 
     def client_setup(self):
         """Do the file creation before hooking up the client."""
-        d = self.get_client()
+        yield self.get_client()
         for i in range(0x600):
-            d.addCallback(lambda _, i=i: self.client.make_file(
-                request.ROOT, self.root_id, 'test_%03x' % i))
-            d.addCallback(lambda mk: self.put_content(request.ROOT,
-                                                      mk.new_id,
-                                                      'hola'))
-        d.addCallback(lambda _: super(TestStupendous, self).client_setup())
-        return d
+            mk = yield self.client.make_file(
+                request.ROOT, self.root_id, 'test_%03x' % i)
+            yield self.put_content(request.ROOT, mk.new_id, 'hola')
+        yield super(TestStupendous, self).client_setup()
 
     def test_survive_creating_a_bucketful_of_files_on_the_server_please(self):
         """Just check that we reach nirvana."""
@@ -2053,7 +1899,7 @@ class TestMoveWhileInProgress(TestServerBase):
     def test_local_move_file_while_uploading(self):
         """Local change after server change waiting for upload."""
         data_conflict = os.urandom(1000000)
-        wait_for_hash = self.wait_for_cb("HQ_HASH_NEW")
+        wait_for_hash = self.wait_for("HQ_HASH_NEW")
 
         # do the local change
         f = open(self.root_dir + "/test_file", "w")
@@ -2069,65 +1915,56 @@ class TestMoveWhileInProgress(TestServerBase):
         yield self.clean_partials_and_conflicts()
         yield self.check()
 
+    @defer.inlineCallbacks
     def test_local_move_file_while_downloading(self):
         """Local change after server change waiting for download."""
         data_one = os.urandom(1000000)
 
-        def change_local():
-            """do the local change"""
-            os.rename(self.root_dir + "/test_file",
-                      self.root_dir + "/test_file_new")
-
-        d = self.get_client()
-        d.addCallback(lambda _: self.client.make_file(
-            request.ROOT, self.root_id, "test_file"))
-        d.addCallback(self.save("req"))
-        d.addCallback(lambda _: self.main.wait_for_nirvana(0.5))
+        yield self.get_client()
+        req = yield self.client.make_file(
+            request.ROOT, self.root_id, "test_file")
+        yield self.main.wait_for_nirvana(0.5)
 
         # let's put some content, for later have something to delete
-        d.addCallback(lambda _: self.put_content(request.ROOT,
-                                                 self.req.new_id, ":)"))
-        d.addCallback(lambda _: self.main.wait_for_nirvana(0.5))
+        yield self.put_content(request.ROOT, req.new_id, ":)")
+        yield self.main.wait_for_nirvana(0.5)
 
-        d.addCallback(lambda _: (self.put_content(
-            request.ROOT, self.req.new_id, data_one), None)[1])
-        d.addCallback(self.wait_for_cb("SV_VOLUME_NEW_GENERATION"))
-        d.addCallback(lambda _: change_local())
-        d.addCallback(lambda _: self.main.wait_for_nirvana(0.5))
-        d.addCallback(lambda _: self.clean_partials_and_conflicts())
-        d.addCallback(lambda _: self.check())
+        d = self.wait_for("SV_VOLUME_NEW_GENERATION")
+        yield self.put_content(request.ROOT, req.new_id, data_one)
+        yield d
 
-        return d
+        os.rename(self.root_dir + "/test_file",
+                  self.root_dir + "/test_file_new")
 
+        yield self.main.wait_for_nirvana(0.5)
+        yield self.clean_partials_and_conflicts()
+        yield self.check()
+
+    @defer.inlineCallbacks
     def test_local_move_dir_while_downloading(self):
         """Local change after server change waiting for download."""
-        def change_local():
-            """do the local change"""
-            os.rename(self.root_dir + "/test_dir",
-                      self.root_dir + "/test_renamed")
-
         # let's build ROOT/test_dir/test_dir in the server
-        d = self.get_client()
-        d.addCallback(lambda _: self.client.make_dir(
-            request.ROOT, self.root_id, "test_dir"))
-        d.addCallback(self.save("req"))
-        d.addCallback(lambda _: self.main.wait_for_nirvana(0.5))
-        d.addCallback(lambda _: self.client.make_dir(
-            request.ROOT, self.req.new_id, "inside_dir"))
-        d.addCallback(self.wait_for_cb("AQ_DELTA_OK"))
+        yield self.get_client()
+        req = yield self.client.make_dir(
+            request.ROOT, self.root_id, "test_dir")
+        yield self.main.wait_for_nirvana(0.5)
+
+        d = self.wait_for("AQ_DELTA_OK")
+        yield self.client.make_dir(
+            request.ROOT, req.new_id, "inside_dir")
+        yield d
 
         # change locally, wait, and compare
-        d.addCallback(lambda _: change_local())
-        d.addCallback(lambda _: self.main.wait_for_nirvana(0.5))
-        d.addCallback(lambda _: self.clean_partials_and_conflicts())
-        d.addCallback(lambda _: self.check())
-
-        return d
+        os.rename(self.root_dir + "/test_dir",
+                  self.root_dir + "/test_renamed")
+        yield self.main.wait_for_nirvana(0.5)
+        yield self.clean_partials_and_conflicts()
+        yield self.check()
 
     @defer.inlineCallbacks
     def test_server_move(self):
         """Receive a move from the server side."""
-        waiting_for_event = self.wait_for_cb("AQ_DELTA_OK")
+        waiting_for_event = self.wait_for("AQ_DELTA_OK")
 
         # let's build ROOT/test_dir/test_dir_2 in the server
         yield self.get_client()
@@ -2142,22 +1979,19 @@ class TestMoveWhileInProgress(TestServerBase):
         yield self.main.wait_for_nirvana(0.5)
         yield self.check()
 
+    @defer.inlineCallbacks
     def test_move_replace_file(self):
         """test rename"""
-        d = self.get_client()
-        d.addCallback(lambda _: self.client.make_file(
-            request.ROOT, self.root_id, "test_file_moved"))
-        d.addCallback(lambda _: self.client.make_file(
-            request.ROOT, self.root_id, "test_file"))
-        d.addCallback(self.save("request"))
-        d.addCallback(lambda r: self.put_content(request.ROOT, r.new_id, ""))
-        d.addCallback(lambda _:
-                      self.main.wait_for_nirvana(last_event_interval=1))
-        d.addCallback(lambda _: self.client.move(
-            request.ROOT, self.request.new_id,
-            self.root_id, "test_file_moved"))
-        d.addCallback(lambda _: self.check())
-        return d
+        yield self.get_client()
+        yield self.client.make_file(
+            request.ROOT, self.root_id, "test_file_moved")
+        req = yield self.client.make_file(
+            request.ROOT, self.root_id, "test_file")
+        self.put_content(request.ROOT, req.new_id, "")
+        yield self.main.wait_for_nirvana(last_event_interval=1)
+        yield self.client.move(
+            request.ROOT, req.new_id, self.root_id, "test_file_moved")
+        yield self.check()
 
     @defer.inlineCallbacks
     def test_move_while_hashing(self):
@@ -2174,12 +2008,12 @@ class TestMoveWhileInProgress(TestServerBase):
 
         def rename_it(*a):
             """Restore the proper hasher, and rename the file."""
-            hash_nuker.restore(None)
+            hash_nuker.restore()
             os.rename(dname_src, dname_dst)
             return True
 
         hash_nuker = MethodInterferer(self.main.hash_q, 'insert')
-        hash_nuker.insert_before(None, rename_it)
+        hash_nuker.insert_before(rename_it)
 
         # need to wait the Upload to be executed before unleashing
         # the make file, to hit the bug
@@ -2190,45 +2024,30 @@ class TestMoveWhileInProgress(TestServerBase):
             return True
 
         upload_nuker = MethodInterferer(self.aq, 'upload')
-        upload_nuker.insert_after(None, unleash_makefile)
+        upload_nuker.insert_after(unleash_makefile)
 
         # write the file, wait and check
         os.mkdir(dname_src)
         with open(os.path.join(dname_src, 'file.txt'), 'w') as fh:
             fh.write('hola')
-        yield self.main.wait_for_nirvana(0.5)
         yield self.check()
 
-
-class TestMoveWhileInProgress2(TestServerBase):
-    """Handle more new move cases."""
-
+    @defer.inlineCallbacks
     def test_local_move_file_while_uploading_no_wait(self):
-        """local change after server change waiting for upload no wait."""
-
+        """Local change after server change waiting for upload no wait."""
         data_conflict = os.urandom(10000000)
 
-        def change_local1():
-            """do the local change"""
-            f = open(self.root_dir + "/test_file", "w")
-            f.write(data_conflict)
-            f.close()
+        d = self.wait_for("HQ_HASH_NEW")
+        f = open(self.root_dir + "/test_file", "w")
+        f.write(data_conflict)
+        f.close()
+        yield d
 
-        def change_local2():
-            """do the local change"""
-            os.rename(self.root_dir + "/test_file",
-                      self.root_dir + "/test_file_new")
-
-        d = defer.succeed(True)
-        d.addCallback(lambda _: change_local1())
-        # d.addCallback(self.wait_for_cb("HQ_HASH_NEW"))
-        d.addCallback(lambda _: change_local2())
-        d.addCallback(lambda _:
-                      self.main.wait_for_nirvana(last_event_interval=0.5))
-        # d.addCallback(lambda _: self.clean_partials_and_conflicts())
-        d.addCallback(lambda _: self.check())
-        return d
-    test_local_move_file_while_uploading_no_wait.skip = '20 (?)'
+        os.rename(self.root_dir + "/test_file",
+                  self.root_dir + "/test_file_new")
+        yield self.main.wait_for_nirvana(last_event_interval=0.5)
+        yield self.clean_partials_and_conflicts()
+        yield self.check()
 
 
 class TestLocalRescan(TestServerBase):
@@ -2273,13 +2092,13 @@ class TestLocalRescan(TestServerBase):
 
         # put content in the server, so it will start the download, but LR
         # will get in the middle
-        nuker.insert_before(None, trigger_lr)
+        nuker.insert_before(trigger_lr)
         try:
             yield self.put_content(request.ROOT, req.new_id, ":)")
             yield self.main.wait_for_nirvana(0)
             yield lr_def
         finally:
-            nuker.restore(None)
+            nuker.restore()
 
         # issue a query on the node, to get the info from the server,
         # simulating the server_rescan...
@@ -2297,7 +2116,7 @@ class TestLocalRescan(TestServerBase):
 
         # nuke AQ and create the file in disk, to simulate a broken upload
         nuker = MethodInterferer(self.aq, 'upload')
-        nuker.nuke(None)
+        nuker.nuke()
         fname = os.path.join(self.root_dir, 'file.txt')
         try:
             with open(fname, 'w') as fh:
@@ -2305,7 +2124,7 @@ class TestLocalRescan(TestServerBase):
             # need to wait until all is procesed before restoring the upload
             yield self.main.wait_for_nirvana(.5)
         finally:
-            nuker.restore(None)
+            nuker.restore()
 
         # let LR run, and then SR, and wait
         yield self.main.lr.scan_dir('mdid', self.root_dir)
@@ -2324,7 +2143,7 @@ class TestLocalRescan(TestServerBase):
 
         # nuke AQ and create the file in server, to simulate a broken download
         nuker = MethodInterferer(self.aq, 'download')
-        nuker.nuke(None)
+        nuker.nuke()
 
         try:
             req = yield self.client.make_file(request.ROOT,
@@ -2332,7 +2151,7 @@ class TestLocalRescan(TestServerBase):
             yield self.put_content(request.ROOT, req.new_id, 'hola')
             yield self.main.wait_for_nirvana(0)
         finally:
-            nuker.restore(None)
+            nuker.restore()
 
         # let LR run, and then SR, and wait
         yield self.main.lr.scan_dir('mdid', self.root_dir)
@@ -2349,6 +2168,7 @@ class TestLocalRescan(TestServerBase):
 class TestDownloadError(TestServerBase):
     """test handling of AQ_DOWNLOAD_ERROR"""
 
+    @defer.inlineCallbacks
     def test_not_available(self):
         """Tests that on a AQ_DOWNLOAD_ERROR (NOT_AVAILABLE) the .u1partial is
         deleted.
@@ -2364,24 +2184,20 @@ class TestDownloadError(TestServerBase):
             return FakeGetContent(failed, share, node, hash)
 
         nuker = NukeAQClient(self.aq, 'get_content_request')
-        d = self.get_client()
-        d.addCallback(lambda _: self.client.make_dir(
-            request.ROOT, self.root_id, "test_dir"))
-        d.addCallback(self.save("request"))
-        d.addCallback(lambda _: nuker.nuke(_, get_content_request))
-        d.addCallback(lambda _: self.wait_for_nirvana())
+        yield self.get_client()
+        req = yield self.client.make_dir(
+            request.ROOT, self.root_id, "test_dir")
+        yield nuker.nuke(get_content_request)
+        yield self.wait_for_nirvana()
 
-        def check_partial(_):
-            """check if the partial is there"""
-            self.assertFalse(os.path.exists(os.path.join(self.root_dir,
-                                                         '.u1partial')))
-        d.addCallback(check_partial)
-        d.addCallback(nuker.restore)
-        d.addCallback(lambda _: self.client.unlink(
-            request.ROOT, self.request.new_id))
-        d.addCallback(lambda _: self.check())
-        return d
+        self.assertFalse(
+            os.path.exists(os.path.join(self.root_dir, '.u1partial')))
 
+        yield nuker.restore()
+        yield self.client.unlink(request.ROOT, req.new_id)
+        yield self.check()
+
+    @defer.inlineCallbacks
     def test_other_error(self):
         """Tests that on a AQ_DOWNLOAD_ERROR (misc error) the .u1partial isn't
         deleted.
@@ -2397,23 +2213,18 @@ class TestDownloadError(TestServerBase):
             return FakeGetContent(failed, share, node, hash)
 
         nuker = NukeAQClient(self.aq, 'get_content_request')
-        d = self.get_client()
-        d.addCallback(lambda _: self.client.make_dir(
-            request.ROOT, self.root_id, "test_dir"))
-        d.addCallback(self.save("request"))
-        d.addCallback(lambda _: nuker.nuke(_, get_content_request))
-        d.addCallback(lambda _: self.wait_for_nirvana())
+        yield self.get_client()
+        req = yield self.client.make_dir(
+            request.ROOT, self.root_id, "test_dir")
+        yield nuker.nuke(get_content_request)
+        yield self.wait_for_nirvana()
 
-        def check_partial(_):
-            """check if the partial is there"""
-            self.assertFalse(os.path.exists(
-                os.path.join(self.root_dir, '.u1partial')))
-        d.addCallback(check_partial)
-        d.addCallback(nuker.restore)
-        d.addCallback(lambda _: self.client.unlink(
-            request.ROOT, self.request.new_id))
-        d.addCallback(lambda _: self.check())
-        return d
+        self.assertFalse(
+            os.path.exists(os.path.join(self.root_dir, '.u1partial')))
+
+        yield nuker.restore()
+        yield self.client.unlink(request.ROOT, req.new_id)
+        yield self.check()
 
 
 class TestOpenFiles(TestServerBase):

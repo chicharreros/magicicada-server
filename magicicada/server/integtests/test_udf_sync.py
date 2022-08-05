@@ -256,12 +256,10 @@ class TestUDFServerMove(TestUDFServerBase):
     def test_simple_dir_move(self):
         """Test rename dir."""
         yield self.get_client()
-        d = self.client.make_dir(self.my_udf_id,
-                                 self.my_udf.node_id, "test_dir")
-        d.addCallback(self.save("request"))
-        yield d
+        req = yield self.client.make_dir(
+            self.my_udf_id, self.my_udf.node_id, "test_dir")
         yield self.main.wait_for_nirvana(last_event_interval=1)
-        yield self.client.move(self.my_udf_id, self.request.new_id,
+        yield self.client.move(self.my_udf_id, req.new_id,
                                self.my_udf.node_id, "test_dir_moved")
         yield self.check()
 
