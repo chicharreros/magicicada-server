@@ -15,9 +15,14 @@
 
 """A generic abstraction for merge operations on directory trees."""
 
+import logging
+
 from itertools import chain
 
 from magicicadaprotocol.dircontent_pb2 import DIRECTORY
+
+
+logger = logging.getLogger(__name__)
 
 
 class MergeNode(object):
@@ -47,13 +52,14 @@ class MergeNode(object):
 
 
 def show_tree(tree, indent="", name="/"):
-    """Prints a tree."""
+    """Show a tree."""
     if tree.node_type == DIRECTORY:
         type_str = "DIR "
     else:
         type_str = "FILE"
-    print "%s%-36s %s %s  %s" % (indent, tree.uuid, type_str, name,
-                                 tree.content_hash)
+    logger.debug(
+        "%s%-36s %s %s  %s",
+        indent, tree.uuid, type_str, name, tree.content_hash)
     if tree.node_type == DIRECTORY and tree.children is not None:
         for name in sorted(tree.children.keys()):
             subtree = tree.children[name]

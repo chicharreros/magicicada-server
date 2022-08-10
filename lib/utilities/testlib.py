@@ -26,6 +26,7 @@ import re
 from unittest import TestSuite, TestLoader, defaultTestLoader
 
 import django
+from django.conf import settings
 from django.test.runner import DiscoverRunner
 from twisted.internet import defer
 from twisted.internet.base import DelayedCall
@@ -221,6 +222,11 @@ class MagicicadaRunner(DiscoverRunner):
 
 def test_with_trial(options, topdir, testdirs, testpaths):
     """The main testing entry point."""
+    # hook twisted.python.log with standard logging
+    from twisted.python import log
+    observer = log.PythonLoggingObserver('twisted')
+    observer.start()
+
     # parse arguments
     reporter_decorators = []
     if options.one:
@@ -265,4 +271,9 @@ def test_with_trial(options, topdir, testdirs, testpaths):
         factory, filter_test, verbosity=options.verbosity,
         debug=options.debug)
     result = runner.run_tests(test_labels=(topdir, testdirs, testpaths))
-    return not result.wasSuccessful()
+    failed = not result.wasSuccessful()
+    if failed and os.getenv('CI'):
+        with open(settings.LOGGING['handlers']['trace']['filename']) as f:
+            print(f.read())
+
+    return failed

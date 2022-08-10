@@ -18,7 +18,6 @@
 
 """Assorted stuff used by test_action_queue."""
 
-import logging
 import os
 import shutil
 import time
@@ -37,7 +36,6 @@ from magicicadaclient.syncdaemon.action_queue import (
 )
 from magicicadaclient.syncdaemon import (
     main,
-    logger as syncdaemon_logger,
     tritcask,
     volume_manager,
 )
@@ -57,18 +55,16 @@ from magicicada.server.auth import SimpleAuthProvider
 from magicicada.server.testing.testcase import BaseProtocolTestCase
 from magicicada.testing.testcase import BaseTestCase
 
+
+NO_CONTENT_HASH = ""
 ROOT_DIR = os.getcwd()
 SD_CONFIG_DIR = os.path.join(
     ROOT_DIR, '.sourcecode', 'magicicada-client', 'data')
 SD_CONFIGS = [os.path.join(SD_CONFIG_DIR, 'syncdaemon.conf'),
               os.path.join(SD_CONFIG_DIR, 'syncdaemon-dev.conf')]
+TESTS_DIR = os.getcwd() + "/tmp/sync_tests"
 
 _marker = object()
-logger = logging.getLogger(__name__)
-NO_CONTENT_HASH = ""
-
-
-TESTS_DIR = os.getcwd() + "/tmp/sync_tests"
 
 
 def show_time():
@@ -177,7 +173,6 @@ class ReallyFakeMain(main.Main):
         self.hash_q = type('fake hash queue', (),
                            {'empty': staticmethod(lambda: True),
                             '__len__': staticmethod(lambda: 0)})()
-        self.logger = logger
         self.db = tritcask.Tritcask(self.tritcask_dir)
         self.vm = DumbVolumeManager(self)
         self.fs = FileSystemManager(self.fsmdir, self.partials_dir, self.vm,
@@ -369,10 +364,6 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
         main.config.get_user_config().set_throttling_write_limit(-1)
         main.config.get_user_config().set_autoconnect(False)
 
-        # logging can not be configured dinamically, touch the general logger
-        # to get one big file and be able to get the logs if failure
-        syncdaemon_logger.init()
-        syncdaemon_logger.set_max_bytes(0)
         yield self.client_setup()
 
     @property

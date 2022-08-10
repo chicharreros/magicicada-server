@@ -49,15 +49,6 @@ dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
 
 LIB_DIR = os.path.abspath("lib")
 CLIENT_DIR = os.path.abspath(os.path.join('.sourcecode', 'magicicada-client'))
-PROTOCOL_DIR = os.path.abspath(
-    os.path.join('.sourcecode', 'magicicada-protocol'))
-DEP_BUILDCLIENT = """
-cd %s
-./autogen.sh --with-protocol=%s
-make
-""" % (CLIENT_DIR, PROTOCOL_DIR)
-
-
 ROOT = utils.get_rootdir()
 TMP_DIR = os.path.join(ROOT, 'tmp')
 PID_FILENAME = os.path.join(TMP_DIR, 'syncdaemon-process-%d.pid')
@@ -94,14 +85,9 @@ def deps_missing():
     This tests the best way we can that all dependencies are ready. It depends
     on how other parts of the projects do their stuff, so it may change.
     """
-    couchdb_port = os.path.join(TMP_DIR, "couchdb-master0.port")
-    if not os.path.exists(couchdb_port):
-        print("Not ready! Hint: did you run...?:\nmake start")
-        return True
-
-    log_conf = os.path.join(CLIENT_DIR, "data", "logging.conf")
+    log_conf = os.path.join(CLIENT_DIR, "data", "syncdaemon.conf")
     if not os.path.exists(log_conf):
-        print("Not ready! Hint: did you do...?:\n" + DEP_BUILDCLIENT)
+        print("Not ready! Hint: did you run make bootstrap?")
         return True
 
 

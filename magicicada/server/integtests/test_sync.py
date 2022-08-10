@@ -55,7 +55,7 @@ from magicicada.server.testing.testcase import logger
 from magicicada.u1sync import client as u1sync_client
 from magicicada.u1sync.main import TreesDiffer, do_diff, do_init, do_sync
 
-U1SYNC_QUIET = True
+
 NO_CONTENT_HASH = ""
 
 
@@ -171,17 +171,17 @@ class TestSync(TestWithDatabase):
             raise Exception("Test ended with errors: \n" + errs)
 
     def compare_dirs(self):
-        "run rsync to compare directories, needs some work"
+        """Run rsync to compare directories, needs some work."""
+
         def _compare():
-            """spwan rsync and compare"""
+            """Spwan rsync and compare dirs."""
             cmd = ["rsync", "-nric", self.root_dir, self.source_dir]
             output = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                                       env=os.environ).communicate()[0]
-            if not output:
-                return True
-            else:
-                print("****\n", output, "****")
+            if output:
+                logger.debug("****\n%s\n****", output)
                 return False
+            return True
         return deferToThread(_compare)
 
     def upload_server(self, share=None):
@@ -193,11 +193,14 @@ class TestSync(TestWithDatabase):
                 if self.u1sync_init:
                     do_init(
                         client=c, share_spec=share, directory=self.source_dir,
-                        quiet=U1SYNC_QUIET, subtree_path=None)
+                        subtree_path=None)
                     self.u1sync_init = False
                 do_sync(
                     client=c, directory=self.source_dir,
-                    action="clobber-server", dry_run=False, quiet=U1SYNC_QUIET)
+                    action="clobber-server", dry_run=False)
+            except Exception:
+                logger.exception(self.id() + '-> upload_server failed with:')
+                raise
             finally:
                 c.disconnect()
         return deferToThread(_runit)
@@ -212,7 +215,7 @@ class TestSync(TestWithDatabase):
             c = self._u1sync_client()
             try:
                 do_diff(client=c, share_spec=share, directory=target,
-                        quiet=U1SYNC_QUIET, subtree_path=None)
+                        subtree_path=None)
             finally:
                 c.disconnect()
 
@@ -1876,10 +1879,15 @@ class TestStupendous(TestServerBase):
 
     timeout = 3600  # yes, an hour
 
+    @defer.inlineCallbacks
     def client_setup(self):
         """Do the file creation before hooking up the client."""
         yield self.get_client()
-        for i in range(0x600):
+        amount = 10
+        if os.getenv('CI', None) is not None:
+            amount = 0x600
+        logger.info('TestStupendous, creating %s amount of files.' % amount)
+        for i in range(amount):
             mk = yield self.client.make_file(
                 request.ROOT, self.root_id, 'test_%03x' % i)
             yield self.put_content(request.ROOT, mk.new_id, 'hola')
@@ -1887,9 +1895,7 @@ class TestStupendous(TestServerBase):
 
     def test_survive_creating_a_bucketful_of_files_on_the_server_please(self):
         """Just check that we reach nirvana."""
-        return self.main.wait_for_nirvana()
-    test_survive_creating_a_bucketful_of_files_on_the_server_please.skip = \
-        False if os.getenv('RUN_REALLY_SLOW_TESTS') else 'really slow test'
+        return self.wait_for_nirvana()
 
 
 class TestMoveWhileInProgress(TestServerBase):

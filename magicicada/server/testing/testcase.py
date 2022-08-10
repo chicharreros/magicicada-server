@@ -176,8 +176,6 @@ class ClientTestHelper(object):
 class SimpleClient(StorageClient, ClientTestHelper):
     """Simple client that calls a callback on connection."""
 
-    log = logger
-
     def __init__(self, *args, **kwargs):
         """create the instance"""
         StorageClient.__init__(self, *args, **kwargs)
@@ -385,6 +383,18 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
         """Save a request for later use."""
         setattr(self._state, name, req)
         return req
+
+    @defer.inlineCallbacks
+    def _get_client_helper(self, auth_token="open sesame"):
+        """Simplify the testing code by getting a client for the user."""
+        connect_d = defer.Deferred()
+        factory = FactoryHelper(connect_d.callback, caps=PREFERRED_CAP)
+        connector = reactor.connectTCP("localhost", self.port, factory)
+        self.addCleanup(connector.disconnect)
+        client = yield connect_d
+        self.addCleanup(client.kill)
+        yield client.dummy_authenticate(auth_token)
+        defer.returnValue((client, connector))
 
 
 class BufferedConsumer(object):
