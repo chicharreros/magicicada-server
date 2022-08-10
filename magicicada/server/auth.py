@@ -67,7 +67,7 @@ class DummyAuthProvider(AuthenticationProvider):
         """Authenticate users if request_token is self._request_token."""
         request_token = auth_parameters.get('dummy_token')
         if request_token not in self._allowed:
-            logger.debug("AUTH: request_token not in _allowed")
+            logger.debug("AUTH: request_token not in _allowed list")
             return
 
         session_id = protocol.session_id if protocol else None

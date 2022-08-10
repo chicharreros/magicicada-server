@@ -128,21 +128,13 @@ class TestSharesBasic(TestSharesSync, test_sync.TestBasic):
 
 
 class TestSharesBasic2(TestSharesSync, test_sync.TestBasic2):
-    """ Basic2 tests for shares"""
+    """Basic2 tests for shares"""
 
+    @defer.inlineCallbacks
     def setUp(self):
         """ Set the root_dir = share_dir"""
-        d = super(TestSharesBasic2, self).setUp()
-
-        def set_root_dir(result):
-            self.root_dir = self.jane_share_dir
-
-        d.addCallback(set_root_dir)
-        return d
-
-    def tearDown(self):
-        """ cleanup the test """
-        return super(TestSharesBasic2, self).tearDown()
+        yield super(TestSharesBasic2, self).setUp()
+        self.root_dir = self.jane_share_dir
 
 
 class TestShareClientMove(TestSharesSync, test_sync.TestClientMove):

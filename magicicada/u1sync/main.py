@@ -17,8 +17,9 @@
 
 from __future__ import with_statement
 
-import signal
+import logging
 import os
+import signal
 import sys
 import uuid
 
@@ -45,6 +46,7 @@ from magicicada.u1sync.sync import download_tree, upload_tree
 from magicicada.u1sync.utils import safe_mkdir
 
 
+logger = logging.getLogger(__name__)
 gobject.set_application_name('u1sync')
 
 DEFAULT_MERGE_ACTION = 'auto'
@@ -83,12 +85,9 @@ class NoParentError(Exception):
 
 class TreesDiffer(Exception):
     """Raised when diff tree differs."""
-    def __init__(self, quiet):
-        self.quiet = quiet
 
 
-def do_init(client, share_spec, directory, quiet, subtree_path,
-            metadata=metadata):
+def do_init(client, share_spec, directory, subtree_path, metadata=metadata):
     """Initializes a directory for syncing, and syncs it."""
     info = metadata.Metadata()
 
@@ -102,8 +101,7 @@ def do_init(client, share_spec, directory, quiet, subtree_path,
     else:
         info.path = "/"
 
-    if not quiet:
-        print "\nInitializing directory..."
+    logger.debug("Initializing directory...")
     safe_mkdir(directory)
 
     metadata_dir = os.path.join(directory, METADATA_DIR_NAME)
@@ -115,15 +113,13 @@ def do_init(client, share_spec, directory, quiet, subtree_path,
         else:
             raise
 
-    if not quiet:
-        print "\nWriting mirror metadata..."
+    logger.debug("Writing mirror metadata...")
     metadata.write(metadata_dir, info)
 
-    if not quiet:
-        print "\nDone."
+    logger.debug("Done.")
 
 
-def do_sync(client, directory, action, dry_run, quiet):
+def do_sync(client, directory, action, dry_run):
     """Synchronizes a directory with the given share."""
     absolute_path = os.path.abspath(directory)
     while True:
@@ -134,8 +130,7 @@ def do_sync(client, directory, action, dry_run, quiet):
             raise DirectoryNotInitializedError(directory)
         absolute_path = os.path.split(absolute_path)[0]
 
-    if not quiet:
-        print "\nReading mirror metadata..."
+    logger.debug("Reading mirror metadata...")
     info = metadata.read(metadata_dir)
 
     top_uuid, writable = client.get_root_info(info.share_uuid)
@@ -153,35 +148,28 @@ def do_sync(client, directory, action, dry_run, quiet):
     if should_upload and not writable:
         raise ReadOnlyShareError(info.share_uuid)
 
-    if not quiet:
-        print "\nScanning directory..."
-    local_tree = scan_directory(absolute_path, quiet=quiet)
+    logger.debug("Scanning directory...")
+    local_tree = scan_directory(absolute_path)
 
-    if not quiet:
-        print "\nFetching metadata..."
+    logger.debug("Fetching metadata...")
     remote_tree = client.build_tree(info.share_uuid, info.root_uuid)
-    if not quiet:
-        show_tree(remote_tree)
+    show_tree(remote_tree)
 
-    if not quiet:
-        print "\nMerging trees..."
+    logger.debug("Merging trees...")
     merged_tree = merge_trees(old_local_tree=info.local_tree,
                               local_tree=local_tree,
                               old_remote_tree=info.remote_tree,
                               remote_tree=remote_tree,
                               merge_action=merge_type())
-    if not quiet:
-        show_tree(merged_tree)
+    show_tree(merged_tree)
 
-    if not quiet:
-        print "\nSyncing content..."
+    logger.debug("Syncing content...")
     if should_download:
         info.local_tree = download_tree(merged_tree=merged_tree,
                                         local_tree=local_tree,
                                         client=client,
                                         share_uuid=info.share_uuid,
-                                        path=absolute_path, dry_run=dry_run,
-                                        quiet=quiet)
+                                        path=absolute_path, dry_run=dry_run)
     else:
         info.local_tree = local_tree
     if should_upload:
@@ -189,18 +177,15 @@ def do_sync(client, directory, action, dry_run, quiet):
                                        remote_tree=remote_tree,
                                        client=client,
                                        share_uuid=info.share_uuid,
-                                       path=absolute_path, dry_run=dry_run,
-                                       quiet=quiet)
+                                       path=absolute_path, dry_run=dry_run)
     else:
         info.remote_tree = remote_tree
 
     if not dry_run:
-        if not quiet:
-            print "\nUpdating mirror metadata..."
+        logger.debug("Updating mirror metadata...")
         metadata.write(metadata_dir, info)
 
-    if not quiet:
-        print "\nDone."
+    logger.debug("Done.")
 
 
 def do_list_shares(client):
@@ -213,11 +198,10 @@ def do_list_shares(client):
             status = ""
         name = name.encode("utf-8")
         user = user.encode("utf-8")
-        print "%s  %s (from %s) [%s]%s" % (id, name, user, access, status)
+        logger.debug("%s  %s (from %s) [%s]%s", id, name, user, access, status)
 
 
-def do_diff(client, share_spec, directory, quiet, subtree_path,
-            ignore_symlinks=True):
+def do_diff(client, share_spec, directory, subtree_path, ignore_symlinks=True):
     """Diffs a local directory with the server."""
     if share_spec is not None:
         share_uuid = client.find_volume(share_spec)
@@ -228,36 +212,35 @@ def do_diff(client, share_spec, directory, quiet, subtree_path,
 
     root_uuid, writable = client.get_root_info(share_uuid)
     subtree_uuid = client.resolve_path(share_uuid, root_uuid, subtree_path)
-    local_tree = scan_directory(directory, quiet=True)
+    local_tree = scan_directory(directory)
     remote_tree = client.build_tree(share_uuid, subtree_uuid)
 
     def pre_merge(nodes, name, partial_parent):
-        """Compares nodes and prints differences."""
+        """Compare nodes and show differences."""
         (local_node, remote_node) = nodes
         (parent_display_path, parent_differs) = partial_parent
         display_path = os.path.join(parent_display_path, name.encode("UTF-8"))
         differs = True
         if local_node is None:
-            if not quiet:
-                print "%s missing from client" % display_path
+            logger.debug("%s missing from client", display_path)
         elif remote_node is None:
             if ignore_symlinks and local_node.node_type == SYMLINK:
                 differs = False
-            elif not quiet:
-                print "%s missing from server" % display_path
+            else:
+                logger.debug("%s missing from server", display_path)
         elif local_node.node_type != remote_node.node_type:
             local_type = node_type_str(local_node.node_type)
             remote_type = node_type_str(remote_node.node_type)
-            if not quiet:
-                print ("%s node types differ (client: %s, server: %s)" %
-                       (display_path, local_type, remote_type))
+            logger.debug(
+                "%s node types differ (client: %s, server: %s)",
+                display_path, local_type, remote_type)
         elif (local_node.node_type != DIRECTORY and
                 local_node.content_hash != remote_node.content_hash):
             local_content = local_node.content_hash
             remote_content = remote_node.content_hash
-            if not quiet:
-                print ("%s has different content (client: %s, server: %s)" %
-                       (display_path, local_content, remote_content))
+            logger.debug(
+                "%s has different content (client: %s, server: %s)",
+                display_path, local_content, remote_content)
         else:
             differs = False
         return (display_path, differs)
@@ -271,7 +254,7 @@ def do_diff(client, share_spec, directory, quiet, subtree_path,
                             pre_merge=pre_merge, post_merge=post_merge,
                             partial_parent=("", False), name=u"")
     if differs:
-        raise TreesDiffer(quiet=quiet)
+        raise TreesDiffer()
 
 
 def do_main(argv):
@@ -297,8 +280,6 @@ def do_main(argv):
     parser.add_option("--dry-run", action="store_true", dest="dry_run",
                       default=False, help="Do a dry run without actually "
                                           "making changes")
-    parser.add_option("--quiet", action="store_true", dest="quiet",
-                      default=False, help="Produces less output")
     parser.add_option("--list-shares", action="store_const", dest="mode",
                       const="list-shares", default="sync",
                       help="List available shares")
@@ -383,17 +364,17 @@ def do_main(argv):
             if options.mode == "sync":
                 do_sync(client=client, directory=directory,
                         action=options.action,
-                        dry_run=options.dry_run, quiet=options.quiet)
+                        dry_run=options.dry_run)
             elif options.mode == "init":
                 do_init(client=client, share_spec=share_spec,
                         directory=directory,
-                        quiet=options.quiet, subtree_path=options.subtree)
+                        subtree_path=options.subtree)
             elif options.mode == "list-shares":
                 do_list_shares(client=client)
             elif options.mode == "diff":
                 do_diff(client=client, share_spec=share_spec,
                         directory=directory,
-                        quiet=options.quiet, subtree_path=options.subtree,
+                        subtree_path=options.subtree,
                         ignore_symlinks=False)
         finally:
             client.disconnect()
@@ -422,22 +403,23 @@ def main(*argv):
     try:
         do_main(argv=argv)
     except AuthenticationError as e:
-        print "Authentication failed: %s" % e
+        logger.debug("Authentication failed: %s", e)
     except ConnectionError as e:
-        print "Connection failed: %s" % e
+        logger.debug("Connection failed: %s", e)
     except DirectoryNotInitializedError:
-        print "Directory not initialized; use --init [DIRECTORY] to init it."
+        logger.debug(
+            "Directory not initialized; use --init [DIRECTORY] to init it.")
     except DirectoryAlreadyInitializedError:
-        print "Directory already initialized."
+        logger.debug("Directory already initialized.")
     except NoSuchShareError:
-        print "No matching share found."
+        logger.debug("No matching share found.")
     except ReadOnlyShareError:
-        print "The selected action isn't possible on a read-only share."
+        logger.debug(
+            "The selected action isn't possible on a read-only share.")
     except (ForcedShutdown, KeyboardInterrupt):
-        print "Interrupted!"
+        logger.debug("Interrupted!")
     except TreesDiffer as e:
-        if not e.quiet:
-            print "Trees differ."
+        logger.debug("Trees differ: %s.", e)
     else:
         return 0
     return 1

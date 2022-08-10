@@ -505,8 +505,6 @@ class TestContent(TestContentBase):
                 self.tempfile.close(*a, **k)
 
         self.patch(action_queue, 'NamedTemporaryFile', MyTempFile)
-        # since our temp file is a StringIO, do not remove it for real
-        self.patch(action_queue, 'remove_file', lambda name: None)
         self.patch(self.main.fs, 'open_file', lambda mdid: fobj)
 
         mdid, node_id = yield self._mkfile('hola')

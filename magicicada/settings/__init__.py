@@ -169,8 +169,13 @@ logging.setLoggerClass(MagicicadaLogger)
 APP_NAME = 'filesync'
 ENVIRONMENT_NAME = 'development'
 INSTANCE_ID = 1
+
 LOG_FOLDER = os.path.join(BASE_DIR, 'tmp')
 LOG_FORMAT = '%(asctime)s %(levelname)-8s %(name)s[%(process)d]: %(message)s'
+_LOG_HANDLERS = os.getenv('MAGICICADA_LOG_HANDLERS', 'file').split()
+_LOG_LEVEL = os.getenv('MAGICICADA_LOG_LEVEL', 'INFO')
+if 'trace' in _LOG_HANDLERS:
+    _LOG_LEVEL = 'TRACE'
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -181,23 +186,28 @@ LOGGING = {
     },
     'handlers': {
         'console': {
+            'level': 'TRACE',
             'class': 'logging.StreamHandler',
+            'formatter': 'simple',
         },
         'file': {
-            'level': 'DEBUG',
-            'class': 'logging.FileHandler',
+            'level': 'TRACE',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'encoding': 'utf-8',
             'filename': os.path.join(LOG_FOLDER, 'magicicada.log'),
             'formatter': 'simple',
         },
-        'server': {
+        'trace': {
             'level': 'TRACE',
             'class': 'logging.handlers.TimedRotatingFileHandler',
-            'filename': os.path.join(LOG_FOLDER, 'filesync-server.log'),
+            'encoding': 'utf-8',
+            'filename': os.path.join(LOG_FOLDER, 'magicicada-trace.log'),
             'formatter': 'simple',
         },
         'metrics': {
             'level': 'TRACE',
             'class': 'logging.handlers.TimedRotatingFileHandler',
+            'encoding': 'utf-8',
             'filename': os.path.join(LOG_FOLDER, 'metrics.log'),
             'formatter': 'simple',
         },
@@ -205,21 +215,44 @@ LOGGING = {
     'loggers': {
         'django': {
             'handlers': ['file'],
-            'level': os.getenv('MAGICICADA_LOG_LEVEL', 'INFO'),
+            'level': 'INFO',
             'propagate': True,
         },
-        'magicicada.server': {
-            'handlers': ['server'],
-            'level': os.getenv('MAGICICADA_LOG_LEVEL', 'DEBUG'),
+        'pyinotify': {
+            'handlers': ['file'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        'magicicada': {
+            'handlers': _LOG_HANDLERS,
+            'level': _LOG_LEVEL,
             'propagate': False,
         },
         'magicicada.metrics': {
             'handlers': ['metrics'],
-            'level': 'DEBUG',
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'magicicadaclient': {
+            'handlers': _LOG_HANDLERS,
+            'level': _LOG_LEVEL,
+            'propagate': False,
+        },
+        'magicicadaprotocol': {
+            'handlers': _LOG_HANDLERS,
+            'level': _LOG_LEVEL,
+            'propagate': False,
+        },
+        # This requires hooking up the PythonLoggingObserver, which we do in
+        # the testlib helper to get Twisted's logs when running the suite
+        'twisted': {
+            'handlers': _LOG_HANDLERS,
+            'level': 'INFO',
             'propagate': False,
         },
     },
 }
+
 PUBLIC_URL_PREFIX = 'http://some_url'
 ROOT_USERVOLUME_NAME = 'Magicicada'
 ROOT_USERVOLUME_PATH = '~/' + ROOT_USERVOLUME_NAME

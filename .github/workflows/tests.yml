@@ -27,4 +27,8 @@ jobs:
         sudo apt install make
         make bootstrap
     - name: Run Tests
+      env:
+        MAGICICADA_DEBUG: 1
+        MAGICICADA_LOG_LEVEL: TRACE
+        MAGICICADA_LOG_HANDLERS: trace
       run: make test

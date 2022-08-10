@@ -26,11 +26,9 @@ import uuid
 import zlib
 
 from cStringIO import StringIO
-from logging.handlers import RotatingFileHandler
 from Queue import Queue
 from threading import Lock
 
-from dirspec.basedir import xdg_cache_home
 from magicicadaprotocol import request, volumes
 from magicicadaprotocol.content_hash import crc32
 from magicicadaprotocol.context import get_ssl_context
@@ -45,13 +43,7 @@ from magicicada.u1sync.genericmerge import MergeNode
 from magicicada.u1sync.utils import should_sync
 
 
-u1sync_log_dir = os.path.join(xdg_cache_home, 'u1sync', 'log')
-LOGFILENAME = os.path.join(u1sync_log_dir, 'u1sync.log')
-if not os.path.exists(u1sync_log_dir):
-    os.makedirs(u1sync_log_dir)
-u1_logger = logging.getLogger("u1sync.timing.log")
-handler = RotatingFileHandler(LOGFILENAME)
-u1_logger.addHandler(handler)
+timing_logger = logging.getLogger(__name__ + '.timing')
 
 
 def share_str(share_uuid):
@@ -64,8 +56,8 @@ def log_timing(func):
         start = time.time()
         ent = func(*arg, **kwargs)
         stop = time.time()
-        u1_logger.debug('for %s %0.5f ms elapsed',
-                        func.func_name, stop-start * 1000.0)
+        timing_logger.debug(
+            'for %s %0.5f ms elapsed', func.__name__, stop-start * 1000.0)
         return ent
     return wrapper
 

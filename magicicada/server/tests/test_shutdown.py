@@ -73,7 +73,8 @@ class TestShutdown(TwistedTestCase, BaseTestCase):
         d = defer.Deferred()
         f = TestClientFactory()
         f.connected = d.callback
-        reactor.connectTCP("localhost", service.port, f)
+        connector = reactor.connectTCP("localhost", service.port, f)
+        self.addCleanup(connector.disconnect)
         client = yield d
         # auth, get root, create a file
         service.factory.auth_provider._allowed["open sesame"] = self.usr0.id

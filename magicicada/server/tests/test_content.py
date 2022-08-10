@@ -55,7 +55,6 @@ from magicicada.server.content import (
 )
 from magicicada.server.testing.testcase import (
     BufferedConsumer,
-    FactoryHelper,
     TestWithDatabase,
 )
 
@@ -1205,16 +1204,6 @@ class TestPutContent(TestWithDatabase):
         self.assertTrue(pc.finished)
 
     @defer.inlineCallbacks
-    def _get_client_helper(self, auth_token):
-        """Simplify the testing code by getting a client for the user."""
-        connect_d = defer.Deferred()
-        factory = FactoryHelper(connect_d.callback, caps=server.PREFERRED_CAP)
-        connector = reactor.connectTCP("localhost", self.port, factory)
-        client = yield connect_d
-        yield client.dummy_authenticate(auth_token)
-        defer.returnValue((client, connector))
-
-    @defer.inlineCallbacks
     def test_putcontent_reuse_content_different_user_no_magic(self):
         """Different user with no magic hash: upload everything again."""
         data = os.urandom(30000)
@@ -1655,11 +1644,7 @@ class TestMultipartPutContent(TestWithDatabase):
         deflated_size = len(deflated_data)
 
         # setup
-        connect_d = defer.Deferred()
-        factory = FactoryHelper(connect_d.callback, caps=server.PREFERRED_CAP)
-        connector = reactor.connectTCP("localhost", self.port, factory)
-        client = yield connect_d
-        yield client.dummy_authenticate("open sesame")
+        (client, _) = yield self._get_client_helper("open sesame")
 
         # hook to test stats
         meter = []
@@ -1692,32 +1677,21 @@ class TestMultipartPutContent(TestWithDatabase):
         filename = 'hola_12'
         mkfile_req = yield client.make_file(request.ROOT, root, filename)
         upload_info = []
-        try:
-            yield client.put_content(
-                request.ROOT, mkfile_req.new_id, NO_CONTENT_HASH,
-                hash_value, crc32_value, size, deflated_size,
-                StringIO(deflated_data),
-                upload_id_cb=lambda *a: upload_info.append(a))
-        except EOFError:
-            # check upload stat and log, with the offset sent,
-            # first time tarts from beginning.
-            self.assertTrue(('UploadJob.upload', 0) in gauge)
-            self.assertTrue(('UploadJob.upload.begin', 1) in meter)
-            self.handler.assert_debug("UploadJob begin content from offset 0")
-        else:
-            self.fail("Should raise EOFError.")
-        yield client.kill()
-        yield connector.disconnect()
+        d = client.put_content(
+            request.ROOT, mkfile_req.new_id, NO_CONTENT_HASH,
+            hash_value, crc32_value, size, deflated_size,
+            StringIO(deflated_data),
+            upload_id_cb=lambda *a: upload_info.append(a),
+        )
+        yield self.assertFailure(d, EOFError)
 
-        # restore the BytesMessageProducer.go method
-        self.patch(sp_client.BytesMessageProducer, 'go', orig_go)
+        # check upload stat and log, with the offset sent
+        self.assertTrue(('UploadJob.upload', 0) in gauge)
+        self.assertTrue(('UploadJob.upload.begin', 1) in meter)
+        self.handler.assert_debug("UploadJob begin content from offset 0")
 
         # connect a new client and try to upload again
-        connect_d = defer.Deferred()
-        factory = FactoryHelper(connect_d.callback, caps=server.PREFERRED_CAP)
-        connector = reactor.connectTCP("localhost", self.port, factory)
-        client = yield connect_d
-        yield client.dummy_authenticate("open sesame")
+        (client, _) = yield self._get_client_helper("open sesame")
 
         # restore patched client
         self.patch(sp_client.BytesMessageProducer, 'go', orig_go)
@@ -1757,9 +1731,6 @@ class TestMultipartPutContent(TestWithDatabase):
         self.assertTrue(('UploadJob.upload', offset_sent) in gauge)
         self.handler.assert_debug(
             "UploadJob begin content from offset %d" % offset_sent)
-
-        yield client.kill()
-        yield connector.disconnect()
 
     @defer.inlineCallbacks
     def test_resume_putcontent_invalid_upload_id(self):

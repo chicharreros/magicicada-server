@@ -17,8 +17,9 @@
 
 from __future__ import with_statement
 
-import os
 import hashlib
+import logging
+import os
 import shutil
 
 from errno import ENOTDIR, EINVAL
@@ -29,13 +30,14 @@ from magicicada.u1sync.genericmerge import MergeNode
 from magicicada.u1sync.utils import should_sync
 
 
+logger = logging.getLogger(__name__)
 EMPTY_HASH = "sha1:%s" % hashlib.sha1().hexdigest()
 
 
-def scan_directory(path, display_path="", quiet=False):
+def scan_directory(path, display_path=""):
     """Scans a local directory and builds an in-memory tree from it."""
-    if display_path != "" and not quiet:
-        print display_path
+    if display_path != "":
+        logger.debug(display_path.decode('utf-8'))
 
     link_target = None
     child_names = None
@@ -63,7 +65,7 @@ def scan_directory(path, display_path="", quiet=False):
         child_paths = [(os.path.join(path, child_name),
                         os.path.join(display_path, child_name))
                        for child_name in child_names]
-        children = [scan_directory(child_path, child_display_path, quiet)
+        children = [scan_directory(child_path, child_display_path)
                     for (child_path, child_display_path) in child_paths]
         unicode_child_names = [n.decode("utf-8") for n in child_names]
         children = dict(zip(unicode_child_names, children))
