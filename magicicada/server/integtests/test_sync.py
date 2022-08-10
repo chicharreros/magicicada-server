@@ -1885,6 +1885,11 @@ class TestStupendous(TestServerBase):
         yield self.get_client()
         amount = 10
         if os.getenv('CI', None) is not None:
+            print('===== GITHUB_EVENT_NAME', os.getenv('GITHUB_EVENT_NAME'))
+            print('===== GITHUB_HEAD_REF', os.getenv('GITHUB_HEAD_REF'))
+            print('===== GITHUB_REF', os.getenv('GITHUB_REF'))
+            print('===== GITHUB_REF_NAME', os.getenv('GITHUB_REF_NAME'))
+            print('===== GITHUB_REF_TYPE', os.getenv('GITHUB_REF_TYPE'))
             amount = 0x600
         logger.info('TestStupendous, creating %s amount of files.' % amount)
         for i in range(amount):

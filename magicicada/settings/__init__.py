@@ -215,12 +215,12 @@ LOGGING = {
     'loggers': {
         'django': {
             'handlers': ['file'],
-            'level': _LOG_LEVEL,
+            'level': 'INFO',
             'propagate': True,
         },
         'pyinotify': {
             'handlers': ['file'],
-            'level': _LOG_LEVEL,
+            'level': 'INFO',
             'propagate': True,
         },
         'magicicada': {
@@ -247,7 +247,7 @@ LOGGING = {
         # the testlib helper to get Twisted's logs when running the suite
         'twisted': {
             'handlers': _LOG_HANDLERS,
-            'level': _LOG_LEVEL,
+            'level': 'INFO',
             'propagate': False,
         },
     },
