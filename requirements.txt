@@ -1,7 +1,6 @@
 configglue==1.1.3
 Cython==0.29.28
 Django==1.11.29
-dirspec @ https://launchpad.net/dirspec/stable-13-10/13.10/+download/dirspec-13.10.tar.gz
 magicicadaprotocol==2.0
 pyOpenSSL==21.0.0
 protobuf==3.17.3
