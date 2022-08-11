@@ -272,8 +272,4 @@ def test_with_trial(options, topdir, testdirs, testpaths):
         debug=options.debug)
     result = runner.run_tests(test_labels=(topdir, testdirs, testpaths))
     failed = not result.wasSuccessful()
-    if failed and os.getenv('CI'):
-        with open(settings.LOGGING['handlers']['trace']['filename']) as f:
-            print(f.read())
-
     return failed

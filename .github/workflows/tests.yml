@@ -32,3 +32,11 @@ jobs:
         MAGICICADA_LOG_LEVEL: TRACE
         MAGICICADA_LOG_HANDLERS: trace
       run: make test
+    - name: Upload trace logs as artifact on failure
+      uses: actions/upload-artifact@v3
+      with:
+        name: magicicada-tmp-logs
+        path: |
+            tmp/
+            !tmp/filestorage/
+      if: failure()
