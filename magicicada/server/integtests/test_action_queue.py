@@ -169,7 +169,7 @@ class TestMeta(TestBase):
         yield wait_for_queue_done
         self.assertInListenerEvents(
             'AQ_MOVE_OK',
-            {'share_id': aShareUUID, 'node_id': anUUID, 'new_generation': 3L})
+            {'share_id': aShareUUID, 'node_id': anUUID, 'new_generation': 3})
 
     @defer.inlineCallbacks
     def test_node_is_with_queued_move__move(self):
@@ -432,10 +432,9 @@ class TestContent(TestContentBase):
     @defer.inlineCallbacks
     def test_upload_several(self):
         """Test we can upload several stuff."""
-        dl = []
 
         @defer.inlineCallbacks
-        def _check(node_data, signal_d, hash_value, data):
+        def _check(node_data, hash_value, data):
             """Check the upload was ok."""
             mdid, node_id = node_data
 
@@ -447,17 +446,11 @@ class TestContent(TestContentBase):
             yield self.wait_for_nirvana()
             self.assertEqual(buf.getvalue(), data)
 
-            # it's ok, we're happy
-            signal_d.callback(None)
-
         for i in range(8):
             filename = 'hola_%d' % i
-            signal_d = defer.Deferred()
-            dl.append(signal_d)
             hash_value, _, data, d = self._mk_file_w_content(filename)
-            d.addCallback(_check, signal_d, hash_value, data)
-
-        yield defer.DeferredList(dl, fireOnOneErrback=True, consumeErrors=True)
+            node_data = yield d
+            yield _check(node_data, hash_value, data)
 
     @defer.inlineCallbacks
     def test_uploading(self):
@@ -596,6 +589,7 @@ class TestContent(TestContentBase):
         Try downloading stuff from the server, halting the connection
         in the middle: download should continue from where it left off.
         """
+        self.addCleanup(self.main.event_q.push, 'SYS_USER_DISCONNECT')
         outer_self = self
 
         class Foo(object):
@@ -624,9 +618,7 @@ class TestContent(TestContentBase):
         self.patch(self.main.fs, 'get_partial_for_writing', lambda s, n: buf)
         yield self.aq.download(request.ROOT, node_id, hash_value, mdid)
         yield self.main.wait_for_nirvana(.1)
-        if data != buf.getvalue():
-            raise Exception('data does not match')
-        self.main.event_q.push('SYS_USER_DISCONNECT')
+        self.assertEqual(buf.getvalue(), data)
 
 
 class TestShares(TestBase):
@@ -885,7 +877,8 @@ class TestMulticon(TestWithDatabase):
             """Disconnect the client before the calling original method."""
             self.main.action_q.disconnect()
             return query_caps(s, c)
-        StorageClient.query_caps = my_query_caps
+
+        self.patch(StorageClient, 'query_caps', my_query_caps)
         self.state.connection.handshake_timeout = 10
         self.connect()
         d = self.main.wait_for('SYS_CONNECTION_LOST')

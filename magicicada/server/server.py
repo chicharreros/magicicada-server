@@ -741,12 +741,12 @@ class StorageServerRequestResponse(BaseRequestResponse):
             if self.start_time is not None:
                 delta = time.time() - self.start_time
                 self.protocol.factory.metrics.timing(
-                    '%s.request_error' % (class_name,), delta)
+                    '%s.request_error' % class_name, delta)
                 self.protocol.factory.metrics.timing('request_error', delta)
 
             transferred = getattr(self, 'transferred', None)
             if transferred is not None:
-                msg = '%s.transferred' % (class_name,)
+                msg = '%s.transferred' % class_name
                 self.protocol.factory.metrics.gauge(msg, transferred)
 
     def done(self, _=None):
@@ -927,26 +927,28 @@ class SimpleRequestResponse(StorageServerRequestResponse):
             self.sendError(protocol_error, comment=comment,
                            free_space_info=free_space_info)
             return  # the error has been consumed
-        elif error in self.protocol_errors:
+
+        if error in self.protocol_errors:
             # an error we expect and can convert to a protocol error
             protocol_error = self.protocol_errors[error]
             self.sendError(protocol_error, comment=comment)
             return  # the error has been consumed
-        elif (error == errors.StorageServerError and
+
+        if (error == errors.StorageServerError and
                 not failure.check(errors.InternalError)):
             # an error which corresponds directly to a protocol error
             self.sendError(failure.value.errno, comment=comment)
             return  # the error has been consumed
-        elif error == dataerror.LockedUserError:
+
+        if error == dataerror.LockedUserError:
             self.log.warning('Shutting down protocol: user locked')
             if not self.protocol.shutting_down:
                 self.protocol.shutdown()
             return  # the error has been consumed
-        else:
-            # an unexpected or unconvertable error
-            self.sendError(protocol_pb2.Error.INTERNAL_ERROR,
-                           comment=comment)
-            return failure  # propagate the error
+
+        # an unexpected or unconvertable error
+        self.sendError(protocol_pb2.Error.INTERNAL_ERROR, comment=comment)
+        return failure  # propagate the error
 
     def internal_error(self, failure):
         """Handle a failure that caused an INTERNAL_ERROR."""
@@ -1475,11 +1477,10 @@ class GetContentResponse(SimpleRequestResponse):
                 self.log.warning(msg, failure)
             return  # the error has been consumed
 
-        else:
-            # handle all the TRY_AGAIN cases
-            if failure.check(error.ConnectionLost):
-                failure = Failure(errors.TryAgain(failure.value))
-            return SimpleRequestResponse._send_protocol_error(self, failure)
+        # handle all the TRY_AGAIN cases
+        if failure.check(error.ConnectionLost):
+            failure = Failure(errors.TryAgain(failure.value))
+        return super(GetContentResponse, self)._send_protocol_error(failure)
 
     def _start(self):
         """Get node content and send it."""
@@ -2388,7 +2389,8 @@ class StorageServerFactory(Factory):
             msg = failure.getTraceback()
 
         # log
-        logger.error('Unhandled error in deferred! %s', msg)
+        logger.error(
+            'Unhandled error in deferred! %s\nGot data:\n%r', msg, data)
 
     def event_callback_handler(self, func):
         """Wrap the event callback in an error handler."""

@@ -275,13 +275,25 @@ class FakeNetworkManager(dbus.service.Object):
                               dbus.bus.NAME_FLAG_ALLOW_REPLACEMENT)
         self.busName = dbus.service.BusName('org.freedesktop.NetworkManager',
                                             bus=self.bus)
-        dbus.service.Object.__init__(self, bus_name=self.busName,
-                                     object_path=self.path)
+        super(FakeNetworkManager, self).__init__(
+            self.busName, object_path=self.path)
 
     def shutdown(self):
         """Shutdown the fake NetworkManager."""
         self.busName.get_bus().release_name(self.busName.get_name())
         self.remove_from_connection()
+
+    @dbus.service.signal('org.freedesktop.NetworkManager', signature='i')
+    def StateChanged(self, state):
+        """Fire DBus signal StatusChanged."""
+
+    def emit_connected(self):
+        """Emits the signal StateChanged(3)."""
+        self.StateChanged(70)
+
+    def emit_disconnected(self):
+        """Emits the signal StateChanged(4)."""
+        self.StateChanged(20)
 
     @dbus.service.method(dbus.PROPERTIES_IFACE,
                          in_signature='ss', out_signature='v',
@@ -292,6 +304,11 @@ class FakeNetworkManager(dbus.service.Object):
             reply_handler(getattr(self, propname, None))
         except Exception as e:
             error_handler(e)
+
+    @dbus.service.method('org.freedesktop.NetworkManager')
+    def state(self):
+        """Fake the state."""
+        return 70
 
 
 class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
@@ -450,18 +467,10 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
 
     def nuke_client_method(self, method_name, callback,
                            method_retval_cb=defer.Deferred):
-        """
-        Nuke the client method, call the callback, and de-nuke it
-        """
-        old_method = getattr(self.aq.client, method_name)
-        setattr(self.aq.client, method_name,
-                lambda *_, **__: method_retval_cb())
-        try:
-            retval = callback()
-        finally:
-            if self.aq.client is not None:
-                setattr(self.aq.client, method_name, old_method)
-        return retval
+        """Nuke the client method, call the callback, and de-nuke it."""
+        self.patch(
+            self.aq.client, method_name, lambda *_, **__: method_retval_cb())
+        return callback()
 
     def wait_for(self, *waiting_events, **waiting_kwargs):
         """defer until event appears"""

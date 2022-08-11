@@ -152,9 +152,7 @@ class TestClientCapabilities(TestWithDatabase):
     @defer.inlineCallbacks
     @failure_expected("The server doesn't have the requested capabilities")
     def test_query_bad_capabilities(self):
-        """Test how the client hanlde trying to set capabilities that the
-        server don't have.
-        """
+        """The client supports setting capabilities missing in the server."""
         syncdaemon.REQUIRED_CAPS = frozenset(['foo'])
         needed_event = self.wait_for('SYS_SET_CAPABILITIES_ERROR')
         yield self.connect()
