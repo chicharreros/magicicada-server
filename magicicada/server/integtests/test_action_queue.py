@@ -41,7 +41,7 @@ from twisted.internet import defer, reactor
 from magicicada.server.testing.aq_helpers import (
     FakeFailure,
     NO_CONTENT_HASH,
-    NoCloseStringIO,
+    NoCloseCustomIO,
     TestBase,
     TestContentBase,
     TestWithDatabase,
@@ -415,7 +415,7 @@ class TestContent(TestContentBase):
     @defer.inlineCallbacks
     def test_upload(self):
         """Test we can upload stuff."""
-        buf = NoCloseStringIO()
+        buf = NoCloseCustomIO()
         self.patch(self.main.fs, 'get_partial_for_writing', lambda s, n: buf)
 
         hash_value, _, data, d = self._mk_file_w_content()
@@ -440,7 +440,7 @@ class TestContent(TestContentBase):
             mdid, node_id = node_data
 
             # download it
-            buf = NoCloseStringIO()
+            buf = NoCloseCustomIO()
             self.patch(self.main.fs, 'get_partial_for_writing',
                        lambda s, n: buf)
             yield self.aq.download(request.ROOT, node_id, hash_value, mdid)
@@ -599,12 +599,12 @@ class TestContent(TestContentBase):
         outer_self = self
 
         class Foo(object):
-            """A proxy for NoCloseStringIO.
+            """A proxy for NoCloseCustomIO.
 
             Disconnects the network after the second write.
             """
             def __init__(self):
-                self.buf = NoCloseStringIO()
+                self.buf = NoCloseCustomIO()
                 self.writes = 0
 
             def write(self, data):

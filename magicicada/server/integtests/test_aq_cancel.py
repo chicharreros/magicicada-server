@@ -30,7 +30,7 @@ from twisted.internet import defer, error
 from magicicada.server.testing.aq_helpers import (
     NO_CONTENT_HASH,
     FakeGetContent,
-    NoCloseStringIO,
+    NoCloseCustomIO,
     TestContentBase,
     aShareUUID,
     anEmptyShareList,
@@ -196,12 +196,12 @@ class TestCancel(AQCancelTestBase):
         """Test we can cancel content transfers."""
         aq = self.aq
 
-        class MyFile(NoCloseStringIO):
-            """A NoCloseStringIO that cancels on the first call to write"""
+        class MyFile(NoCloseCustomIO):
+            """A NoCloseCustomIO that cancels on the first call to write"""
             def write(self, data):
                 """Cancel the request, and then go on and write."""
                 aq.cancel_download(request.ROOT, self.file_id)
-                NoCloseStringIO.write(self, data)
+                NoCloseCustomIO.write(self, data)
 
         hash_v, crc32_v, data, d = self._mk_file_w_content(data_len=1024 * 256)
         myfile = MyFile()
