@@ -266,7 +266,7 @@ class StorageServer(request.RequestHandler):
 
     def __init__(self, session_id=None):
         """Create a network server. The factory does this."""
-        super(StorageServer, self).__init__()
+        request.RequestHandler.__init__(self)
         self.user = None
         self.factory = None
         self.session_id = session_id or uuid.uuid4()
@@ -369,7 +369,7 @@ class StorageServer(request.RequestHandler):
 
     def connectionMade(self):
         """Called when a connection is made."""
-        super(StorageServer, self).connectionMade()
+        request.RequestHandler.connectionMade(self)
         self.factory.protocols.append(self)
         self.log.info('Connection Made')
         msg = '%d %s.\r\n' % (self.PROTOCOL_VERSION, FILESYNC_STATUS_MSG)
@@ -433,7 +433,7 @@ class StorageServer(request.RequestHandler):
                                 protocol_pb2.Message.PONG):
             self.ping_loop.reset()
         try:
-            result = super(StorageServer, self).processMessage(message)
+            result = request.RequestHandler.processMessage(self, message)
         except Exception as e:
             self._log_error(e, self.processMessage, exc_info=sys.exc_info())
             return
@@ -732,7 +732,7 @@ class StorageServerRequestResponse(BaseRequestResponse):
                 failure = Failure(failure)
             self.log.error('Request error',
                            exc_info=(failure.type, failure.value, None))
-            super(BaseRequestResponse, self).error(failure)
+            request.RequestResponse.error(self, failure)
         except Exception as e:
             msg = 'error() crashed when processing %s: %s'
             self.log.error(msg, failure, e, exc_info=sys.exc_info())
@@ -759,7 +759,7 @@ class StorageServerRequestResponse(BaseRequestResponse):
                 self.log.info('Request done')
             else:
                 self.log.info('Request done: %s', self.operation_data)
-            super(BaseRequestResponse, self).done()
+            request.RequestResponse.done(self)
         except Exception as e:
             self.error(Failure(e))
         else:
@@ -793,7 +793,7 @@ class StorageServerRequestResponse(BaseRequestResponse):
     def sendMessage(self, message):
         """Send a message and trace it."""
         self.log.trace_message('OUT: ', message)
-        super(BaseRequestResponse, self).sendMessage(message)
+        request.RequestResponse.sendMessage(self, message)
 
     def _processMessage(self, message):
         """Locally overridable part of processMessage."""
@@ -1618,7 +1618,7 @@ class PutContentResponse(SimpleRequestResponse):
             self.log.warning('%s: called done() finished=%s',
                              call_chain, self.finished)
         else:
-            super(PutContentResponse, self).done()
+            SimpleRequestResponse.done(self)
 
     def _get_node_info(self):
         """Return node info from the message."""
@@ -2621,7 +2621,7 @@ class StorageServerService(OrderedMultiService):
         @param port: the port to listen on without ssl.
         @param auth_provider_class: the authentication provider.
         """
-        super(StorageServerService, self).__init__()
+        OrderedMultiService.__init__(self)
         self.heartbeat_writer = None
         if heartbeat_interval is None:
             heartbeat_interval = float(settings.HEARTBEAT_INTERVAL)
@@ -2673,7 +2673,7 @@ class StorageServerService(OrderedMultiService):
     def startService(self):
         """Start listening on two ports."""
         logger.info('- - - - - SERVER STARTING')
-        yield super(StorageServerService, self).startService()
+        yield OrderedMultiService.startService(self)
         yield defer.maybeDeferred(self.start_rpc_dal)
         self.factory.content.rpc_dal = self.rpc_dal
         self.factory.rpc_dal = self.rpc_dal
@@ -2691,7 +2691,7 @@ class StorageServerService(OrderedMultiService):
     def stopService(self):
         """Stop listening on both ports."""
         logger.info('- - - - - SERVER STOPPING')
-        yield super(StorageServerService, self).stopService()
+        yield OrderedMultiService.stopService(self)
         yield self.factory.wait_for_shutdown()
         self.metrics.meter('server_stop')
         self.metrics.decrement('services_active')

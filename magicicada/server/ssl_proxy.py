@@ -128,7 +128,7 @@ class SSLProxyFactory(portforward.ProxyFactory):
 
     def __init__(self, listen_port, remote_host, remote_port,
                  server_name='ssl-proxy'):
-        super(SSLProxyFactory, self).__init__(remote_host, remote_port)
+        portforward.ProxyFactory.__init__(self, remote_host, remote_port)
         self.listen_port = listen_port
         self.server_name = server_name
         self.metrics = None
@@ -227,7 +227,7 @@ class ProxyService(MultiService):
         @param dest_port: destination port.
         @param server_name: name of this server.
         """
-        super(ProxyService, self).__init__()
+        MultiService.__init__(self)
         self.heartbeat_writer = None
         if server_name is None:
             server_name = "anonymous_instance"
@@ -305,7 +305,7 @@ class _Status(resource.Resource):
 
     def __init__(self, service):
         """Create the Resource."""
-        super(_Status, self).__init__()
+        resource.Resource.__init__(self)
         self.service = service
 
     def render_GET(self, request):
