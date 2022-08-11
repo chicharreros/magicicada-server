@@ -75,7 +75,7 @@ def show_time():
     return "%s,%s" % (p1, p2)
 
 
-class NoCloseStringIO(StringIO):
+class NoCloseCustomIO(StringIO):
     """a stringio subclass that doesnt destroy content on close."""
     def close(self):
         """do nothing"""
@@ -647,7 +647,7 @@ class TestContentBase(TestBase):
         hash_value = hash_object.content_hash()
         crc32_value = crc32(data)
         size = len(data)
-        return NoCloseStringIO(data), data, hash_value, crc32_value, size
+        return NoCloseCustomIO(data), data, hash_value, crc32_value, size
 
     def _mk_file_w_content(self, filename='hola', data_len=1000):
         """Make a file and dump some content in it."""
