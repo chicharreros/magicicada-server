@@ -88,8 +88,6 @@ def filter_symlinks(root, listdir):
 class TestSync(TestWithDatabase):
     """Basic test setup"""
 
-    _ignore_cancelled_downloads = True
-
     def no_op(self):
         """Do nothing."""
 
@@ -691,7 +689,6 @@ class TestServerBase(TestSync):
                    client_name='client'):
         """Return a deferred that will succeed with a connected client."""
         d = defer.Deferred()
-        self.clients = []
         factory = ClientFactory(d)
         reactor.connectTCP("localhost", self.port, factory)
         client = yield d
@@ -699,7 +696,6 @@ class TestServerBase(TestSync):
 
         # connected!
         setattr(self, client_name, client)
-        self.clients.append(client)
         yield client.set_caps(REQUIRED_CAPS)
         auth_info = self.access_tokens[username]
         yield client.simple_authenticate(auth_info['username'],
@@ -740,12 +736,12 @@ class TestServerBase(TestSync):
                 if match(name):
                     os.remove(os.path.join(root, name))
 
-    def get_put_content_data(self):
-        """Returns the test data for put_content."""
+    def get_put_content_data(self, data=''):
+        """Return the test data for put_content."""
         ho = content_hash_factory()
         hash_value = ho.content_hash()
-        crc32_value = crc32("")
-        deflated_content = zlib.compress("")
+        crc32_value = crc32(data)
+        deflated_content = zlib.compress(data)
         deflated_size = len(deflated_content)
         return hash_value, crc32_value, deflated_size, deflated_content
 
@@ -1213,7 +1209,7 @@ class TestTimings(TestServerBase):
         # check that everything is ok
         files = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
         self.assertEqual(files, ["test_file"])
-        with open(self.root_dir + "/test_file") as f:
+        with open(filepath) as f:
             content = f.read()
         self.assertEqual(content, ":)")
         yield self.compare_server()
@@ -1905,17 +1901,17 @@ class TestMoveWhileInProgress(TestServerBase):
     def test_local_move_file_while_uploading(self):
         """Local change after server change waiting for upload."""
         data_conflict = os.urandom(1000000)
-        wait_for_hash = self.wait_for("HQ_HASH_NEW")
+        filepath = self.root_dir + "/test_file"
+        wait_for_hash = self.wait_for("HQ_HASH_NEW", path=filepath)
 
         # do the local change
-        f = open(self.root_dir + "/test_file", "w")
+        f = open(filepath, "w")
         f.write(data_conflict)
         f.close()
         yield wait_for_hash
 
         # do the rename
-        os.rename(self.root_dir + "/test_file",
-                  self.root_dir + "/test_file_new")
+        os.rename(filepath, filepath + '_new')
 
         yield self.main.wait_for_nirvana(0.5)
         yield self.clean_partials_and_conflicts()
@@ -2042,17 +2038,16 @@ class TestMoveWhileInProgress(TestServerBase):
     def test_local_move_file_while_uploading_no_wait(self):
         """Local change after server change waiting for upload no wait."""
         data_conflict = os.urandom(10000000)
+        filepath = self.root_dir + "/test_file"
 
-        d = self.wait_for("HQ_HASH_NEW")
-        f = open(self.root_dir + "/test_file", "w")
+        f = open(filepath, "wb")
         f.write(data_conflict)
         f.close()
-        yield d
 
-        os.rename(self.root_dir + "/test_file",
-                  self.root_dir + "/test_file_new")
+        # do the rename
+        os.rename(filepath, filepath + '_new')
+
         yield self.main.wait_for_nirvana(last_event_interval=0.5)
-        yield self.clean_partials_and_conflicts()
         yield self.check()
 
 

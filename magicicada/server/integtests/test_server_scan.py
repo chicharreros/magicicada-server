@@ -47,8 +47,9 @@ class TestServerScan(TestServerBase):
         # data for putcontent
         ho = content_hash_factory()
         hash_value = ho.content_hash()
-        crc32_value = crc32("")
-        deflated_content = zlib.compress("")
+        data = ''
+        crc32_value = crc32(data)
+        deflated_content = zlib.compress(data)
         deflated_size = len(deflated_content)
 
         mk = yield self.client.make_file(request.ROOT, self.root_id,

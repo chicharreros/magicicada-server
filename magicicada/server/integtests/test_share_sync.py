@@ -97,10 +97,7 @@ class TestSharesSync(test_sync.TestSync):
             out = StringIO()
             subprocess.call(["rsync", "-nric", self.jane_share_dir,
                              self.source_dir], stdout=out)
-            if not out.getvalue():
-                return True
-            else:
-                return False
+            return not out.getvalue()
         return test_sync.deferToThread(_compare)
 
     def upload_server(self):

@@ -44,6 +44,7 @@ class AQCancelTestBase(TestContentBase):
     def setUp(self):
         """Set up."""
         self.connlost_deferred = defer.Deferred()
+        self.connlost_deferred.addErrback(self.ensure_connection_lost)
         return super(AQCancelTestBase, self).setUp()
 
     def tearDown(self):
@@ -51,6 +52,10 @@ class AQCancelTestBase(TestContentBase):
         self.eq.push('SYS_NET_DISCONNECTED')
         self.eq.push('SYS_USER_DISCONNECT')
         return super(AQCancelTestBase, self).tearDown()
+
+    def ensure_connection_lost(self, failure):
+        if not failure.check(error.ConnectionLost):
+            return failure
 
     def hiccup(self):
         """Hiccup the network."""

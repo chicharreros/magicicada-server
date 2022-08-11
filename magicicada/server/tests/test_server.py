@@ -195,7 +195,7 @@ class BaseStorageServerTestCase(BaseTestCase, TwistedTestCase):
     @property
     def msg(self):
         """A per-test message to raise exceptions."""
-        return 'Some message for a failure while executing %s.' % self
+        return 'Some message for a failure while executing %s.' % self.id()
 
     def assert_correct_comment(self, comment, msg):
         """Ckeck that error sent had `msg' as comment."""
@@ -660,6 +660,7 @@ class StorageServerRequestResponseTestCase(BaseStorageServerTestCase):
 class SSRequestResponseSpecificTestCase(StorageServerRequestResponseTestCase):
     """Test the StorageServerRequestResponse class, not all inherited ones."""
 
+    @defer.inlineCallbacks
     def test_done_user_activity_yes(self):
         """Report the request's user activity string."""
         # put a user_activity in the class
@@ -676,8 +677,11 @@ class SSRequestResponseSpecificTestCase(StorageServerRequestResponseTestCase):
 
         # execute and test
         self.response.done()
+        yield self.response.deferred
+
         self.assertEqual(informed, ['test-activity', '42'])
 
+    @defer.inlineCallbacks
     def test_done_user_activity_no_activity(self):
         """Don't report the request's user activity, as there is no string."""
         # assure there's no activity
@@ -690,8 +694,10 @@ class SSRequestResponseSpecificTestCase(StorageServerRequestResponseTestCase):
 
         # execute and test
         self.response.done()
+        yield self.response.deferred
         self.assertEqual(informed, [])
 
+    @defer.inlineCallbacks
     def test_done_user_activity_no_user_name(self):
         """Report the request's user activity, but still no user."""
         # put a user_activity in the class
@@ -708,6 +714,7 @@ class SSRequestResponseSpecificTestCase(StorageServerRequestResponseTestCase):
 
         # execute and test
         self.response.done()
+        yield self.response.deferred
         self.assertEqual(informed, ['test-activity', ''])
 
     def test_get_extension_valids(self):
@@ -821,7 +828,7 @@ class SimpleRequestResponseTestCase(StorageServerRequestResponseTestCase):
 
     def test_send_protocol_error_try_again_is_metered(self):
         """_send_protocol_error sends metrics on TryAgain errors."""
-        mock_metrics = mock.Mock(metrics.FileBasedMeter)
+        mock_metrics = mock.Mock(name='metrics')
         self.patch(self.response.protocol.factory, 'metrics', mock_metrics)
 
         failure = Failure(errors.TryAgain(ValueError(self.msg)))
@@ -867,11 +874,15 @@ class SimpleRequestResponseTestCase(StorageServerRequestResponseTestCase):
         self.response._start()
         self.assert_comment_present(self.response.auth_required_error)
 
+    @defer.inlineCallbacks
     def test_done_never_fails_if_inner_done_fails(self):
         """_start never fails even if done() fails."""
         failure = Exception(self.msg)
         self.patch(request.RequestResponse, 'done', self.fail_please(failure))
+
         self.response.done()
+        yield self.assertFailure(self.response.deferred, Exception)
+
         self.assertTrue(
             self.response.deferred.called, 'request.deferred was fired.')
         self.handler.assert_exception(
@@ -946,12 +957,7 @@ class SimpleRequestResponseTestCase(StorageServerRequestResponseTestCase):
         """Test for the internal_error method."""
         failure = Failure(ValueError(self.msg))
         self.response.internal_error(failure=failure)
-        try:
-            yield self.response.deferred
-        except ValueError:
-            pass
-        else:
-            self.fail('Should get a ValueError.')
+        yield self.assertFailure(self.response.deferred, ValueError)
         self.assertTrue(self.response.finished)
         self.assertTrue(self.shutdown)
 
@@ -1040,6 +1046,7 @@ class SimpleRequestResponseTestCase(StorageServerRequestResponseTestCase):
         # verify that all the requests were properly cleaned
         self.assertEqual(sorted(cleaned), list(range(5)), cleaned)
 
+    @defer.inlineCallbacks
     def test_sli_informed_on_done_default(self):
         """The SLI is informed when all ok."""
         mock_metrics = mock.Mock()
@@ -1047,10 +1054,12 @@ class SimpleRequestResponseTestCase(StorageServerRequestResponseTestCase):
         self.response.start_time = time.time()
 
         self.response.done()
+        yield self.response.deferred
 
         mock_metrics.timing.assert_called_once_with(
             self.response_class.__name__, mock.ANY)
 
+    @defer.inlineCallbacks
     def test_sli_informed_on_done_some_value(self):
         """The SLI is informed when all ok."""
         mock_metrics = mock.Mock()
@@ -1060,16 +1069,19 @@ class SimpleRequestResponseTestCase(StorageServerRequestResponseTestCase):
 
         self.response.length = op_length
         self.response.done()
+        yield self.response.deferred
 
         mock_metrics.timing.assert_called_once_with(
             self.response_class.__name__, mock.ANY)
 
+    @defer.inlineCallbacks
     def test_sli_informed_on_error(self):
         """The SLI is informed after a problem."""
         mock_metrics = mock.Mock()
         self.patch(self.response.protocol.factory, 'sli_metrics', mock_metrics)
 
-        self.response.error(ValueError())
+        self.response.error(ValueError(self.msg))
+        yield self.assertFailure(self.response.deferred, ValueError)
 
         mock_metrics.report.assert_called_once_with(
             'sli_error', self.response_class.__name__)
@@ -1291,6 +1303,7 @@ class GetContentResponseTestCase(SimpleRequestResponseTestCase):
         self.assertEqual(response.message_producer, None)
         self.assertEqual(response.transferred, 0)
 
+    @defer.inlineCallbacks
     def test_transferred_informed_on_done(self):
         """The transferred quantity is informed when all ok."""
         mock_metrics = mock.Mock()
@@ -1298,28 +1311,34 @@ class GetContentResponseTestCase(SimpleRequestResponseTestCase):
 
         self.response.transferred = 123
         self.response.done()
+        yield self.response.deferred
 
         mock_metrics.gauge.assert_called_once_with(
             'GetContentResponse.transferred', 123)
 
+    @defer.inlineCallbacks
     def test_transferred_informed_on_error(self):
         """The transferred quantity is informed after a problem."""
         mock_metrics = mock.Mock()
         self.patch(self.response.protocol.factory, 'metrics', mock_metrics)
 
         self.response.transferred = 123
-        self.response.error(ValueError())
+        self.response.error(ValueError(self.msg))
+        yield self.assertFailure(self.response.deferred, ValueError)
 
         mock_metrics.gauge.assert_called_once_with(
             'GetContentResponse.transferred', 123)
 
+    @defer.inlineCallbacks
     def test_sli_informed_on_done_default(self):
         """The SLI is NOT informed when all ok."""
         self.patch(self.response.protocol.factory.sli_metrics,
                    'timing', lambda *a: self.fail("Must not be called"))
         self.response.start_time = time.time()
         self.response.done()
+        yield self.response.deferred
 
+    @defer.inlineCallbacks
     def test_sli_informed_on_done_some_value(self):
         """The SLI is informed when all ok."""
         self.patch(self.response.protocol.factory.sli_metrics,
@@ -1327,7 +1346,9 @@ class GetContentResponseTestCase(SimpleRequestResponseTestCase):
         self.response.start_time = time.time()
         self.response.transferred = 12345
         self.response.done()
+        yield self.response.deferred
 
+    @defer.inlineCallbacks
     def test_sli_informed_on_done_zero_value(self):
         """The SLI is informed when all ok."""
         self.patch(self.response.protocol.factory.sli_metrics,
@@ -1335,6 +1356,7 @@ class GetContentResponseTestCase(SimpleRequestResponseTestCase):
         self.response.start_time = time.time()
         self.response.transferred = 0
         self.response.done()
+        yield self.response.deferred
 
     def test_sli_informed_on_init(self):
         """The SLI is informed after the operation init part."""
@@ -1431,6 +1453,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase):
         node_info = response._get_node_info()
         self.assertEqual(node_info, "node: 'abc'")
 
+    @defer.inlineCallbacks
     def test_transferred_informed_on_done(self):
         """The transferred quantity is informed when all ok."""
         mock_metrics = mock.Mock()
@@ -1438,28 +1461,34 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase):
 
         self.response.transferred = 123
         self.response.done()
+        yield self.response.deferred
 
         mock_metrics.gauge.assert_called_once_with(
             'PutContentResponse.transferred', 123)
 
+    @defer.inlineCallbacks
     def test_transferred_informed_on_error(self):
         """The transferred quantity is informed after a problem."""
         mock_metrics = mock.Mock()
         self.patch(self.response.protocol.factory, 'metrics', mock_metrics)
 
         self.response.transferred = 123
-        self.response.error(ValueError())
+        self.response.error(ValueError(self.msg))
+        yield self.assertFailure(self.response.deferred, ValueError)
 
         mock_metrics.gauge.assert_called_once_with(
             'PutContentResponse.transferred', 123)
 
+    @defer.inlineCallbacks
     def test_sli_informed_on_done_default(self):
         """The SLI is informed when all ok."""
         self.patch(self.response.protocol.factory.sli_metrics,
                    'timing', lambda *a: self.fail("Must not be called"))
         self.response.start_time = time.time()
         self.response.done()
+        yield self.response.deferred
 
+    @defer.inlineCallbacks
     def test_sli_informed_on_done_some_value(self):
         """The SLI is informed when all ok."""
         self.patch(self.response.protocol.factory.sli_metrics,
@@ -1467,7 +1496,9 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase):
         self.response.start_time = time.time()
         self.response.transferred = 12345
         self.response.done()
+        yield self.response.deferred
 
+    @defer.inlineCallbacks
     def test_sli_informed_on_done_zero_value(self):
         """The SLI is informed when all ok."""
         self.patch(self.response.protocol.factory.sli_metrics,
@@ -1475,14 +1506,15 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase):
         self.response.start_time = time.time()
         self.response.transferred = 0
         self.response.done()
+        yield self.response.deferred
 
     @defer.inlineCallbacks
     def test_sli_informed_on_init(self):
         """The SLI is informed after the operation init part."""
         # fake uploadjob
-        uploadjob = mock.Mock(deferred=defer.Deferred())
+        uploadjob = mock.Mock(
+            deferred=defer.Deferred(), name='upload-job', offset=5)
         uploadjob.connect.return_value = defer.succeed(None)
-        uploadjob.stop.return_value = defer.succeed(None)
         self.patch(self.response, '_get_upload_job',
                    lambda: defer.succeed(uploadjob))
         # the user
@@ -1498,7 +1530,6 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase):
         mock_metrics.timing.assert_called_once_with(
             'PutContentResponseInit', mock.ANY)
         uploadjob.connect.assert_called_once_with()
-        uploadjob.stop.assert_called_once_with()
 
     @defer.inlineCallbacks
     def test_sli_informed_on_commit(self):
@@ -1548,7 +1579,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase):
         self.response.protocol.user = 'user'
 
         self.response._log_start = mock.Mock()
-        failure = Failure(NameError('foo'))
+        failure = Failure(NameError(self.msg))
         self.response._start_upload = mock.Mock(
             return_value=defer.fail(failure))
         self.response._generic_error = mock.Mock()
@@ -1633,11 +1664,14 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase):
         self.handler.assert_debug("Stoping the upload job after a cancel")
         self.response.upload_job.stop.assert_called_once_with()
 
+    @defer.inlineCallbacks
     def test__cancel_uploadjob_stop_None(self):
         """Test cancel not having an upload_job."""
         assert self.response.state != PutContentResponse.states.canceling
         assert self.response.upload_job is None
+
         self.response._cancel()
+        yield self.response.deferred
 
         self.handler.assert_not_logged("Stoping the upload job after a cancel")
 
@@ -1654,6 +1688,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase):
 
         # call and check
         self.response._cancel()
+
         self.assertTrue(called)
         self.assertEqual(self.response.state, PutContentResponse.states.done)
         self.assertEqual(self.last_msg.type, protocol_pb2.Message.CANCELLED)
@@ -1669,6 +1704,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase):
 
         # call and check
         self.response._cancel()
+
         self.assertTrue(called)
         self.assertEqual(self.response.state, PutContentResponse.states.done)
 
@@ -1696,47 +1732,65 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase):
         self.assertEqual(self.response.state, PutContentResponse.states.done)
         upload_job.stop.assert_called_once_with()
 
+    @defer.inlineCallbacks
     def test_genericerror_log_error(self):
         """Generic error logs when called with an error."""
         assert self.response.state == PutContentResponse.states.init
-        self.response._generic_error(NameError('foo'))
-        self.handler.assert_warning("Error while in INIT", "NameError", "foo")
+        yield self.response._generic_error(NameError(self.msg))
+        yield self.assertFailure(self.response.deferred, NameError)
+        self.handler.assert_warning(
+            "Error while in INIT", "NameError", self.msg)
 
+    @defer.inlineCallbacks
     def test_genericerror_log_failure(self):
         """Generic error logs when called with a failure."""
         assert self.response.state == PutContentResponse.states.init
-        self.response._generic_error(Failure(NameError('foo')))
-        self.handler.assert_warning("Error while in INIT", "NameError", "foo")
 
+        yield self.response._generic_error(Failure(NameError(self.msg)))
+        yield self.assertFailure(self.response.deferred, NameError)
+
+        self.handler.assert_warning(
+            "Error while in INIT", "NameError", self.msg)
+
+    @defer.inlineCallbacks
     def test_genericerror_already_in_error(self):
         """Just log if already in error."""
         self.response.state = PutContentResponse.states.error
         called = []
         self.response._send_protocol_error = called.append
-        self.response._generic_error(NameError('foo'))
+        yield self.response._generic_error(NameError(self.msg))
         self.assertFalse(called)
-        self.handler.assert_warning("Error while in ERROR", "NameError", "foo")
+        self.handler.assert_warning(
+            "Error while in ERROR", "NameError", self.msg)
 
+    @defer.inlineCallbacks
     def test_genericerror_already_in_done(self):
         """Just log if already in done."""
         self.response.state = PutContentResponse.states.done
         called = []
         self.response._send_protocol_error = called.append
-        self.response._generic_error(NameError('foo'))
+        yield self.response._generic_error(NameError(self.msg))
         self.assertFalse(called)
-        self.handler.assert_warning("Error while in DONE", "NameError", "foo")
+        self.handler.assert_warning(
+            "Error while in DONE", "NameError", self.msg)
 
+    @defer.inlineCallbacks
     def test_genericerror_no_uploadjob(self):
         """Don't stop the upload job if doesn't have one."""
         assert self.response.upload_job is None
-        self.response._generic_error(NameError('foo'))
+
+        yield self.response._generic_error(NameError(self.msg))
+        yield self.assertFailure(self.response.deferred, NameError)
+
         self.handler.assert_not_logged("Stoping the upload job after an error")
 
+    @defer.inlineCallbacks
     def test_genericerror_stop_uploadjob(self):
         """Stop the upload job if has one."""
         self.response.upload_job = mock.Mock()
 
-        self.response._generic_error(NameError('foo'))
+        yield self.response._generic_error(NameError(self.msg))
+        yield self.assertFailure(self.response.deferred, NameError)
 
         self.handler.assert_debug("Stoping the upload job after an error")
         self.response.upload_job.stop.assert_called_once_with()
@@ -1752,26 +1806,29 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase):
         # expect(metrics.gauge("upload_error.TRY_AGAIN.NameError", size_hint))
 
         # call and test
-        self.response._log_exception(errors.TryAgain(NameError('foo')))
+        self.response._log_exception(errors.TryAgain(NameError(self.msg)))
 
         self.handler.assert_debug("TryAgain", "NameError", str(size_hint))
 
+    @defer.inlineCallbacks
     def test_genericerror_requestcancelled_canceling(self):
         """Test how a RequestCancelledError error is handled when canceling."""
         self.response.state = PutContentResponse.states.canceling
         called = []
         self.response._send_protocol_error = called.append
         self.response.done = called.append
-        self.response._generic_error(request.RequestCancelledError('message'))
+        yield self.response._generic_error(
+            request.RequestCancelledError('message'))
         self.assertFalse(called)
         self.handler.assert_debug("Request cancelled: message")
 
+    @defer.inlineCallbacks
     def test_genericerror_requestcancelled_other(self):
         """Test how a RequestCancelledError error is handled in other state."""
         assert self.response.state != PutContentResponse.states.canceling
         self.response.upload_job = self.FakeUploadJob()
 
-        failure = Failure(request.RequestCancelledError("foo"))
+        failure = Failure(request.RequestCancelledError(self.msg))
         # These are commented out since the open source fork was published
         # expect(response.protocol.factory.metrics.gauge(
         #     "upload_error.RequestCancelledError", 1000))
@@ -1779,30 +1836,32 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase):
         self.response._send_protocol_error = mock.Mock()
         self.response.done = mock.Mock()
 
-        self.response._generic_error(failure)
+        yield self.response._generic_error(failure)
 
         self.assertEqual(self.response.state, PutContentResponse.states.error)
         self.handler.assert_debug("RequestCancelledError", str(1000))
         self.response._send_protocol_error.assert_called_once_with(failure)
         self.response.done.assert_called_once_with()
 
+    @defer.inlineCallbacks
     def test_genericerror_other_errors_ok(self):
         """Generic error handling."""
         self.response.upload_job = self.FakeUploadJob()
-        failure = Failure(NameError("foo"))
+        failure = Failure(NameError(self.msg))
         # These are commented out since the open source fork was published
         # expect(response.protocol.factory.metrics.gauge(
         #     "upload_error.NameError", 1000))
         self.response._send_protocol_error = mock.Mock()
         self.response.done = mock.Mock()
 
-        self.response._generic_error(failure)
+        yield self.response._generic_error(failure)
 
         self.assertEqual(self.response.state, PutContentResponse.states.error)
         self.handler.assert_debug("NameError", str(1000))
         self.response._send_protocol_error.assert_called_once_with(failure)
         self.response.done.assert_called_once_with()
 
+    @defer.inlineCallbacks
     def test_genericerror_other_errors_problem_sendprotocolerror(self):
         """Handle problems in the _send_protocol_error() call."""
         error = Exception("broken")
@@ -1811,7 +1870,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase):
         self.response.internal_error = internal.append
 
         real_error = ValueError('error')
-        self.response._generic_error(real_error)
+        yield self.response._generic_error(real_error)
 
         self.assertEqual(self.response.state, PutContentResponse.states.error)
         error = internal[0].value
@@ -1822,6 +1881,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase):
         self.assertIsInstance(actual, Failure)
         self.assertEqual(actual.value, real_error)
 
+    @defer.inlineCallbacks
     def test_genericerror_other_errors_problem_done(self):
         """Handle problems in the done() call."""
         self.response._send_protocol_error = mock.Mock(
@@ -1832,7 +1892,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase):
         self.response.internal_error = internal.append
 
         real_error = ValueError('error')
-        self.response._generic_error(real_error)
+        yield self.response._generic_error(real_error)
 
         self.assertEqual(self.response.state, PutContentResponse.states.error)
         error = internal[0].value
@@ -1894,7 +1954,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase):
         """Process a message while uploading, explodes."""
         self.response.state = PutContentResponse.states.uploading
         message = self.make_protocol_message(msg_type='BYTES')
-        failure = Exception('foo')
+        failure = Exception(self.msg)
         self.response._process_while_uploading = mock.Mock(side_effect=failure)
         self.response._generic_error = mock.Mock()
 
@@ -1928,7 +1988,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase):
         """Process a cancel request while in init, explodes."""
         self.response.state = PutContentResponse.states.init
         message = self.make_protocol_message(msg_type='CANCEL_REQUEST')
-        failure = Exception('foo')
+        failure = Exception(self.msg)
         self.response.cancel = mock.Mock(side_effect=failure)
         self.response._generic_error = mock.Mock()
 
@@ -2140,7 +2200,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase):
         self.response.protocol.release.assert_called_once_with(self.response)
         self.response._send_begin.assert_called_once_with()
 
-    def _test_startupload_canceling_while_getting_uploadjob(self, state):
+    def _startupload_canceling_while_getting_uploadjob(self, state):
         """State changes while waiting for the upload job."""
         self.response.state = PutContentResponse.states.init
         d = defer.Deferred()
@@ -2158,12 +2218,12 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase):
     def test_startupload_done(self):
         """State changes to done while getting the upload job."""
         state = PutContentResponse.states.done
-        self._test_startupload_canceling_while_getting_uploadjob(state)
+        self._startupload_canceling_while_getting_uploadjob(state)
 
     def test_startupload_canceling(self):
         """State changes to canceling while getting the upload job."""
         state = PutContentResponse.states.canceling
-        self._test_startupload_canceling_while_getting_uploadjob(state)
+        self._startupload_canceling_while_getting_uploadjob(state)
 
     def test__send_begin(self):
         """Test sendbegin."""
@@ -2198,6 +2258,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase):
         self.handler.assert_debug(
             upload_type, "begin content", "from offset 0", "fake storagekey")
 
+    @defer.inlineCallbacks
     def test_putcontent_double_done(self):
         """Double call to self.done()."""
         self.response.state = PutContentResponse.states.init
@@ -2211,15 +2272,21 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase):
         upload_job.upload_id = 1
         d.callback(upload_job)
         self.response.done()
+        yield self.response.deferred
+
         called = []
         self.response.error = called.append
         self.response.done()
+        yield self.response.deferred
+
         self.assertEqual(called, [])
         msg = (
-            'runWithWarningsSuppressed -> test_putcontent_double_done: '
+            'PutContentResponse 42 - _cancellableInlineCallbacks -> '
+            '_inlineCallbacks -> test_putcontent_double_done: '
             'called done() finished=True')
         self.handler.assert_warning(msg)
 
+    @defer.inlineCallbacks
     def test_putcontent_done_after_error(self):
         """Double call to self.done()."""
         self.response.state = PutContentResponse.states.init
@@ -2232,13 +2299,18 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase):
         upload_job.offset = 1
         upload_job.upload_id = 1
         d.callback(upload_job)
-        self.response.error(Failure(ValueError("foo")))
+        self.response.error(Failure(ValueError(self.msg)))
+        yield self.assertFailure(self.response.deferred, ValueError)
+
         called = []
         self.response.error = called.append
         self.response.done()
+        yield self.response.deferred
+
         self.assertEqual(called, [])
         msg = (
-            'runWithWarningsSuppressed -> test_putcontent_done_after_error: '
+            'PutContentResponse 42 - _cancellableInlineCallbacks -> '
+            '_inlineCallbacks -> test_putcontent_done_after_error: '
             'called done() finished=True')
         self.handler.assert_warning(msg)
 
@@ -2305,7 +2377,7 @@ class AuthenticateResponseTestCase(SimpleRequestResponseTestCase):
         self.assertEqual(called, [(user,)])
         auth_provider.authenticate.assert_called_once_with({}, self.server)
 
-    def _test_client_metadata(self, expected, expected_metrics):
+    def _client_metadata(self, expected, expected_metrics):
         """Test client metadata handling in AuthenticateResponse."""
         user = FakeUser()
         # set up a fake auth
@@ -2333,7 +2405,7 @@ class AuthenticateResponseTestCase(SimpleRequestResponseTestCase):
             ("client.platform.linux", 1),
             ("client.version.42", 1)
         ]
-        self._test_client_metadata(expected, expected_metrics)
+        self._client_metadata(expected, expected_metrics)
 
     def test_client_metadata_invalid_value(self):
         """Test client metadata handling in AuthenticateResponse."""
@@ -2349,7 +2421,7 @@ class AuthenticateResponseTestCase(SimpleRequestResponseTestCase):
             ("client.platform.Windows_XP_SP3_6_1_2008", 1),
             ("client.version.1_42", 1)
         ]
-        self._test_client_metadata(expected, expected_metrics)
+        self._client_metadata(expected, expected_metrics)
 
 
 class GetDeltaResponseTestCase(SimpleRequestResponseTestCase):
@@ -2649,11 +2721,11 @@ class StorageServerFactoryTestCase(BaseTestCase, TwistedTestCase):
 
     def test_failure(self):
         """Received a full failure."""
-        f = Failure(ValueError('foobar'))
+        f = Failure(ValueError(self.id()))
         self.factory._deferror_handler(dict(isError=True,
                                             failure=f, message=''))
         self.handler.assert_error(
-            "Unhandled error in deferred", "ValueError", "foobar")
+            "Unhandled error in deferred", "ValueError", self.id())
 
     def test_trace_users(self):
         """Check trace users are correctly set."""

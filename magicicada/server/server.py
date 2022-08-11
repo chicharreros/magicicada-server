@@ -266,7 +266,7 @@ class StorageServer(request.RequestHandler):
 
     def __init__(self, session_id=None):
         """Create a network server. The factory does this."""
-        request.RequestHandler.__init__(self)
+        super(StorageServer, self).__init__()
         self.user = None
         self.factory = None
         self.session_id = session_id or uuid.uuid4()
@@ -369,7 +369,7 @@ class StorageServer(request.RequestHandler):
 
     def connectionMade(self):
         """Called when a connection is made."""
-        request.RequestHandler.connectionMade(self)
+        super(StorageServer, self).connectionMade()
         self.factory.protocols.append(self)
         self.log.info('Connection Made')
         msg = '%d %s.\r\n' % (self.PROTOCOL_VERSION, FILESYNC_STATUS_MSG)
@@ -433,7 +433,7 @@ class StorageServer(request.RequestHandler):
                                 protocol_pb2.Message.PONG):
             self.ping_loop.reset()
         try:
-            result = request.RequestHandler.processMessage(self, message)
+            result = super(StorageServer, self).processMessage(message)
         except Exception as e:
             self._log_error(e, self.processMessage, exc_info=sys.exc_info())
             return
@@ -732,7 +732,7 @@ class StorageServerRequestResponse(BaseRequestResponse):
                 failure = Failure(failure)
             self.log.error('Request error',
                            exc_info=(failure.type, failure.value, None))
-            request.RequestResponse.error(self, failure)
+            super(BaseRequestResponse, self).error(failure)
         except Exception as e:
             msg = 'error() crashed when processing %s: %s'
             self.log.error(msg, failure, e, exc_info=sys.exc_info())
@@ -741,12 +741,12 @@ class StorageServerRequestResponse(BaseRequestResponse):
             if self.start_time is not None:
                 delta = time.time() - self.start_time
                 self.protocol.factory.metrics.timing(
-                    '%s.request_error' % (class_name,), delta)
+                    '%s.request_error' % class_name, delta)
                 self.protocol.factory.metrics.timing('request_error', delta)
 
             transferred = getattr(self, 'transferred', None)
             if transferred is not None:
-                msg = '%s.transferred' % (class_name,)
+                msg = '%s.transferred' % class_name
                 self.protocol.factory.metrics.gauge(msg, transferred)
 
     def done(self, _=None):
@@ -759,7 +759,7 @@ class StorageServerRequestResponse(BaseRequestResponse):
                 self.log.info('Request done')
             else:
                 self.log.info('Request done: %s', self.operation_data)
-            request.RequestResponse.done(self)
+            super(BaseRequestResponse, self).done()
         except Exception as e:
             self.error(Failure(e))
         else:
@@ -793,7 +793,7 @@ class StorageServerRequestResponse(BaseRequestResponse):
     def sendMessage(self, message):
         """Send a message and trace it."""
         self.log.trace_message('OUT: ', message)
-        request.RequestResponse.sendMessage(self, message)
+        super(BaseRequestResponse, self).sendMessage(message)
 
     def _processMessage(self, message):
         """Locally overridable part of processMessage."""
@@ -927,26 +927,28 @@ class SimpleRequestResponse(StorageServerRequestResponse):
             self.sendError(protocol_error, comment=comment,
                            free_space_info=free_space_info)
             return  # the error has been consumed
-        elif error in self.protocol_errors:
+
+        if error in self.protocol_errors:
             # an error we expect and can convert to a protocol error
             protocol_error = self.protocol_errors[error]
             self.sendError(protocol_error, comment=comment)
             return  # the error has been consumed
-        elif (error == errors.StorageServerError and
+
+        if (error == errors.StorageServerError and
                 not failure.check(errors.InternalError)):
             # an error which corresponds directly to a protocol error
             self.sendError(failure.value.errno, comment=comment)
             return  # the error has been consumed
-        elif error == dataerror.LockedUserError:
+
+        if error == dataerror.LockedUserError:
             self.log.warning('Shutting down protocol: user locked')
             if not self.protocol.shutting_down:
                 self.protocol.shutdown()
             return  # the error has been consumed
-        else:
-            # an unexpected or unconvertable error
-            self.sendError(protocol_pb2.Error.INTERNAL_ERROR,
-                           comment=comment)
-            return failure  # propagate the error
+
+        # an unexpected or unconvertable error
+        self.sendError(protocol_pb2.Error.INTERNAL_ERROR, comment=comment)
+        return failure  # propagate the error
 
     def internal_error(self, failure):
         """Handle a failure that caused an INTERNAL_ERROR."""
@@ -1475,11 +1477,10 @@ class GetContentResponse(SimpleRequestResponse):
                 self.log.warning(msg, failure)
             return  # the error has been consumed
 
-        else:
-            # handle all the TRY_AGAIN cases
-            if failure.check(error.ConnectionLost):
-                failure = Failure(errors.TryAgain(failure.value))
-            return SimpleRequestResponse._send_protocol_error(self, failure)
+        # handle all the TRY_AGAIN cases
+        if failure.check(error.ConnectionLost):
+            failure = Failure(errors.TryAgain(failure.value))
+        return super(GetContentResponse, self)._send_protocol_error(failure)
 
     def _start(self):
         """Get node content and send it."""
@@ -1617,7 +1618,7 @@ class PutContentResponse(SimpleRequestResponse):
             self.log.warning('%s: called done() finished=%s',
                              call_chain, self.finished)
         else:
-            SimpleRequestResponse.done(self)
+            super(PutContentResponse, self).done()
 
     def _get_node_info(self):
         """Return node info from the message."""
@@ -2388,7 +2389,8 @@ class StorageServerFactory(Factory):
             msg = failure.getTraceback()
 
         # log
-        logger.error('Unhandled error in deferred! %s', msg)
+        logger.error(
+            'Unhandled error in deferred! %s\nGot data:\n%r', msg, data)
 
     def event_callback_handler(self, func):
         """Wrap the event callback in an error handler."""
@@ -2619,7 +2621,7 @@ class StorageServerService(OrderedMultiService):
         @param port: the port to listen on without ssl.
         @param auth_provider_class: the authentication provider.
         """
-        OrderedMultiService.__init__(self)
+        super(StorageServerService, self).__init__()
         self.heartbeat_writer = None
         if heartbeat_interval is None:
             heartbeat_interval = float(settings.HEARTBEAT_INTERVAL)
@@ -2671,7 +2673,7 @@ class StorageServerService(OrderedMultiService):
     def startService(self):
         """Start listening on two ports."""
         logger.info('- - - - - SERVER STARTING')
-        yield OrderedMultiService.startService(self)
+        yield super(StorageServerService, self).startService()
         yield defer.maybeDeferred(self.start_rpc_dal)
         self.factory.content.rpc_dal = self.rpc_dal
         self.factory.rpc_dal = self.rpc_dal
@@ -2689,7 +2691,7 @@ class StorageServerService(OrderedMultiService):
     def stopService(self):
         """Stop listening on both ports."""
         logger.info('- - - - - SERVER STOPPING')
-        yield OrderedMultiService.stopService(self)
+        yield super(StorageServerService, self).stopService()
         yield self.factory.wait_for_shutdown()
         self.metrics.meter('server_stop')
         self.metrics.decrement('services_active')
