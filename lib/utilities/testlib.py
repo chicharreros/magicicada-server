@@ -42,7 +42,7 @@ WORKING_DIR = "./tmp/trial"
 
 def set_twisted_debug():
     DelayedCall.debug = True
-    failure.startDebugMode()
+    # failure.startDebugMode()
     defer.setDebugging(True)
 
 

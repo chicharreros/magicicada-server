@@ -100,9 +100,13 @@ class BaseProtocolTestCase(TwistedTestCase):
     @defer.inlineCallbacks
     def tearDown(self):
         """Tear down after testing."""
+        print('\n\n++++ testcase.BaseProtocolTestCase.tearDown 1')
         yield self.service.stopService()
+        print('\n\n++++ testcase.BaseProtocolTestCase.tearDown 2')
         logger.info("finished test %s", self.id())
+        print('\n\n++++ testcase.BaseProtocolTestCase.tearDown 3')
         yield super(BaseProtocolTestCase, self).tearDown()
+        print('\n\n++++ testcase.BaseProtocolTestCase.tearDown 4')
 
     def make_user(self, username=None, **kwargs):
         if username is None:
@@ -389,6 +393,7 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
         """Simplify the testing code by getting a client for the user."""
         connect_d = defer.Deferred()
         factory = FactoryHelper(connect_d.callback, caps=PREFERRED_CAP)
+        print('\n\n\n=============== testcase.TestWithDatabase._get_client_helper', factory)
         connector = reactor.connectTCP("localhost", self.port, factory)
         self.addCleanup(connector.disconnect)
         client = yield connect_d

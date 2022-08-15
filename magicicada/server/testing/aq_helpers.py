@@ -408,12 +408,17 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
     @defer.inlineCallbacks
     def tearDown(self):
         """Tear down."""
-        yield super(TestWithDatabase, self).tearDown()
-        yield self.ssl_service.stopService()
+        print('\n\n**** aq_helpers.TestWithDatabase.tearDown 1')
         if self._do_teardown_eq:
+            print('\n\n**** aq_helpers.TestWithDatabase.tearDown 2')
             yield self.eq.shutdown()
+        print('\n\n**** aq_helpers.TestWithDatabase.tearDown 3')
         yield self.main.state_manager.shutdown()
+        print('\n\n**** aq_helpers.TestWithDatabase.tearDown 4')
         yield self.main.db.shutdown()
+        print('\n\n**** aq_helpers.TestWithDatabase.tearDown 5')
+        yield self.main.action_q.disconnect()
+        print('\n\n**** aq_helpers.TestWithDatabase.tearDown 6')
 
         test_method = getattr(self, self._testMethodName)
         failure_expected = getattr(test_method, 'failure_expected', False)
@@ -433,8 +438,15 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
                     self._testMethodName, self.failed)
                 self.failed(msg)
 
+        print('\n\n**** aq_helpers.TestWithDatabase.tearDown 7')
         if os.path.exists(self.tmpdir):
             self.rmtree(self.tmpdir)
+
+        print('\n\n**** aq_helpers.TestWithDatabase.tearDown 8')
+        yield self.ssl_service.stopService()
+        print('\n\n**** aq_helpers.TestWithDatabase.tearDown 9')
+        yield super(TestWithDatabase, self).tearDown()
+        print('\n\n**** aq_helpers.TestWithDatabase.tearDown 10')
 
     def mktemp(self, name='temp'):
         """ Customized mktemp that accepts an optional name argument. """

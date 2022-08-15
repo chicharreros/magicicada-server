@@ -135,6 +135,15 @@ class SyncClientFactory(StorageClientFactory):
         self.current_protocol = None
 
     @log_timing
+    def clientConnectionLost(self, connector, reason):
+        """The client connection went down."""
+        print('\n\n\n\n>>>>>>> u1sync.client.SyncClientFactory: %s' % self)
+        print(dir(self))
+        print('\n\n\n\n>>>>>>> u1sync.client.SyncClientFactory: observer %s' % self.observer)
+        print(dir(self.observer))
+        print('\n\n\n\n>>>>>>> u1sync.client.SyncClientFactory: current_protocol %s' % self.current_protocol)
+
+    @log_timing
     def clientConnectionFailed(self, connector, reason):
         """We failed at connecting."""
         self.current_protocol = None

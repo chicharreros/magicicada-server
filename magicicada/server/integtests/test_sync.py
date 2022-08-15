@@ -114,7 +114,6 @@ class TestSync(TestWithDatabase):
         }]
         self.main = Main(root_dir, shares_dir, data_dir, partials_dir,
                          connection_info=connection_info)
-        self.addCleanup(self.main.shutdown)
 
         self.eq = self.main.event_q
         self.aq = self.main.action_q
@@ -129,6 +128,8 @@ class TestSync(TestWithDatabase):
         d = self.wait_for('SYS_SERVER_RESCAN_DONE')
         self.eq.push('SYS_USER_CONNECT',
                      access_token=self.access_tokens['jack'])
+        self.addCleanup(self.eq.push, 'SYS_USER_DISCONNECT')
+
         self.eq.push('SYS_NET_CONNECTED')
         yield d
 
@@ -141,6 +142,8 @@ class TestSync(TestWithDatabase):
 
         def check():
             """Check that it's finished finishing."""
+            print('\n\n\n!!!! test_sync.TestSync._wait_for_dead_nirvana state %s' % state)
+            print('\n!!!! self.main.state_manager.state %s\n\n' % self.main.state_manager.state)
             if state.name in ("READY", "STANDOFF", "SHUTDOWN"):
                 d.callback(True)
             else:
@@ -160,8 +163,15 @@ class TestSync(TestWithDatabase):
         if timer is not None and timer.active():
             timer.cancel()
 
-        yield super(TestSync, self).tearDown()
+        print('\n\n!!!! test_sync.TestSync.tearDown 0')
+        yield self.main.action_q.disconnect()
+        print('\n\n!!!! test_sync.TestSync.tearDown 1')
+        yield self.main.shutdown()
+        print('\n\n!!!! test_sync.TestSync.tearDown 2')
         yield self._wait_for_dead_nirvana()
+        print('\n\n!!!! test_sync.TestSync.tearDown 3')
+        yield super(TestSync, self).tearDown()
+        print('\n\n!!!! test_sync.TestSync.tearDown 4')
 
         # make sure no errors were reported
         if self.handler.records:

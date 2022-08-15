@@ -2692,12 +2692,18 @@ class StorageServerService(OrderedMultiService):
         """Stop listening on both ports."""
         logger.info('- - - - - SERVER STOPPING')
         yield OrderedMultiService.stopService(self)
+        logger.info('- - - - - SERVER STOPPING after OrderedMultiService.stopService')
         yield self.factory.wait_for_shutdown()
+        logger.info('- - - - - SERVER STOPPING after self.factory.wait_for_shutdown')
         self.metrics.meter('server_stop')
+        logger.info('- - - - - SERVER STOPPING after self.metrics.meter')
         self.metrics.decrement('services_active')
+        logger.info('- - - - - SERVER STOPPING after self.metrics.decrement')
         self._reactor_inspector.stop()
+        logger.info('- - - - - SERVER STOPPING after self._reactor_inspector.stop')
         if self.heartbeat_writer:
             self.heartbeat_writer.loseConnection()
+            logger.info('- - - - - SERVER STOPPING after self.heartbeat_writer.loseConnection')
             self.heartbeat_writer = None
         logger.info('- - - - - SERVER STOPPED')
 
