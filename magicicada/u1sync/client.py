@@ -57,7 +57,7 @@ def log_timing(func):
         ent = func(*arg, **kwargs)
         stop = time.time()
         timing_logger.debug(
-            'for %s %0.5f ms elapsed', func.__name__, stop-start * 1000.0)
+            'for %s %0.5f ms elapsed', func.__name__, (stop-start) * 1000.0)
         return ent
     return wrapper
 
