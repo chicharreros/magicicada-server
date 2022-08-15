@@ -159,6 +159,25 @@ class DumbVolumeManager(volume_manager.VolumeManager):
         """Noop."""
 
 
+class FakedHashQueue:
+    """A fake and empty hash queue."""
+
+    def __init__(self, event_queue=None):
+        self.items = []
+
+    def empty(self):
+        return len(self.items) == 0
+
+    def insert(self, path, mdid):
+        return self.items.append((path, mdid))
+
+    def __len__(self):
+        return len(self.items)
+
+    def shutdown(self):
+        pass
+
+
 class ReallyFakeMain(main.Main):
     """This main is so fake, it breaks nearly everything."""
 
@@ -170,9 +189,7 @@ class ReallyFakeMain(main.Main):
         self.fsmdir = os.path.join(data_dir, 'fsmdir')
         self.partials_dir = partials_dir
         self.tritcask_dir = os.path.join(self.data_dir, 'tritcask')
-        self.hash_q = type('fake hash queue', (),
-                           {'empty': staticmethod(lambda: True),
-                            '__len__': staticmethod(lambda: 0)})()
+        self.hash_q = FakedHashQueue()
         self.db = tritcask.Tritcask(self.tritcask_dir)
         self.vm = DumbVolumeManager(self)
         self.fs = FileSystemManager(self.fsmdir, self.partials_dir, self.vm,
