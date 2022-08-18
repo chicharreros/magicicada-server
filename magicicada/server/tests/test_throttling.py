@@ -21,19 +21,17 @@
 import os
 import zlib
 
-from StringIO import StringIO
-
 from django.db import transaction
 from magicicadaprotocol import request, client
-from magicicadaprotocol.content_hash import content_hash_factory, crc32
 from twisted.internet import threads, defer
 from twisted.internet.protocol import connectionDone
 
 from magicicada.filesync import services
 from magicicada.filesync.models import ContentBlob
 from magicicada.server.testing.testcase import (
-    TestWithDatabase,
     ClientTestHelper,
+    TestWithDatabase,
+    get_put_content_params,
 )
 
 NO_CONTENT_HASH = ""
@@ -63,170 +61,102 @@ class TestThrottling(TestWithDatabase):
 
     factory_class = ThrottlingTestFactory
 
+    @defer.inlineCallbacks
     def test_getcontent_file(self, check_file_content=True):
         """Get the content from a file."""
         data = os.urandom(300000)
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
 
-        def check_file(req):
-            if req.data != deflated_data:
-                raise Exception("data does not match")
+        client = yield self.get_client_helper(auth_token="open sesame")
+        root_id = yield client.get_root()
+        # create a file with content
+        mkfile_req = yield client.make_file(request.ROOT, root_id, "test_file")
+        params = get_put_content_params(data, node=mkfile_req.new_id)
+        yield client.put_content(**params)
 
-        def auth(client):
-            d = client.dummy_authenticate("open sesame")
-            d.addCallbacks(lambda _: client.get_root(), client.test_fail)
-            d.addCallbacks(
-                lambda root: client.make_file(request.ROOT, root, "hola"),
-                client.test_fail)
-            d.addCallback(self.save_req, 'req')
-            d.addCallbacks(
-                lambda mkfile_req: client.put_content(
-                    request.ROOT,
-                    mkfile_req.new_id, NO_CONTENT_HASH, hash_value,
-                    crc32_value, size, deflated_size, StringIO(deflated_data)),
-                client.test_fail)
-            d.addCallback(lambda _: client.get_content(
-                          request.ROOT, self._state.req.new_id, hash_value))
-            if check_file_content:
-                d.addCallback(check_file)
-            d.addCallbacks(client.test_done, client.test_fail)
-
-        return self.callback_test(auth, timeout=5)
+        # get the content
+        content = yield client.get_content(
+            params['share'], params['node'], params['new_hash'])
+        if check_file_content:
+            self.assertEqual(zlib.decompress(content.data), data)
 
     @defer.inlineCallbacks
     def test_getcontent_file_slow(self):
         """Get content from a file with very low BW and fail with timeout."""
         data = os.urandom(300000)
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
 
         @defer.inlineCallbacks
         def auth(client):
             """Test."""
             yield client.dummy_authenticate("open sesame")
-            root = yield client.get_root()
+            root_id = yield client.get_root()
 
             # make a file and put content in it
-            mkfile_req = yield client.make_file(request.ROOT, root, "hola")
-            yield client.put_content(request.ROOT, mkfile_req.new_id,
-                                     NO_CONTENT_HASH, hash_value, crc32_value,
-                                     size, deflated_size,
-                                     StringIO(deflated_data))
+            mkfile_req = yield client.make_file(request.ROOT, root_id, "hola")
+            params = get_put_content_params(data, node=mkfile_req.new_id)
+            yield client.put_content(**params)
 
             # set the read limit, and get content
             client.factory.factory.readLimit = 1000
-            yield client.get_content(request.ROOT, mkfile_req.new_id,
-                                     hash_value)
+            yield client.get_content(
+                params['share'], params['node'], params['new_hash'])
 
+        # This test is buggy since the timeout occurs way before the read
+        # operation, so it's not asserting what's described
         d = self.callback_test(auth, add_default_callbacks=True,
                                timeout=0.1)
         err = yield self.assertFailure(d, Exception)
         self.assertEqual(str(err), "timeout")
 
+    @defer.inlineCallbacks
     def test_putcontent(self, num_files=1):
         """Test putting content to a file."""
-        data = os.urandom(300000)
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
 
-        def auth(client):
+        client = yield self.get_client_helper(auth_token="open sesame")
+        root_id = yield client.get_root()
 
-            def check_file(result):
+        def check_file(hash_value):
+            return services.get_object_or_none(ContentBlob, hash=hash_value)
 
-                @transaction.atomic
-                def _check_file():
-                    content_blob = services.get_object_or_none(
-                        ContentBlob, hash=hash_value)
-                    if not content_blob:
-                        raise ValueError("content blob is not there")
+        for i in range(num_files):
+            mkfile_req = yield client.make_file(
+                request.ROOT, root_id, 'hola_%d' % i)
+            data = os.urandom(300 + i)
+            params = get_put_content_params(data, node=mkfile_req.new_id)
+            yield client.put_content(**params)
+            content_blob = yield threads.deferToThread(
+                check_file, params['new_hash'])
+            self.assertIsNotNone(content_blob)
 
-                d = threads.deferToThread(_check_file)
-                return d
-
-            d = client.dummy_authenticate("open sesame")
-            filenames = iter('hola_%d' % i for i in range(num_files))
-            for i in range(num_files):
-                d.addCallbacks(lambda _: client.get_root(), client.test_fail)
-                d.addCallbacks(
-                    lambda root: client.make_file(request.ROOT, root,
-                                                  filenames.next()),
-                    client.test_fail)
-                d.addCallbacks(
-                    lambda mkfile_req: client.put_content(
-                        request.ROOT,
-                        mkfile_req.new_id, NO_CONTENT_HASH, hash_value,
-                        crc32_value, size, deflated_size,
-                        StringIO(deflated_data)),
-                    client.test_fail)
-            d.addCallback(check_file)
-            d.addCallbacks(client.test_done, client.test_fail)
-            return d
-
-        return self.callback_test(auth, timeout=1)
-
+    @defer.inlineCallbacks
     def test_putcontent_slow(self, num_files=1):
-        """Test putting content to a file with very low bandwidth and fail
-        with timeout.
-        """
+        """Putting content using very low bandwidth and fail with timeout."""
         data = os.urandom(30000)
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
 
+        @defer.inlineCallbacks
         def auth(client):
 
-            def check_file(result):
+            @transaction.atomic
+            def check_file(hash_value):
+                return services.get_object_or_none(
+                    ContentBlob, hash=hash_value)
 
-                @transaction.atomic
-                def _check_file():
-                    content_blob = services.get_object_or_none(
-                        ContentBlob, hash=hash_value)
-                    if not content_blob:
-                        raise ValueError("content blob is not there")
+            yield client.dummy_authenticate("open sesame")
+            root_id = yield client.get_root()
 
-                d = threads.deferToThread(_check_file)
-                return d
+            # make a file and put content in it
+            mkfile_req = yield client.make_file(request.ROOT, root_id, "hola")
 
-            d = client.dummy_authenticate("open sesame")
-            filename = 'hola_1'
-            d.addCallbacks(lambda _: client.get_root(), client.test_fail)
-            d.addCallbacks(
-                lambda root: client.make_file(request.ROOT, root, filename),
-                client.test_fail)
+            # set the read limit, and get content
+            client.factory.factory.writeLimit = 100
 
-            def set_write_limit(r):
-                client.factory.factory.writeLimit = 100
-                return r
+            params = get_put_content_params(data, node=mkfile_req.new_id)
+            yield client.put_content(**params)
 
-            d.addCallback(set_write_limit)
-            d.addCallbacks(
-                lambda mkfile_req: client.put_content(
-                    request.ROOT, mkfile_req.new_id, NO_CONTENT_HASH,
-                    hash_value, crc32_value, size, deflated_size,
-                    StringIO(deflated_data)),
-                client.test_fail)
-            return d
-        d1 = defer.Deferred()
-        test_d = self.callback_test(auth, timeout=1)
-        test_d.addCallbacks(d1.errback, lambda r: d1.callback(None))
-        return d1
+            content_blob = yield threads.deferToThread(
+                check_file, params['new_hash'])
+            self.assertIsNotNone(content_blob)
+
+        d = self.callback_test(auth, add_default_callbacks=True,
+                               timeout=0.1)
+        err = yield self.assertFailure(d, Exception)
+        self.assertEqual(str(err), "timeout")

@@ -20,25 +20,22 @@
 
 import os
 
-from cStringIO import StringIO
-
 from magicicadaclient.syncdaemon.marker import MDMarker as Marker
 from magicicadaprotocol import request
-from magicicadaprotocol.content_hash import content_hash_factory, crc32
 from twisted.internet import defer, error
 
 from magicicada.server.testing.aq_helpers import (
-    NO_CONTENT_HASH,
     FakeGetContent,
     NoCloseCustomIO,
-    TestContentBase,
+    TestBase,
     aShareUUID,
     anEmptyShareList,
     anUUID,
+    get_aq_params,
 )
 
 
-class AQCancelTestBase(TestContentBase):
+class AQCancelTestBase(TestBase):
     """Things common to TestCancel and TestCancelMarker."""
 
     def setUp(self):
@@ -180,21 +177,25 @@ class TestCancel(AQCancelTestBase):
     def test_download(self):
         """Hiccup the network in the middle of a download."""
         self.patch(self.main.fs, 'get_partial_for_writing',
-                   lambda s, n: StringIO())
-        hash_value, _, _, d = self._mk_file_w_content()
-        mdid, node_id = yield d
+                   lambda s, n: NoCloseCustomIO())
+        result = yield self._mk_file_w_content()
 
         def worker():
             """Async worker."""
-            self.aq.download('', node_id, hash_value, mdid)
+            self.aq.download(
+                result['share_id'], result['node_id'], result['hash'],
+                result['mdid'])
             return self.hiccup()
-        fake_gc = FakeGetContent(self.connlost_deferred, '',
-                                 self.root, hash_value)
+
+        fake_gc = FakeGetContent(
+            self.connlost_deferred, result['share_id'], self.root,
+            result['hash'])
         yield self.nuke_client_method(
             'get_content_request', worker, lambda: fake_gc)
         self.assertInListenerEvents(
             'AQ_DOWNLOAD_COMMIT',
-            {'share_id': '', 'node_id': node_id, 'server_hash': hash_value})
+            {'share_id': '', 'node_id': result['node_id'],
+             'server_hash': result['hash']})
 
     @defer.inlineCallbacks
     def test_download_while_transferring(self):
@@ -208,15 +209,16 @@ class TestCancel(AQCancelTestBase):
                 aq.cancel_download(request.ROOT, self.file_id)
                 NoCloseCustomIO.write(self, data)
 
-        hash_v, crc32_v, data, d = self._mk_file_w_content(data_len=1024 * 256)
         myfile = MyFile()
         self.patch(
             self.main.fs, 'get_partial_for_writing', lambda s, n: myfile)
 
-        mdid, file_id = yield d
-        myfile.file_id = file_id
-        yield aq.download(request.ROOT, file_id, hash_v, mdid)
-        command = aq.queue.hashed_waiting[('Download', request.ROOT, file_id)]
+        result = yield self._mk_file_w_content(data_len=1024 * 256)
+        myfile.file_id = file_id = result['node_id']
+        yield aq.download(
+            result['share_id'], file_id, result['hash'], result['mdid'])
+        command = aq.queue.hashed_waiting[
+            ('Download', result['share_id'], file_id)]
         yield self.wait_for_nirvana()
 
         # This is insufficient for a proper test. Both a successful download
@@ -229,19 +231,15 @@ class TestCancel(AQCancelTestBase):
     @defer.inlineCallbacks
     def test_upload(self):
         """Hiccup the network in the middle of an upload."""
-        data = os.urandom(1000)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        self.patch(self.main.fs, 'open_file', lambda mdid: StringIO(data))
         mdid, node_id = yield self._mkfile('hola')
+        params = get_aq_params()
+        self.patch(self.main.fs, 'open_file', lambda mdid: params['fd'])
 
         def worker():
             """Async worker."""
-            self.aq.upload('', node_id, NO_CONTENT_HASH, hash_value,
-                           crc32_value, size, mdid)
+            self.aq.upload(
+                params['share_id'], node_id, params['previous_hash'],
+                params['hash'], params['crc32'], params['size'], mdid)
             return self.hiccup()
 
         yield self.wait_for_nirvana()
@@ -250,8 +248,8 @@ class TestCancel(AQCancelTestBase):
 
         self.assertInListenerEvents(
             'AQ_UPLOAD_FINISHED',
-            {'share_id': '', 'hash': hash_value, 'node_id': anUUID,
-             'new_generation': 2})
+            {'share_id': params['share_id'], 'hash': params['hash'],
+             'node_id': anUUID, 'new_generation': 2})
 
 
 class TestCancelMarker(AQCancelTestBase):

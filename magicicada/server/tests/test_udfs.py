@@ -20,20 +20,19 @@
 
 """Test User Defined Folder operations."""
 
+import os
 import uuid
 import zlib
 
-from StringIO import StringIO
-
 from magicicadaprotocol import request
-from magicicadaprotocol.content_hash import content_hash_factory, crc32
 from twisted.internet import reactor, defer
 
 from magicicada.filesync.errors import DoesNotExist
-from magicicada.server.testing.testcase import FactoryHelper, TestWithDatabase
-
-EMPTY_HASH = content_hash_factory().content_hash()
-NO_CONTENT_HASH = ""
+from magicicada.server.testing.testcase import (
+    FactoryHelper,
+    TestWithDatabase,
+    get_put_content_params,
+)
 
 
 class TestManageUDF(TestWithDatabase):
@@ -411,68 +410,43 @@ class TestUDFsWithData(TestWithDatabase):
             d.addCallbacks(client.test_fail, check)
         return self.callback_test(auth)
 
+    @defer.inlineCallbacks
     def test_get_content(self):
         """Read a file."""
-        data = ""
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
+        data = os.urandom(100)
 
-        def auth(client):
-            """Authenticate and test."""
-            d = client.dummy_authenticate("open sesame")
-            d.addCallback(lambda _: client.create_udf(u"~", u"myudf"))
-            d.addCallback(self.save_req, "udf")
+        client = yield self.get_client_helper(auth_token="open sesame")
+        udf = yield client.create_udf(u"~", u"myudf")
+        # create a file with content
+        mkfile_req = yield client.make_file(
+            udf.volume_id, udf.node_id, "test_file")
+        params = get_put_content_params(
+            data, share=udf.volume_id, node=mkfile_req.new_id)
+        yield client.put_content(**params)
 
-            # create a file with content
-            d.addCallback(lambda r: client.make_file(r.volume_id,
-                                                     r.node_id, "test_file"))
-            d.addCallback(self.save_req, "newfile")
-            d.addCallback(lambda r: client.put_content(
-                          self._state.udf.volume_id, r.new_id, NO_CONTENT_HASH,
-                          hash_value, crc32_value, size, deflated_size,
-                          StringIO(deflated_data)))
+        # get the content
+        content = yield client.get_content(
+            params['share'], params['node'], params['new_hash'])
+        self.assertEqual(zlib.decompress(content.data), data)
 
-            # get the content
-            d.addCallback(lambda r: client.get_content(
-                          self._state.udf.volume_id,
-                          self._state.newfile.new_id, EMPTY_HASH))
-            d.addCallbacks(client.test_done, client.test_fail)
-        return self.callback_test(auth)
-
-    def test_put_content(self):
+    @defer.inlineCallbacks
+    def test_put_content(self):  # XXX: this is the same as test_get_content
         """Write a file."""
         data = "*" * 10000
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
 
-        def auth(client):
-            """Authenticate and test."""
-            d = client.dummy_authenticate("open sesame")
-            d.addCallback(lambda _: client.create_udf(u"~", u"myudf"))
-            d.addCallback(self.save_req, "udf")
+        client = yield self.get_client_helper(auth_token="open sesame")
+        udf = yield client.create_udf(u"~", u"myudf")
+        # create a file with content
+        mkfile_req = yield client.make_file(
+            udf.volume_id, udf.node_id, "test_file")
+        params = get_put_content_params(
+            data, share=udf.volume_id, node=mkfile_req.new_id)
+        yield client.put_content(**params)
 
-            # create a file with content
-            d.addCallback(lambda r: client.make_file(self._state.udf.volume_id,
-                                                     self._state.udf.node_id,
-                                                     "foo"))
-            # put content
-            d.addCallback(lambda req: client.put_content(
-                          self._state.udf.volume_id, req.new_id,
-                          NO_CONTENT_HASH, hash_value, crc32_value, size,
-                          deflated_size, StringIO(deflated_data)))
-
-            d.addCallbacks(client.test_done, client.test_fail)
-        return self.callback_test(auth)
+        # get the content
+        content = yield client.get_content(
+            params['share'], params['node'], params['new_hash'])
+        self.assertEqual(zlib.decompress(content.data), data)
 
     def test_notify_multi_clients(self):
         """Node notification are sent with correct info."""

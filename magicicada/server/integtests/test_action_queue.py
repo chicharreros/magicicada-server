@@ -23,7 +23,6 @@
 import StringIO
 import os
 import uuid
-import zlib
 
 from magicicadaclient.syncdaemon.states import (
     StateManager, QueueManager, ConnectionManager)
@@ -40,16 +39,15 @@ from twisted.internet import defer, reactor
 
 from magicicada.server.testing.aq_helpers import (
     FakeFailure,
-    NO_CONTENT_HASH,
     NoCloseCustomIO,
     TestBase,
-    TestContentBase,
     TestWithDatabase,
     aShareInfo,
     aShareUUID,
     anEmptyShareList,
     anUUID,
     failure_expected,
+    get_aq_params,
 )
 
 LETTERS = 'abcdefghijklmnopqrstuvwxyz'
@@ -409,7 +407,7 @@ class TestDeferredMeta(TestBase):
                 {'marker': m, 'failure': FakeFailure('NOT_A_DIRECTORY')})
 
 
-class TestContent(TestContentBase):
+class TestContent(TestBase):
     """Test things described in IContentQueue."""
 
     @defer.inlineCallbacks
@@ -418,44 +416,37 @@ class TestContent(TestContentBase):
         buf = NoCloseCustomIO()
         self.patch(self.main.fs, 'get_partial_for_writing', lambda s, n: buf)
 
-        hash_value, _, data, d = self._mk_file_w_content()
-        mdid, node_id = yield d
-        yield self.aq.download(request.ROOT, node_id, hash_value, mdid)
+        result = yield self._mk_file_w_content()
+        yield self.aq.download(
+            result['share_id'], result['node_id'], result['hash'],
+            result['mdid'])
         yield self.wait_for_nirvana()
-        self.assertEqual(buf.getvalue(), data)
+        self.assertEqual(buf.getvalue(), result['data'])
 
-        self.assertEvent(('AQ_UPLOAD_FINISHED', {'share_id': request.ROOT,
-                                                 'node_id': node_id,
-                                                 'hash': hash_value,
-                                                 'new_generation': 2}))
+        self.assertEvent(
+            ('AQ_UPLOAD_FINISHED',
+             {'share_id': result['share_id'], 'node_id': result['node_id'],
+              'hash': result['hash'], 'new_generation': 2}))
 
     @defer.inlineCallbacks
     def test_upload_several(self):
         """Test we can upload several stuff."""
-
-        @defer.inlineCallbacks
-        def _check(node_data, hash_value, data):
-            """Check the upload was ok."""
-            mdid, node_id = node_data
-
+        for i in range(8):
+            filename = 'hola_%d' % i
+            result = yield self._mk_file_w_content(filename)
             # download it
             buf = NoCloseCustomIO()
             self.patch(self.main.fs, 'get_partial_for_writing',
                        lambda s, n: buf)
-            yield self.aq.download(request.ROOT, node_id, hash_value, mdid)
+            yield self.aq.download(
+                result['share_id'], result['node_id'], result['hash'],
+                result['mdid'])
             yield self.wait_for_nirvana()
-            self.assertEqual(buf.getvalue(), data)
-
-        for i in range(8):
-            filename = 'hola_%d' % i
-            hash_value, _, data, d = self._mk_file_w_content(filename)
-            node_data = yield d
-            yield _check(node_data, hash_value, data)
+            self.assertEqual(buf.getvalue(), result['data'])
 
     @defer.inlineCallbacks
     def test_uploading(self):
         """Test the uploading attribute is set correctly."""
-        fobj, data, hash_value, crc32_value, size = self._get_data()
         outer_self = self
         commands = []
 
@@ -498,24 +489,17 @@ class TestContent(TestContentBase):
                 self.tempfile.close(*a, **k)
 
         self.patch(action_queue, 'NamedTemporaryFile', MyTempFile)
-        self.patch(self.main.fs, 'open_file', lambda mdid: fobj)
-
-        mdid, node_id = yield self._mkfile('hola')
-        wait_for_upload = self.wait_for('AQ_UPLOAD_FINISHED')
-        self.aq.upload(request.ROOT, node_id, NO_CONTENT_HASH,
-                       hash_value, crc32_value, size, mdid)
-        yield wait_for_upload
+        result = yield self._mk_file_w_content()
         cmd = commands[0]
         self.assertEqual(cmd.deflated_size, cmd.n_bytes_written)
         self.assertEqual(cmd.deflated_size, cmd.tempfile.all_read)
-        self.assertEqual(cmd.hash, hash_value)
+        self.assertEqual(cmd.hash, result['hash'])
 
     @defer.inlineCallbacks
     def test_downloading(self):
         """Test the downloading attribute is set correctly"""
-        hash_v, crc32_v, data, d = self._mk_file_w_content()
-        mdid, node_id = yield d
-        deflated_size = len(zlib.compress(data))
+        result = yield self._mk_file_w_content()
+        deflated_size = result['deflated_size']
         outer_self = self
         commands = []
 
@@ -538,7 +522,9 @@ class TestContent(TestContentBase):
         self.patch(self.main.fs, 'get_partial_for_writing',
                    lambda s, n: MyFile())
         wait_for_download = self.wait_for('AQ_DOWNLOAD_COMMIT')
-        self.aq.download(request.ROOT, node_id, hash_v, mdid)
+        self.aq.download(
+            result['share_id'], result['node_id'], result['hash'],
+            result['mdid'])
         yield wait_for_download
         self.assertEqual(commands[0].n_bytes_read, deflated_size)
 
@@ -546,7 +532,6 @@ class TestContent(TestContentBase):
     @failure_expected("it's diet coke now")
     def test_testcase(self):
         """Test for a bug in the testcase setup/teardown order."""
-        fobj, data, hash_value, crc32_value, size = self._get_data()
         tmpfile = os.path.join(self.tmpdir, 'tmpfile')
 
         class FakeFile:
@@ -563,12 +548,14 @@ class TestContent(TestContentBase):
             seek = tell = write = close = flush = lambda *a: 42
 
         self.patch(action_queue, 'NamedTemporaryFile', FakeFile)
-        self.patch(self.main.fs, 'open_file', lambda mdid: fobj)
+        params = get_aq_params()
+        self.patch(self.main.fs, 'open_file', lambda mdid: params['fd'])
 
         mdid, node_id = yield self._mkfile('hola')
         waiter = self.wait_for('AQ_UPLOAD_ERROR')
-        yield self.aq.upload(request.ROOT, node_id, NO_CONTENT_HASH,
-                             hash_value, crc32_value, size, mdid)
+        yield self.aq.upload(
+            params['share_id'], node_id, params['previous_hash'],
+            params['hash'], params['crc32'], params['size'], mdid)
         yield waiter
 
     def test_ordered(self):
@@ -613,12 +600,14 @@ class TestContent(TestContentBase):
             def __getattr__(self, attr):
                 return getattr(self.buf, attr)
         buf = Foo()
-        hash_value, _, data, d = self._mk_file_w_content(data_len=1024 * 128)
-        mdid, node_id = yield d
-        self.patch(self.main.fs, 'get_partial_for_writing', lambda s, n: buf)
-        yield self.aq.download(request.ROOT, node_id, hash_value, mdid)
+        result = yield self._mk_file_w_content(data_len=1024 * 128)
+        self.patch(
+            self.main.fs, 'get_partial_for_writing', lambda s, n: buf)
+        yield self.aq.download(
+            result['share_id'], result['node_id'], result['hash'],
+            result['mdid'])
         yield self.main.wait_for_nirvana(.1)
-        self.assertEqual(buf.getvalue(), data)
+        self.assertEqual(buf.getvalue(), result['data'])
 
 
 class TestShares(TestBase):

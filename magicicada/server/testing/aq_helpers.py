@@ -44,7 +44,6 @@ from magicicadaclient.syncdaemon.filesystem_manager import FileSystemManager
 from magicicadaclient.syncdaemon.sync import Sync
 from magicicadaclient.syncdaemon.marker import MDMarker
 from magicicadaprotocol import request, sharersp, client
-from magicicadaprotocol.content_hash import content_hash_factory, crc32
 from twisted.internet import defer, reactor
 from twisted.names import dns
 from twisted.names.common import ResolverBase
@@ -52,11 +51,13 @@ from twisted.names.common import ResolverBase
 from magicicada import settings
 from magicicada.server import ssl_proxy
 from magicicada.server.auth import SimpleAuthProvider
-from magicicada.server.testing.testcase import BaseProtocolTestCase
+from magicicada.server.testing.testcase import (
+    BaseProtocolTestCase,
+    get_put_content_params,
+)
 from magicicada.testing.testcase import BaseTestCase
 
 
-NO_CONTENT_HASH = ""
 ROOT_DIR = os.getcwd()
 SD_CONFIG_DIR = os.path.join(
     ROOT_DIR, '.sourcecode', 'magicicada-client', 'data')
@@ -431,7 +432,7 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
             if self.failed and self.failed not in failure_ignore:
                 msg = "test method %r failed with: %s" % (
                     self._testMethodName, self.failed)
-                self.failed(msg)
+                self.fail(msg)
 
         if os.path.exists(self.tmpdir):
             self.rmtree(self.tmpdir)
@@ -618,6 +619,17 @@ anAQCommand = _TypedPlaceholder('an action queue command',
                                 ActionQueueCommand)
 
 
+def get_aq_params(data_len=1000, **overrides):
+    data = os.urandom(data_len)
+    fd = NoCloseCustomIO(data)
+    params = get_put_content_params(data=data, fd=fd, **overrides)
+    # adequate some key names to AQ terminology
+    params['share_id'] = params.pop('share')
+    params['hash'] = params.pop('new_hash')
+    params['data'] = data
+    return params
+
+
 class TestBase(TestWithDatabase):
     """Base class for TestMeta and TestContent."""
     client = None
@@ -661,42 +673,24 @@ class TestBase(TestWithDatabase):
         """Create a file, optionally storing the resulting uuid."""
         return self._gmk('file', name, parent, default_id, path)
 
-
-class TestContentBase(TestBase):
-    """Reusable utility methods born out of TestContent."""
-
-    def _get_data(self, data_len=1000):
-        """Get the hash, crc and size of a chunk of data."""
-        data = os.urandom(data_len)  # not terribly compressible
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        return NoCloseCustomIO(data), data, hash_value, crc32_value, size
-
+    @defer.inlineCallbacks
     def _mk_file_w_content(self, filename='hola', data_len=1000):
         """Make a file and dump some content in it."""
-        fobj, data, hash_value, crc32_value, size = self._get_data(data_len)
         path = filename
+        mdid, node_id = yield self._mkfile(filename, path=path)
+        params = get_aq_params(node_id=node_id, mdid=mdid)
+        wait_upload = self.wait_for(
+            'AQ_UPLOAD_FINISHED', share_id=params['share_id'],
+            hash=params['hash'], node_id=node_id)
+        orig_open_file = self.main.fs.open_file
+        self.main.fs.open_file = lambda _: params['fd']
 
-        @defer.inlineCallbacks
-        def worker():
-            """Do the upload, later."""
-            mdid, node_id = yield self._mkfile(filename, path=path)
-            wait_upload = self.wait_for('AQ_UPLOAD_FINISHED',
-                                        share_id=request.ROOT, hash=hash_value,
-                                        node_id=node_id)
-            orig_open_file = self.main.fs.open_file
-            self.main.fs.open_file = lambda _: fobj
-
-            self.aq.upload(request.ROOT, node_id, NO_CONTENT_HASH,
-                           hash_value, crc32_value, size, mdid)
-            self.main.fs.open_file = orig_open_file
-            yield wait_upload
-            defer.returnValue((mdid, node_id))
-
-        return hash_value, crc32_value, data, worker()
+        self.aq.upload(
+            params['share_id'], node_id, params['previous_hash'],
+            params['hash'], params['crc32'], params['size'], mdid)
+        self.main.fs.open_file = orig_open_file
+        yield wait_upload
+        defer.returnValue(params)
 
 
 class FakeResolver(ResolverBase):

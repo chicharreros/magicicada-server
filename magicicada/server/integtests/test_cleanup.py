@@ -24,24 +24,24 @@ from magicicadaprotocol import request
 from twisted.internet import reactor, defer
 
 from magicicada.server.testing.aq_helpers import (
-    NO_CONTENT_HASH,
     NoCloseCustomIO,
-    TestContentBase,
+    TestBase,
     anEmptyShareList,
     anUUID,
     failure_ignore,
+    get_aq_params,
 )
 
 defer.setDebugging(True)
 
 
-class TestCleanup(TestContentBase):
+class TestCleanup(TestBase):
     """Test the different cleanup-related situations."""
 
     def tearDown(self):
         """unplug everything and go home"""
         self.eq.push('SYS_USER_DISCONNECT')
-        return TestContentBase.tearDown(self)
+        return super(TestCleanup, self).tearDown()
 
     @defer.inlineCallbacks
     def test_cleanup_pre_make_file(self):
@@ -220,40 +220,43 @@ class TestCleanup(TestContentBase):
     @defer.inlineCallbacks
     def test_download(self):
         """Download."""
-        hash_value, _, _, d = self._mk_file_w_content('hola.txt')
-        mdid, node_id = yield d
+        result = yield self._mk_file_w_content('hola.txt')
         buf = NoCloseCustomIO()
         self.patch(self.main.fs, 'get_partial_for_writing', lambda s, n: buf)
 
-        self.aq.download('', node_id, hash_value, mdid)
         waiter = self.wait_for('SYS_QUEUE_DONE')
+        self.aq.download(
+            result['share_id'], result['node_id'], result['hash'],
+            result['mdid'])
         self.eq.push('SYS_NET_DISCONNECTED')
         self.eq.push('SYS_CONNECTION_LOST')
         self.eq.push('SYS_NET_CONNECTED')
         yield waiter
         yield self.wait_for_nirvana(1)
-        self.assertEvent(('AQ_DOWNLOAD_COMMIT', {'share_id': '',
-                                                 'node_id': node_id,
-                                                 'server_hash': hash_value}))
+        self.assertEvent(
+            ('AQ_DOWNLOAD_COMMIT',
+             {'share_id': result['share_id'], 'node_id': result['node_id'],
+              'server_hash': result['hash']}))
 
     @defer.inlineCallbacks
     def test_upload(self):
         """Upload works! amazing."""
-        fobj, data, hash_value, crc32_value, size = self._get_data(1000)
-        self.patch(self.main.fs, 'open_file', lambda mdid: fobj)
         mdid, node_id = yield self._mkfile('hola')
+        params = get_aq_params()
+        self.patch(self.main.fs, 'open_file', lambda mdid: params['fd'])
 
         # Start the upload, jigger the network
         waiter = self.wait_for('SYS_QUEUE_DONE')
-        self.aq.upload('', node_id, NO_CONTENT_HASH, hash_value,
-                       crc32_value, size, mdid)
+        self.aq.upload(
+            params['share_id'], node_id, params['previous_hash'],
+            params['hash'], params['crc32'], params['size'], mdid)
         self.eq.push('SYS_NET_DISCONNECTED')
         self.eq.push('SYS_CONNECTION_LOST')
         reactor.callLater(0.2, self.eq.push, 'SYS_NET_CONNECTED')
-        self.main.vm.update_free_space(request.ROOT, size * 2)
+        self.main.vm.update_free_space(request.ROOT, params['size'] * 2)
         yield waiter
         yield self.wait_for_nirvana(1)
-        self.assertEvent(('AQ_UPLOAD_FINISHED', {'share_id': '',
-                                                 'node_id': anUUID,
-                                                 'new_generation': 2,
-                                                 'hash': hash_value}))
+        self.assertEvent(
+            ('AQ_UPLOAD_FINISHED',
+             {'share_id': params['share_id'], 'node_id': anUUID,
+              'new_generation': 2, 'hash': params['hash']}))

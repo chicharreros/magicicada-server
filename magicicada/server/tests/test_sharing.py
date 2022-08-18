@@ -18,21 +18,20 @@
 
 """Test sharing operations."""
 
+import os
 import uuid
 import zlib
 
-from StringIO import StringIO
-
 from magicicadaprotocol import errors as protocol_errors, request
-from magicicadaprotocol.content_hash import content_hash_factory, crc32
 from twisted.internet import reactor, defer
 
 from magicicada.filesync import errors
 from magicicada.filesync.models import STATUS_LIVE, Share
-from magicicada.server.testing.testcase import FactoryHelper, TestWithDatabase
-
-EMPTY_HASH = content_hash_factory().content_hash()
-NO_CONTENT_HASH = ""
+from magicicada.server.testing.testcase import (
+    FactoryHelper,
+    TestWithDatabase,
+    get_put_content_params,
+)
 
 
 class TestCreateShare(TestWithDatabase):
@@ -688,75 +687,47 @@ class TestSharesWithData(TestWithDatabase):
 
         return self.callback_test(auth)
 
+    @defer.inlineCallbacks
     def test_get_content_on_share(self):
-        """read a file on a share."""
-        data = ""
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
+        """Read a file on a share."""
+        data = os.urandom(100)
 
-        def auth(client):
-            """auth"""
-            d = client.dummy_authenticate("open sesame")
-            # need to put data to be able to retrieve it!
-            d.addCallback(
-                lambda r: client.put_content(
-                    self.share_modify, self.filerw, NO_CONTENT_HASH,
-                    hash_value, crc32_value, size, deflated_size,
-                    StringIO(deflated_data)))
-            d.addCallback(
-                lambda r: client.get_content(
-                    self.share_modify, self.filerw, EMPTY_HASH))
-            d.addCallbacks(client.test_done, client.test_fail)
+        client = yield self.get_client_helper(auth_token="open sesame")
+        # need to put data to be able to retrieve it!
+        params = get_put_content_params(
+            data, share=self.share_modify, node=self.filerw)
+        yield client.put_content(**params)
 
-        return self.callback_test(auth)
+        # get the content
+        content = yield client.get_content(
+            params['share'], params['node'], params['new_hash'])
+        self.assertEqual(zlib.decompress(content.data), data)
 
-    def test_put_content_on_share(self):
-        """write a file on a share."""
+    @defer.inlineCallbacks
+    def test_put_content_on_share(self):   # XXX: this is the same as above
+        """Write a file on a share."""
         data = "*" * 100000
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
 
-        def auth(client):
-            """auth"""
-            d = client.dummy_authenticate("open sesame")
-            d.addCallback(
-                lambda r: client.put_content(
-                    self.share_modify, self.filerw, NO_CONTENT_HASH,
-                    hash_value, crc32_value, size, deflated_size,
-                    StringIO(deflated_data)))
-            d.addCallbacks(client.test_done, client.test_fail)
+        client = yield self.get_client_helper(auth_token="open sesame")
+        params = get_put_content_params(
+            data, share=self.share_modify, node=self.filerw)
+        yield client.put_content(**params)
 
-        return self.callback_test(auth)
+        # get the content
+        content = yield client.get_content(
+            params['share'], params['node'], params['new_hash'])
+        self.assertEqual(zlib.decompress(content.data), data)
 
+    @defer.inlineCallbacks
     def test_put_content_on_share_ro(self):
         """Write a file on a share thats read only."""
         data = "*" * 100000
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
 
-        def auth(client):
-            """auth"""
-            d = client.dummy_authenticate("open sesame")
-            d.addCallback(
-                lambda r: client.put_content(
-                    self.share, self.filero, NO_CONTENT_HASH, hash_value,
-                    crc32_value, size, StringIO(data)))
-            d.addCallbacks(client.test_fail, lambda x: client.test_done())
-
-        return self.callback_test(auth)
+        client = yield self.get_client_helper(auth_token="open sesame")
+        params = get_put_content_params(
+            data, share=self.share, node=self.filero)
+        d = client.put_content(**params)
+        yield self.assertFails(d, 'NO_PERMISSION')
 
 
 class TestListShares(TestWithDatabase):

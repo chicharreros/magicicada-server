@@ -18,16 +18,15 @@
 
 """Tests for server rescan."""
 
-import zlib
-
-from cStringIO import StringIO
-
 from magicicadaprotocol import request
-from magicicadaprotocol.content_hash import content_hash_factory, crc32
 from twisted.internet import defer
 
 from magicicada.server.integtests.test_sync import TestServerBase
-from magicicada.server.testing.aq_helpers import NO_CONTENT_HASH
+from magicicada.server.testing.testcase import get_put_content_params
+
+
+# XXX: This class does not seem to be used anywhere in the codebase, maybe
+# this was an import error when open sourcing the project?
 
 
 class TestServerScan(TestServerBase):
@@ -44,24 +43,14 @@ class TestServerScan(TestServerBase):
     @defer.inlineCallbacks
     def do_create_lots_of_files(self, suffix=''):
         """A helper that creates N files."""
-        # data for putcontent
-        ho = content_hash_factory()
-        hash_value = ho.content_hash()
-        data = ''
-        crc32_value = crc32(data)
-        deflated_content = zlib.compress(data)
-        deflated_size = len(deflated_content)
-
         mk = yield self.client.make_file(request.ROOT, self.root_id,
                                          "test_first" + suffix)
-        yield self.client.put_content(
-            request.ROOT, mk.new_id, NO_CONTENT_HASH, hash_value,
-            crc32_value, 0, deflated_size, StringIO(deflated_content))
+        # data for putcontent
+        params = get_put_content_params(share=request.ROOT, node=mk.new_id)
+        yield self.client.put_content(**params)
 
         for i in range(self.N):
             mk = yield self.client.make_file(request.ROOT, self.root_id,
                                              "test_%03x%s" % (i, suffix))
-            yield self.client.put_content(request.ROOT, mk.new_id,
-                                          NO_CONTENT_HASH, hash_value,
-                                          crc32_value, 0, deflated_size,
-                                          StringIO(deflated_content))
+            params = get_put_content_params(share=request.ROOT, node=mk.new_id)
+            yield self.client.put_content(**params)
