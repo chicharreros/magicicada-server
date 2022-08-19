@@ -111,7 +111,7 @@ class BaseProtocolTestCase(TwistedTestCase):
     """Reusable part of ProtocolTestCase."""
 
     heartbeat_interval = 0
-    timeout = 12
+    timeout = 120
     maxDiff = None
 
     @property
