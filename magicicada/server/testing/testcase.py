@@ -101,8 +101,8 @@ class BaseProtocolTestCase(TwistedTestCase):
     def tearDown(self):
         """Tear down after testing."""
         yield self.service.stopService()
-        logger.info("finished test %s", self.id())
         yield super(BaseProtocolTestCase, self).tearDown()
+        logger.info("finished test %s", self.id())
 
     def make_user(self, username=None, **kwargs):
         if username is None:

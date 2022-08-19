@@ -132,7 +132,7 @@ class TestSync(TestWithDatabase):
         self.eq.push('SYS_NET_CONNECTED')
         yield d
 
-        self.handler = self.add_memento_handler(logger, level=logging.ERROR)
+        self.handler = self.add_memento_handler(logger)
 
     def _wait_for_dead_nirvana(self):
         """Wait until it's disconnected."""
@@ -163,10 +163,12 @@ class TestSync(TestWithDatabase):
         yield super(TestSync, self).tearDown()
         yield self._wait_for_dead_nirvana()
 
-        # make sure no errors were reported
-        if self.handler.records:
-            errs = "\n".join(e.getMessage() for e in self.handler.records)
-            raise Exception("Test ended with errors: \n" + errs)
+        # make sure no errors were reported, check for WARNING and above
+        errs = "\n".join(
+            e.getMessage() for e in self.handler.records
+            if e.levelno >= logging.WARNING)
+        if errs:
+            raise Exception("Test ended with errors: \n\n" + errs)
 
     def compare_dirs(self):
         """Run rsync to compare directories, needs some work."""
@@ -238,7 +240,7 @@ class TestSync(TestWithDatabase):
     @defer.inlineCallbacks
     def check(self):
         """Compare against server."""
-        yield self.main.wait_for_nirvana(last_event_interval=0)
+        yield self.main.wait_for_nirvana(last_event_interval=2)
         yield self.compare_server()
 
 
@@ -956,8 +958,11 @@ class TestClientMove(TestSync):
         """Test rename a file quickly."""
         fname = self.root_dir + "/test_file"
         open(fname, "w").close()
+        logger.debug('%s item created at %s', self.id(), fname)
         os.rename(fname, fname + "_new")
+        logger.debug('%s item moved to %s', self.id(), fname + "_new")
         yield self.check()
+        logger.debug('%s check done.', self.id())
 
     @defer.inlineCallbacks
     def test_simple_move_dir(self):
@@ -973,8 +978,11 @@ class TestClientMove(TestSync):
         """Test rename a dir quickly."""
         fname = self.root_dir + "/test_dir"
         os.mkdir(fname)
+        logger.debug('%s item created at %s', self.id(), fname)
         os.rename(fname, fname + "_new")
+        logger.debug('%s item moved to %s', self.id(), fname + "_new")
         yield self.check()
+        logger.debug('%s check done.', self.id())
 
     @defer.inlineCallbacks
     def test_change_parent_move_dir(self):
