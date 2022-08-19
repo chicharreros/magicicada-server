@@ -240,7 +240,7 @@ class TestSync(TestWithDatabase):
     @defer.inlineCallbacks
     def check(self):
         """Compare against server."""
-        yield self.main.wait_for_nirvana(last_event_interval=0)
+        yield self.main.wait_for_nirvana(last_event_interval=2)
         yield self.compare_server()
 
 
