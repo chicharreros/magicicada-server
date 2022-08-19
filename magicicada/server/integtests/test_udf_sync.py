@@ -27,7 +27,7 @@ from twisted.internet import reactor, defer
 from twisted.python.failure import Failure
 
 from magicicada.server.integtests import test_sync
-from magicicada.server.testing.aq_helpers import NO_CONTENT_HASH
+from magicicada.server.testing.testcase import get_put_content_params
 
 
 class TestUDFSync(test_sync.TestSync):
@@ -84,10 +84,7 @@ class TestUDFSync(test_sync.TestSync):
             out = StringIO()
             subprocess.call(["rsync", "-nric", self.my_udf_dir,
                              self.source_dir], stdout=out)
-            if not out.getvalue():
-                return True
-            else:
-                return False
+            return not out.getvalue()
         return test_sync.deferToThread(_compare)
 
     def upload_server(self):
@@ -138,24 +135,20 @@ class TestUDFClientMove(TestUDFSync, test_sync.TestClientMove):
 class TestUDFServerBase(TestUDFSync, test_sync.TestServerBase):
     """Base test case for server-side UDF related tests."""
 
+    @defer.inlineCallbacks
     def make_file(self, udf_name, filename, parent):
         """Create a file in the server."""
-        # data for putcontent
-        hash_value, crc32_value, deflated_size, deflated_content = \
-            self.get_put_content_data()
-
         volume_id = getattr(self, udf_name + '_id')
-        d = self.get_client()
-        d.addCallback(lambda _: self.client.make_file(volume_id,
-                                                      parent, filename))
-        d.addCallback(lambda mk: self.client.put_content(
-            volume_id, mk.new_id, NO_CONTENT_HASH, hash_value, crc32_value, 0,
-            deflated_size, StringIO(deflated_content)))
-        d.addCallback(lambda _:
-                      self.main.wait_for_nirvana(last_event_interval=1))
-        d.addCallback(lambda _: self.check(udf_name + '_dir',
-                                           udf_name + '_id'))
-        return d
+        yield self.get_client()
+        mkfile_req = yield self.client.make_file(volume_id, parent, filename)
+
+        # data for putcontent
+        params = get_put_content_params(
+            share=volume_id, node=mkfile_req.new_id)
+        yield self.client.put_content(**params)
+
+        yield self.main.wait_for_nirvana(last_event_interval=1)
+        yield self.check(udf_name + '_dir', udf_name + '_id')
 
     def make_dir(self, udf_name, dirname, parent):
         """Create a dir in the server."""
@@ -178,6 +171,7 @@ class TestUDFServerBase(TestUDFSync, test_sync.TestServerBase):
 
 class TestClientMoveMultipleUDFs(TestUDFServerBase):
     """Moves on the client (between UDFs), e.g:
+
         1) jack has two UDFs
         2) jack moves (on the filesystem) a file from udf1 to udf2
         3) jack moves (on the filesystem) a dir from udf1 to udf2
@@ -236,17 +230,14 @@ class TestUDFServerMove(TestUDFServerBase):
     @defer.inlineCallbacks
     def test_simple_move(self):
         """Server-side move of a file inside a UDF."""
-        # data for putcontent
-        hash_value, crc32_value, deflated_size, deflated_content = \
-            self.get_put_content_data()
-
         yield self.get_client()
         req = yield self.client.make_file(self.my_udf_id,
                                           self.my_udf.node_id, "test_file")
-        yield self.client.put_content(self.my_udf_id, req.new_id,
-                                      NO_CONTENT_HASH, hash_value, crc32_value,
-                                      0, deflated_size,
-                                      StringIO(deflated_content))
+        # data for putcontent
+        params = get_put_content_params(
+            share=self.my_udf_id, node=req.new_id)
+        yield self.client.put_content(**params)
+
         yield self.main.wait_for_nirvana(last_event_interval=.5)
         yield self.client.move(self.my_udf_id, req.new_id,
                                self.my_udf.node_id, "test_file_moved")

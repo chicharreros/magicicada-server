@@ -21,18 +21,15 @@
 """Test making nodes."""
 
 import uuid
-import zlib
-
-from StringIO import StringIO
 
 from magicicadaprotocol import request, volumes
-from magicicadaprotocol.content_hash import content_hash_factory, crc32
 from twisted.internet import defer
 
 from magicicada.filesync import errors
-from magicicada.server.testing.testcase import TestWithDatabase
-
-NO_CONTENT_HASH = ""
+from magicicada.server.testing.testcase import (
+    TestWithDatabase,
+    get_put_content_params,
+)
 
 
 class TestMakeFile(TestWithDatabase):
@@ -162,30 +159,19 @@ class TestMakeFile(TestWithDatabase):
                 lambda x: client.test_done("ok"), client.test_fail)
         return self.callback_test(auth)
 
+    @defer.inlineCallbacks
     def test_mkfile_already_exists_content(self):
         """Create a file on a file that already exists and have content."""
         data = "*" * 100
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
 
-        def auth(client):
-            d = client.dummy_authenticate("open sesame")
-            d.addCallback(lambda r: client.get_root())
-            d.addCallback(self.save_req, "root")
-            d.addCallback(lambda r: client.make_file(request.ROOT, r, "hola"))
-            d.addCallback(lambda req: client.put_content(request.ROOT,
-                          req.new_id, NO_CONTENT_HASH, hash_value, crc32_value,
-                          size, deflated_size, StringIO(deflated_data)))
-            d.addCallback(lambda r: client.make_file(request.ROOT,
-                                                     self._state.root, "hola"))
-            d.addCallbacks(
-                lambda x: client.test_done("ok"), client.test_fail)
-        return self.callback_test(auth)
+        client = yield self.get_client_helper(auth_token="open sesame")
+        root_id = yield client.get_root()
+        mkfile_req = yield client.make_file(request.ROOT, root_id, "hola")
+
+        params = get_put_content_params(data, node=mkfile_req.new_id)
+        yield client.put_content(**params)
+
+        yield client.make_file(params['share'], root_id, "hola")
 
     def test_mkfile_auth_required(self):
         """Require authentication for make_file."""

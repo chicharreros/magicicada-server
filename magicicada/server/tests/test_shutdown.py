@@ -21,14 +21,13 @@
 import os
 
 from magicicadaprotocol import request
-from magicicadaprotocol.content_hash import content_hash_factory
 from magicicadaprotocol.client import StorageClientFactory, StorageClient
 from twisted.trial.unittest import TestCase as TwistedTestCase
 from twisted.internet import reactor, defer, error
 
 from magicicada.filesync.services import make_storage_user
 from magicicada.server.auth import DummyAuthProvider
-from magicicada.server.testing.testcase import StorageServerService
+from magicicada.server.testing.testcase import StorageServerService, get_hash
 from magicicada.testing.testcase import BaseTestCase
 
 
@@ -94,7 +93,7 @@ class TestShutdown(TwistedTestCase, BaseTestCase):
         mkfile_req = yield client.make_file(request.ROOT, root, "hola")
 
         # try to upload something that will fail when sending data
-        empty_hash = content_hash_factory().content_hash()
+        empty_hash = get_hash(b'')
         # lose the connection if something wrong
         try:
             yield client.put_content(request.ROOT, mkfile_req.new_id,

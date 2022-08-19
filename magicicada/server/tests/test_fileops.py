@@ -18,15 +18,15 @@
 
 """Test file operations."""
 
-from StringIO import StringIO
-
 from magicicadaprotocol import errors as protocol_errors, request
-from magicicadaprotocol.content_hash import content_hash_factory, crc32
 from twisted.internet import threads, defer
 
 from magicicada.filesync import errors
 from magicicada.filesync.models import STATUS_LIVE, STATUS_DEAD
-from magicicada.server.testing.testcase import TestWithDatabase
+from magicicada.server.testing.testcase import (
+    TestWithDatabase,
+    get_put_content_params,
+)
 
 
 class TestMove(TestWithDatabase):
@@ -354,33 +354,22 @@ class TestUnlink(TestWithDatabase):
             d.addCallbacks(client.test_fail, lambda x: client.test_done("ok"))
         return self.callback_test(auth)
 
+    @defer.inlineCallbacks
     def test_putcontent_unlinked(self):
         """Try to put content in an unlinked file."""
-        empty_hash = content_hash_factory().content_hash()
         data = "*"
-        size = 1
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
 
-        def auth(client):
-            # setup
-            d = client.dummy_authenticate("open sesame")
-            d.addCallback(lambda r: client.get_root())
+        client = yield self.get_client_helper(auth_token="open sesame")
+        root_id = yield client.get_root()
+        # create file and remove it
+        mkfile_req = yield client.make_file(request.ROOT, root_id, "hola")
 
-            # create file and remove it
-            d.addCallback(lambda r: client.make_file(request.ROOT, r, "hola"))
-            d.addCallback(lambda req: self._save_state("file", req.new_id))
-            d.addCallback(lambda _: client.unlink(request.ROOT,
-                                                  self._state.file))
+        params = get_put_content_params(data, node=mkfile_req.new_id)
+        client.unlink(params['share'], params['node'])
 
-            # try to put content
-            d.addCallback(lambda _: client.put_content(
-                request.ROOT, self._state.file, empty_hash, hash_value,
-                crc32_value, size, StringIO(data)))
-            d.addCallbacks(client.test_fail, lambda x: client.test_done("ok"))
-        return self.callback_test(auth)
+        # try to put content
+        d = client.put_content(**params)
+        yield self.assertFails(d, 'DOES_NOT_EXIST')
 
     def test_unlink_and_create_same_name(self):
         """Unlink a dir, and create it again with same name."""

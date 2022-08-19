@@ -29,7 +29,7 @@ from twisted.internet import reactor, defer
 from twisted.python.failure import Failure
 
 from magicicada.server.integtests import test_sync
-from magicicada.server.testing.aq_helpers import NO_CONTENT_HASH
+from magicicada.server.testing.testcase import get_put_content_params
 
 
 class TestSharesSync(test_sync.TestSync):
@@ -101,12 +101,12 @@ class TestSharesSync(test_sync.TestSync):
         return test_sync.deferToThread(_compare)
 
     def upload_server(self):
-        "upload files in source to the test share"
+        """Upload files in source to the test share."""
         return test_sync.TestSync.upload_server(self, share=self.jane_share_id)
 
     def compare_server(self, dir_name='jane_share_dir',
                        share_id_name='jane_share_id'):
-        "compare share with server"
+        """Compare share with server."""
         return test_sync.TestSync.compare_server(
             self, share=getattr(self, share_id_name),
             target=getattr(self, dir_name))
@@ -145,28 +145,25 @@ class TestShareClientMove(TestSharesSync, test_sync.TestClientMove):
 
 
 class TestShareServerBase(TestSharesSync, test_sync.TestServerBase):
-    """ Base test case for server-side share related tests. """
+    """Base test case for server-side share related tests."""
 
+    @defer.inlineCallbacks
     def make_file(self, username, filename, parent):
-        """ create a file in the server. """
-        # data for putcontent
-        hash_value, crc32_value, deflated_size, deflated_content = \
-            self.get_put_content_data()
+        """Create a file in the server."""
+        yield self.get_client_by_user(username)
+        mkfile_req = yield self.client.make_file(
+            request.ROOT, parent, filename)
 
-        d = self.get_client_by_user(username)
-        d.addCallback(lambda _: self.client.make_file(
-            request.ROOT, parent, filename))
-        d.addCallback(lambda mk: self.client.put_content(
-            request.ROOT, mk.new_id, NO_CONTENT_HASH, hash_value,
-            crc32_value, 0, deflated_size, StringIO(deflated_content)))
-        d.addCallback(lambda _:
-                      self.main.wait_for_nirvana(last_event_interval=1))
-        d.addCallback(lambda _: self.check(username + '_share_dir',
-                                           username + '_share_id'))
-        return d
+        # data for putcontent
+        params = get_put_content_params(
+            share=request.ROOT, node=mkfile_req.new_id)
+        yield self.client.put_content(**params)
+
+        yield self.main.wait_for_nirvana(last_event_interval=1)
+        yield self.check(username + '_share_dir', username + '_share_id')
 
     def make_dir(self, username, dirname, parent):
-        """ create a dir in the server. """
+        """Create a dir in the server."""
         d = self.get_client_by_user(username)
         d.addCallback(lambda _: self.client.make_dir(
             request.ROOT, parent, dirname))
@@ -177,13 +174,13 @@ class TestShareServerBase(TestSharesSync, test_sync.TestServerBase):
         return d
 
     def check(self, share_dir, share_id):
-        """compare against server."""
+        """Compare against server."""
         d = self.main.wait_for_nirvana(last_event_interval=0.5)
         d.addCallback(lambda _: self.compare_server(share_dir, share_id))
         return d
 
     def get_client_by_user(self, username):
-        """ returns the client for the user with token: username+'_token'. """
+        """Return the client for the user with token: username+'_token'."""
         return self.get_client(username=username,
                                root_id_name=username + '_root_id')
 

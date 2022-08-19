@@ -22,12 +22,20 @@ Base classes to do all the testing.
 """
 
 import logging
+import os
 import time
+import zlib
 from functools import wraps
+from io import BytesIO
 from StringIO import StringIO
 
 from magicicadaprotocol import client as protocol_client, request, protocol_pb2
 from magicicadaprotocol.client import StorageClientFactory, StorageClient
+from magicicadaprotocol.content_hash import (
+    content_hash_factory,
+    crc32,
+    magic_hash_factory,
+)
 from OpenSSL import crypto
 from twisted.internet import reactor, defer, ssl
 from twisted.internet.protocol import connectionDone
@@ -39,6 +47,7 @@ from twisted.web.client import getPage
 from magicicada import settings
 from magicicada.filesync import services
 from magicicada.server.auth import DummyAuthProvider
+from magicicada.server.content import DBUploadJob, UploadJob
 from magicicada.server.server import PREFERRED_CAP, StorageServerService
 from magicicada.testing.testcase import BaseTestCase
 
@@ -46,6 +55,40 @@ logger = logging.getLogger(__name__)
 server_key = settings.CRT_KEY
 server_crt = settings.CRT
 server_crt_chain = settings.CRT_CHAIN
+EMPTY_HASH = content_hash_factory().content_hash()
+NO_CONTENT_HASH = ""
+
+
+def get_hash(data):
+    """Return the hash for the data."""
+    hash_object = content_hash_factory()
+    hash_object.update(data)
+    return hash_object.content_hash()
+
+
+def get_magic_hash(data):
+    """Return the magic hash for the data."""
+    magic_hash_object = magic_hash_factory()
+    magic_hash_object.update(data)
+    return magic_hash_object.content_hash()._magic_hash
+
+
+def get_put_content_params(
+        data=None, deflated_data=None, share=request.ROOT, **overrides):
+    """Return the test data for put_content."""
+    if data is None:
+        data = os.urandom(1000)  # not terribly compressible
+    if deflated_data is None:
+        deflated_data = zlib.compress(data)
+    params = overrides.copy()
+    params.setdefault('share', share)
+    params.setdefault('previous_hash', NO_CONTENT_HASH)
+    params.setdefault('new_hash', get_hash(data))
+    params.setdefault('crc32', crc32(data))
+    params.setdefault('size', len(data))
+    params.setdefault('deflated_size', len(deflated_data))
+    params.setdefault('fd', BytesIO(deflated_data))
+    return params
 
 
 class FakeTimestampChecker(object):
@@ -108,6 +151,38 @@ class BaseProtocolTestCase(TwistedTestCase):
         if username is None:
             username = self.factory.get_unique_string()
         return services.make_storage_user(username=username, **kwargs)
+
+    @defer.inlineCallbacks
+    def make_upload_job(self, size, user, content_user):
+        """Create an UploadJob object.
+
+        @param size: the size of the upload
+        @param user: the storage user
+        @param content_user: the User owning the file content
+        @return: a tuple (deflated_data, hash_value, upload_job)
+
+        """
+        data = os.urandom(size)
+        deflated_data = zlib.compress(data)
+        hash_value = get_hash(data)
+        magic_hash_value = get_magic_hash(data)
+        crc32_value = crc32(data)
+        deflated_size = len(deflated_data)
+        root, _ = yield content_user.get_root()
+        r = yield self.service.factory.content.rpc_dal.call(
+            'make_file_with_content',
+            user_id=content_user.id, volume_id=user.root_volume_id,
+            parent_id=root, name=u"A new file", node_hash=EMPTY_HASH,
+            crc32=0, size=0, deflated_size=0, storage_key=None)
+        node_id = r['node_id']
+        node = yield content_user.get_node(user.root_volume_id, node_id, None)
+        args = (content_user, user.root_volume_id, node_id, node.content_hash,
+                hash_value, crc32_value, size)
+        upload = yield DBUploadJob.make(*args)
+        upload_job = UploadJob(
+            content_user, node, node.content_hash, hash_value, crc32_value,
+            size, deflated_size, None, False, magic_hash_value, upload)
+        defer.returnValue((deflated_data, hash_value, upload_job))
 
 
 class ClientTestHelper(object):
@@ -269,6 +344,7 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
 
     auth_provider_class = DummyAuthProvider
     factory_class = SimpleFactory
+    STORAGE_CHUNK_SIZE = 1024 * 64
 
     def _save_state(self, key, value):
         """Store values to be accessed by deferred functions."""
@@ -377,7 +453,7 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
                 dummy_tokens[password] = user.id
 
         # tune the config for this tests
-        self.patch(settings, 'STORAGE_CHUNK_SIZE', 1024 * 64)
+        self.patch(settings, 'STORAGE_CHUNK_SIZE', self.STORAGE_CHUNK_SIZE)
 
     def save_req(self, req, name):
         """Save a request for later use."""
@@ -385,16 +461,56 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
         return req
 
     @defer.inlineCallbacks
-    def _get_client_helper(self, auth_token="open sesame"):
+    def get_client_helper(
+            self, wait_notifications=0, timeout=None, caps=PREFERRED_CAP,
+            use_ssl=False, auth_token=None, name='a-client', **kwargs):
         """Simplify the testing code by getting a client for the user."""
         connect_d = defer.Deferred()
-        factory = FactoryHelper(connect_d.callback, caps=PREFERRED_CAP)
-        connector = reactor.connectTCP("localhost", self.port, factory)
+        factory = FactoryHelper(
+            connect_d.callback, factory=self.buildFactory(),
+            wait_notifications=wait_notifications,
+            timeout=timeout, caps=caps, **kwargs)
+
+        def wait_test_deferred():
+            logger.info(
+                'TestWithDatabase.get_client_helper: client %r waiting for '
+                'deferred %r (already called? %s)',
+                name, factory.test_deferred, factory.test_deferred.called)
+            return factory.test_deferred
+
+        self.addCleanup(wait_test_deferred)
+
+        # there are 3 ways to connect to a server.
+        # tcp and ssl will work in the tests
+        if use_ssl:
+            connector = reactor.connectSSL(
+                "localhost", self.ssl_port, factory,
+                ssl.ClientContextFactory())
+        else:
+            connector = reactor.connectTCP("localhost", self.port, factory)
+        # https connect requires a working proxy and a server on
+        # the default port running (we are not setting this up for
+        # automated testing yet)
+        # connector = proxy_tunnel.connectHTTPS(
+        #     'localhost', 3128, "localhost", 20101, factory,
+        #     user="test", passwd="test")
         self.addCleanup(connector.disconnect)
+
         client = yield connect_d
+        self.addCleanup(client.test_done)
         self.addCleanup(client.kill)
-        yield client.dummy_authenticate(auth_token)
-        defer.returnValue((client, connector))
+        self.addCleanup(client.transport.loseConnection)
+
+        if isinstance(auth_token, dict):
+            yield client.simple_authenticate(**auth_token)
+        elif isinstance(auth_token, str):
+            yield client.dummy_authenticate(auth_token)
+        else:
+            logger.warning(
+                'TestWithDatabase.get_client_helper, no authentication done '
+                '(auth_token: %r)', auth_token)
+
+        defer.returnValue(client)
 
 
 class BufferedConsumer(object):

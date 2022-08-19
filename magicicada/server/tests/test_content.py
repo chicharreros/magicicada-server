@@ -22,7 +22,7 @@ import logging
 import os
 import uuid
 import zlib
-from StringIO import StringIO
+from functools import partial
 
 import mock
 from magicicadaprotocol import (
@@ -30,11 +30,6 @@ from magicicadaprotocol import (
     client as sp_client,
     errors as protoerrors,
     protocol_pb2,
-)
-from magicicadaprotocol.content_hash import (
-    content_hash_factory,
-    crc32,
-    magic_hash_factory,
 )
 from twisted.internet import defer, reactor, threads, task, address
 from twisted.trial.unittest import TestCase
@@ -54,152 +49,85 @@ from magicicada.server.content import (
     logger,
 )
 from magicicada.server.testing.testcase import (
+    EMPTY_HASH,
     BufferedConsumer,
     TestWithDatabase,
+    get_hash,
+    get_magic_hash,
+    get_put_content_params,
 )
-
-
-NO_CONTENT_HASH = ""
-EMPTY_HASH = content_hash_factory().content_hash()
-
-
-def get_magic_hash(data):
-    """Return the magic hash for the data."""
-    magic_hash_object = magic_hash_factory()
-    magic_hash_object.update(data)
-    return magic_hash_object.content_hash()._magic_hash
 
 
 class TestGetContent(TestWithDatabase):
     """Test get_content command."""
 
+    @defer.inlineCallbacks
     def test_getcontent_unknown(self):
         """Get the content from an unknown file."""
+        client = yield self.get_client_helper(auth_token="open sesame")
+        root_id = yield client.get_root()
+        d = client.get_content(request.ROOT, root_id, request.UNKNOWN_HASH)
+        yield self.assertFails(d, 'NOT_AVAILABLE')
 
-        def auth(client):
-            d = client.dummy_authenticate("open sesame")
-            d.addCallbacks(lambda r: client.get_root(), client.test_fail)
-            d.addCallbacks(
-                lambda r: client.get_content(
-                    request.ROOT, r, request.UNKNOWN_HASH),
-                client.test_fail)
-            d.addCallbacks(client.test_fail, lambda x: client.test_done("ok"))
-
-        return self.callback_test(auth)
-
+    @defer.inlineCallbacks
     def test_getcontent_no_content(self):
         """Get the contents a file with no content"""
-        file = self.usr0.root.make_file(u"file")
+        file_id = self.usr0.root.make_file(u"file").id
 
-        def auth(client):
-            """Do the real work """
-            d = client.dummy_authenticate("open sesame")
-            d.addCallbacks(lambda r: client.get_root(), client.test_fail)
-            d.addCallback(
-                lambda r: client.get_content(request.ROOT, file.id, ''))
-            d.addCallbacks(client.test_done, client.test_fail)
-        d = self.callback_test(auth)
-        self.assertFails(d, 'DOES_NOT_EXIST')
-        return d
+        client = yield self.get_client_helper(auth_token="open sesame")
+        yield client.get_root()
+        d = client.get_content(request.ROOT, file_id, '')
+        yield self.assertFails(d, 'DOES_NOT_EXIST')
 
+    @defer.inlineCallbacks
     def test_getcontent_not_owned_file(self):
         """Get the contents of a directory not owned by the user."""
         # create another user
         dir_id = self.usr1.root.make_subdirectory(u"subdir1").id
 
         # try to get the content of the directory with a different user
-        def auth(client):
-            """Do the real work """
-            d = client.dummy_authenticate("open sesame")
-            d.addCallbacks(lambda r: client.get_root(), client.test_fail)
-            d.addCallbacks(
-                lambda root_id: client.make_file(request.ROOT, root_id, "foo"),
-                client.test_fail)
-            d.addCallback(
-                lambda r: client.get_content(request.ROOT, dir_id, EMPTY_HASH))
-            d.addCallbacks(client.test_done, client.test_fail)
+        client = yield self.get_client_helper(auth_token="open sesame")
+        root_id = yield client.get_root()
+        yield client.make_file(request.ROOT, root_id, "foo")
+        d = client.get_content(request.ROOT, dir_id, EMPTY_HASH)
+        yield self.assertFails(d, 'DOES_NOT_EXIST')
 
-        d = self.callback_test(auth)
-        self.assertFails(d, 'DOES_NOT_EXIST')
-        return d
-
+    @defer.inlineCallbacks
     def test_getcontent_empty_file(self):
         """Make sure get content of empty files work."""
         data = ""
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
 
-        def check_file(req):
-            if zlib.decompress(req.data) != "":
-                raise Exception("data does not match")
+        client = yield self.get_client_helper(auth_token="open sesame")
+        root_id = yield client.get_root()
+        mkfile_req = yield client.make_file(request.ROOT, root_id, "foo")
 
-        def auth(client):
-            d = client.dummy_authenticate("open sesame")
-            d.addCallbacks(lambda _: client.get_root(), client.test_fail)
-            d.addCallbacks(
-                lambda root_id: client.make_file(request.ROOT, root_id, "foo"),
-                client.test_fail)
-            d.addCallback(self.save_req, 'req')
-            d.addCallback(lambda r: client.put_content(
-                request.ROOT, r.new_id, NO_CONTENT_HASH, hash_value,
-                crc32_value, size, deflated_size, StringIO(deflated_data)))
-            d.addCallback(lambda _: client.get_content(
-                          request.ROOT, self._state.req.new_id, EMPTY_HASH))
-            d.addCallback(check_file)
-            d.addCallbacks(client.test_done, client.test_fail)
+        params = get_put_content_params(data, node=mkfile_req.new_id)
+        yield client.put_content(**params)
+        result = yield client.get_content(
+            params['share'], params['node'], EMPTY_HASH)
+        self.assertEqual(zlib.decompress(result.data), data)
 
-        return self.callback_test(auth)
-
+    @defer.inlineCallbacks
     def test_getcontent_file(self, check_file_content=True):
         """Get the content from a file."""
         data = "*" * 100000
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
 
-        def check_file(req):
-            if req.data != deflated_data:
-                raise Exception("data does not match")
+        client = yield self.get_client_helper(auth_token="open sesame")
+        root_id = yield client.get_root()
+        mkfile_req = yield client.make_file(request.ROOT, root_id, "hola")
 
-        def auth(client):
-            d = client.dummy_authenticate("open sesame")
-            d.addCallbacks(lambda _: client.get_root(), client.test_fail)
-            d.addCallbacks(
-                lambda root: client.make_file(request.ROOT, root, "hola"),
-                client.test_fail)
-            d.addCallback(self.save_req, 'req')
-            d.addCallbacks(
-                lambda mkfile_req: client.put_content(
-                    request.ROOT, mkfile_req.new_id, NO_CONTENT_HASH,
-                    hash_value, crc32_value, size, deflated_size,
-                    StringIO(deflated_data)),
-                client.test_fail)
-            d.addCallback(lambda _: client.get_content(
-                          request.ROOT, self._state.req.new_id, hash_value))
-            if check_file_content:
-                d.addCallback(check_file)
-            d.addCallbacks(client.test_done, client.test_fail)
-        return self.callback_test(auth)
+        params = get_put_content_params(data, node=mkfile_req.new_id)
+        yield client.put_content(**params)
 
+        req = yield client.get_content(
+            params['share'], params['node'], params['new_hash'])
+        if check_file_content:
+            self.assertEqual(zlib.decompress(req.data), data)
+
+    @defer.inlineCallbacks
     def test_getcontent_cancel_after_other_request(self):
         """Simulate getting the cancel after another request in the middle."""
         data = os.urandom(100000)
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
 
         # this is for the get content to send a lot of BYTES (which will leave
         # time for the cancel to arrive to the server) but not needing to
@@ -228,72 +156,53 @@ class TestGetContent(TestWithDatabase):
 
         server.GetContentResponse.processMessage = lie_about_current
 
-        def auth(client):
-            d = client.dummy_authenticate("open sesame")
+        # monkeypatching to assure that the lock is released
+        orig_check_method = server.GetContentResponse._processMessage
 
-            # monkeypatching to assure that the lock is released
-            orig_check_method = server.GetContentResponse._processMessage
-
-            def middle_check(innerself, *a, **k):
-                """Check that the lock is released."""
-                orig_check_method(innerself, *a, **k)
-                self.assertFalse(innerself.protocol.request_locked)
-                server.GetContentResponse._processMessage = orig_check_method
-                d.addCallbacks(client.test_done, client.test_fail)
+        def middle_check(innerself, *a, **k):
+            """Check that the lock is released."""
+            orig_check_method(innerself, *a, **k)
+            self.assertFalse(innerself.protocol.request_locked)
+            server.GetContentResponse._processMessage = orig_check_method
 
             server.GetContentResponse._processMessage = middle_check
 
-            class HelperClass(object):
+        d = defer.Deferred()
 
-                def __init__(innerself):
-                    innerself.cancelled = False
-                    innerself.req = None
+        def cancel(*args):
+            if d.called:
+                return
 
-                def cancel(innerself, *args):
-                    if innerself.cancelled:
-                        return
-                    innerself.cancelled = True
+            d.callback(True)
 
-                    def _cancel(_):
-                        """Directly cancel the server request."""
-                        m = protocol_pb2.Message()
-                        m.id = self.request.id
-                        m.type = protocol_pb2.Message.CANCEL_REQUEST
-                        self.request.cancel_message = m
-                        self.request.processMessage(m)
-                    d.addCallbacks(_cancel)
+            def _cancel(_):
+                """Directly cancel the server request."""
+                m = protocol_pb2.Message()
+                m.id = self.request.id
+                m.type = protocol_pb2.Message.CANCEL_REQUEST
+                self.request.cancel_message = m
+                self.request.processMessage(m)
 
-                def store_getcontent_result(innerself, req):
-                    innerself.req = req
+            d.addCallbacks(_cancel)
 
-            hc = HelperClass()
+        client = yield self.get_client_helper(auth_token="open sesame")
+        root_id = yield client.get_root()
+        mkfile_req = yield client.make_file(request.ROOT, root_id, "hola")
 
-            d.addCallbacks(lambda _: client.get_root(), client.test_fail)
-            d.addCallbacks(
-                lambda root: client.make_file(request.ROOT, root, "hola"),
-                client.test_fail)
-            d.addCallback(self.save_req, 'req')
-            d.addCallbacks(
-                lambda mkfile_req: client.put_content(
-                    request.ROOT,
-                    mkfile_req.new_id, NO_CONTENT_HASH, hash_value,
-                    crc32_value, size, deflated_size, StringIO(deflated_data)),
-                client.test_fail)
-            d.addCallback(lambda _: client.get_content_request(request.ROOT,
-                          self._state.req.new_id, hash_value, 0, hc.cancel))
-            d.addCallback(hc.store_getcontent_result)
-        return self.callback_test(auth)
+        params = get_put_content_params(data, node=mkfile_req.new_id)
+        yield client.put_content(**params)
 
+        gc_request = client.get_content_request(
+            params['share'], params['node'], params['new_hash'],
+            offset=0, callback=cancel)
+        yield d
+        yield self.assertFailure(
+            gc_request.deferred, protoerrors.RequestCancelledError)
+
+    @defer.inlineCallbacks
     def test_getcontent_cancel_inside_download(self):
         """Start to get the content from a file, and cancel in the middle."""
         data = os.urandom(100000)
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
 
         # this is for the get content to send a lot of BYTES (which will leave
         # time for the cancel to arrive to the server) but not needing to
@@ -309,131 +218,86 @@ class TestGetContent(TestWithDatabase):
         self.patch(server.StorageServer, 'handle_GET_CONTENT',
                    handle_get_content)
 
-        def auth(client):
-            d = client.dummy_authenticate("open sesame")
+        # monkeypatching to assure that the producer was cancelled
+        orig_method = server.GetContentResponse.unregisterProducer
 
-            # monkeypatching to assure that the producer was cancelled
-            orig_method = server.GetContentResponse.unregisterProducer
+        def check(*a, **k):
+            """Assure that it was effectively cancelled."""
+            orig_method(*a, **k)
+            server.GetContentResponse.unregisterProducer = orig_method
 
-            def check(*a, **k):
-                """Assure that it was effectively cancelled."""
-                d.addCallbacks(client.test_done, client.test_fail)
-                orig_method(*a, **k)
-                server.GetContentResponse.unregisterProducer = orig_method
+        server.GetContentResponse.unregisterProducer = check
 
-            server.GetContentResponse.unregisterProducer = check
+        d = defer.Deferred()
 
-            class HelperClass(object):
+        def cancel(*args):
+            if d.called:
+                return
 
-                def __init__(innerself):
-                    innerself.cancelled = False
-                    innerself.req = None
+            d.callback(True)
 
-                def cancel(innerself, *args):
-                    if innerself.cancelled:
-                        return
-                    innerself.cancelled = True
+            def _cancel(_):
+                """Directly cancel the server request."""
+                m = protocol_pb2.Message()
+                m.id = self.request.id
+                m.type = protocol_pb2.Message.CANCEL_REQUEST
+                self.request.cancel_message = m
+                self.request.processMessage(m)
 
-                    def _cancel(_):
-                        """Directly cancel the server request."""
-                        m = protocol_pb2.Message()
-                        m.id = self.request.id
-                        m.type = protocol_pb2.Message.CANCEL_REQUEST
-                        self.request.cancel_message = m
-                        self.request.processMessage(m)
-                    d.addCallbacks(_cancel)
+            d.addCallbacks(_cancel)
 
-                def store_getcontent_result(innerself, req):
-                    innerself.req = req
+        client = yield self.get_client_helper(auth_token="open sesame")
+        root_id = yield client.get_root()
+        mkfile_req = yield client.make_file(request.ROOT, root_id, "hola")
 
-            hc = HelperClass()
+        params = get_put_content_params(data, node=mkfile_req.new_id)
+        yield client.put_content(**params)
 
-            d.addCallbacks(lambda _: client.get_root(), client.test_fail)
-            d.addCallbacks(
-                lambda root: client.make_file(request.ROOT, root, "hola"),
-                client.test_fail)
-            d.addCallback(self.save_req, 'req')
-            d.addCallbacks(
-                lambda mkfile_req: client.put_content(
-                    request.ROOT,
-                    mkfile_req.new_id, NO_CONTENT_HASH, hash_value,
-                    crc32_value, size, deflated_size, StringIO(deflated_data)),
-                client.test_fail)
-            d.addCallback(lambda _: client.get_content_request(request.ROOT,
-                          self._state.req.new_id, hash_value, 0, hc.cancel))
-            d.addCallback(hc.store_getcontent_result)
-        return self.callback_test(auth)
+        gc_request = client.get_content_request(
+            params['share'], params['node'], params['new_hash'], 0, cancel)
+        yield d
+        yield self.assertFailure(
+            gc_request.deferred, protoerrors.RequestCancelledError)
 
+    @defer.inlineCallbacks
     def test_getcontent_cancel_after_download(self):
         """Start to get the content from a file, and cancel in the middle"""
         data = "*" * 100000
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
 
-        def auth(client):
-            d = client.dummy_authenticate("open sesame")
+        client = yield self.get_client_helper(auth_token="open sesame")
 
-            class HelperClass(object):
+        d = defer.Deferred()
+        received = []
 
-                def __init__(innerself):
-                    innerself.cancelled = False
-                    innerself.req = None
-                    innerself.received = ""
+        def cancel(newdata):
+            received.append(newdata)
+            if zlib.decompress(b''.join(received)) != data:
+                return
+            # got everything, now generate the cancel
+            if d.called:
+                self.fail('Should not be called again, already cancelled!')
+            d.callback(True)
 
-                def cancel(innerself, newdata):
-                    innerself.received += newdata
-                    if innerself.received != deflated_data:
-                        return
+        root_id = yield client.get_root()
+        mkfile_req = yield client.make_file(request.ROOT, root_id, "hola")
 
-                    # got everything, now generate the cancel
-                    if innerself.cancelled:
-                        client.test_fail()
-                    innerself.cancelled = True
-                    d.addCallbacks(lambda _: innerself.req.cancel())
-                    d.addCallbacks(client.test_done, client.test_fail)
+        params = get_put_content_params(data, node=mkfile_req.new_id)
+        yield client.put_content(**params)
 
-                def store_getcontent_result(innerself, req):
-                    innerself.req = req
+        gc_request = client.get_content_request(
+                params['share'], params['node'], params['new_hash'], 0, cancel)
+        yield d
+        yield gc_request.cancel()
+        yield gc_request.deferred
 
-            hc = HelperClass()
-
-            d.addCallbacks(lambda _: client.get_root(), client.test_fail)
-            d.addCallbacks(
-                lambda root: client.make_file(request.ROOT, root, "hola"),
-                client.test_fail)
-            d.addCallback(self.save_req, 'req')
-            d.addCallbacks(
-                lambda mkfile_req: client.put_content(
-                    request.ROOT,
-                    mkfile_req.new_id, NO_CONTENT_HASH, hash_value,
-                    crc32_value, size, deflated_size, StringIO(deflated_data)),
-                client.test_fail)
-            d.addCallback(lambda _: client.get_content_request(request.ROOT,
-                          self._state.req.new_id, hash_value, 0, hc.cancel))
-            d.addCallback(hc.store_getcontent_result)
-        return self.callback_test(auth)
-
+    @defer.inlineCallbacks
     def test_getcontent_doesnt_exist(self):
         """Get the content from an unexistent node."""
 
-        def auth(client):
-            """Do the test."""
-            d = client.dummy_authenticate("open sesame")
-            d.addCallbacks(lambda _: client.get_root(), client.test_fail)
-            d.addCallbacks(lambda _: client.get_content(request.ROOT,
-                                                        uuid.uuid4(),
-                                                        EMPTY_HASH),
-                           client.test_fail)
-            d.addCallbacks(client.test_done, client.test_fail)
-
-        d = self.callback_test(auth)
-        self.assertFails(d, 'DOES_NOT_EXIST')
-        return d
+        client = yield self.get_client_helper(auth_token="open sesame")
+        yield client.get_root()
+        d = client.get_content(request.ROOT, uuid.uuid4(), EMPTY_HASH)
+        yield self.assertFails(d, 'DOES_NOT_EXIST')
 
     @defer.inlineCallbacks
     def test_when_to_release(self):
@@ -481,208 +345,123 @@ class TestPutContent(TestWithDatabase):
         self.handler = self.add_memento_handler(server.logger, level=0)
         return d
 
+    @defer.inlineCallbacks
     def test_putcontent_cancel(self):
         """Test putting content to a file and cancelling it."""
         data = os.urandom(300000)
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
 
-        def auth(client):
-
-            def cancel_it(request):
-                request.cancel()
-                return request
-
-            def test_done(request):
-                if request.cancelled and request.finished:
-                    client.test_done()
-                else:
-                    reactor.callLater(.1, test_done, request)
-
-            d = client.dummy_authenticate("open sesame")
-            d.addCallbacks(lambda _: client.get_root(), client.test_fail)
-            d.addCallback(
-                lambda root: client.make_file(request.ROOT, root, "hola"))
-            d.addCallback(
-                lambda mkfile_req: client.put_content_request(
-                    request.ROOT, mkfile_req.new_id, NO_CONTENT_HASH,
-                    hash_value, crc32_value, size, deflated_size,
-                    StringIO(deflated_data)))
-            d.addCallback(cancel_it)
-
-            def wait_and_trap(req):
-                d = req.deferred
-                d.addErrback(
-                    lambda failure:
-                    req if failure.check(request.RequestCancelledError)
-                    else failure)
-                return d
-
-            d.addCallback(wait_and_trap)
-            d.addCallbacks(test_done, client.test_fail)
+        def test_done(request):
+            d = defer.Deferred()
+            if request.cancelled and request.finished:
+                d.callback(True)
+            else:
+                reactor.callLater(.1, test_done, request)
             return d
-        return self.callback_test(auth)
 
+        client = yield self.get_client_helper(auth_token="open sesame")
+        root_id = yield client.get_root()
+        mkfile_req = yield client.make_file(request.ROOT, root_id, "hola")
+
+        params = get_put_content_params(data, node=mkfile_req.new_id)
+        pc_request = client.put_content_request(**params)
+        pc_request.cancel()
+        yield self.assertFailure(
+            pc_request.deferred, protoerrors.RequestCancelledError)
+
+        yield test_done(pc_request)
+
+    @defer.inlineCallbacks
     def test_putcontent_cancel_after(self):
         """Test putting content to a file and cancelling it after finished."""
         data = os.urandom(300000)
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
 
-        def auth(client):
-            d = client.dummy_authenticate("open sesame")
-            d.addCallbacks(lambda _: client.get_root(), client.test_fail)
-            d.addCallback(
-                lambda root: client.make_file(request.ROOT, root, "hola"))
-            d.addCallback(
-                lambda mkfile_req: client.put_content_request(
-                    request.ROOT, mkfile_req.new_id, NO_CONTENT_HASH,
-                    hash_value, crc32_value, size, deflated_size,
-                    StringIO(deflated_data)))
-            d.addCallback(self.save_req, 'request')
-            d.addCallback(lambda _: self._state.request.deferred)
-            d.addCallback(lambda _: self._state.request.cancel())
-            d.addCallbacks(client.test_done, client.test_fail)
-            return d
-        return self.callback_test(auth)
+        client = yield self.get_client_helper(auth_token="open sesame")
+        root_id = yield client.get_root()
+        mkfile_req = yield client.make_file(request.ROOT, root_id, "hola")
 
+        params = get_put_content_params(data, node=mkfile_req.new_id)
+        pc_request = client.put_content_request(**params)
+        yield pc_request.deferred
+        yield pc_request.cancel()
+
+    @defer.inlineCallbacks
     def test_putcontent_cancel_middle(self):
         """Test putting content to a file and cancelling it in the middle."""
         size = int(settings.STORAGE_CHUNK_SIZE * 1.5)
         data = os.urandom(size)
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        deflated_size = len(deflated_data)
         StorageUser.objects.filter(id=self.usr0.id).update(
             max_storage_bytes=size * 2)
 
-        def auth(client):
+        client = yield self.get_client_helper(auth_token="open sesame")
+        root_id = yield client.get_root()
+        mkfile_req = yield client.make_file(request.ROOT, root_id, "hola")
+        params = get_put_content_params(data, node=mkfile_req.new_id)
+        real_fd_read = params['fd'].read
 
-            class Helper(object):
+        notifs = []
 
-                def __init__(innerself):
-                    innerself.notifs = 0
-                    innerself.request = None
-                    innerself.data = StringIO(deflated_data)
+        def cancel_and_read(request, amount):
+            """Change the file when this client starts uploading it."""
+            # modify the file and cause a conflict
+            hash_value = get_hash('randomdata')
+            filenode = self.usr0.get_node(params['node'])
+            filenode.make_content(
+                filenode.content_hash, hash_value, 32, 1000, 1000,
+                uuid.uuid4())
+            """If second read, cancel and trigger test."""
+            notifs.append(amount)
+            if len(notifs) == 2:
+                request.cancel()
+            if len(notifs) > 2:
+                self.fail(ValueError("called beyond cancel!"))
+            return real_fd_read(amount)
 
-                def store_request(innerself, request):
-                    innerself.request = request
-                    return request
-
-                def read(innerself, cant):
-                    """If second read, cancel and trigger test."""
-                    innerself.notifs += 1
-                    if innerself.notifs == 2:
-                        innerself.request.cancel()
-                    if innerself.notifs > 2:
-                        client.test_fail(ValueError("called beyond cancel!"))
-                    return innerself.data.read(cant)
-            helper = Helper()
-
-            d = client.dummy_authenticate("open sesame")
-            d.addCallbacks(lambda _: client.get_root(), client.test_fail)
-            d.addCallback(
-                lambda root: client.make_file(request.ROOT, root, "hola"))
-            d.addCallback(lambda mkfile_req: client.put_content_request(
-                request.ROOT, mkfile_req.new_id, NO_CONTENT_HASH, hash_value,
-                crc32_value, size, deflated_size, helper))
-            d.addCallback(helper.store_request)
-            d.addCallback(lambda request: request.deferred)
-            d.addErrback(
-                lambda failure:
-                helper.request if failure.check(request.RequestCancelledError)
-                else failure)
-            d.addCallback(lambda _: client.test_done())
-            return d
-        return self.callback_test(auth)
+        pc_request = client.put_content_request(**params)
+        pc_request.fd.read = partial(cancel_and_read, pc_request)
+        yield self.assertFailure(
+            pc_request.deferred, protoerrors.RequestCancelledError)
 
     @defer.inlineCallbacks
     def test_putcontent(self, num_files=1, size=300000):
         """Test putting content to a file."""
         data = os.urandom(size)
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
 
-        @defer.inlineCallbacks
-        def auth(client):
-            """Authenticated test."""
-            yield client.dummy_authenticate("open sesame")
-            root = yield client.get_root()
+        client = yield self.get_client_helper(auth_token="open sesame")
+        root_id = yield client.get_root()
 
-            # hook to test stats
-            meter = []
-            self.service.factory.metrics.meter = lambda *a: meter.append(a)
-            gauge = []
-            self.service.factory.metrics.gauge = lambda *a: gauge.append(a)
+        # hook to test stats
+        meter = []
+        self.service.factory.metrics.meter = lambda *a: meter.append(a)
+        gauge = []
+        self.service.factory.metrics.gauge = lambda *a: gauge.append(a)
 
-            for i in range(num_files):
-                fname = 'hola_%d' % i
-                mkfile_req = yield client.make_file(request.ROOT, root, fname)
-                yield client.put_content(request.ROOT, mkfile_req.new_id,
-                                         NO_CONTENT_HASH, hash_value,
-                                         crc32_value, size, deflated_size,
-                                         StringIO(deflated_data))
+        for i in range(num_files):
+            fname = 'hola_%d' % i
+            mkfile_req = yield client.make_file(request.ROOT, root_id, fname)
+            params = get_put_content_params(data, node=mkfile_req.new_id)
+            yield client.put_content(**params)
+            try:
+                self.usr0.volume().get_content(params['new_hash'])
+            except errors.DoesNotExist:
+                raise ValueError("content blob is not there")
 
-                try:
-                    self.usr0.volume().get_content(hash_value)
-                except errors.DoesNotExist:
-                    raise ValueError("content blob is not there")
+            # check upload stat and the offset sent
+            self.assertTrue(('UploadJob.upload', 0) in gauge)
+            self.assertTrue(('UploadJob.upload.begin', 1) in meter)
+            self.handler.assert_debug("UploadJob begin content from offset 0")
 
-                # check upload stat and the offset sent
-                self.assertTrue(('UploadJob.upload', 0) in gauge)
-                self.assertTrue(('UploadJob.upload.begin', 1) in meter)
-                self.handler.assert_debug(
-                    "UploadJob begin content from offset 0")
-
-        yield self.callback_test(auth, add_default_callbacks=True)
-
+    @defer.inlineCallbacks
     def test_put_content_in_not_owned_file(self):
         """Test putting content in other user file"""
         # create another user
         file_id = self.usr1.root.make_file(u"a_dile").id
         # try to put the content in this file, but with other user
         data = os.urandom(300000)
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
 
-        def auth(client):
-            """do the real work"""
-            d = client.dummy_authenticate("open sesame")
-            d.addCallbacks(lambda _: client.get_root(), client.test_fail)
-            d.addCallbacks(
-                lambda _: client.put_content(
-                    request.ROOT, file_id, NO_CONTENT_HASH, hash_value,
-                    crc32_value, size, deflated_size, StringIO(deflated_data)),
-                client.test_fail)
-            d.addCallbacks(client.test_done, client.test_fail)
-            return d
-
-        d = self.callback_test(auth)
-        self.assertFails(d, 'DOES_NOT_EXIST')
-        return d
+        client = yield self.get_client_helper(auth_token="open sesame")
+        params = get_put_content_params(data, node=file_id)
+        d = client.put_content(**params)
+        yield self.assertFails(d, 'DOES_NOT_EXIST')
 
     @defer.inlineCallbacks
     def test_putcontent_duplicated(self):
@@ -695,184 +474,108 @@ class TestPutContent(TestWithDatabase):
         yield self.test_putcontent(num_files=2)
         self.assertEqual(len(called), 1)
 
+    @defer.inlineCallbacks
     def test_putcontent_twice_simple(self):
         """Test putting content twice."""
         data = "*" * 100
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
 
-        def auth(client):
+        client = yield self.get_client_helper(auth_token="open sesame")
+        root_id = yield client.get_root()
+        mkfile_req = yield client.make_file(request.ROOT, root_id, "hola")
 
-            def check_file(result):
+        params = get_put_content_params(data, node=mkfile_req.new_id)
+        yield client.put_content(**params)
+        yield client.put_content(**params)
 
-                def _check_file():
-                    try:
-                        self.usr0.volume().get_content(hash_value)
-                    except errors.DoesNotExist:
-                        raise ValueError("content blob is not there")
+        def check_file():
+            try:
+                self.usr0.volume().get_content(params['new_hash'])
+            except errors.DoesNotExist:
+                raise ValueError("content blob is not there")
 
-                d = threads.deferToThread(_check_file)
-                return d
+        yield threads.deferToThread(check_file)
 
-            d = client.dummy_authenticate("open sesame")
-            d.addCallback(lambda _: client.get_root())
-            d.addCallback(lambda root_id:
-                          client.make_file(request.ROOT, root_id, "hola"))
-            d.addCallback(self.save_req, "file")
-            d.addCallback(lambda req: client.put_content(
-                request.ROOT, req.new_id, NO_CONTENT_HASH, hash_value,
-                crc32_value, size, deflated_size, StringIO(deflated_data)))
-            d.addCallback(lambda _: client.put_content(request.ROOT,
-                          self._state.file.new_id, hash_value, hash_value,
-                          crc32_value, size, deflated_size,
-                          StringIO(deflated_data)))
-            d.addCallback(check_file)
-            d.addCallbacks(client.test_done, client.test_fail)
-        return self.callback_test(auth)
-
+    @defer.inlineCallbacks
     def test_putcontent_twice_samefinal(self):
         """Test putting content twice."""
         data = "*" * 100
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
 
-        def auth(client):
+        client = yield self.get_client_helper(auth_token="open sesame")
+        root_id = yield client.get_root()
+        mkfile_req = yield client.make_file(request.ROOT, root_id, "hola")
 
-            def check_file(result):
+        params = get_put_content_params(data, node=mkfile_req.new_id)
+        yield client.put_content(**params)
+        # don't care about previous hash, as long the final hash is ok
+        yield client.put_content(**params)
 
-                def _check_file():
-                    try:
-                        self.usr0.volume().get_content(hash_value)
-                    except errors.DoesNotExist:
-                        raise ValueError("content blob is not there")
+        def check_file():
+            try:
+                self.usr0.volume().get_content(params['new_hash'])
+            except errors.DoesNotExist:
+                raise ValueError("content blob is not there")
 
-                d = threads.deferToThread(_check_file)
-                return d
+        yield threads.deferToThread(check_file)
 
-            d = client.dummy_authenticate("open sesame")
-            d.addCallback(lambda _: client.get_root())
-            d.addCallback(lambda root_id:
-                          client.make_file(request.ROOT, root_id, "hola"))
-            d.addCallback(self.save_req, "file")
-            d.addCallback(lambda req: client.put_content(
-                request.ROOT, req.new_id, NO_CONTENT_HASH, hash_value,
-                crc32_value, size, deflated_size, StringIO(deflated_data)))
-
-            # don't care about previous hash, as long the final hash is ok
-            d.addCallback(lambda _: client.put_content(
-                request.ROOT, self._state.file.new_id, NO_CONTENT_HASH,
-                hash_value, crc32_value, size, deflated_size,
-                StringIO(deflated_data)))
-            d.addCallback(check_file)
-            d.addCallbacks(client.test_done, client.test_fail)
-        return self.callback_test(auth)
-
-    def mkauth(self, data=None, previous_hash=None,
-               hash_value=None, crc32_value=None, size=None):
+    @defer.inlineCallbacks
+    def _put_content_bad_params(self, error_class, data=None, **kwargs):
         """Base function to create tests of wrong hints."""
         if data is None:
             data = "*" * 1000
-        deflated_data = zlib.compress(data)
-        if previous_hash is None:
-            previous_hash = content_hash_factory().content_hash()
-        if hash_value is None:
-            hash_object = content_hash_factory()
-            hash_object.update(data)
-            hash_value = hash_object.content_hash()
-        if crc32_value is None:
-            crc32_value = crc32(data)
-        if size is None:
-            size = len(data)
-        deflated_size = len(deflated_data)
 
-        def auth(client):
-            d = client.dummy_authenticate("open sesame")
-            d.addCallbacks(lambda _: client.get_root(), client.test_fail)
-            d.addCallbacks(
-                lambda root_id: client.make_file(request.ROOT, root_id, "foo"),
-                client.test_fail)
-            d.addCallbacks(
-                lambda mkfile_req: client.put_content(
-                    request.ROOT, mkfile_req.new_id, previous_hash, hash_value,
-                    crc32_value, size, deflated_size, StringIO(deflated_data)),
-                client.test_fail)
-            d.addCallbacks(client.test_fail, lambda r: client.test_done("ok"))
-        return auth
+        client = yield self.get_client_helper(auth_token="open sesame")
+        root_id = yield client.get_root()
+        mkfile_req = yield client.make_file(request.ROOT, root_id, "foo")
+
+        params = get_put_content_params(data, node=mkfile_req.new_id, **kwargs)
+        yield self.assertFailure(client.put_content(**params), error_class)
 
     def test_putcontent_bad_prev_hash(self):
         """Test wrong prev hash hint."""
-        return self.callback_test(
-            self.mkauth(previous_hash="sha1:notthehash"))
+        return self._put_content_bad_params(
+            previous_hash="sha1:wrong", error_class=protoerrors.ConflictError)
 
     def test_putcontent_bad_hash(self):
         """Test wrong hash hint."""
-        return self.callback_test(
-            self.mkauth(hash_value="sha1:notthehash"))
+        return self._put_content_bad_params(
+            new_hash="sha1:notthehash", error_class=protoerrors.ProtocolError)
 
     def test_putcontent_bad_c3c32(self):
         """Test wrong crc32 hint."""
-        return self.callback_test(
-            self.mkauth(crc32_value=100))
+        return self._put_content_bad_params(
+            crc32=100, error_class=protoerrors.UploadCorruptError)
 
     def test_putcontent_bad_size(self):
         """Test wrong size hint."""
-        return self.callback_test(
-            self.mkauth(size=20))
+        return self._put_content_bad_params(
+            size=20, error_class=protoerrors.UploadCorruptError)
 
+    @defer.inlineCallbacks
     def test_putcontent_notify(self):
         """Make sure put_content generates a notification."""
         data = "*" * 100000
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
 
-        def auth(client):
-            d = client.dummy_authenticate("open sesame")
-            d.addCallbacks(lambda _: client.get_root(), client.test_fail)
-            d.addCallbacks(
-                lambda root_id: client.make_file(request.ROOT, root_id, "foo"),
-                client.test_fail)
-            d.addCallbacks(
-                lambda mkfile_req: client.put_content(
-                    request.ROOT,
-                    mkfile_req.new_id, NO_CONTENT_HASH, hash_value,
-                    crc32_value, size, deflated_size, StringIO(deflated_data)),
-                client.test_fail)
-            d.addCallbacks(client.test_done, client.test_fail)
-        return self.callback_test(auth)
+        client = yield self.get_client_helper(auth_token="open sesame")
+        root_id = yield client.get_root()
+        mkfile_req = yield client.make_file(request.ROOT, root_id, "foo")
+        params = get_put_content_params(data, node=mkfile_req.new_id)
+        yield client.put_content(**params)
 
+        # XXX where is the notification???
+
+    @defer.inlineCallbacks
     def test_putcontent_nofile(self):
         """Test putting content to an inexistent file."""
 
-        def auth(client):
-            """Do the real work."""
-            d = client.dummy_authenticate("open sesame")
-            d.addCallbacks(lambda r: client.get_root(), client.test_fail)
-            args = (request.ROOT, uuid.uuid4(), '', '', 0, 0, 0, '')
-            d.addCallbacks(lambda _: client.put_content(*args),
-                           client.test_fail)
-            d.addCallbacks(client.test_done, client.test_fail)
-
-        d = self.callback_test(auth)
-        self.assertFails(d, 'DOES_NOT_EXIST')
-        return d
+        client = yield self.get_client_helper(auth_token="open sesame")
+        kwargs = get_put_content_params(
+            share=request.ROOT, node=uuid.uuid4(), previous_hash='',
+            new_hash='', crc32=0, size=0, deflated_size=0, fd='')
+        d = client.put_content(**kwargs)
+        yield self.assertFails(d, 'DOES_NOT_EXIST')
 
     def test_remove_uploadjob_deleted_file(self):
-        """make sure we dont raise exceptions on deleted files"""
+        """Make sure we dont raise exceptions on deleted files."""
         so_file = self.usr0.root.make_file(u"foobar")
         upload_job = so_file.make_uploadjob(
             so_file.content_hash, "sha1:100", 0, 100)
@@ -880,178 +583,96 @@ class TestPutContent(TestWithDatabase):
         so_file.delete()
         upload_job.delete()
 
+    @defer.inlineCallbacks
     def test_putcontent_conflict_middle(self):
         """Test putting content to a file and changing it in the middle."""
         data = os.urandom(3000)
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
 
-        def auth(client):
+        client = yield self.get_client_helper(auth_token="open sesame")
+        root_id = yield client.get_root()
+        mkfile_req = yield client.make_file(request.ROOT, root_id, "hola")
+        params = get_put_content_params(data, node=mkfile_req.new_id)
+        real_fd_read = params['fd'].read
 
-            class Helper(object):
+        def make_conflict_and_read(amount):
+            """Change the file when this client starts uploading it."""
+            # modify the file and cause a conflict
+            hash_value = get_hash('randomdata')
+            filenode = self.usr0.get_node(params['node'])
+            filenode.make_content(
+                filenode.content_hash, hash_value, 32, 1000, 1000,
+                uuid.uuid4())
+            return real_fd_read(amount)
 
-                def __init__(innerself):
-                    innerself.notifs = 0
-                    innerself.request = None
-                    innerself.data = StringIO(deflated_data)
-                    innerself.node_id = None
+        params['fd'].read = make_conflict_and_read
+        pc_request = client.put_content_request(**params)
+        yield self.assertFailure(
+            pc_request.deferred, protoerrors.ConflictError)
 
-                def save_node(innerself, node):
-                    innerself.node_id = node.new_id
-                    return node
-
-                def store_request(innerself, request):
-                    innerself.request = request
-                    return request
-
-                def read(innerself, data):
-                    """Change the file when this client starts uploading it."""
-                    # modify the file and cause a conflict
-                    ho = content_hash_factory()
-                    ho.update('randomdata')
-                    hash_value = ho.content_hash()
-                    filenode = self.usr0.get_node(innerself.node_id)
-                    filenode.make_content(filenode.content_hash, hash_value,
-                                          32, 1000, 1000, uuid.uuid4())
-                    return innerself.data.read(data)
-
-            helper = Helper()
-
-            d = client.dummy_authenticate("open sesame")
-            d.addCallbacks(lambda _: client.get_root(), client.test_fail)
-            d.addCallback(
-                lambda root: client.make_file(request.ROOT, root, "hola"))
-            d.addCallback(helper.save_node)
-            d.addCallback(
-                lambda mkfile_req: client.put_content_request(
-                    request.ROOT, mkfile_req.new_id, NO_CONTENT_HASH,
-                    hash_value, crc32_value, size, deflated_size, helper))
-            d.addCallback(helper.store_request)
-            d.addCallback(lambda request: request.deferred)
-            d.addErrback(
-                lambda f:
-                helper.request if f.check(protoerrors.ConflictError) else f)
-            d.addCallback(lambda _: client.test_done())
-            return d
-        d = self.callback_test(auth)
-        return d
-
+    @defer.inlineCallbacks
     def test_putcontent_update_used_bytes(self):
-        """Test putting content to a file and check that user used bytes
-        is updated.
-        """
+        """Putting content to a file updates user's used bytes."""
         data = os.urandom(300000)
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
 
-        def auth(client):
+        client = yield self.get_client_helper(auth_token="open sesame")
+        root_id = yield client.get_root()
+        mkfile_req = yield client.make_file(request.ROOT, root_id, 'hola_1')
 
-            def check_used_bytes(result):
+        params = get_put_content_params(data, node=mkfile_req.new_id)
+        yield client.put_content(**params)
 
-                def _check_file():
-                    quota = StorageUser.objects.get(id=self.usr0.id)
-                    self.assertEqual(size, quota.used_storage_bytes)
+        def check_used_bytes():
+            quota = StorageUser.objects.get(id=self.usr0.id)
+            self.assertEqual(params['size'], quota.used_storage_bytes)
 
-                d = threads.deferToThread(_check_file)
-                return d
-
-            d = client.dummy_authenticate("open sesame")
-            d.addCallbacks(lambda _: client.get_root(), client.test_fail)
-            d.addCallbacks(lambda root: client.make_file(request.ROOT, root,
-                                                         'hola_1'),
-                           client.test_fail)
-            d.addCallbacks(
-                lambda mkfile_req: client.put_content(
-                    request.ROOT, mkfile_req.new_id, NO_CONTENT_HASH,
-                    hash_value, crc32_value, size, deflated_size,
-                    StringIO(deflated_data)),
-                client.test_fail)
-            d.addCallback(check_used_bytes)
-            d.addCallbacks(client.test_done, client.test_fail)
-            return d
-        return self.callback_test(auth)
+        yield threads.deferToThread(check_used_bytes)
 
     @defer.inlineCallbacks
     def test_putcontent_quota_exceeded(self):
         """Test the QuotaExceeded handling."""
         StorageUser.objects.filter(id=self.usr0.id).update(max_storage_bytes=1)
-        try:
-            yield self.test_putcontent()
-        except protoerrors.QuotaExceededError as e:
-            self.assertEqual(e.free_bytes, 1)
-            self.assertEqual(e.share_id, request.ROOT)
-        else:
-            self.fail('Should fail with QuotaExceededError!')
+        e = yield self.assertFailure(
+            self.test_putcontent(), protoerrors.QuotaExceededError)
+        self.assertEqual(e.free_bytes, 1)
+        self.assertEqual(e.share_id, request.ROOT)
 
+    @defer.inlineCallbacks
     def test_putcontent_generations(self):
         """Put content on a file and receive new generation."""
         data = os.urandom(30)
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
 
-        @defer.inlineCallbacks
-        def test(client):
-            """Test."""
-            yield client.dummy_authenticate("open sesame")
+        client = yield self.get_client_helper(auth_token="open sesame")
+        # create the dir
+        root_id = yield client.get_root()
+        mkfile_req = yield client.make_file(request.ROOT, root_id, "hola")
 
-            # create the dir
-            root_id = yield client.get_root()
-            make_req = yield client.make_file(request.ROOT, root_id, "hola")
+        # put content and check
+        params = get_put_content_params(data, node=mkfile_req.new_id)
+        putc_req = yield client.put_content(**params)
+        self.assertEqual(putc_req.new_generation,
+                         mkfile_req.new_generation + 1)
 
-            # put content and check
-            args = (request.ROOT, make_req.new_id, NO_CONTENT_HASH, hash_value,
-                    crc32_value, size, deflated_size, StringIO(deflated_data))
-            putc_req = yield client.put_content(*args)
-            self.assertEqual(putc_req.new_generation,
-                             make_req.new_generation + 1)
-        return self.callback_test(test, add_default_callbacks=True)
-
+    @defer.inlineCallbacks
     def test_putcontent_corrupt(self):
         """Put content on a file with corrupt data."""
         data = os.urandom(30)
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
         size = len(data) + 10
-        deflated_size = len(deflated_data)
 
-        @defer.inlineCallbacks
-        def test(client):
-            """Test."""
-            yield client.dummy_authenticate("open sesame")
-            meter = []
-            self.service.factory.metrics.meter = lambda *a: meter.append(a)
+        client = yield self.get_client_helper(auth_token="open sesame")
 
-            # create the dir
-            root_id = yield client.get_root()
-            make_req = yield client.make_file(request.ROOT, root_id, "hola")
+        meter = []
+        self.service.factory.metrics.meter = lambda *a: meter.append(a)
 
-            # put content and check
-            args = (request.ROOT, make_req.new_id, NO_CONTENT_HASH, hash_value,
-                    crc32_value, size, deflated_size, StringIO(deflated_data))
-            try:
-                yield client.put_content(*args)
-            except Exception as ex:
-                self.assertIsInstance(ex, protoerrors.UploadCorruptError)
-            self.handler.assert_debug('UploadCorrupt', str(size))
-        return self.callback_test(test, add_default_callbacks=True)
+        # create the dir
+        root_id = yield client.get_root()
+        mkfile_req = yield client.make_file(request.ROOT, root_id, "hola")
+
+        # put content and check
+        params = get_put_content_params(
+            data, node=mkfile_req.new_id, size=size)
+        yield self.assertFailure(
+            client.put_content(**params), protoerrors.UploadCorruptError)
+        self.handler.assert_debug('UploadCorrupt', str(size))
 
     @defer.inlineCallbacks
     def test_when_to_release(self):
@@ -1093,32 +714,22 @@ class TestPutContent(TestWithDatabase):
             upload_id=message.put_content.upload_id)
         upload_job.connect.assert_called_once_with()
 
+    @defer.inlineCallbacks
     def test_putcontent_bad_data(self):
         """Test putting bad data to a file."""
         data = os.urandom(300000)
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
         # insert bad data in the deflated_data
-        deflated_data = deflated_data[:10] + 'break it' + deflated_data[10:]
+        deflated_data = 'break it'
 
-        @defer.inlineCallbacks
-        def test(client):
-            yield client.dummy_authenticate("open sesame")
-            root = yield client.get_root()
-            mkfile_req = yield client.make_file(
-                request.ROOT, root, u'a_file.txt')
-            yield client.put_content(request.ROOT, mkfile_req.new_id,
-                                     NO_CONTENT_HASH, hash_value, crc32_value,
-                                     size, deflated_size,
-                                     StringIO(deflated_data))
-        d = self.callback_test(test, add_default_callbacks=True)
-        self.assertFails(d, 'UPLOAD_CORRUPT')
-        return d
+        client = yield self.get_client_helper(auth_token="open sesame")
+        root_id = yield client.get_root()
+        mkfile_req = yield client.make_file(
+            request.ROOT, root_id, u'a_file.txt')
+
+        params = get_put_content_params(
+            data, node=mkfile_req.new_id, deflated_data=deflated_data)
+        d = client.put_content(**params)
+        yield self.assertFails(d, 'UPLOAD_CORRUPT')
 
     def _get_users(self, max_storage_bytes):
         """Get both storage and content users."""
@@ -1141,14 +752,9 @@ class TestPutContent(TestWithDatabase):
         # create the file
         a_file = user.root.make_file(u"A new file")
         # build the upload data
-        data = os.urandom(int(chunk_size * 1.5))
-        size = len(data)
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        deflated_size = len(deflated_data)
+        size = int(chunk_size * 1.5)
+        data = os.urandom(size)
+        params = get_put_content_params(data, node=str(a_file.id), size=size)
 
         # get a server instance
         storage_server = self.service.factory.buildProtocol('addr')
@@ -1160,13 +766,13 @@ class TestPutContent(TestWithDatabase):
         storage_server.working_caps = server.PREFERRED_CAP
 
         message = protocol_pb2.Message()
-        message.put_content.share = ''
-        message.put_content.node = str(a_file.id)
-        message.put_content.previous_hash = ''
-        message.put_content.hash = hash_value
-        message.put_content.crc32 = crc32_value
-        message.put_content.size = size
-        message.put_content.deflated_size = deflated_size
+        message.put_content.share = params['share']
+        message.put_content.node = params['node']
+        message.put_content.previous_hash = params['previous_hash']
+        message.put_content.hash = params['new_hash']
+        message.put_content.crc32 = params['crc32']
+        message.put_content.size = params['size']
+        message.put_content.deflated_size = params['deflated_size']
         message.id = 10
         message.type = protocol_pb2.Message.PUT_CONTENT
 
@@ -1188,12 +794,11 @@ class TestPutContent(TestWithDatabase):
 
         # start uploading
         pc.start()
-        # only one packet, in order to trigger the _start_receiving code
-        # path.
+        # only one packet, in order to trigger the _start_receiving code path
         yield begin_d
         msg = protocol_pb2.Message()
         msg.type = protocol_pb2.Message.BYTES
-        msg.bytes.bytes = deflated_data[:65536]
+        msg.bytes.bytes = params['fd'].read(65536)
         pc._processMessage(msg)
         # check the error
         error_type, comment = yield error_d
@@ -1207,35 +812,24 @@ class TestPutContent(TestWithDatabase):
     def test_putcontent_reuse_content_different_user_no_magic(self):
         """Different user with no magic hash: upload everything again."""
         data = os.urandom(30000)
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        mhash_object = magic_hash_factory()
-        mhash_object.update(data)
 
-        client, connector = yield self._get_client_helper("open sesame")
-        root = yield client.get_root()
+        client = yield self.get_client_helper(auth_token="open sesame")
+        root_id = yield client.get_root()
 
         # first file, it should ask for all the content not magic here
-        mkfile_req = yield client.make_file(request.ROOT, root, 'hola')
-        upload_req = self._put_content(client, mkfile_req.new_id,
-                                       hash_value, crc32_value, size,
-                                       deflated_data, None)
-        yield upload_req.deferred
+        mkfile_req = yield client.make_file(request.ROOT, root_id, 'hola')
+        params = get_put_content_params(
+            data, node=mkfile_req.new_id, magic_hash=None)
+        yield client.put_content(**params)
 
         # startup another client for a different user
-        client.kill()
-        connector.disconnect()
-        client, connector = yield self._get_client_helper("usr3")
-        root = yield client.get_root()
-        mkfile_req = yield client.make_file(request.ROOT, root, 'chau')
-        upload_req = self._put_content(client, mkfile_req.new_id,
-                                       hash_value, crc32_value, size,
-                                       deflated_data, None)
-        yield upload_req.deferred
+        client = yield self.get_client_helper(auth_token="usr3")
+        root_id = yield client.get_root()
+        mkfile_req = yield client.make_file(request.ROOT, root_id, 'chau')
+
+        params = get_put_content_params(
+            data, node=mkfile_req.new_id, magic_hash=None)
+        yield client.put_content(**params)
 
         # the BEGIN_CONTENT should be from 0
         message = [m for m in client.messages
@@ -1243,35 +837,24 @@ class TestPutContent(TestWithDatabase):
         self.assertEqual(message.begin_content.offset, 0)
 
         # check all went ok by getting the content
-        get_req = yield client.get_content(request.ROOT,
-                                           mkfile_req.new_id, hash_value)
-        self.assertEqual(get_req.data, deflated_data)
-        client.kill()
-        connector.disconnect()
+        get_req = yield client.get_content(
+            params['share'], params['node'], params['new_hash'])
+        self.assertEqual(zlib.decompress(get_req.data), data)
 
     @defer.inlineCallbacks
     def test_putcontent_reuse_content_different_user_with_magic(self):
         """Different user but with magic hash: don't upload all again."""
         data = os.urandom(30000)
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
-        mhash_object = magic_hash_factory()
-        mhash_object.update(data)
-        mhash_value = mhash_object.content_hash()._magic_hash
+        mhash_value = get_magic_hash(data)
 
-        client, connector = yield self._get_client_helper("open sesame")
-        root = yield client.get_root()
+        client = yield self.get_client_helper(auth_token="open sesame")
+        root_id = yield client.get_root()
 
         # first file, it should ask for all the content not magic here
-        mkfile_req = yield client.make_file(request.ROOT, root, 'hola')
-        upload_req = self._put_content(client, mkfile_req.new_id, hash_value,
-                                       crc32_value, size, deflated_data, None)
-        yield upload_req.deferred
+        mkfile_req = yield client.make_file(request.ROOT, root_id, 'hola')
+        params = get_put_content_params(
+            data, node=mkfile_req.new_id, magic_hash=None)
+        yield client.put_content(**params)
 
         # hook to test stats
         meter = []
@@ -1280,16 +863,13 @@ class TestPutContent(TestWithDatabase):
         self.service.factory.metrics.gauge = lambda *a: gauge.append(a)
 
         # startup another client for a different user.
-        client.kill()
-        connector.disconnect()
-        client, connector = yield self._get_client_helper("usr3")
-        root = yield client.get_root()
+        client = yield self.get_client_helper(auth_token="usr3")
+        root_id = yield client.get_root()
 
-        mkfile_req = yield client.make_file(request.ROOT, root, 'chau')
-        upload_req = self._put_content(client, mkfile_req.new_id, hash_value,
-                                       crc32_value, size, deflated_data,
-                                       mhash_value)
-        resp = yield upload_req.deferred
+        mkfile_req = yield client.make_file(request.ROOT, root_id, 'chau')
+        params = get_put_content_params(
+            data, node=mkfile_req.new_id, magic_hash=mhash_value)
+        resp = yield client.put_content(**params)
 
         # the response should have the new_generation
         self.assertEqual(mkfile_req.new_generation + 1, resp.new_generation)
@@ -1297,335 +877,237 @@ class TestPutContent(TestWithDatabase):
         # the BEGIN_CONTENT should be from the end
         message = [m for m in client.messages
                    if m.type == protocol_pb2.Message.BEGIN_CONTENT][0]
-        self.assertEqual(message.begin_content.offset, deflated_size)
+        self.assertEqual(message.begin_content.offset, params['deflated_size'])
 
         # check all went ok by getting the content
-        get_req = yield client.get_content(request.ROOT,
-                                           mkfile_req.new_id, hash_value)
-        self.assertEqual(get_req.data, deflated_data)
+        get_req = yield client.get_content(
+            params['share'], mkfile_req.new_id, params['new_hash'])
+        self.assertEqual(zlib.decompress(get_req.data), data)
         # check reused content stat
-        self.assertTrue(('MagicUploadJob.upload', deflated_size) in gauge)
-        self.assertTrue(('MagicUploadJob.upload.begin', 1) in meter)
-        client.kill()
-        connector.disconnect()
+        self.assertIn(
+            ('MagicUploadJob.upload', params['deflated_size']), gauge)
+        self.assertIn(('MagicUploadJob.upload.begin', 1), meter)
 
     @defer.inlineCallbacks
     def test_putcontent_reuse_content_same_user_no_magic(self):
         """Same user doesn't upload everything even with no hash."""
         data = os.urandom(30000)
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
 
-        @defer.inlineCallbacks
-        def auth(client):
-            """Start authenticated test."""
-            yield client.dummy_authenticate("open sesame")
-            root = yield client.get_root()
+        client = yield self.get_client_helper(auth_token="open sesame")
+        root_id = yield client.get_root()
 
-            # first file, it should ask for all the content not magic here
-            mkfile_req = yield client.make_file(request.ROOT, root, 'hola')
-            upload_req = self._put_content(client, mkfile_req.new_id,
-                                           hash_value, crc32_value, size,
-                                           deflated_data, None)
-            yield upload_req.deferred
+        # first file, it should ask for all the content not magic here
+        mkfile_req = yield client.make_file(request.ROOT, root_id, 'hola')
+        params = get_put_content_params(
+            data, node=mkfile_req.new_id, magic_hash=None)
+        yield client.put_content(**params)
 
-            # the BEGIN_CONTENT should be from 0
-            message = [m for m in client.messages
-                       if m.type == protocol_pb2.Message.BEGIN_CONTENT][0]
-            self.assertEqual(message.begin_content.offset, 0)
+        # the BEGIN_CONTENT should be from 0
+        message = [m for m in client.messages
+                   if m.type == protocol_pb2.Message.BEGIN_CONTENT][0]
+        self.assertEqual(message.begin_content.offset, 0)
 
-            # hook to test stats
-            meter = []
-            self.service.factory.metrics.meter = lambda *a: meter.append(a)
-            gauge = []
-            self.service.factory.metrics.gauge = lambda *a: gauge.append(a)
-            client.messages = []
+        # hook to test stats
+        meter = []
+        self.service.factory.metrics.meter = lambda *a: meter.append(a)
+        gauge = []
+        self.service.factory.metrics.gauge = lambda *a: gauge.append(a)
+        client.messages = []
 
-            # other file but same content, still no magic
-            mkfile_req = yield client.make_file(request.ROOT, root, 'chau')
-            upload_req = self._put_content(client, mkfile_req.new_id,
-                                           hash_value, crc32_value, size,
-                                           deflated_data, None)
-            resp = yield upload_req.deferred
+        # other file but same content, still no magic
+        mkfile_req = yield client.make_file(request.ROOT, root_id, 'chau')
+        params = get_put_content_params(
+            data, node=mkfile_req.new_id, magic_hash=None)
+        resp = yield client.put_content(**params)
 
-            # response has the new generation in it
-            self.assertEqual(
-                resp.new_generation, mkfile_req.new_generation + 1)
+        # response has the new generation in it
+        self.assertEqual(resp.new_generation, mkfile_req.new_generation + 1)
 
-            # the BEGIN_CONTENT should be from the end
-            message = [m for m in client.messages
-                       if m.type == protocol_pb2.Message.BEGIN_CONTENT][0]
-            self.assertEqual(message.begin_content.offset, deflated_size)
+        # the BEGIN_CONTENT should be from the end
+        message = [m for m in client.messages
+                   if m.type == protocol_pb2.Message.BEGIN_CONTENT][0]
+        self.assertEqual(message.begin_content.offset, params['deflated_size'])
 
-            # check all went ok by getting the content
-            get_req = yield client.get_content(request.ROOT,
-                                               mkfile_req.new_id, hash_value)
-            self.assertEqual(get_req.data, deflated_data)
-            # check reused content stat
-            self.assertTrue(('MagicUploadJob.upload', deflated_size) in gauge)
-            self.assertTrue(('MagicUploadJob.upload.begin', 1) in meter)
-
-        yield self.callback_test(auth, add_default_callbacks=True)
-
-    def _put_content(self, client, new_id, hash_value, crc32_value,
-                     size, deflated_data, magic_hash):
-        """Put content to a file."""
-        return client.put_content_request(
-            request.ROOT, new_id, NO_CONTENT_HASH, hash_value, crc32_value,
-            size, len(deflated_data), StringIO(deflated_data),
-            magic_hash=magic_hash)
+        # check all went ok by getting the content
+        get_req = yield client.get_content(
+            params['share'], params['node'], params['new_hash'])
+        self.assertEqual(zlib.decompress(get_req.data), data)
+        # check reused content stat
+        self.assertIn(
+            ('MagicUploadJob.upload', params['deflated_size']), gauge)
+        self.assertIn(('MagicUploadJob.upload.begin', 1), meter)
 
     @defer.inlineCallbacks
     def test_putcontent_reuse_content_same_user_with_magic(self):
         """Same user with magic hash: of course no new upload is needed."""
         data = os.urandom(30000)
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
-        mhash_object = magic_hash_factory()
-        mhash_object.update(data)
-        mhash_value = mhash_object.content_hash()._magic_hash
+        mhash_value = get_magic_hash(data)
 
-        @defer.inlineCallbacks
-        def auth(client):
-            """Start authenticated test."""
-            yield client.dummy_authenticate("open sesame")
-            root = yield client.get_root()
+        client = yield self.get_client_helper(auth_token="open sesame")
+        root_id = yield client.get_root()
 
-            # first file, it should ask for all the content not magic here
-            mkfile_req = yield client.make_file(request.ROOT, root, 'hola')
-            upload_req = self._put_content(client, mkfile_req.new_id,
-                                           hash_value, crc32_value, size,
-                                           deflated_data, mhash_value)
-            yield upload_req.deferred
+        # first file, it should ask for all the content not magic here
+        mkfile_req = yield client.make_file(request.ROOT, root_id, 'hola')
+        params = get_put_content_params(
+            data, node=mkfile_req.new_id, magic_hash=mhash_value)
+        yield client.put_content(**params)
 
-            # the BEGIN_CONTENT should be from 0
-            message = [m for m in client.messages
-                       if m.type == protocol_pb2.Message.BEGIN_CONTENT][0]
-            self.assertEqual(message.begin_content.offset, 0)
+        # the BEGIN_CONTENT should be from 0
+        message = [m for m in client.messages
+                   if m.type == protocol_pb2.Message.BEGIN_CONTENT][0]
+        self.assertEqual(message.begin_content.offset, 0)
 
-            meter = []
-            self.service.factory.metrics.meter = lambda *a: meter.append(a)
-            gauge = []
-            self.service.factory.metrics.gauge = lambda *a: gauge.append(a)
-            client.messages = []
+        meter = []
+        self.service.factory.metrics.meter = lambda *a: meter.append(a)
+        gauge = []
+        self.service.factory.metrics.gauge = lambda *a: gauge.append(a)
+        client.messages = []
 
-            # another file but same content, still no upload
-            mkfile_req = yield client.make_file(request.ROOT, root, 'chau')
-            upload_req = self._put_content(client, mkfile_req.new_id,
-                                           hash_value, crc32_value, size,
-                                           deflated_data, mhash_value)
-            resp = yield upload_req.deferred
+        # another file but same content, still no upload
+        mkfile_req = yield client.make_file(request.ROOT, root_id, 'chau')
+        params = get_put_content_params(
+            data, node=mkfile_req.new_id, magic_hash=mhash_value)
+        resp = yield client.put_content(**params)
 
-            # response has the new generation in it
-            self.assertEqual(
-                resp.new_generation, mkfile_req.new_generation + 1)
+        # response has the new generation in it
+        self.assertEqual(resp.new_generation, mkfile_req.new_generation + 1)
 
-            # the BEGIN_CONTENT should be from the end
-            message = [m for m in client.messages
-                       if m.type == protocol_pb2.Message.BEGIN_CONTENT][0]
-            self.assertEqual(message.begin_content.offset, deflated_size)
+        # the BEGIN_CONTENT should be from the end
+        message = [m for m in client.messages
+                   if m.type == protocol_pb2.Message.BEGIN_CONTENT][0]
+        self.assertEqual(message.begin_content.offset, params['deflated_size'])
 
-            # check all went ok by getting the content
-            get_req = yield client.get_content(request.ROOT,
-                                               mkfile_req.new_id, hash_value)
-            self.assertEqual(get_req.data, deflated_data)
-            # check reused content stat
-            self.assertTrue(('MagicUploadJob.upload', deflated_size) in gauge)
-            self.assertTrue(('MagicUploadJob.upload.begin', 1) in meter)
-
-        yield self.callback_test(auth, add_default_callbacks=True)
+        # check all went ok by getting the content
+        get_req = yield client.get_content(
+            params['share'], params['node'], params['new_hash'])
+        self.assertEqual(zlib.decompress(get_req.data), data)
+        # check reused content stat
+        self.assertIn(
+            ('MagicUploadJob.upload', params['deflated_size']), gauge)
+        self.assertIn(('MagicUploadJob.upload.begin', 1), meter)
 
     @defer.inlineCallbacks
     def test_putcontent_magic_hash(self):
         """Test that it calculated and stored the magic hash on put content."""
         data = os.urandom(30000)
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
         magic_hash_value = get_magic_hash(data)
 
-        @defer.inlineCallbacks
-        def auth(client):
-            """Start authenticated test."""
-            yield client.dummy_authenticate("open sesame")
-            root = yield client.get_root()
+        client = yield self.get_client_helper(auth_token="open sesame")
+        root_id = yield client.get_root()
 
-            mkfile_req = yield client.make_file(request.ROOT, root, 'hola')
-            yield client.put_content(request.ROOT, mkfile_req.new_id,
-                                     NO_CONTENT_HASH, hash_value, crc32_value,
-                                     size, deflated_size,
-                                     StringIO(deflated_data))
+        mkfile_req = yield client.make_file(request.ROOT, root_id, 'hola')
+        params = get_put_content_params(data, node=mkfile_req.new_id)
+        yield client.put_content(**params)
 
-            content_blob = self.usr0.volume().get_content(hash_value)
-            self.assertEqual(content_blob.magic_hash, magic_hash_value)
+        content_blob = self.usr0.volume().get_content(params['new_hash'])
+        self.assertEqual(content_blob.magic_hash, magic_hash_value)
 
-        yield self.callback_test(auth, add_default_callbacks=True)
-
+    @defer.inlineCallbacks
     def test_putcontent_blob_exists(self):
         """Test putting content with an existing blob (no magic)."""
         data = "*" * 100
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
+        params = get_put_content_params(data)
         # create the content blob without a magic hash in a different user.
         self.make_user(u'my_user', max_storage_bytes=2 ** 20)
         self.usr3.make_filepath_with_content(
-            settings.ROOT_USERVOLUME_PATH + u"/file.txt", hash_value,
-            crc32_value, size, deflated_size, uuid.uuid4())
+            settings.ROOT_USERVOLUME_PATH + u"/file.txt", params['new_hash'],
+            params['crc32'], params['size'], params['deflated_size'],
+            uuid.uuid4())
 
         # overwrite UploadJob method to detect if it
         # uploaded stuff (it shouldn't)
         self.patch(BaseUploadJob, '_start_receiving',
                    lambda s: defer.fail(Exception("This shouldn't be called")))
 
-        @defer.inlineCallbacks
-        def auth(client):
-            yield client.dummy_authenticate("open sesame")
-            root_id = yield client.get_root()
-            req = yield client.make_file(request.ROOT, root_id, "hola")
-            yield client.put_content(request.ROOT, req.new_id, NO_CONTENT_HASH,
-                                     hash_value, crc32_value, size,
-                                     deflated_size, StringIO(deflated_data))
+        client = yield self.get_client_helper(auth_token="open sesame")
+        root_id = yield client.get_root()
+        mkfile_req = yield client.make_file(request.ROOT, root_id, "hola")
+        params = get_put_content_params(data, node=mkfile_req.new_id)
+        yield client.put_content(**params)
 
-            # check it has content ok
-            self.usr0.volume().get_content(hash_value)
+        # check it has content ok
+        result = self.usr0.volume().get_content(params['new_hash'])
+        self.assertEqual(result.hash, params['new_hash'])
 
-        return self.callback_test(auth, add_default_callbacks=True)
-
+    @defer.inlineCallbacks
     def test_put_content_on_a_dir_normal(self):
         """Test putting content in a dir."""
         data = os.urandom(300000)
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
-        file_obj = StringIO(deflated_data)
 
-        @defer.inlineCallbacks
-        def test(client):
-            """Test."""
-            yield client.dummy_authenticate("open sesame")
-            root_id = yield client.get_root()
-            make_req = yield client.make_dir(request.ROOT, root_id, "hola")
-            d = client.put_content(request.ROOT, make_req.new_id,
-                                   NO_CONTENT_HASH, hash_value, crc32_value,
-                                   size, deflated_size, file_obj)
-            yield self.assertFailure(d, protoerrors.NoPermissionError)
-        return self.callback_test(test, add_default_callbacks=True)
+        client = yield self.get_client_helper(auth_token="open sesame")
+        root_id = yield client.get_root()
+        mkfile_req = yield client.make_dir(request.ROOT, root_id, "hola")
+        params = get_put_content_params(data, node=mkfile_req.new_id)
+        d = client.put_content(**params)
+        yield self.assertFailure(d, protoerrors.NoPermissionError)
 
+    @defer.inlineCallbacks
     def test_put_content_on_a_dir_magic(self):
         """Test putting content in a dir."""
         data = os.urandom(300000)
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
-        file_obj = StringIO(deflated_data)
 
-        @defer.inlineCallbacks
-        def test(client):
-            """Test."""
-            yield client.dummy_authenticate("open sesame")
-            root_id = yield client.get_root()
+        client = yield self.get_client_helper(auth_token="open sesame")
+        root_id = yield client.get_root()
 
-            # create a normal file
-            make_req = yield client.make_file(request.ROOT, root_id, "hola")
-            yield client.put_content(request.ROOT, make_req.new_id,
-                                     NO_CONTENT_HASH, hash_value, crc32_value,
-                                     size, deflated_size, file_obj)
+        # create a normal file
+        mkfile_req = yield client.make_file(request.ROOT, root_id, "hola")
+        params = get_put_content_params(data, node=mkfile_req.new_id)
+        yield client.put_content(**params)
 
-            # create a dir and trigger a putcontent that will use 'magic'
-            make_req = yield client.make_dir(request.ROOT, root_id, "chau")
-            d = client.put_content(request.ROOT, make_req.new_id,
-                                   NO_CONTENT_HASH, hash_value, crc32_value,
-                                   size, deflated_size, file_obj)
-            yield self.assertFailure(d, protoerrors.NoPermissionError)
-        return self.callback_test(test, add_default_callbacks=True)
+        # create a dir and trigger a putcontent that will use 'magic'
+        mkfile_req = yield client.make_dir(request.ROOT, root_id, "chau")
+        params = get_put_content_params(data, node=mkfile_req.new_id)
+        d = client.put_content(**params)
+        yield self.assertFailure(d, protoerrors.NoPermissionError)
 
 
 class TestMultipartPutContent(TestWithDatabase):
     """Test put_content using multipart command."""
+
+    # override defaults set by TestWithDatabase.setUp.
+    STORAGE_CHUNK_SIZE = 1024
 
     @defer.inlineCallbacks
     def setUp(self):
         """Set up."""
         self.handler = self.add_memento_handler(server.logger, level=0)
         yield super(TestMultipartPutContent, self).setUp()
-        # override defaults set by TestWithDatabase.setUp.
-        self.patch(settings, 'STORAGE_CHUNK_SIZE', 1024)
 
     def get_data(self, size):
-        """Return random data of the specified size."""
+        """Return random data of the specified size.
+
+        This method is overriden in the next testcase.
+
+        """
         return os.urandom(size)
 
     @defer.inlineCallbacks
     def _test_putcontent(self, num_files=1, size=1024 * 1024):
         """Test putting content to a file."""
         data = self.get_data(size)
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
 
-        @defer.inlineCallbacks
-        def auth(client):
-            """Authenticated test."""
-            yield client.dummy_authenticate("open sesame")
-            root = yield client.get_root()
+        client = yield self.get_client_helper(auth_token="open sesame")
+        root_id = yield client.get_root()
 
-            # hook to test stats
-            meter = []
-            self.service.factory.metrics.meter = lambda *a: meter.append(a)
-            gauge = []
-            self.service.factory.metrics.gauge = lambda *a: gauge.append(a)
+        # hook to test stats
+        meter = []
+        self.service.factory.metrics.meter = lambda *a: meter.append(a)
+        gauge = []
+        self.service.factory.metrics.gauge = lambda *a: gauge.append(a)
 
-            for i in range(num_files):
-                fname = 'hola_%d' % i
-                mkfile_req = yield client.make_file(request.ROOT, root, fname)
-                yield client.put_content(request.ROOT, mkfile_req.new_id,
-                                         NO_CONTENT_HASH, hash_value,
-                                         crc32_value, size, deflated_size,
-                                         StringIO(deflated_data))
+        for i in range(num_files):
+            fname = 'hola_%d' % i
+            mkfile_req = yield client.make_file(request.ROOT, root_id, fname)
+            params = get_put_content_params(data, node=mkfile_req.new_id)
+            yield client.put_content(**params)
 
-                try:
-                    self.usr0.volume().get_content(hash_value)
-                except errors.DoesNotExist:
-                    raise ValueError("content blob is not there")
-                # check upload stat and log, with the offset sent
-                self.assertIn(('UploadJob.upload', 0), gauge)
-                self.assertIn(('UploadJob.upload.begin', 1), meter)
-                self.handler.assert_debug(
-                    "UploadJob begin content from offset 0")
-
-        yield self.callback_test(auth, timeout=self.timeout,
-                                 add_default_callbacks=True)
+            self.assertRaises(
+                errors.DoesNotExist,
+                self.usr0.volume().get_content, params['new_hash'])
+            # check upload stat and log, with the offset sent
+            self.assertIn(('UploadJob.upload', 0), gauge)
+            self.assertIn(('UploadJob.upload.begin', 1), meter)
+            self.handler.assert_debug("UploadJob begin content from offset 0")
 
     @defer.inlineCallbacks
     def test_resume_putcontent(self):
@@ -1634,17 +1116,10 @@ class TestMultipartPutContent(TestWithDatabase):
         size = 2 * 1024 * 512
         StorageUser.objects.filter(id=self.usr0.id).update(
             max_storage_bytes=size * 2)
-        data = os.urandom(size)
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
+        data = self.get_data(size)
 
         # setup
-        (client, _) = yield self._get_client_helper("open sesame")
+        client = yield self.get_client_helper(auth_token="open sesame")
 
         # hook to test stats
         meter = []
@@ -1673,17 +1148,14 @@ class TestMultipartPutContent(TestWithDatabase):
 
         self.patch(sp_client.BytesMessageProducer, 'go', my_go)
         # we are authenticated
-        root = yield client.get_root()
-        filename = 'hola_12'
-        mkfile_req = yield client.make_file(request.ROOT, root, filename)
+        root_id = yield client.get_root()
+        mkfile_req = yield client.make_file(request.ROOT, root_id, 'hola_12')
         upload_info = []
-        d = client.put_content(
-            request.ROOT, mkfile_req.new_id, NO_CONTENT_HASH,
-            hash_value, crc32_value, size, deflated_size,
-            StringIO(deflated_data),
+        params = get_put_content_params(
+            data, node=mkfile_req.new_id,
             upload_id_cb=lambda *a: upload_info.append(a),
         )
-        yield self.assertFailure(d, EOFError)
+        yield self.assertFailure(client.put_content(**params), EOFError)
 
         # check upload stat and log, with the offset sent
         self.assertTrue(('UploadJob.upload', 0) in gauge)
@@ -1691,7 +1163,7 @@ class TestMultipartPutContent(TestWithDatabase):
         self.handler.assert_debug("UploadJob begin content from offset 0")
 
         # connect a new client and try to upload again
-        (client, _) = yield self._get_client_helper("open sesame")
+        client = yield self.get_client_helper(auth_token="open sesame")
 
         # restore patched client
         self.patch(sp_client.BytesMessageProducer, 'go', orig_go)
@@ -1707,23 +1179,23 @@ class TestMultipartPutContent(TestWithDatabase):
             return processMessage(myself, message)
 
         self.patch(sp_client.PutContent, 'processMessage', new_processMessage)
-        req = sp_client.PutContent(
-            client, request.ROOT, mkfile_req.new_id, NO_CONTENT_HASH,
-            hash_value, crc32_value, size, deflated_size,
-            StringIO(deflated_data), upload_id=str(upload_info[0][0]))
+        params = get_put_content_params(
+            data, node_id=mkfile_req.new_id,
+            upload_id=str(upload_info[0][0]))
+        req = sp_client.PutContent(client, **params)
         req.start()
         yield req.deferred
 
         message = yield begin_content_d
         offset_sent = message.begin_content.offset
         try:
-            node_content = self.usr0.volume().get_content(hash_value)
+            node_content = self.usr0.volume().get_content(params['new_hash'])
         except errors.DoesNotExist:
             raise ValueError("content blob is not there")
-        self.assertEqual(node_content.crc32, crc32_value)
-        self.assertEqual(node_content.size, size)
-        self.assertEqual(node_content.deflated_size, deflated_size)
-        self.assertEqual(node_content.hash, hash_value)
+        self.assertEqual(node_content.crc32, params['crc32'])
+        self.assertEqual(node_content.size, params['size'])
+        self.assertEqual(node_content.deflated_size, params['deflated_size'])
+        self.assertEqual(node_content.hash, params['new_hash'])
         self.assertTrue(node_content.storage_key)
 
         # check upload stat and log, with the offset sent, second time it
@@ -1742,170 +1214,111 @@ class TestMultipartPutContent(TestWithDatabase):
         size = 2 * 1024 * 128
         StorageUser.objects.filter(id=self.usr0.id).update(
             max_storage_bytes=size * 2)
-        data = os.urandom(size)
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
+        data = self.get_data(size)
         # hook to test stats
         meter = []
         self.service.factory.metrics.meter = lambda *a: meter.append(a)
         gauge = []
         self.service.factory.metrics.gauge = lambda *a: gauge.append(a)
 
-        @defer.inlineCallbacks
-        def auth(client):
-            """Make authenticated test."""
-            yield client.dummy_authenticate("open sesame")
-            root = yield client.get_root()
-            mkfile_req = yield client.make_file(request.ROOT, root, 'hola')
-            upload_info = []
-            req = client.put_content_request(
-                request.ROOT, mkfile_req.new_id, NO_CONTENT_HASH,
-                hash_value, crc32_value, size, deflated_size,
-                StringIO(deflated_data), upload_id="invalid id",
-                upload_id_cb=lambda *a: upload_info.append(a))
-            yield req.deferred
-            self.assertTrue(('UploadJob.upload', 0) in gauge)
-            self.assertTrue(('UploadJob.upload.begin', 1) in meter)
-            self.handler.assert_debug(
-                "UploadJob begin content from offset 0")
-            self.assertEqual(len(upload_info), 1)
-            upload_id, start_from = upload_info[0]
-            self.assertIsInstance(uuid.UUID(upload_id), uuid.UUID)
-            self.assertEqual(start_from, 0)
+        client = yield self.get_client_helper(auth_token="open sesame")
+        root_id = yield client.get_root()
+        mkfile_req = yield client.make_file(request.ROOT, root_id, 'hola')
+        upload_info = []
+        params = get_put_content_params(
+            data, node=mkfile_req.new_id, upload_id="invalid id",
+            upload_id_cb=lambda *a: upload_info.append(a))
+        yield client.put_content(**params)
 
-        yield self.callback_test(auth, add_default_callbacks=True)
+        self.assertIn(('UploadJob.upload', 0), gauge)
+        self.assertIn(('UploadJob.upload.begin', 1), meter)
+        self.handler.assert_debug("UploadJob begin content from offset 0")
+        self.assertEqual(len(upload_info), 1)
+        upload_id, start_from = upload_info[0]
+        self.assertIsInstance(uuid.UUID(upload_id), uuid.UUID)
+        self.assertEqual(start_from, 0)
 
     @defer.inlineCallbacks
     def test_putcontent_magic_hash(self):
         """Test that it calculated and stored the magic hash on put content."""
-        data = os.urandom(30000)
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
+        data = self.get_data(30000)
         magic_hash_value = get_magic_hash(data)
 
-        @defer.inlineCallbacks
-        def auth(client):
-            """Make authenticated test."""
-            yield client.dummy_authenticate("open sesame")
-            root = yield client.get_root()
-            mkfile_req = yield client.make_file(request.ROOT, root, 'hola')
-            yield client.put_content(request.ROOT, mkfile_req.new_id,
-                                     NO_CONTENT_HASH, hash_value, crc32_value,
-                                     size, deflated_size,
-                                     StringIO(deflated_data))
+        client = yield self.get_client_helper(auth_token="open sesame")
+        root_id = yield client.get_root()
+        mkfile_req = yield client.make_file(request.ROOT, root_id, 'hola')
+        params = get_put_content_params(data, node=mkfile_req.new_id)
+        yield client.put_content(**params)
 
-            content_blob = self.usr0.volume().get_content(hash_value)
-            self.assertEqual(content_blob.magic_hash, magic_hash_value)
-        yield self.callback_test(auth, add_default_callbacks=True)
+        content_blob = self.usr0.volume().get_content(params['new_hash'])
+        self.assertEqual(content_blob.magic_hash, magic_hash_value)
 
+    @defer.inlineCallbacks
     def test_putcontent_corrupt(self):
         """Put content on a file with corrupt data."""
         self.patch(settings, 'STORAGE_CHUNK_SIZE', 1024 * 64)
         size = 2 * 1024 * 512
         StorageUser.objects.filter(id=self.usr0.id).update(
-            max_storage_bytes=size * 2)
-        data = os.urandom(size)
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
+            max_storage_bytes=size * 2 + 10)
+        data = self.get_data(size)
         size = len(data) + 10
-        deflated_size = len(deflated_data)
 
-        @defer.inlineCallbacks
-        def test(client):
-            """Test."""
-            yield client.dummy_authenticate("open sesame")
+        client = yield self.get_client_helper(auth_token="open sesame")
+        # create the dir
+        root_id = yield client.get_root()
+        mkfile_req = yield client.make_file(request.ROOT, root_id, "hola")
 
-            # create the dir
-            root_id = yield client.get_root()
-            make_req = yield client.make_file(request.ROOT, root_id, "hola")
+        params = get_put_content_params(
+            data, node=mkfile_req.new_id, size=size)
+        # put content and check
+        putc_req = client.put_content_request(**params)
+        yield self.assertFailure(
+            putc_req.deferred, protoerrors.UploadCorruptError)
 
-            # put content and check
-            args = (request.ROOT, make_req.new_id, NO_CONTENT_HASH, hash_value,
-                    crc32_value, size, deflated_size, StringIO(deflated_data))
-            try:
-                putc_req = client.put_content_request(*args)
-                yield putc_req.deferred
-            except Exception as ex:
-                self.assertIsInstance(ex, protoerrors.UploadCorruptError)
-            self.handler.assert_debug('UploadCorrupt', str(size))
-            # check that the uploadjob was deleted.
-            node = self.usr0.volume(None).get_node(make_req.new_id)
-            self.assertRaises(errors.DoesNotExist,
-                              node.get_multipart_uploadjob, putc_req.upload_id,
-                              hash_value, crc32_value)
+        self.handler.assert_debug('UploadCorrupt', str(size))
+        # check that the uploadjob was deleted.
+        node = self.usr0.volume(None).get_node(params['node'])
+        self.assertRaises(
+            errors.DoesNotExist,
+            node.get_multipart_uploadjob,
+            putc_req.upload_id, params['new_hash'], params['crc32'])
 
-        return self.callback_test(test, add_default_callbacks=True)
-
+    @defer.inlineCallbacks
     def test_putcontent_blob_exists(self):
         """Test putting content with an existing blob (no magic)."""
         data = self.get_data(1024 * 20)
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
+        params = get_put_content_params(data)
         # create the content blob without a magic hash in a different user.
         self.make_user(u'my_user', max_storage_bytes=2 ** 20)
         self.usr3.make_filepath_with_content(
             settings.ROOT_USERVOLUME_PATH + u"/file.txt",
-            hash_value, crc32_value, size, deflated_size, uuid.uuid4())
+            params['new_hash'], params['crc32'], params['size'],
+            params['deflated_size'], uuid.uuid4())
 
-        def auth(client):
+        client = yield self.get_client_helper(auth_token="open sesame")
+        root_id = yield client.get_root()
+        mkfile_req = yield client.make_file(request.ROOT, root_id, "hola")
 
-            def check_file(result):
-                return threads.deferToThread(
-                    lambda: self.usr0.volume().get_content(hash_value))
+        params = get_put_content_params(data, node=mkfile_req.new_id)
+        yield client.put_content(**params)
 
-            d = client.dummy_authenticate("open sesame")
-            d.addCallback(lambda _: client.get_root())
-            d.addCallback(lambda root_id:
-                          client.make_file(request.ROOT, root_id, "hola"))
-            d.addCallback(self.save_req, "file")
-            d.addCallback(lambda req: client.put_content(
-                request.ROOT, req.new_id, NO_CONTENT_HASH, hash_value,
-                crc32_value, size, deflated_size, StringIO(deflated_data)))
-            d.addCallback(check_file)
-            d.addCallbacks(client.test_done, client.test_fail)
-        return self.callback_test(auth)
+        def check_file():
+            self.usr0.volume().get_content(params['new_hash'])
 
+        yield threads.deferToThread(check_file)
+
+    @defer.inlineCallbacks
     def test_put_content_on_a_dir(self):
         """Test putting content in a dir."""
-        data = os.urandom(300000)
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
-        file_obj = StringIO(deflated_data)
+        data = self.get_data(300000)
 
-        @defer.inlineCallbacks
-        def test(client):
-            """Test."""
-            yield client.dummy_authenticate("open sesame")
-            root_id = yield client.get_root()
-            make_req = yield client.make_dir(request.ROOT, root_id, "hola")
-            d = client.put_content(request.ROOT, make_req.new_id,
-                                   NO_CONTENT_HASH, hash_value, crc32_value,
-                                   size, deflated_size, file_obj)
-            yield self.assertFailure(d, protoerrors.NoPermissionError)
-        return self.callback_test(test, add_default_callbacks=True)
+        client = yield self.get_client_helper(auth_token="open sesame")
+        root_id = yield client.get_root()
+        mkfile_req = yield client.make_dir(request.ROOT, root_id, "hola")
+
+        params = get_put_content_params(data, node=mkfile_req.new_id)
+        d = client.put_content(**params)
+        yield self.assertFailure(d, protoerrors.NoPermissionError)
 
 
 class TestMultipartPutContentGoodCompression(TestMultipartPutContent):
@@ -1936,13 +1349,7 @@ class TestPutContentInternalError(TestWithDatabase):
         a_file = user.root.make_file(u"A new file")
         # build the upload data
         data = os.urandom(int(chunk_size * 1.5))
-        size = len(data)
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        deflated_size = len(deflated_data)
+        params = get_put_content_params(data, node=str(a_file.id))
 
         # get a server instance
         storage_server = self.service.factory.buildProtocol('addr')
@@ -1954,13 +1361,13 @@ class TestPutContentInternalError(TestWithDatabase):
         storage_server.working_caps = server.PREFERRED_CAP
 
         message = protocol_pb2.Message()
-        message.put_content.share = ''
-        message.put_content.node = str(a_file.id)
-        message.put_content.previous_hash = ''
-        message.put_content.hash = hash_value
-        message.put_content.crc32 = crc32_value
-        message.put_content.size = size
-        message.put_content.deflated_size = deflated_size
+        message.put_content.share = params['share']
+        message.put_content.node = params['node']
+        message.put_content.previous_hash = params['previous_hash']
+        message.put_content.hash = params['new_hash']
+        message.put_content.crc32 = params['crc32']
+        message.put_content.size = params['size']
+        message.put_content.deflated_size = params['deflated_size']
         message.id = 10
         message.type = protocol_pb2.Message.PUT_CONTENT
 
@@ -1987,7 +1394,7 @@ class TestPutContentInternalError(TestWithDatabase):
         yield begin_d
         msg = protocol_pb2.Message()
         msg.type = protocol_pb2.Message.BYTES
-        msg.bytes.bytes = deflated_data[:65536]
+        msg.bytes.bytes = params['fd'].read(65536)
         pc._processMessage(msg)
         # check the error
         error_type, comment = yield error_d
@@ -2003,135 +1410,92 @@ class TestPutContentInternalError(TestWithDatabase):
     def test_putcontent_handle_error_in_sendok(self):
         """PutContent should handle errors in send_ok."""
         data = os.urandom(1000)
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
 
-        @defer.inlineCallbacks
-        def auth(client):
-            """Authenticated test."""
-            yield client.dummy_authenticate("open sesame")
-            root = yield client.get_root()
+        client = yield self.get_client_helper(auth_token="open sesame")
+        root_id = yield client.get_root()
+        mkfile_req = yield client.make_file(request.ROOT, root_id, "hola")
 
-            mkfile_req = yield client.make_file(request.ROOT, root, "hola")
+        def breakit(*a):
+            """Raise an exception to simulate the method call failed."""
+            raise MemoryError("Simulated ME")
 
-            def breakit(*a):
-                """Raise an exception to simulate the method call failed."""
-                raise MemoryError("Simulated ME")
+        self.patch(server.PutContentResponse, "_commit_uploadjob", breakit)
 
-            self.patch(server.PutContentResponse, "_commit_uploadjob", breakit)
-
-            d = client.put_content(
-                request.ROOT, mkfile_req.new_id, NO_CONTENT_HASH, hash_value,
-                crc32_value, size, deflated_size, StringIO(deflated_data))
-            yield self.assertFailure(d, protoerrors.InternalError)
-
-        yield self.callback_test(auth, add_default_callbacks=True)
+        params = get_put_content_params(data, node=mkfile_req.new_id)
+        d = client.put_content(**params)
+        yield self.assertFailure(d, protoerrors.InternalError)
 
 
 class TestChunkedContent(TestWithDatabase):
-    """ Tests operation on large data that requires multiple chunks """
+    """Test operation on large data that requires multiple chunks."""
+
+    STORAGE_CHUNK_SIZE = 1024 * 1024
 
     @defer.inlineCallbacks
-    def setUp(self):
-        """Setup the test."""
-        yield super(TestChunkedContent, self).setUp()
-        # tune the config for this tests
-        self.patch(settings, 'STORAGE_CHUNK_SIZE', 1024 * 1024)
-
     def test_putcontent_chunked(self, put_fail=False, get_fail=False):
         """Checks a chunked putcontent."""
         size = int(settings.STORAGE_CHUNK_SIZE * 1.5)
+        StorageUser.objects.filter(id=self.usr0.id).update(
+            max_storage_bytes=size * 2)
         data = os.urandom(size)
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        deflated_size = len(deflated_data)
 
-        def auth(client):
+        def _put_fail():
+            # this will allow the server to split the data into chunks but
+            # fail to put it back together in a single blob
+            if put_fail:
+                # make the consumer crash
+                def crash(*_):
+                    """Make it crash."""
+                    raise ValueError("test problem")
+                self.patch(diskstorage.FileWriterConsumer, 'write', crash)
 
-            def raise_quota(_):
-                StorageUser.objects.filter(id=self.usr0.id).update(
-                    max_storage_bytes=size * 2)
+        def _get_fail():
+            # this will allow the server to split the data into chunks but
+            # fail to put it back together in a single blob
+            if get_fail:
+                # make the producer crash
+                orig_func = diskstorage.FileReaderProducer.startProducing
 
-            def check_content(content):
-                self.assertEqual(content.data, deflated_data)
+                def mitm(*a):
+                    """MITM to return a failed deferred, not real one."""
+                    deferred = orig_func(*a)
+                    deferred.errback(ValueError())
+                    return deferred
+                self.patch(
+                    diskstorage.FileReaderProducer, 'startProducing', mitm)
 
-            def _put_fail(result):
-                # this will allow the server to split the data into chunks but
-                # fail to put it back together in a single blob
-                if put_fail:
-                    # make the consumer crash
-                    def crash(*_):
-                        """Make it crash."""
-                        raise ValueError("test problem")
-                    self.patch(diskstorage.FileWriterConsumer, 'write', crash)
-                return result
+        client = yield self.get_client_helper(auth_token="open sesame")
+        root_id = yield client.get_root()
+        mkfile_req = yield client.make_file(request.ROOT, root_id, "hola")
 
-            def _get_fail(result):
-                # this will allow the server to split the data into chunks but
-                # fail to put it back together in a single blob
-                if get_fail:
-                    # make the producer crash
-                    orig_func = diskstorage.FileReaderProducer.startProducing
+        _put_fail()
+        _get_fail()
 
-                    def mitm(*a):
-                        """MITM to return a failed deferred, not real one."""
-                        deferred = orig_func(*a)
-                        deferred.errback(ValueError())
-                        return deferred
-                    self.patch(diskstorage.FileReaderProducer,
-                               'startProducing', mitm)
-                return result
+        params = get_put_content_params(data, node=mkfile_req.new_id)
+        yield client.put_content(**params)
 
-            d = client.dummy_authenticate("open sesame")
-            d.addCallback(raise_quota)
-            d.addCallback(lambda _: client.get_root())
-            d.addCallback(lambda root_id: client.make_file(request.ROOT,
-                                                           root_id, "hola"))
-            d.addCallback(self.save_req, 'req')
-            d.addCallback(_put_fail)
-            d.addCallback(_get_fail)
-            d.addCallback(lambda mkfile_req: client.put_content(
-                request.ROOT, mkfile_req.new_id, NO_CONTENT_HASH, hash_value,
-                crc32_value, size, deflated_size, StringIO(deflated_data)))
-            d.addCallback(lambda _: client.get_content(request.ROOT,
-                                                       self._state.req.new_id,
-                                                       hash_value))
-            if not put_fail and not get_fail:
-                d.addCallback(check_content)
-            d.addCallbacks(client.test_done, client.test_fail)
-            return d
-        return self.callback_test(auth, timeout=10)
+        content = yield client.get_content(
+            params['share'], params['node'], params['new_hash'])
+        if not put_fail and not get_fail:
+            self.assertEqual(zlib.decompress(content.data), data)
 
     def test_putcontent_chunked_putfail(self):
         """Assures that chunked putcontent fails with "try again"."""
         d = self.test_putcontent_chunked(put_fail=True)
-        self.assertFails(d, 'TRY_AGAIN')
-        return d
+        return self.assertFails(d, 'TRY_AGAIN')
 
     def test_putcontent_chunked_getfail(self):
         """Assures that chunked putcontent fails with "try again"."""
         d = self.test_putcontent_chunked(get_fail=True)
-        self.assertFails(d, 'NOT_AVAILABLE')
-        return d
+        return self.assertFails(d, 'NOT_AVAILABLE')
 
+    @defer.inlineCallbacks
     def test_deferred_add_part_to_uj(self):
         """Check that parts are added to upload job only after a limit."""
         size = int(settings.STORAGE_CHUNK_SIZE * 2.5)
+        StorageUser.objects.filter(id=self.usr0.id).update(
+            max_storage_bytes=size * 2)
         data = os.urandom(size)
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        deflated_size = len(deflated_data)
 
         recorded_calls = []
         orig_call = self.service.rpc_dal.call
@@ -2143,22 +1507,15 @@ class TestChunkedContent(TestWithDatabase):
 
         self.service.rpc_dal.call = recording_call
 
-        @defer.inlineCallbacks
-        def test(client):
-            yield client.dummy_authenticate("open sesame")
-            StorageUser.objects.filter(id=self.usr0.id).update(
-                max_storage_bytes=size * 2)
-            root = yield client.get_root()
-            mkfile_req = yield client.make_file(request.ROOT, root, "hola")
-            putcontent_req = yield client.put_content_request(
-                request.ROOT, mkfile_req.new_id, NO_CONTENT_HASH, hash_value,
-                crc32_value, size, deflated_size, StringIO(deflated_data))
-            yield putcontent_req.deferred
+        client = yield self.get_client_helper(auth_token="open sesame")
+        root_id = yield client.get_root()
+        mkfile_req = yield client.make_file(request.ROOT, root_id, "hola")
 
-            # check calls; there should be only 2, as size == chunk size * 2.5
-            self.assertEqual(len(recorded_calls), 2)
+        params = get_put_content_params(data, node=mkfile_req.new_id)
+        yield client.put_content(**params)
 
-        return self.callback_test(test, add_default_callbacks=True)
+        # check calls; there should be only 2, as size == chunk size * 2.5
+        self.assertEqual(len(recorded_calls), 2)
 
 
 class UserTest(TestWithDatabase):
@@ -2227,8 +1584,7 @@ class UserTest(TestWithDatabase):
         size = 1024
         # this will create a new uploadjob
         upload_job = yield self.user.get_upload_job(
-            None, node_id, NO_CONTENT_HASH, 'foo', 10, size / 2, size / 4,
-            True)
+            None, node_id, '', 'foo', 10, size / 2, size / 4, True)
         self.assertIsInstance(upload_job, UploadJob)
 
     @defer.inlineCallbacks
@@ -2300,8 +1656,6 @@ class UserTest(TestWithDatabase):
 class TestUploadJob(TestWithDatabase):
     """Tests for UploadJob class."""
 
-    upload_class = UploadJob
-
     @defer.inlineCallbacks
     def setUp(self):
         """Setup the test."""
@@ -2322,39 +1676,13 @@ class TestUploadJob(TestWithDatabase):
         self._cooperator = task.Cooperator(scheduler=slowScheduler)
         self.addCleanup(self._cooperator.stop)
 
-    @defer.inlineCallbacks
     def make_upload(self, size):
         """Create the storage UploadJob object.
 
         @param size: the size of the upload
         @return: a tuple (deflated_data, hash_value, upload_job)
         """
-        data = os.urandom(size)
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        magic_hash_value = get_magic_hash(data)
-        crc32_value = crc32(data)
-        deflated_size = len(deflated_data)
-        root, _ = yield self.content_user.get_root()
-        c_user = self.content_user
-        r = yield self.service.factory.content.rpc_dal.call(
-            'make_file_with_content',
-            user_id=c_user.id, volume_id=self.user.root_volume_id,
-            parent_id=root, name=u"A new file",
-            node_hash=EMPTY_HASH, crc32=0,
-            size=0, deflated_size=0, storage_key=None)
-        node_id = r['node_id']
-        node = yield c_user.get_node(self.user.root_volume_id, node_id, None)
-        args = (c_user, self.user.root_volume_id, node_id, node.content_hash,
-                hash_value, crc32_value, size)
-        upload = yield DBUploadJob.make(*args)
-        upload_job = self.upload_class(c_user, node, node.content_hash,
-                                       hash_value, crc32_value, size,
-                                       deflated_size, None, False,
-                                       magic_hash_value, upload)
-        defer.returnValue((deflated_data, hash_value, upload_job))
+        return self.make_upload_job(size, self.user, self.content_user)
 
     @defer.inlineCallbacks
     def test_simple_upload(self):
@@ -2401,12 +1729,10 @@ class TestUploadJob(TestWithDatabase):
         yield upload_job.add_data(deflated_data)
         # poison the upload
         upload_job.original_file_hash = "sha1:fakehash"
-        try:
-            yield upload_job.commit()
-        except server.errors.ConflictError as e:
-            self.assertEqual(str(e), 'The File changed while uploading.')
-        else:
-            self.fail("Should fail with ConflictError")
+
+        e = yield self.assertFailure(
+            upload_job.commit(), server.errors.ConflictError)
+        self.assertEqual(str(e), 'The File changed while uploading.')
 
     @defer.inlineCallbacks
     def test_upload_corrupted_deflated(self):
@@ -2629,8 +1955,6 @@ class TestUploadJob(TestWithDatabase):
 class TestNode(TestWithDatabase):
     """Tests for Node class."""
 
-    upload_class = UploadJob
-
     @defer.inlineCallbacks
     def setUp(self):
         """Setup the test."""
@@ -2656,31 +1980,12 @@ class TestNode(TestWithDatabase):
         @return: a tuple (upload, deflated_data)
         """
         size = self.chunk_size / 2
-        data = os.urandom(size)
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        magic_hash_value = get_magic_hash(data)
-        crc32_value = crc32(data)
-        deflated_size = len(deflated_data)
-        root, _ = yield content_user.get_root()
-        r = yield self.service.factory.content.rpc_dal.call(
-            'make_file_with_content', user_id=content_user.id,
-            volume_id=self.user.root_volume_id, parent_id=root,
-            name=u"A new file", node_hash=EMPTY_HASH, crc32=0,
-            size=0, deflated_size=0, storage_key=None)
-        node_id = r['node_id']
-        node = yield content_user.get_node(user.root_volume_id, node_id, None)
-        args = (content_user, self.user.root_volume_id, node_id,
-                node.content_hash, hash_value, crc32_value, size)
-        upload = yield DBUploadJob.make(*args)
-        upload_job = UploadJob(
-            content_user, node, node.content_hash, hash_value, crc32_value,
-            size, deflated_size, None, False, magic_hash_value, upload)
+        deflated_data, hash_value, upload_job = yield self.make_upload_job(
+            size, user, content_user)
         yield upload_job.connect()
         yield upload_job.add_data(deflated_data)
         yield upload_job.commit()
+        node_id = upload_job.file_node.id
         node = yield content_user.get_node(user.root_volume_id, node_id, None)
         self.assertEqual(hash_value, node.content_hash)
         defer.returnValue((node, deflated_data))
@@ -2868,80 +2173,40 @@ class TestContentManagerTests(TestWithDatabase):
 class TestContent(TestWithDatabase):
     """Test the upload and download."""
 
+    @defer.inlineCallbacks
     def test_getcontent(self):
         """Get the content from a file."""
         data = "*" * 100000
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
 
-        def check_file(req):
-            if req.data != deflated_data:
-                raise Exception("data does not match")
+        client = yield self.get_client_helper(auth_token="open sesame")
+        root_id = yield client.get_root()
+        mkfile_req = yield client.make_file(request.ROOT, root_id, "hola")
 
-        def auth(client):
-            d = client.dummy_authenticate("open sesame")
-            d.addCallbacks(lambda _: client.get_root(), client.test_fail)
-            d.addCallbacks(
-                lambda root: client.make_file(request.ROOT, root, "hola"),
-                client.test_fail)
-            d.addCallback(self.save_req, 'req')
-            d.addCallbacks(
-                lambda mkfile_req: client.put_content(
-                    request.ROOT, mkfile_req.new_id, NO_CONTENT_HASH,
-                    hash_value, crc32_value, size, deflated_size,
-                    StringIO(deflated_data)),
-                client.test_fail)
-            d.addCallback(lambda _: client.get_content(
-                          request.ROOT, self._state.req.new_id, hash_value))
-            d.addCallback(check_file)
-            d.addCallbacks(client.test_done, client.test_fail)
-        return self.callback_test(auth)
+        params = get_put_content_params(data, node=mkfile_req.new_id)
+        yield client.put_content(**params)
 
+        req = yield client.get_content(
+            params['share'], params['node'], params['new_hash'])
+        self.assertEqual(zlib.decompress(req.data), data)
+
+    @defer.inlineCallbacks
     def test_putcontent(self):
         """Test putting content to a file."""
         data = os.urandom(100000)
-        deflated_data = zlib.compress(data)
-        hash_object = content_hash_factory()
-        hash_object.update(data)
-        hash_value = hash_object.content_hash()
-        crc32_value = crc32(data)
-        size = len(data)
-        deflated_size = len(deflated_data)
 
-        def auth(client):
+        client = yield self.get_client_helper(auth_token="open sesame")
+        root_id = yield client.get_root()
+        mkfile_req = yield client.make_file(request.ROOT, root_id, 'hola')
+        params = get_put_content_params(data, node=mkfile_req.new_id)
+        yield client.put_content(**params)
 
-            def check_file(result):
+        def check_file():
+            try:
+                self.usr0.volume().get_content(params['new_hash'])
+            except errors.DoesNotExist:
+                raise ValueError("content blob is not there")
 
-                def _check_file():
-                    try:
-                        self.usr0.volume().get_content(hash_value)
-                    except errors.DoesNotExist:
-                        raise ValueError("content blob is not there")
-                d = threads.deferToThread(_check_file)
-                return d
-
-            d = client.dummy_authenticate("open sesame")
-            filename = 'hola'
-            d.addCallbacks(lambda _: client.get_root(), client.test_fail)
-            d.addCallbacks(
-                lambda root: client.make_file(request.ROOT, root, filename),
-                client.test_fail)
-            d.addCallbacks(
-                lambda mkfile_req: client.put_content(
-                    request.ROOT, mkfile_req.new_id, NO_CONTENT_HASH,
-                    hash_value, crc32_value, size, deflated_size,
-                    StringIO(deflated_data)),
-                client.test_fail)
-            d.addCallback(check_file)
-            d.addCallbacks(client.test_done, client.test_fail)
-            return d
-
-        return self.callback_test(auth)
+        yield threads.deferToThread(check_file)
 
 
 class DBUploadJobTestCase(TestCase):

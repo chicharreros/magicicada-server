@@ -28,8 +28,6 @@ import shutil
 import subprocess
 import threading
 import uuid
-import zlib
-from StringIO import StringIO
 
 from twisted.internet import reactor, defer
 
@@ -41,7 +39,6 @@ from magicicadaprotocol.client import (
     StorageClient,
     StorageClientFactory,
 )
-from magicicadaprotocol.content_hash import content_hash_factory, crc32
 
 from magicicada.server import server
 from magicicada.server.testing.aq_helpers import (
@@ -51,12 +48,9 @@ from magicicada.server.testing.aq_helpers import (
     FakeGetContent,
 )
 from magicicada.server.testing.caps_helpers import required_caps
-from magicicada.server.testing.testcase import logger
+from magicicada.server.testing.testcase import get_put_content_params, logger
 from magicicada.u1sync import client as u1sync_client
 from magicicada.u1sync.main import TreesDiffer, do_diff, do_init, do_sync
-
-
-NO_CONTENT_HASH = ""
 
 
 def deferToThread(func, *args, **kwargs):
@@ -704,6 +698,7 @@ class TestServerBase(TestSync):
                                          auth_info['password'])
         root = yield client.get_root()
         setattr(self, root_id_name, root)
+        defer.returnValue(client)
 
     @defer.inlineCallbacks
     def put_content(self, share_id, node_id, content, client_name='client'):
@@ -713,16 +708,9 @@ class TestServerBase(TestSync):
         dt = [dt for dt in req.response
               if dt.node_id == node_id and dt.share_id == share_id][0]
         old_hash = dt.content_hash
-        ho = content_hash_factory()
-        ho.update(content)
-        hash_value = ho.content_hash()
-        crc32_value = crc32(content)
-        deflated_content = zlib.compress(content)
-        size = len(content)
-        deflated_size = len(deflated_content)
-        yield client.put_content(
-            share_id, node_id, old_hash, hash_value,
-            crc32_value, size, deflated_size, StringIO(deflated_content))
+        params = get_put_content_params(
+            data=content, share=share_id, node=node_id, previous_hash=old_hash)
+        yield client.put_content(**params)
 
     def clean_partials_and_conflicts(self):
         """remove all partial and conflicted files"""
@@ -737,15 +725,6 @@ class TestServerBase(TestSync):
             for name in files:
                 if match(name):
                     os.remove(os.path.join(root, name))
-
-    def get_put_content_data(self, data=''):
-        """Return the test data for put_content."""
-        ho = content_hash_factory()
-        hash_value = ho.content_hash()
-        crc32_value = crc32(data)
-        deflated_content = zlib.compress(data)
-        deflated_size = len(deflated_content)
-        return hash_value, crc32_value, deflated_size, deflated_content
 
 
 class TestServerMove(TestServerBase):
