@@ -26,6 +26,7 @@ import shutil
 import subprocess
 import threading
 import uuid
+from unittest import SkipTest
 
 from twisted.internet import reactor, defer
 
@@ -1175,6 +1176,9 @@ class TestTimings(TestServerBase):
         the hash generation is threaded, so it's too difficult to assure that
         the timing will be correct for the test case we created here
         """
+        raise SkipTest(
+            'Transient failures in CI, see issue '
+            'https://github.com/chicharreros/magicicada-server/issues/38')
         dfnew = self.wait_for("SV_FILE_NEW")
         yield self.get_client()
         req = yield self.client.make_file(request.ROOT, self.root_id,
