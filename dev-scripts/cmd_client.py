@@ -20,7 +20,6 @@
 
 """A simple ping client."""
 
-import Queue
 import cmd
 import os
 import shlex
@@ -29,7 +28,7 @@ import time
 import traceback
 import uuid
 import zlib
-
+from Queue import Queue
 from threading import Thread
 from optparse import OptionParser
 
@@ -201,7 +200,7 @@ class ClientCmd(cmd.Cmd):
         self.cwd = "/"
         self.volume = request.ROOT
         self.volume_root = None
-        self.queue = Queue.Queue()
+        self.queue = Queue()
 
         self.username = username
         self.password = password
@@ -225,7 +224,7 @@ class ClientCmd(cmd.Cmd):
     def defer_from_thread(self, function, *args, **kwargs):
         """Do twisted defer magic to get results and show exceptions."""
 
-        queue = Queue.Queue()
+        queue = Queue()
 
         def runner():
             """inner."""

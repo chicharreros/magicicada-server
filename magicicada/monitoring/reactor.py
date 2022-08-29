@@ -22,11 +22,11 @@ from __future__ import unicode_literals
 
 import logging
 import os
+import Queue as queue
 import sys
 import time
 import threading
 import traceback
-import Queue
 
 from magicicada import metrics
 from magicicada.settings import TRACE
@@ -41,7 +41,7 @@ class ReactorInspector(threading.Thread):
     def __init__(self, reactor_call, loop_time=3):
         self.running = False
         self.stopped = False
-        self.queue = Queue.Queue()
+        self.queue = queue.Queue()
         self.reactor_call = reactor_call
         self.loop_time = loop_time
         self.metrics = metrics.get_meter("reactor_inspector")
@@ -92,7 +92,7 @@ class ReactorInspector(threading.Thread):
             time.sleep(self.loop_time)
             try:
                 id_sent, tini, tsent = self.queue.get_nowait()
-            except Queue.Empty:
+            except queue.Empty:
                 # Oldest pending request is still out there
                 delay = time.time() - oldest_pending_request_ts
                 self.metrics.gauge("delay", delay)
