@@ -40,8 +40,7 @@ from twisted.internet import reactor, defer, ssl
 from twisted.internet.protocol import connectionDone
 from twisted.python.failure import Failure
 from twisted.trial.unittest import TestCase as TwistedTestCase
-from twisted.web.error import Error
-from twisted.web.client import getPage
+from twisted.web.client import Agent, readBody
 
 from magicicada import settings
 from magicicada.filesync import services
@@ -484,16 +483,18 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
     @defer.inlineCallbacks
     def get_url(self, url):
         logger.debug('Getting URL at: %s', url)
-        try:
-            result = yield getPage(url.encode('utf-8'))
-        except Error as e:
-            result = {
-                'status': int(e.status),
-                'message': e.message.decode('utf-8'),
-                'response': e.response.decode('utf-8'),
-            }
+        agent = Agent(reactor)
+        response = yield agent.request(b'GET', url.encode('utf-8'))
+        body = yield readBody(response)
+        status = response.code
+        if status < 300:
+            result = {'status': status, 'response': body.decode('utf-8')}
         else:
-            result = {'status': 200, 'response': result.decode('utf-8')}
+            result = {
+                'status': status,
+                'message': response.phrase.decode('utf-8'),
+                'response': body.decode('utf-8'),
+            }
         defer.returnValue(result)
 
     @defer.inlineCallbacks
