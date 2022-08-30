@@ -28,9 +28,11 @@ from warnings import warn
 
 def _bad_rootdir(rootdir):
     """Tell whether the given rootdir is bad"""
-    return (rootdir is None or                # shouldn't happen
-            not isdir(rootdir) or             # garbage in env
-            not os.access(rootdir, os.R_OK))  # perms are wrong
+    return (
+        rootdir is None
+        or not isdir(rootdir)  # shouldn't happen
+        or not os.access(rootdir, os.R_OK)  # garbage in env
+    )  # perms are wrong
 
 
 def get_rootdir():

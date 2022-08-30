@@ -55,7 +55,8 @@ class ReactorInspector(threading.Thread):
             self.running = True
             super(ReactorInspector, self).start()
         logger.info(
-            "ReactorInspector: started, reactor thread pid: %s", os.getpid())
+            "ReactorInspector: started, reactor thread pid: %s", os.getpid()
+        )
 
     def stop(self):
         """Stop the thread."""
@@ -77,7 +78,8 @@ class ReactorInspector(threading.Thread):
             else:
                 title = "Dumping Python frame"
             logger.debug(
-                "%s %s (pid: %d):\n%s", title, frame_id, os.getpid(), stack)
+                "%s %s (pid: %d):\n%s", title, frame_id, os.getpid(), stack
+            )
 
     def run(self):
         """Start running the thread."""
@@ -85,9 +87,11 @@ class ReactorInspector(threading.Thread):
         msg_id = 0
         oldest_pending_request_ts = time.time()
         while not self.stopped:
+
             def task(msg_id=msg_id, tini=time.time()):
                 """Put result in queue with initial and completed times."""
                 self.queue.put((msg_id, tini, time.time()))
+
             self.reactor_call(task)
             time.sleep(self.loop_time)
             try:
@@ -98,7 +102,11 @@ class ReactorInspector(threading.Thread):
                 self.metrics.gauge("delay", delay)
                 logger.critical(
                     "ReactorInspector: detected unresponsive! (current: %d, "
-                    "pid: %d) delay: %.3f", msg_id, os.getpid(), delay)
+                    "pid: %d) delay: %.3f",
+                    msg_id,
+                    os.getpid(),
+                    delay,
+                )
                 self.dump_frames()
             else:
                 delay = tsent - tini
@@ -107,7 +115,11 @@ class ReactorInspector(threading.Thread):
                     logger.warning(
                         "ReactorInspector: late (current: %d, got: %d, pid: "
                         "%d, cleaning queue) delay: %.3f",
-                        msg_id, id_sent, os.getpid(), delay)
+                        msg_id,
+                        id_sent,
+                        os.getpid(),
+                        delay,
+                    )
                     while not self.queue.empty():
                         self.queue.get_nowait()
                     # About to start a new request with nothing pending
@@ -120,6 +132,9 @@ class ReactorInspector(threading.Thread):
                     logger.log(
                         TRACE,
                         "ReactorInspector: ok (msg: %d, pid: %d) delay: %.3f",
-                        msg_id, os.getpid(), delay)
+                        msg_id,
+                        os.getpid(),
+                        delay,
+                    )
             finally:
                 msg_id += 1

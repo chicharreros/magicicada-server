@@ -33,12 +33,20 @@ from twisted.internet import reactor
 
 from magicicada.u1sync import metadata
 from magicicada.u1sync.client import (
-    ConnectionError, AuthenticationError, NoSuchShareError,
-    ForcedShutdown, Client)
+    ConnectionError,
+    AuthenticationError,
+    NoSuchShareError,
+    ForcedShutdown,
+    Client,
+)
 from magicicada.u1sync.constants import METADATA_DIR_NAME
 from magicicada.u1sync.genericmerge import show_tree, generic_merge
 from magicicada.u1sync.merge import (
-    SyncMerge, ClobberServerMerge, ClobberLocalMerge, merge_trees)
+    SyncMerge,
+    ClobberServerMerge,
+    ClobberLocalMerge,
+    merge_trees,
+)
 from magicicada.u1sync.scan import scan_directory
 from magicicada.u1sync.sync import download_tree, upload_tree
 from magicicada.u1sync.utils import safe_mkdir
@@ -55,7 +63,7 @@ MERGE_ACTIONS = {
     'clobber-local': (ClobberLocalMerge, False, True),
     'upload': (SyncMerge, True, False),
     'download': (SyncMerge, False, True),
-    'auto': None  # special case
+    'auto': None,  # special case
 }
 NODE_TYPE_ENUM = dircontent_pb2._NODETYPE
 
@@ -134,8 +142,9 @@ def do_sync(client, directory, action, dry_run):
     top_uuid, writable = client.get_root_info(info.share_uuid)
 
     if info.root_uuid is None:
-        info.root_uuid = client.resolve_path(info.share_uuid, top_uuid,
-                                             info.path)
+        info.root_uuid = client.resolve_path(
+            info.share_uuid, top_uuid, info.path
+        )
 
     if action == 'auto':
         if writable:
@@ -154,28 +163,36 @@ def do_sync(client, directory, action, dry_run):
     show_tree(remote_tree)
 
     logger.debug("Merging trees...")
-    merged_tree = merge_trees(old_local_tree=info.local_tree,
-                              local_tree=local_tree,
-                              old_remote_tree=info.remote_tree,
-                              remote_tree=remote_tree,
-                              merge_action=merge_type())
+    merged_tree = merge_trees(
+        old_local_tree=info.local_tree,
+        local_tree=local_tree,
+        old_remote_tree=info.remote_tree,
+        remote_tree=remote_tree,
+        merge_action=merge_type(),
+    )
     show_tree(merged_tree)
 
     logger.debug("Syncing content...")
     if should_download:
-        info.local_tree = download_tree(merged_tree=merged_tree,
-                                        local_tree=local_tree,
-                                        client=client,
-                                        share_uuid=info.share_uuid,
-                                        path=absolute_path, dry_run=dry_run)
+        info.local_tree = download_tree(
+            merged_tree=merged_tree,
+            local_tree=local_tree,
+            client=client,
+            share_uuid=info.share_uuid,
+            path=absolute_path,
+            dry_run=dry_run,
+        )
     else:
         info.local_tree = local_tree
     if should_upload:
-        info.remote_tree = upload_tree(merged_tree=merged_tree,
-                                       remote_tree=remote_tree,
-                                       client=client,
-                                       share_uuid=info.share_uuid,
-                                       path=absolute_path, dry_run=dry_run)
+        info.remote_tree = upload_tree(
+            merged_tree=merged_tree,
+            remote_tree=remote_tree,
+            client=client,
+            share_uuid=info.share_uuid,
+            path=absolute_path,
+            dry_run=dry_run,
+        )
     else:
         info.remote_tree = remote_tree
 
@@ -229,14 +246,22 @@ def do_diff(client, share_spec, directory, subtree_path, ignore_symlinks=True):
             remote_type = node_type_str(remote_node.node_type)
             logger.debug(
                 "%s node types differ (client: %s, server: %s)",
-                display_path, local_type, remote_type)
-        elif (local_node.node_type != DIRECTORY and
-                local_node.content_hash != remote_node.content_hash):
+                display_path,
+                local_type,
+                remote_type,
+            )
+        elif (
+            local_node.node_type != DIRECTORY
+            and local_node.content_hash != remote_node.content_hash
+        ):
             local_content = local_node.content_hash
             remote_content = remote_node.content_hash
             logger.debug(
                 "%s has different content (client: %s, server: %s)",
-                display_path, local_content, remote_content)
+                display_path,
+                local_content,
+                remote_content,
+            )
         else:
             differs = False
         return (display_path, differs)
@@ -246,9 +271,13 @@ def do_diff(client, share_spec, directory, subtree_path, ignore_symlinks=True):
         (display_path, differs) = partial_result
         return differs or any(child_results.values())
 
-    differs = generic_merge(trees=[local_tree, remote_tree],
-                            pre_merge=pre_merge, post_merge=post_merge,
-                            partial_parent=("", False), name="")
+    differs = generic_merge(
+        trees=[local_tree, remote_tree],
+        pre_merge=pre_merge,
+        post_merge=post_merge,
+        partial_parent=("", False),
+        name="",
+    )
     if differs:
         raise TreesDiffer()
 
@@ -259,43 +288,85 @@ def do_main(argv):
         "Usage: %prog [options] [DIRECTORY]\n"
         "       %prog --list-shares [options]\n"
         "       %prog --init [--share=SHARE_UUID] [options] DIRECTORY\n"
-        "       %prog --diff [--share=SHARE_UUID] [options] DIRECTORY")
+        "       %prog --diff [--share=SHARE_UUID] [options] DIRECTORY"
+    )
     parser = OptionParser(usage=usage)
-    parser.add_option("--port", dest="port", metavar="PORT",
-                      default=443,
-                      help="The port on which to connect to the server")
-    parser.add_option("--host", dest="host", metavar="HOST",
-                      default='fs-1.one.ubuntu.com',
-                      help="The server address")
+    parser.add_option(
+        "--port",
+        dest="port",
+        metavar="PORT",
+        default=443,
+        help="The port on which to connect to the server",
+    )
+    parser.add_option(
+        "--host",
+        dest="host",
+        metavar="HOST",
+        default='fs-1.one.ubuntu.com',
+        help="The server address",
+    )
 
     action_list = ", ".join(sorted(MERGE_ACTIONS.keys()))
-    parser.add_option("--action", dest="action", metavar="ACTION",
-                      default=None,
-                      help="Select a sync action (%s; default is %s)" %
-                           (action_list, DEFAULT_MERGE_ACTION))
-    parser.add_option("--dry-run", action="store_true", dest="dry_run",
-                      default=False, help="Do a dry run without actually "
-                                          "making changes")
-    parser.add_option("--list-shares", action="store_const", dest="mode",
-                      const="list-shares", default="sync",
-                      help="List available shares")
-    parser.add_option("--init", action="store_const", dest="mode",
-                      const="init",
-                      help="Initialize a local directory for syncing")
-    parser.add_option("--no-ssl-verify", action="store_true",
-                      dest="no_ssl_verify",
-                      default=False, help=SUPPRESS_HELP)
-    parser.add_option("--diff", action="store_const", dest="mode",
-                      const="diff",
-                      help="Compare tree on server with local tree "
-                           "(does not require previous --init)")
-    parser.add_option("--share", dest="share", metavar="SHARE_UUID",
-                      default=None,
-                      help="Sync the directory with a share rather than the "
-                           "user's own volume")
-    parser.add_option("--subtree", dest="subtree", metavar="PATH",
-                      default=None,
-                      help="Mirror a subset of the share or volume")
+    parser.add_option(
+        "--action",
+        dest="action",
+        metavar="ACTION",
+        default=None,
+        help="Select a sync action (%s; default is %s)"
+        % (action_list, DEFAULT_MERGE_ACTION),
+    )
+    parser.add_option(
+        "--dry-run",
+        action="store_true",
+        dest="dry_run",
+        default=False,
+        help="Do a dry run without actually " "making changes",
+    )
+    parser.add_option(
+        "--list-shares",
+        action="store_const",
+        dest="mode",
+        const="list-shares",
+        default="sync",
+        help="List available shares",
+    )
+    parser.add_option(
+        "--init",
+        action="store_const",
+        dest="mode",
+        const="init",
+        help="Initialize a local directory for syncing",
+    )
+    parser.add_option(
+        "--no-ssl-verify",
+        action="store_true",
+        dest="no_ssl_verify",
+        default=False,
+        help=SUPPRESS_HELP,
+    )
+    parser.add_option(
+        "--diff",
+        action="store_const",
+        dest="mode",
+        const="diff",
+        help="Compare tree on server with local tree "
+        "(does not require previous --init)",
+    )
+    parser.add_option(
+        "--share",
+        dest="share",
+        metavar="SHARE_UUID",
+        default=None,
+        help="Sync the directory with a share rather than the "
+        "user's own volume",
+    )
+    parser.add_option(
+        "--subtree",
+        dest="subtree",
+        metavar="PATH",
+        default=None,
+        help="Mirror a subset of the share or volume",
+    )
 
     (options, args) = parser.parse_args(args=list(argv[1:]))
 
@@ -308,26 +379,31 @@ def do_main(argv):
             parser.error("Too many arguments")
         elif len(args) < 1:
             if options.mode == "init" or options.mode == "diff":
-                parser.error("--%s requires a directory to "
-                             "be specified" % options.mode)
+                parser.error(
+                    "--%s requires a directory to "
+                    "be specified" % options.mode
+                )
             else:
                 directory = "."
         else:
             directory = args[0]
     if options.mode in ("init", "list-shares", "diff"):
         if options.action is not None:
-            parser.error("--%s does not take the --action parameter" %
-                         options.mode)
+            parser.error(
+                "--%s does not take the --action parameter" % options.mode
+            )
         if options.dry_run:
-            parser.error("--%s does not take the --dry-run parameter" %
-                         options.mode)
+            parser.error(
+                "--%s does not take the --dry-run parameter" % options.mode
+            )
     if options.mode == "list-shares":
         if len(args) != 0:
             parser.error("--list-shares does not take a directory")
     if options.mode not in ("init", "diff"):
         if options.subtree is not None:
-            parser.error("--%s does not take the --subtree parameter" %
-                         options.mode)
+            parser.error(
+                "--%s does not take the --subtree parameter" % options.mode
+            )
 
     if options.action is not None and options.action not in MERGE_ACTIONS:
         parser.error("--action: Unknown action %s" % options.action)
@@ -352,26 +428,36 @@ def do_main(argv):
     def run_client():
         """Run the blocking client."""
         client.connect_ssl(
-            options.host, int(options.port), options.no_ssl_verify)
+            options.host, int(options.port), options.no_ssl_verify
+        )
 
         try:
             client.set_capabilities()
 
             if options.mode == "sync":
-                do_sync(client=client, directory=directory,
-                        action=options.action,
-                        dry_run=options.dry_run)
+                do_sync(
+                    client=client,
+                    directory=directory,
+                    action=options.action,
+                    dry_run=options.dry_run,
+                )
             elif options.mode == "init":
-                do_init(client=client, share_spec=share_spec,
-                        directory=directory,
-                        subtree_path=options.subtree)
+                do_init(
+                    client=client,
+                    share_spec=share_spec,
+                    directory=directory,
+                    subtree_path=options.subtree,
+                )
             elif options.mode == "list-shares":
                 do_list_shares(client=client)
             elif options.mode == "diff":
-                do_diff(client=client, share_spec=share_spec,
-                        directory=directory,
-                        subtree_path=options.subtree,
-                        ignore_symlinks=False)
+                do_diff(
+                    client=client,
+                    share_spec=share_spec,
+                    directory=directory,
+                    subtree_path=options.subtree,
+                    ignore_symlinks=False,
+                )
         finally:
             client.disconnect()
 
@@ -404,14 +490,16 @@ def main(*argv):
         logger.debug("Connection failed: %s", e)
     except DirectoryNotInitializedError:
         logger.debug(
-            "Directory not initialized; use --init [DIRECTORY] to init it.")
+            "Directory not initialized; use --init [DIRECTORY] to init it."
+        )
     except DirectoryAlreadyInitializedError:
         logger.debug("Directory already initialized.")
     except NoSuchShareError:
         logger.debug("No matching share found.")
     except ReadOnlyShareError:
         logger.debug(
-            "The selected action isn't possible on a read-only share.")
+            "The selected action isn't possible on a read-only share."
+        )
     except (ForcedShutdown, KeyboardInterrupt):
         logger.debug("Interrupted!")
     except TreesDiffer as e:

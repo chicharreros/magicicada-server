@@ -29,8 +29,7 @@ from threading import Lock
 from magicicadaprotocol import request, volumes
 from magicicadaprotocol.content_hash import crc32
 from magicicadaprotocol.context import get_ssl_context
-from magicicadaprotocol.client import (
-    StorageClientFactory, StorageClient)
+from magicicadaprotocol.client import StorageClientFactory, StorageClient
 from magicicadaprotocol.delta import DIRECTORY as delta_DIR
 from magicicadaprotocol.dircontent_pb2 import DIRECTORY, FILE
 from twisted.internet import reactor, defer
@@ -54,8 +53,10 @@ def log_timing(func):
         ent = func(*arg, **kwargs)
         stop = time.time()
         timing_logger.debug(
-            'for %s %0.5f ms elapsed', func.__name__, (stop-start) * 1000.0)
+            'for %s %0.5f ms elapsed', func.__name__, (stop - start) * 1000.0
+        )
         return ent
+
     return wrapper
 
 
@@ -160,10 +161,17 @@ class CapabilitiesError(Exception):
 
 class Client(object):
     """U1 storage client facade."""
-    required_caps = frozenset([
-        "no-content", "account-info", "resumable-uploads",
-        "fix462230", "volumes", "generations",
-    ])
+
+    required_caps = frozenset(
+        [
+            "no-content",
+            "account-info",
+            "resumable-uploads",
+            "fix462230",
+            "volumes",
+            "generations",
+        ]
+    )
 
     def __init__(self, realm=None, reactor=reactor):
         """Create the instance.
@@ -186,8 +194,9 @@ class Client(object):
             self._status = "forced_shutdown"
             self._reason = None
             for waiter in self._active_waiters:
-                waiter.wakeAndRaise((ForcedShutdown("Forced shutdown"),
-                                     None, None))
+                waiter.wakeAndRaise(
+                    (ForcedShutdown("Forced shutdown"), None, None)
+                )
             self._active_waiters.clear()
 
     def _get_waiter_locked(self):
@@ -273,8 +282,10 @@ class Client(object):
             try:
                 d = function(*args, **kwargs)
                 if isinstance(d, defer.Deferred):
-                    d.addCallbacks(lambda r: waiter.wake((r, None, None)),
-                                   lambda f: waiter.wake((None, None, f)))
+                    d.addCallbacks(
+                        lambda r: waiter.wake((r, None, None)),
+                        lambda f: waiter.wake((None, None, f)),
+                    )
                 else:
                     waiter.wake((d, None, None))
             except Exception:
@@ -295,18 +306,22 @@ class Client(object):
     @log_timing
     def connect(self, host, port):
         """Connect to host/port."""
+
         def _connect():
             """Deferred part."""
             self.reactor.connectTCP(host, port, self.factory)
+
         self._connect_inner(_connect)
 
     @log_timing
     def connect_ssl(self, host, port, no_verify):
         """Connect to host/port using ssl."""
+
         def _connect():
             """deferred part."""
             ctx = get_ssl_context(no_verify, host)
             self.reactor.connectSSL(host, port, self.factory, ctx)
+
         self._connect_inner(_connect)
 
     @log_timing
@@ -323,7 +338,8 @@ class Client(object):
         """Disconnect."""
         if self.factory.current_protocol is not None:
             self.reactor.callFromThread(
-                self.factory.current_protocol.transport.loseConnection)
+                self.factory.current_protocol.transport.loseConnection
+            )
         self._await_status_not("connecting", "connected", "authenticated")
 
     @log_timing
@@ -335,7 +351,8 @@ class Client(object):
             """Wrapped authenticate."""
             try:
                 yield self.factory.current_protocol.simple_authenticate(
-                    username, password)
+                    username, password
+                )
             except Exception:
                 self.factory.current_protocol.transport.loseConnection()
             else:
@@ -359,8 +376,9 @@ class Client(object):
         def set_caps_callback(req):
             "Caps query succeeded"
             if not req.accepted:
-                de = defer.fail("The server denied setting %s capabilities" %
-                                req.caps)
+                de = defer.fail(
+                    "The server denied setting %s capabilities" % req.caps
+                )
                 return de
 
         @log_timing
@@ -374,13 +392,15 @@ class Client(object):
                 # the server don't have the requested capabilities.
                 # return a failure for now, in the future we might want
                 # to reconnect to another server
-                de = defer.fail("The server don't have the requested"
-                                " capabilities: %s" % str(req.caps))
+                de = defer.fail(
+                    "The server don't have the requested"
+                    " capabilities: %s" % str(req.caps)
+                )
                 return de
 
         @log_timing
         def _wrapped_set_capabilities():
-            """Wrapped set_capabilities """
+            """Wrapped set_capabilities"""
             d = client.query_caps(self.required_caps)
             d.addCallback(query_caps_callback)
             return d
@@ -400,7 +420,8 @@ class Client(object):
         else:
             str_volume_uuid = str(volume_uuid)
             volume = self._match_volume(
-                lambda v: str(v.volume_id) == str_volume_uuid)
+                lambda v: str(v.volume_id) == str_volume_uuid
+            )
             if isinstance(volume, volumes.ShareVolume):
                 modify = volume.access_level == "Modify"
             if isinstance(volume, volumes.UDFVolume):
@@ -446,8 +467,10 @@ class Client(object):
         and root node UUIDs."""
 
         def match(s):
-            return (str(s.volume_id) == volume_spec or
-                    str(s.node_id) == volume_spec)
+            return (
+                str(s.volume_id) == volume_spec
+                or str(s.node_id) == volume_spec
+            )
 
         volume = self._match_volume(match)
         return uuid.UUID(str(volume.volume_id))
@@ -496,8 +519,9 @@ class Client(object):
             children = {}
             for entry in entries:
                 if should_sync(entry.name):
-                    child = MergeNode(node_type=entry.node_type,
-                                      uuid=uuid.UUID(entry.node))
+                    child = MergeNode(
+                        node_type=entry.node_type, uuid=uuid.UUID(entry.node)
+                    )
                     children[entry.name] = child
 
             content_hashes = yield self._get_node_hashes(share_uuid)
@@ -510,8 +534,9 @@ class Client(object):
         while need_children:
             node = need_children.pop()
             if node.content_hash is not None:
-                children = self.defer_from_thread(_get_children, node.uuid,
-                                                  node.content_hash)
+                children = self.defer_from_thread(
+                    _get_children, node.uuid, node.content_hash
+                )
                 node.children = children
                 for child in children.values():
                     if child.node_type == DIRECTORY:
@@ -524,7 +549,8 @@ class Client(object):
     def _get_dir_entries(self, share_uuid, node_uuid):
         """Get raw dir entries for the given directory."""
         result = yield self.factory.current_protocol.get_delta(
-            share_str(share_uuid), from_scratch=True)
+            share_str(share_uuid), from_scratch=True
+        )
         node_uuid = share_str(node_uuid)
         children = []
         for n in result.response:
@@ -539,8 +565,12 @@ class Client(object):
     def download_string(self, share_uuid, node_uuid, content_hash):
         """Reads a file from the server into a string."""
         output = BytesIO()
-        self._download_inner(share_uuid=share_uuid, node_uuid=node_uuid,
-                             content_hash=content_hash, output=output)
+        self._download_inner(
+            share_uuid=share_uuid,
+            node_uuid=node_uuid,
+            content_hash=content_hash,
+            output=output,
+        )
         return output.getValue()
 
     @log_timing
@@ -561,13 +591,25 @@ class Client(object):
             output.close()
             os.remove(partial_filename)
 
-        self._download_inner(share_uuid=share_uuid, node_uuid=node_uuid,
-                             content_hash=content_hash, output=output,
-                             on_success=rename_file, on_failure=delete_file)
+        self._download_inner(
+            share_uuid=share_uuid,
+            node_uuid=node_uuid,
+            content_hash=content_hash,
+            output=output,
+            on_success=rename_file,
+            on_failure=delete_file,
+        )
 
     @log_timing
-    def _download_inner(self, share_uuid, node_uuid, content_hash, output,
-                        on_success=lambda: None, on_failure=lambda: None):
+    def _download_inner(
+        self,
+        share_uuid,
+        node_uuid,
+        content_hash,
+        output,
+        on_success=lambda: None,
+        on_failure=lambda: None,
+    ):
         """Helper function for content downloads."""
         dec = zlib.decompressobj()
 
@@ -595,8 +637,12 @@ class Client(object):
         def _download():
             """Async helper."""
             _get_content = self.factory.current_protocol.get_content
-            d = _get_content(share_str(share_uuid), str(node_uuid),
-                             content_hash, callback=write_data)
+            d = _get_content(
+                share_str(share_uuid),
+                str(node_uuid),
+                content_hash,
+                callback=write_data,
+            )
             d.addCallbacks(finish_download, abort_download)
             return d
 
@@ -605,17 +651,23 @@ class Client(object):
     @log_timing
     def create_directory(self, share_uuid, parent_uuid, name):
         """Creates a directory on the server."""
-        r = self.defer_from_thread(self.factory.current_protocol.make_dir,
-                                   share_str(share_uuid), str(parent_uuid),
-                                   name)
+        r = self.defer_from_thread(
+            self.factory.current_protocol.make_dir,
+            share_str(share_uuid),
+            str(parent_uuid),
+            name,
+        )
         return uuid.UUID(r.new_id)
 
     @log_timing
     def create_file(self, share_uuid, parent_uuid, name):
         """Creates a file on the server."""
-        r = self.defer_from_thread(self.factory.current_protocol.make_file,
-                                   share_str(share_uuid), str(parent_uuid),
-                                   name)
+        r = self.defer_from_thread(
+            self.factory.current_protocol.make_file,
+            share_str(share_uuid),
+            str(parent_uuid),
+            name,
+        )
         return uuid.UUID(r.new_id)
 
     @log_timing
@@ -624,27 +676,36 @@ class Client(object):
         raise UnsupportedOperationError("Protocol does not support symlinks")
 
     @log_timing
-    def upload_string(self, share_uuid, node_uuid, old_content_hash,
-                      content_hash, content):
+    def upload_string(
+        self, share_uuid, node_uuid, old_content_hash, content_hash, content
+    ):
         """Uploads a string to the server as file content."""
         crc = crc32(content, 0)
         compressed_content = zlib.compress(content, 9)
         compressed = BytesIO(compressed_content)
-        self.defer_from_thread(self.factory.current_protocol.put_content,
-                               share_str(share_uuid), str(node_uuid),
-                               old_content_hash, content_hash,
-                               crc, len(content), len(compressed_content),
-                               compressed)
+        self.defer_from_thread(
+            self.factory.current_protocol.put_content,
+            share_str(share_uuid),
+            str(node_uuid),
+            old_content_hash,
+            content_hash,
+            crc,
+            len(content),
+            len(compressed_content),
+            compressed,
+        )
 
     @log_timing
-    def upload_file(self, share_uuid, node_uuid, old_content_hash,
-                    content_hash, filename):
+    def upload_file(
+        self, share_uuid, node_uuid, old_content_hash, content_hash, filename
+    ):
         """Uploads a file to the server."""
         parent_dir = os.path.split(filename)[0]
         unique_filename = os.path.join(parent_dir, "." + str(uuid.uuid4()))
 
         class StagingFile(object):
             """An object which tracks data being compressed for staging."""
+
             def __init__(self, stream):
                 """Initialize a compression object."""
                 self.crc32 = 0
@@ -674,32 +735,45 @@ class Client(object):
                 shutil.copyfileobj(original, staging)
             staging.finish()
             compressed.seek(0)
-            self.defer_from_thread(self.factory.current_protocol.put_content,
-                                   share_str(share_uuid), str(node_uuid),
-                                   old_content_hash, content_hash,
-                                   staging.crc32,
-                                   staging.size, staging.compressed_size,
-                                   compressed)
+            self.defer_from_thread(
+                self.factory.current_protocol.put_content,
+                share_str(share_uuid),
+                str(node_uuid),
+                old_content_hash,
+                content_hash,
+                staging.crc32,
+                staging.size,
+                staging.compressed_size,
+                compressed,
+            )
 
     @log_timing
     def move(self, share_uuid, parent_uuid, name, node_uuid):
         """Moves a file on the server."""
-        self.defer_from_thread(self.factory.current_protocol.move,
-                               share_str(share_uuid), str(node_uuid),
-                               str(parent_uuid), name)
+        self.defer_from_thread(
+            self.factory.current_protocol.move,
+            share_str(share_uuid),
+            str(node_uuid),
+            str(parent_uuid),
+            name,
+        )
 
     @log_timing
     def unlink(self, share_uuid, node_uuid):
         """Unlinks a file on the server."""
-        self.defer_from_thread(self.factory.current_protocol.unlink,
-                               share_str(share_uuid), str(node_uuid))
+        self.defer_from_thread(
+            self.factory.current_protocol.unlink,
+            share_str(share_uuid),
+            str(node_uuid),
+        )
 
     @log_timing
     @defer.inlineCallbacks
     def _get_node_hashes(self, share_uuid):
         """Fetches hashes for the given nodes."""
         result = yield self.factory.current_protocol.get_delta(
-            share_str(share_uuid), from_scratch=True)
+            share_str(share_uuid), from_scratch=True
+        )
         hashes = {}
         for fid in result.response:
             node_uuid = uuid.UUID(fid.node_id)
@@ -714,6 +788,8 @@ class Client(object):
         """
         _list_shares = self.factory.current_protocol.list_shares
         r = self.defer_from_thread(_list_shares)
-        return [(s.name, s.id, s.other_visible_name,
-                 s.accepted, s.access_level)
-                for s in r.shares if s.direction == "to_me"]
+        return [
+            (s.name, s.id, s.other_visible_name, s.accepted, s.access_level)
+            for s in r.shares
+            if s.direction == "to_me"
+        ]

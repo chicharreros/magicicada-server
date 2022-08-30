@@ -45,10 +45,12 @@ def create(args):
         return
 
     # let's create it
-    user = User(username=username,
-                email=args.email.decode("utf8"),
-                first_name=args.firstname.decode("utf8"),
-                last_name=args.lastname.decode("utf8"))
+    user = User(
+        username=username,
+        email=args.email.decode("utf8"),
+        first_name=args.firstname.decode("utf8"),
+        last_name=args.lastname.decode("utf8"),
+    )
     user.set_password(args.password.decode("utf8"))
     user.save()
 
@@ -57,7 +59,7 @@ def create(args):
 
     # create also the storage user
     visible_name = "%s %s" % (user.first_name, user.last_name)
-    services.make_storage_user(user.id, username, visible_name, 2 ** 20)
+    services.make_storage_user(user.id, username, visible_name, 2**20)
 
     print("Success: User created ok")
 
@@ -126,8 +128,9 @@ p_create.add_argument("lastname")
 p_create.add_argument("email")
 p_create.add_argument("password")
 
-p_update = subparsers.add_parser('update',
-                                 help="Change information for a user.")
+p_update = subparsers.add_parser(
+    'update', help="Change information for a user."
+)
 p_update.add_argument("username")
 p_update.set_defaults(func=update)
 p_update.add_argument("--email")
@@ -135,13 +138,13 @@ p_update.add_argument("--firstname")
 p_update.add_argument("--lastname")
 p_update.add_argument("--password")
 
-p_delete = subparsers.add_parser('delete',
-                                 help="Remove a user from the system.")
+p_delete = subparsers.add_parser(
+    'delete', help="Remove a user from the system."
+)
 p_delete.set_defaults(func=delete)
 p_delete.add_argument("username")
 
-p_show = subparsers.add_parser('show',
-                               help="Show information about an user.")
+p_show = subparsers.add_parser('show', help="Show information about an user.")
 p_show.set_defaults(func=show)
 p_show.add_argument("username")
 

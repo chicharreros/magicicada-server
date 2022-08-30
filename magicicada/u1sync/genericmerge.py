@@ -27,8 +27,15 @@ logger = logging.getLogger(__name__)
 
 class MergeNode(object):
     """A filesystem node.  Should generally be treated as immutable."""
-    def __init__(self, node_type, content_hash=None, uuid=None, children=None,
-                 conflict_info=None):
+
+    def __init__(
+        self,
+        node_type,
+        content_hash=None,
+        uuid=None,
+        children=None,
+        conflict_info=None,
+    ):
         """Initializes a node instance."""
         self.node_type = node_type
         self.children = children
@@ -40,11 +47,13 @@ class MergeNode(object):
         """Equality test."""
         if type(other) is not type(self):
             return False
-        return (self.node_type == other.node_type and
-                self.children == other.children and
-                self.uuid == other.uuid and
-                self.content_hash == other.content_hash and
-                self.conflict_info == other.conflict_info)
+        return (
+            self.node_type == other.node_type
+            and self.children == other.children
+            and self.uuid == other.uuid
+            and self.content_hash == other.content_hash
+            and self.conflict_info == other.conflict_info
+        )
 
     def __ne__(self, other):
         """Non-equality test."""
@@ -59,7 +68,12 @@ def show_tree(tree, indent="", name="/"):
         type_str = "FILE"
     logger.debug(
         "%s%-36s %s %s  %s",
-        indent, tree.uuid, type_str, name, tree.content_hash)
+        indent,
+        tree.uuid,
+        type_str,
+        name,
+        tree.content_hash,
+    )
     if tree.node_type == DIRECTORY and tree.children is not None:
         for name in sorted(tree.children.keys()):
             subtree = tree.children[name]
@@ -69,8 +83,9 @@ def show_tree(tree, indent="", name="/"):
 def generic_merge(trees, pre_merge, post_merge, partial_parent, name):
     """Generic tree merging function."""
 
-    partial_result = pre_merge(nodes=trees, name=name,
-                               partial_parent=partial_parent)
+    partial_result = pre_merge(
+        nodes=trees, name=name, partial_parent=partial_parent
+    )
 
     def tree_children(tree):
         """Returns children if tree is not None"""
@@ -81,12 +96,15 @@ def generic_merge(trees, pre_merge, post_merge, partial_parent, name):
     child_results = {}
     for child_name in child_names:
         subtrees = [cs.get(child_name, None) for cs in child_dicts]
-        child_result = generic_merge(trees=subtrees,
-                                     pre_merge=pre_merge,
-                                     post_merge=post_merge,
-                                     partial_parent=partial_result,
-                                     name=child_name)
+        child_result = generic_merge(
+            trees=subtrees,
+            pre_merge=pre_merge,
+            post_merge=post_merge,
+            partial_parent=partial_result,
+            name=child_name,
+        )
         child_results[child_name] = child_result
 
-    return post_merge(nodes=trees, partial_result=partial_result,
-                      child_results=child_results)
+    return post_merge(
+        nodes=trees, partial_result=partial_result, child_results=child_results
+    )

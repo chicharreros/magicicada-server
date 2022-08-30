@@ -25,9 +25,18 @@ from django.conf import settings
 from utilities import utils
 
 
-def launch(progname, username, params=None, environ=None, verbose=False,
-           homedir=None, machine_suffix=None, host=None, api_port=None,
-           auth_data=None):
+def launch(
+    progname,
+    username,
+    params=None,
+    environ=None,
+    verbose=False,
+    homedir=None,
+    machine_suffix=None,
+    host=None,
+    api_port=None,
+    auth_data=None,
+):
     """Run a program in a developer context.
 
     @param progname: the program name
@@ -46,16 +55,16 @@ def launch(progname, username, params=None, environ=None, verbose=False,
     if api_port is None:
         api_port = int(open('tmp/filesyncserver.port.ssl').read())
 
-    extra_args = ["--port", str(api_port), "--host", host,
-                  "--auth", auth_data]
+    extra_args = ["--port", str(api_port), "--host", host, "--auth", auth_data]
     env = os.environ.copy()
 
     if 'ubuntuone-syncdaemon' in progname:
         if machine_suffix is not None:
             username += machine_suffix
         if homedir is None:
-            base = os.path.join(utils.get_rootdir(), 'tmp',
-                                'syncdaemon_homes', username)
+            base = os.path.join(
+                utils.get_rootdir(), 'tmp', 'syncdaemon_homes', username
+            )
             home = os.path.join(base, 'home')
         else:
             base = os.path.dirname(homedir)
@@ -76,10 +85,10 @@ def launch(progname, username, params=None, environ=None, verbose=False,
         progname_root = os.path.dirname(os.path.dirname(progname))
         config_files_root = os.path.join(progname_root, 'data')
         config_file = os.path.join(config_files_root, "syncdaemon.conf")
-        dev_config_file = os.path.join(config_files_root,
-                                       "syncdaemon-dev.conf")
-        log_config_file = os.path.join(config_files_root,
-                                       "logging.conf")
+        dev_config_file = os.path.join(
+            config_files_root, "syncdaemon-dev.conf"
+        )
+        log_config_file = os.path.join(config_files_root, "logging.conf")
         if not os.path.exists(log_config_file):
             msg = "Please run: cd %s && ./setup.py build; cd -\n"
             print(msg % progname_root)
@@ -87,8 +96,14 @@ def launch(progname, username, params=None, environ=None, verbose=False,
         extra_args.insert(0, config_file)
         extra_args.insert(1, dev_config_file)
         extra_args.insert(2, log_config_file)
-        extra_args += ["--data_dir", data, "--root_dir", root,
-                       '--shares_dir', shares]
+        extra_args += [
+            "--data_dir",
+            data,
+            "--root_dir",
+            root,
+            '--shares_dir',
+            shares,
+        ]
 
     args = [progname] + extra_args
     if params:

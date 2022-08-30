@@ -59,11 +59,17 @@ def scan_directory(path, display_path=""):
     elif child_names is not None:
         # directory
         child_names = [n for n in child_names if should_sync(n)]
-        child_paths = [(os.path.join(path, child_name),
-                        os.path.join(display_path, child_name))
-                       for child_name in child_names]
-        children = [scan_directory(child_path, child_display_path)
-                    for (child_path, child_display_path) in child_paths]
+        child_paths = [
+            (
+                os.path.join(path, child_name),
+                os.path.join(display_path, child_name),
+            )
+            for child_name in child_names
+        ]
+        children = [
+            scan_directory(child_path, child_display_path)
+            for (child_path, child_display_path) in child_paths
+        ]
         children = dict(zip(child_names, children))
         return MergeNode(node_type=DIRECTORY, children=children)
     else:
@@ -72,6 +78,7 @@ def scan_directory(path, display_path=""):
 
         class HashStream(object):
             """Stream that computes hashes."""
+
             def write(self, bytes):
                 """Accumulate bytes."""
                 sum.update(bytes)

@@ -67,7 +67,8 @@ def validate_volume_path(value):
     """Validate a UserVolume path."""
     if not value or not value.startswith("~/") or value.endswith('/'):
         raise InvalidVolumePath(
-            'Path must start with ~/ and must not end with / (got %r)' % value)
+            'Path must start with ~/ and must not end with / (got %r)' % value
+        )
     return value
 
 
@@ -137,7 +138,8 @@ class DownloadManager(models.Manager):
         if download_key:
             download_key = repr(download_key)
         return super(DownloadManager, self).create(
-            download_key=download_key, **kwargs)
+            download_key=download_key, **kwargs
+        )
 
 
 class StorageUserManager(UserManager):
@@ -145,8 +147,8 @@ class StorageUserManager(UserManager):
     """A custom manager for User model."""
 
     def get_with_session_id(
-            self, user_id=None, username=None, session_id=None,
-            ignore_lock=False):
+        self, user_id=None, username=None, session_id=None, ignore_lock=False
+    ):
 
         try:
             if user_id is not None:
@@ -159,7 +161,8 @@ class StorageUserManager(UserManager):
         if user is None:
             raise StorageError(
                 'Invalid call to get_with_session_id, user_id or username '
-                'must be provided.')
+                'must be provided.'
+            )
 
         if user.locked and not ignore_lock:
             raise LockedUserError()
@@ -178,11 +181,13 @@ class UserVolumeManager(models.Manager):
 
         if path == settings.ROOT_USERVOLUME_PATH:
             raise NoPermission(
-                'Invalid volume path: %r.' % settings.ROOT_USERVOLUME_PATH)
+                'Invalid volume path: %r.' % settings.ROOT_USERVOLUME_PATH
+            )
 
         # Create the udf and fix the volume_id in the node
         volume = super(UserVolumeManager, self).create(
-            owner=owner, path=path, **kwargs)
+            owner=owner, path=path, **kwargs
+        )
 
         node = volume.storageobject_set.create_directory(name=ROOT_NAME)
         assert volume.root_node == node
@@ -191,14 +196,14 @@ class UserVolumeManager(models.Manager):
     def get_root(self, owner):
         """Get the root UserVolume."""
         return self.get(
-            owner=owner, path=settings.ROOT_USERVOLUME_PATH,
-            status=STATUS_LIVE)
+            owner=owner, path=settings.ROOT_USERVOLUME_PATH, status=STATUS_LIVE
+        )
 
     def get_or_create_root(self, owner):
         """Create a root UserVolume and its root node, if they don't exist."""
         volume, created = self.get_or_create(
-            owner=owner, path=settings.ROOT_USERVOLUME_PATH,
-            status=STATUS_LIVE)
+            owner=owner, path=settings.ROOT_USERVOLUME_PATH, status=STATUS_LIVE
+        )
         if created:
             node = volume.storageobject_set.create_directory(name=ROOT_NAME)
             assert volume.root_node == node
@@ -210,8 +215,16 @@ class StorageObjectManager(models.Manager):
     """A custom manager for StorageObject model."""
 
     def create(
-            self, name, parent=None, path=None, volume=None, generation=0,
-            generation_created=0, validate_path=True, **kwargs):
+        self,
+        name,
+        parent=None,
+        path=None,
+        volume=None,
+        generation=0,
+        generation_created=0,
+        validate_path=True,
+        **kwargs
+    ):
         validate_name(name)
 
         if parent is not None:
@@ -220,7 +233,8 @@ class StorageObjectManager(models.Manager):
             if volume is not None and parent.volume != volume:
                 raise ValidationError(
                     'Volume can not be set on when parent given (or they must '
-                    'match).')
+                    'match).'
+                )
 
             volume = parent.volume
             generation = volume.increment_generation()
@@ -240,16 +254,22 @@ class StorageObjectManager(models.Manager):
         # This validation breaks MoveFromShare, use a conditional param
         if validate_path and path is not None and path != expected_path:
             raise ValidationError(
-                'Path can not be set, should be %r (got %r).' %
-                (expected_path, path))
+                'Path can not be set, should be %r (got %r).'
+                % (expected_path, path)
+            )
 
         if path is None:
             path = expected_path
 
         return super(StorageObjectManager, self).create(
-            parent=parent, name=name, path=path, volume=volume,
-            generation=generation, generation_created=generation_created,
-            **kwargs)
+            parent=parent,
+            name=name,
+            path=path,
+            volume=volume,
+            generation=generation,
+            generation_created=generation_created,
+            **kwargs
+        )
 
     def create_directory(self, **kwargs):
         assert 'kind' not in kwargs
@@ -264,8 +284,10 @@ class StorageObjectManager(models.Manager):
     def get_root(self, owner):
         """Get the root node for owner."""
         return self.get(
-            volume__owner=owner, volume__path=settings.ROOT_USERVOLUME_PATH,
-            name=ROOT_NAME)
+            volume__owner=owner,
+            volume__path=settings.ROOT_USERVOLUME_PATH,
+            name=ROOT_NAME,
+        )
 
     def filter_live_files(self):
         return self.filter(kind=self.model.FILE, status=STATUS_LIVE)
@@ -277,13 +299,14 @@ class StorageObjectManager(models.Manager):
 
     def calculate_size_by_owner(self, owner):
         result = self.filter_live_files().filter(
-            volume__status=STATUS_LIVE, volume__owner__id=owner.id)
+            volume__status=STATUS_LIVE, volume__owner__id=owner.id
+        )
         return self.calculate_size(result)
 
     def calculate_size_by_parent(self, parent):
         result = self.filter_live_files().filter(
-            models.Q(parent__id=parent.id) |
-            models.Q(path__startswith=parent.absolute_path),
+            models.Q(parent__id=parent.id)
+            | models.Q(path__startswith=parent.absolute_path),
             volume__id=parent.volume.id,
         )
         return self.calculate_size(result)
@@ -304,12 +327,19 @@ class MoveFromShareManager(StorageObjectManager):
         """
         name = name or node.name
         result = super(MoveFromShareManager, self).create(
-            share_id=share_id, node_id=node.id, old_parent=old_parent,
-            name=name, volume=node.volume, kind=node.kind,
-            content_blob=node.content_blob, mimetype=node.mimetype,
+            share_id=share_id,
+            node_id=node.id,
+            old_parent=old_parent,
+            name=name,
+            volume=node.volume,
+            kind=node.kind,
+            content_blob=node.content_blob,
+            mimetype=node.mimetype,
             when_created=node.when_created,
-            when_last_modified=node.when_last_modified, status=STATUS_DEAD,
-            path=node.path, public_uuid=node.public_uuid,
+            when_last_modified=node.when_last_modified,
+            status=STATUS_DEAD,
+            path=node.path,
+            public_uuid=node.public_uuid,
             generation=node.generation,
             generation_created=node.generation_created,
             validate_path=False,
@@ -330,7 +360,8 @@ class ShareManager(models.Manager):
         basename = name
         idx = 0
         while self.filter(
-                status=STATUS_LIVE, shared_to=user, name=name).exists():
+            status=STATUS_LIVE, shared_to=user, name=name
+        ).exists():
             idx += 1
             name = "%s~%s" % (basename, idx)
             if idx > 50:

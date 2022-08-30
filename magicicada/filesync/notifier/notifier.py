@@ -66,8 +66,9 @@ class Notification(object):
         for name, value in values.items():
             setattr(self, name, value)
 
-        self.recipient_ids = {getattr(self, name)
-                              for name in self.__class__.recipient_id_fields}
+        self.recipient_ids = {
+            getattr(self, name) for name in self.__class__.recipient_id_fields
+        }
 
     @classmethod
     def create_for_enqueue(cls, *args, **kw):
@@ -103,13 +104,20 @@ class Notification(object):
 
 class UDFCreate(Notification):
     """Message indicating that an UDF was created."""
-    _fields = ('owner_id', 'udf_id', 'root_id',
-               'suggested_path', 'source_session')
+
+    _fields = (
+        'owner_id',
+        'udf_id',
+        'root_id',
+        'suggested_path',
+        'source_session',
+    )
     recipient_id_fields = ['owner_id']
 
 
 class UDFDelete(Notification):
     """Message indicating that an UDF was deleted."""
+
     _fields = ('owner_id', 'udf_id', 'source_session')
     recipient_id_fields = ['owner_id']
 
@@ -121,46 +129,71 @@ class ShareBaseEvent(Notification):
     by the time the message is delivered. The final details can be determined
     once the share is retrieved from the when the event is received.
     """
+
     # override generated event type for backwards-compatibility
     _event_type = "share_base"
 
-    _fields = ('share_id', 'name', 'root_id', 'shared_by_id',
-               'shared_to_id', 'access', 'accepted', 'source_session')
+    _fields = (
+        'share_id',
+        'name',
+        'root_id',
+        'shared_by_id',
+        'shared_to_id',
+        'access',
+        'accepted',
+        'source_session',
+    )
     recipient_id_fields = []  # override in subclasses
 
     @classmethod
     def create_for_enqueue(cls, share, source_session=None):
         """Create instance for share-specific queue_* methods."""
-        return cls(share.id, share.name, share.root_id, share.shared_by_id,
-                   share.shared_to_id, share.access, share.accepted,
-                   source_session)
+        return cls(
+            share.id,
+            share.name,
+            share.root_id,
+            share.shared_by_id,
+            share.shared_to_id,
+            share.access,
+            share.accepted,
+            source_session,
+        )
 
 
 class ShareCreated(ShareBaseEvent):
     """A share was created."""
+
     recipient_id_fields = ['shared_to_id']
 
 
 class ShareDeleted(ShareBaseEvent):
     """A share was deleted."""
+
     recipient_id_fields = ['shared_to_id']
 
 
 class ShareAccepted(ShareBaseEvent):
     """A share was accepted."""
+
     recipient_id_fields = ['shared_to_id', 'shared_by_id']
     call_with_recipient = True
 
 
 class ShareDeclined(ShareBaseEvent):
     """A share was declined."""
+
     recipient_id_fields = ['shared_by_id']
 
 
 class VolumeNewGeneration(Notification):
     """The volume is in a new generation."""
-    _fields = ('user_id', 'client_volume_id',
-               'new_generation', 'source_session')
+
+    _fields = (
+        'user_id',
+        'client_volume_id',
+        'new_generation',
+        'source_session',
+    )
     recipient_id_fields = ['user_id']
 
 
@@ -209,8 +242,9 @@ class EventNotifier(object):
         if cback is not None:
             if event.call_with_recipient:
                 for recipient_id in event.recipient_ids:
-                    reactor.callFromThread(cback, event,
-                                           recipient_id=recipient_id)
+                    reactor.callFromThread(
+                        cback, event, recipient_id=recipient_id
+                    )
             else:
                 reactor.callFromThread(cback, event)
 
@@ -224,8 +258,9 @@ class EventNotifier(object):
         The events added will be sent when the transaction manager
         successfully commits the changes.
         """
-        per_transaction = getattr(self.per_thread,
-                                  'notifications_by_transaction', None)
+        per_transaction = getattr(
+            self.per_thread, 'notifications_by_transaction', None
+        )
         if per_transaction is None:
             per_transaction = {}
             self.per_thread.notifications_by_transaction = per_transaction

@@ -47,7 +47,8 @@ class DataServicesTestCase(BaseTestCase):
     """
 
     def assert_storage_user(
-            self, storage_user, max_storage_bytes, visible_name):
+        self, storage_user, max_storage_bytes, visible_name
+    ):
         self.assertIsInstance(storage_user, DAOStorageUser)
         self.assertEqual(storage_user.visible_name, visible_name)
         self.assertEqual(storage_user.max_storage_bytes, max_storage_bytes)
@@ -55,15 +56,19 @@ class DataServicesTestCase(BaseTestCase):
     def test_make_storage_user(self):
         """Test the make_storage_user function."""
         storage_user = make_storage_user(
-            username="Cool UserName", max_storage_bytes=MAX_STORAGE_BYTES,
-            visible_name="Visible Name")
+            username="Cool UserName",
+            max_storage_bytes=MAX_STORAGE_BYTES,
+            visible_name="Visible Name",
+        )
         self.assert_storage_user(
-            storage_user, MAX_STORAGE_BYTES, visible_name='Visible Name')
+            storage_user, MAX_STORAGE_BYTES, visible_name='Visible Name'
+        )
 
     def test_get_storage_user(self):
         """Test the get_storage_user function."""
         user = make_storage_user(
-            "Cool UserName", MAX_STORAGE_BYTES, visible_name='Visible Name')
+            "Cool UserName", MAX_STORAGE_BYTES, visible_name='Visible Name'
+        )
         user = get_storage_user(user.id)
         self.assertTrue(isinstance(user, DAOStorageUser))
         # now check a locked user.
@@ -93,7 +98,8 @@ class DataServicesTestCase(BaseTestCase):
         """Test the get_public_file function."""
         user = make_storage_user("Cool UserName", 10)
         a_file = user.volume().root.make_file_with_content(
-            "file.txt", self.factory.get_fake_hash(), 123, 1, 1, uuid.uuid4())
+            "file.txt", self.factory.get_fake_hash(), 123, 1, 1, uuid.uuid4()
+        )
         a_file.change_public_access(True)
         public_key = a_file.public_key
         f1 = get_public_file(public_key)
@@ -106,20 +112,23 @@ class DataServicesTestCase(BaseTestCase):
         user = make_storage_user("Cool UserName", 10)
         a_dir = user.volume().root.make_subdirectory('test_dir')
         a_dir.make_file_with_content(
-            "file.txt", self.factory.get_fake_hash(), 123, 1, 1, uuid.uuid4())
+            "file.txt", self.factory.get_fake_hash(), 123, 1, 1, uuid.uuid4()
+        )
         a_dir.change_public_access(True, allow_directory=True)
         public_key = a_dir.public_key
         pub_dir = get_public_directory(public_key)
         self.assertEqual(pub_dir, a_dir)
         a_dir.change_public_access(False, allow_directory=True)
-        self.assertRaises(errors.DoesNotExist,
-                          get_public_directory, public_key)
+        self.assertRaises(
+            errors.DoesNotExist, get_public_directory, public_key
+        )
 
     def test_get_public_file_public_uuid(self):
         """Test the get_public_file function."""
         user = make_storage_user("Cool UserName", 10)
         a_file = user.volume().root.make_file_with_content(
-            "file.txt", self.factory.get_fake_hash(), 123, 1, 1, uuid.uuid4())
+            "file.txt", self.factory.get_fake_hash(), 123, 1, 1, uuid.uuid4()
+        )
         a_file.change_public_access(True)
         public_key = a_file.public_key
         # get the file using the public uuid

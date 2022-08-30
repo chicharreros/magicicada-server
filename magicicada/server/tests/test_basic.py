@@ -49,8 +49,10 @@ class TestBasic(TestWithDatabase):
 
     def test_connect(self):
         """Create a simple client that just connects."""
+
         def dummy(client):
             client.test_done("ok")
+
         return self.callback_test(dummy)
 
     def test_disconnect_with_user_locked(self):
@@ -127,10 +129,12 @@ class TestBasic(TestWithDatabase):
 
     def test_ping(self):
         """Ping should be done in less than 2ms."""
+
         def ping(client):
             def done(result):
                 self.assertTrue(result.rtt < 2)
                 client.test_done("ok")
+
             d = client.ping()
             d.addCallbacks(done, client.test_fail)
 
@@ -138,49 +142,60 @@ class TestBasic(TestWithDatabase):
 
     def test_noop(self):
         """How do you test a noop?"""
+
         def noop(client):
             d = client.noop()
             # this delay is just so the server has time to shut down
             d.addCallbacks(
                 lambda x: reactor.callLater(0.1, client.test_done, x),
-                client.test_fail)
+                client.test_fail,
+            )
 
         return self.callback_test(noop)
 
     def test_protocol_ok(self):
         """Protocol version must match."""
+
         def protocol_version(client):
             def done(result):
                 client.test_done("ok")
+
             d = client.protocol_version()
             d.addCallbacks(done, client.test_fail)
+
         return self.callback_test(protocol_version)
 
     def test_protocol_error(self):
         """Protocol version check must fail."""
+
         def protocol_version(client):
             def done(result):
                 client.test_done("ok")
+
             client.PROTOCOL_VERSION = -1
             d = client.protocol_version()
             d.addCallbacks(client.test_fail, done)
+
         return self.callback_test(protocol_version)
 
     def test_size_too_big(self):
         """Connection must be closed because message is too big."""
+
         def size_too_big(client):
             def done(result):
                 client.test_done("ok")
-            data = b"*" * (2 ** 16 + 1)
+
+            data = b"*" * (2**16 + 1)
             sz = struct.pack(request.SIZE_FMT, len(data))
             client.transport.write(sz + data)
             client.connectionLostHandler = done
+
         return self.callback_test(size_too_big)
 
     def test_flood(self):
         """Send lots of mixed messages, check that nothing breaks."""
-        def flood(client):
 
+        def flood(client):
             def done(result):
                 client.pending_tests -= 1
                 client.recv_ok += 1
@@ -205,6 +220,7 @@ class TestBasic(TestWithDatabase):
             client.messages_sent = 0
             for i in range(256):
                 send_message()
+
         return self.callback_test(flood, timeout=12)
 
     @defer.inlineCallbacks
@@ -225,7 +241,7 @@ class TestBasic(TestWithDatabase):
 
 
 class ServerPingTest(TestWithDatabase):
-    """ Test the server side Ping loop. """
+    """Test the server side Ping loop."""
 
     @defer.inlineCallbacks
     def setUp(self):
@@ -243,39 +259,43 @@ class ServerPingTest(TestWithDatabase):
         return super(ServerPingTest, self).tearDown()
 
     def test_server_ping(self):
-        """ basic server ping test """
+        """basic server ping test"""
+
         def auth(client):
             ping_cb = defer.Deferred()
 
             def handle_PING(message):
-                """ custom handle_PING that run the callback on the first
+                """custom handle_PING that run the callback on the first
                 ping request
                 """
                 client.__class__.handle_PING(client, message)
                 ping_cb.callback(True)
+
             client.handle_PING = handle_PING
-            ping_cb.addCallbacks(self.assertTrue,
-                                 client.test_fail)
+            ping_cb.addCallbacks(self.assertTrue, client.test_fail)
             ping_cb.addCallbacks(client.test_done, client.test_fail)
             return ping_cb
 
         return self.callback_test(auth)
 
     def test_multiple_server_ping(self):
-        """ test that multiple pings are received from the server. """
+        """test that multiple pings are received from the server."""
+
         def auth(client):
             ping_cb = defer.Deferred()
 
             def handle_PING(message):
-                """ custom handle_PING that save the num of ping requests. """
+                """custom handle_PING that save the num of ping requests."""
                 ping_count = getattr(self._state, 'ping_count', 0)
                 self._save_state('ping_count', ping_count + 1)
                 client.__class__.handle_PING(client, message)
                 if self._state.ping_count == 5:
                     ping_cb.callback(self._state.ping_count)
+
             client.handle_PING = handle_PING
-            ping_cb.addCallbacks(lambda result: self.assertEqual(5, result),
-                                 client.test_fail)
+            ping_cb.addCallbacks(
+                lambda result: self.assertEqual(5, result), client.test_fail
+            )
             ping_cb.addCallbacks(client.test_done, client.test_fail)
             return ping_cb
 
@@ -285,26 +305,30 @@ class ServerPingTest(TestWithDatabase):
         """test that the client is disconnected when there is no response
         to a server ping.
         """
+
         def auth(client):
             def handle_PING(message):
-                """ don't reply to the ping, just save each request. """
+                """don't reply to the ping, just save each request."""
                 pings = getattr(self._state, 'pings', 0)
                 self._save_state('pings', pings + 1)
+
             client.handle_PING = handle_PING
 
             def my_connection_lost(reason=None):
-                """ check if we received a ping and finish the test. """
+                """check if we received a ping and finish the test."""
                 client.__class__.connectionLost(client, reason)
                 self.assertEqual(getattr(self._state, 'pings', 0), 1)
                 client.test_done('ok')
 
             client.connectionLost = my_connection_lost
+
         d = self.callback_test(auth)
         return d
 
     @defer.inlineCallbacks
     def test_pingloop_reset_when_no_idle(self):
         """Test that the looping ping reset is called with non-idle client."""
+
         @defer.inlineCallbacks
         def auth(client):
             # stop the real looping ping and patch the reset method.
@@ -321,6 +345,7 @@ class ServerPingTest(TestWithDatabase):
                 if not d.called:
                     d.callback(None)
                 real_reschedule()
+
             self.patch(server.ping_loop, 'reschedule', reschedule)
             yield d
 
@@ -335,6 +360,7 @@ class ServerPingTest(TestWithDatabase):
             self.assertEqual(1, len(called))
             yield client.list_shares()
             self.assertEqual(2, len(called))
+
         yield self.callback_test(auth, add_default_callbacks=True)
 
     @defer.inlineCallbacks
@@ -427,6 +453,7 @@ class DumpTest(TestWithDatabase):
     def test_meliae_dump(self):
         """Check that the dump works."""
         from meliae import scanner
+
         collect_called = []
         self.patch(gc, 'collect', lambda: collect_called.append(True))
         self.patch(scanner, 'dump_all_objects', lambda _: None)
@@ -478,8 +505,10 @@ class DumpTest(TestWithDatabase):
     @defer.inlineCallbacks
     def test_gc_dump_error_garbage(self):
         """Support something that breaks in repr."""
+
         class Strange(object):
             """Weird object that breaks on repr."""
+
             def __repr__(self):
                 raise ValueError('foo')
 
@@ -490,14 +519,18 @@ class DumpTest(TestWithDatabase):
 
 class TestServerHeartbeat(TestWithDatabase):
     """Server Heartbeat tests."""
+
     heartbeat_interval = 0.1
 
     @defer.inlineCallbacks
     def setUp(self):
         self.stdout = StringIO()
         send_heartbeat = supervisor_utils.send_heartbeat
-        self.patch(supervisor_utils, 'send_heartbeat',
-                   lambda *a, **kw: send_heartbeat(out=self.stdout))
+        self.patch(
+            supervisor_utils,
+            'send_heartbeat',
+            lambda *a, **kw: send_heartbeat(out=self.stdout),
+        )
         yield super(TestServerHeartbeat, self).setUp()
 
     @defer.inlineCallbacks

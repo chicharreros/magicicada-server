@@ -46,8 +46,9 @@ class FakeNotifier(object):
         """Initializes an instance of the storage controller."""
         self.event_sent_deferred = event_sent_deferred
         self.notifications = []
-        self._event_callbacks = dict.fromkeys(cls.event_type
-                                              for cls in event_classes)
+        self._event_callbacks = dict.fromkeys(
+            cls.event_type for cls in event_classes
+        )
 
     def on_event(self, event):
         """Record notifications."""
@@ -79,6 +80,7 @@ class FakeNode(object):
 
 class FakeShare(object):
     """Trivial fake share for testing."""
+
     def __init__(self):
         self.id = uuid.uuid4()
         self.name = 'FakeShare'
@@ -91,8 +93,15 @@ class FakeShare(object):
     @property
     def event_args(self):
         """Return the args for creating a ShareBaseEvent."""
-        return (self.id, self.name, self.root_id, self.shared_by_id,
-                self.shared_to_id, self.access, self.accepted)
+        return (
+            self.id,
+            self.name,
+            self.root_id,
+            self.shared_by_id,
+            self.shared_to_id,
+            self.access,
+            self.accepted,
+        )
 
 
 class TestEventNotifier(BaseTestCase):
@@ -118,32 +127,32 @@ class TestEventNotifier(BaseTestCase):
         share = FakeShare()
         with fsync_commit():
             self.notifier.queue_share_created(share)
-        self.assertEqual(self.notifications,
-                         [ShareCreated(*share.event_args)])
+        self.assertEqual(self.notifications, [ShareCreated(*share.event_args)])
 
     def test_broadcast_share_deleted(self):
         """Test broadcast of an share deletion."""
         share = FakeShare()
         with fsync_commit():
             self.notifier.queue_share_deleted(share)
-        self.assertEqual(self.notifications,
-                         [ShareDeleted(*share.event_args)])
+        self.assertEqual(self.notifications, [ShareDeleted(*share.event_args)])
 
     def test_broadcast_share_accepted(self):
         """Test broadcast of an share accepted."""
         share = FakeShare()
         with fsync_commit():
             self.notifier.queue_share_accepted(share)
-        self.assertEqual(self.notifications,
-                         [ShareAccepted(*share.event_args)])
+        self.assertEqual(
+            self.notifications, [ShareAccepted(*share.event_args)]
+        )
 
     def test_broadcast_share_declined(self):
         """Test broadcast of an share declined."""
         share = FakeShare()
         with fsync_commit():
             self.notifier.queue_share_declined(share)
-        self.assertEqual(self.notifications,
-                         [ShareDeclined(*share.event_args)])
+        self.assertEqual(
+            self.notifications, [ShareDeclined(*share.event_args)]
+        )
 
     def test_broadcast_udf_create(self):
         """Test broadcast of an udf creation."""
@@ -152,16 +161,17 @@ class TestEventNotifier(BaseTestCase):
         suggested_path = "foo"
         with fsync_commit():
             self.notifier.queue_udf_create(0, udf_id, root_id, suggested_path)
-        self.assertEqual(self.notifications,
-                         [UDFCreate(0, udf_id, root_id, suggested_path, None)])
+        self.assertEqual(
+            self.notifications,
+            [UDFCreate(0, udf_id, root_id, suggested_path, None)],
+        )
 
     def test_broadcast_udf_delete(self):
         """Test broadcast of an udf creation."""
         udf_id = uuid.uuid4()
         with fsync_commit():
             self.notifier.queue_udf_delete(0, udf_id)
-        self.assertEqual(self.notifications,
-                         [UDFDelete(0, udf_id, None)])
+        self.assertEqual(self.notifications, [UDFDelete(0, udf_id, None)])
 
     def test_broadcast_vol_new_gen(self):
         """Test the broadcast of a new generation for the volume."""
@@ -170,10 +180,12 @@ class TestEventNotifier(BaseTestCase):
         new_gen = 77
         with fsync_commit():
             self.notifier.queue_volume_new_generation(
-                user_id, volume_id, new_gen)
-        self.assertEqual(self.notifications,
-                         [VolumeNewGeneration(user_id, volume_id,
-                                              new_gen, None)])
+                user_id, volume_id, new_gen
+            )
+        self.assertEqual(
+            self.notifications,
+            [VolumeNewGeneration(user_id, volume_id, new_gen, None)],
+        )
 
     def test_deliver_after_commit(self):
         """Test that notifications are delivered after committing."""

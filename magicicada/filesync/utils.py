@@ -28,13 +28,12 @@ from django.conf import settings
 MAX_IS_IN_SIZE = 50
 
 
-def split_in_list(inlist, max=MAX_IS_IN_SIZE):
+def split_in_list(inlist, max_size=MAX_IS_IN_SIZE):
     """Split a list into a list of list."""
-    if len(inlist) > max:
-        last = len(inlist)
-        return [inlist[i:min(last, i + max)] for i in range(0, last, max)]
-    else:
-        return [inlist]
+    return [
+        inlist[i : i + max_size]  # noqa: E203
+        for i in range(0, len(inlist), max_size)
+    ]
 
 
 def encode_hash(hash_value):
@@ -70,7 +69,8 @@ def decode_uuid(encoded, label=''):
         value_bytes = base64.urlsafe_b64decode(encoded)
     except ValueError:
         raise NodeKeyParseError(
-            'Could not decode %r portion of node key' % label)
+            'Could not decode %r portion of node key' % label
+        )
     try:
         value_id = uuid.UUID(bytes=value_bytes)
     except ValueError:
@@ -118,7 +118,8 @@ class Base62Error(Exception):
 
 
 _base62_digits = (
-    '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz')
+    '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+)
 
 
 _base62_values = [-1] * 256

@@ -27,8 +27,9 @@ class NodeTypeMismatchError(Exception):
     """Node types don't match."""
 
 
-def merge_trees(old_local_tree, local_tree, old_remote_tree, remote_tree,
-                merge_action):
+def merge_trees(
+    old_local_tree, local_tree, old_remote_tree, remote_tree, merge_action
+):
     """Performs a tree merge using the given merge action."""
 
     def pre_merge(nodes, name, partial_parent):
@@ -36,11 +37,13 @@ def merge_trees(old_local_tree, local_tree, old_remote_tree, remote_tree,
         old_local_node, local_node, old_remote_node, remote_node = nodes
         (parent_path, parent_type) = partial_parent
         path = os.path.join(parent_path, name)
-        node_type = merge_action.get_node_type(old_local_node=old_local_node,
-                                               local_node=local_node,
-                                               old_remote_node=old_remote_node,
-                                               remote_node=remote_node,
-                                               path=path)
+        node_type = merge_action.get_node_type(
+            old_local_node=old_local_node,
+            local_node=local_node,
+            old_remote_node=old_remote_node,
+            remote_node=remote_node,
+            path=path,
+        )
         return (path, node_type)
 
     def post_merge(nodes, partial_result, child_results):
@@ -49,28 +52,36 @@ def merge_trees(old_local_tree, local_tree, old_remote_tree, remote_tree,
         (path, node_type) = partial_result
         if node_type == DIRECTORY:
             merged_children = dict(
-                (name, child) for (name, child) in child_results.items()
-                if child is not None)
+                (name, child)
+                for (name, child) in child_results.items()
+                if child is not None
+            )
         else:
             merged_children = None
-        return merge_action.merge_node(old_local_node=old_local_node,
-                                       local_node=local_node,
-                                       old_remote_node=old_remote_node,
-                                       remote_node=remote_node,
-                                       node_type=node_type,
-                                       merged_children=merged_children)
+        return merge_action.merge_node(
+            old_local_node=old_local_node,
+            local_node=local_node,
+            old_remote_node=old_remote_node,
+            remote_node=remote_node,
+            node_type=node_type,
+            merged_children=merged_children,
+        )
 
-    return generic_merge(trees=[old_local_tree, local_tree,
-                                old_remote_tree, remote_tree],
-                         pre_merge=pre_merge, post_merge=post_merge,
-                         name="", partial_parent=("", None))
+    return generic_merge(
+        trees=[old_local_tree, local_tree, old_remote_tree, remote_tree],
+        pre_merge=pre_merge,
+        post_merge=post_merge,
+        name="",
+        partial_parent=("", None),
+    )
 
 
 class SyncMerge(object):
     """Performs a bidirectional sync merge."""
 
-    def get_node_type(self, old_local_node, local_node,
-                      old_remote_node, remote_node, path):
+    def get_node_type(
+        self, old_local_node, local_node, old_remote_node, remote_node, path
+    ):
         """Requires that all node types match."""
         node_type = None
         for node in (old_local_node, local_node, remote_node):
@@ -83,8 +94,15 @@ class SyncMerge(object):
                     node_type = node.node_type
         return node_type
 
-    def merge_node(self, old_local_node, local_node,
-                   old_remote_node, remote_node, node_type, merged_children):
+    def merge_node(
+        self,
+        old_local_node,
+        local_node,
+        old_remote_node,
+        remote_node,
+        node_type,
+        merged_children,
+    ):
         """Performs bidirectional merge of node state."""
 
         def node_content_hash(node):
@@ -99,23 +117,31 @@ class SyncMerge(object):
         locally_deleted = old_local_node is not None and local_node is None
         deleted_on_server = old_remote_node is not None and remote_node is None
         # updated means modified or created
-        locally_updated = (not locally_deleted and
-                           old_local_content_hash != local_content_hash)
-        updated_on_server = (not deleted_on_server and
-                             old_remote_content_hash != remote_content_hash)
+        locally_updated = (
+            not locally_deleted
+            and old_local_content_hash != local_content_hash
+        )
+        updated_on_server = (
+            not deleted_on_server
+            and old_remote_content_hash != remote_content_hash
+        )
 
-        has_merged_children = (merged_children is not None and
-                               len(merged_children) > 0)
+        has_merged_children = (
+            merged_children is not None and len(merged_children) > 0
+        )
 
         either_node_exists = local_node is not None or remote_node is not None
-        should_delete = (
-            (locally_deleted and not updated_on_server) or
-            (deleted_on_server and not locally_updated))
+        should_delete = (locally_deleted and not updated_on_server) or (
+            deleted_on_server and not locally_updated
+        )
 
         if (either_node_exists and not should_delete) or has_merged_children:
-            if (node_type != DIRECTORY and locally_updated and
-                    updated_on_server and
-                    local_content_hash != remote_content_hash):
+            if (
+                node_type != DIRECTORY
+                and locally_updated
+                and updated_on_server
+                and local_content_hash != remote_content_hash
+            ):
                 # local_content_hash will become the merged content_hash;
                 # save remote_content_hash in conflict info
                 conflict_info = (str(uuid.uuid4()), remote_content_hash)
@@ -127,8 +153,12 @@ class SyncMerge(object):
             else:
                 content_hash = remote_content_hash or local_content_hash
             return MergeNode(
-                node_type=node_type, uuid=node_uuid, children=merged_children,
-                content_hash=content_hash, conflict_info=conflict_info)
+                node_type=node_type,
+                uuid=node_uuid,
+                children=merged_children,
+                content_hash=content_hash,
+                conflict_info=conflict_info,
+            )
         else:
             return None
 
@@ -136,16 +166,24 @@ class SyncMerge(object):
 class ClobberServerMerge(object):
     """Clobber server to match local state."""
 
-    def get_node_type(self, old_local_node, local_node,
-                      old_remote_node, remote_node, path):
+    def get_node_type(
+        self, old_local_node, local_node, old_remote_node, remote_node, path
+    ):
         """Return local node type."""
         if local_node is not None:
             return local_node.node_type
         else:
             return None
 
-    def merge_node(self, old_local_node, local_node,
-                   old_remote_node, remote_node, node_type, merged_children):
+    def merge_node(
+        self,
+        old_local_node,
+        local_node,
+        old_remote_node,
+        remote_node,
+        node_type,
+        merged_children,
+    ):
         """Copy local node and associate with remote uuid (if applicable)."""
         if local_node is None:
             return None
@@ -154,26 +192,40 @@ class ClobberServerMerge(object):
         else:
             node_uuid = None
         return MergeNode(
-            node_type=local_node.node_type, uuid=node_uuid,
-            content_hash=local_node.content_hash, children=merged_children)
+            node_type=local_node.node_type,
+            uuid=node_uuid,
+            content_hash=local_node.content_hash,
+            children=merged_children,
+        )
 
 
 class ClobberLocalMerge(object):
     """Clobber local state to match server."""
 
-    def get_node_type(self, old_local_node, local_node,
-                      old_remote_node, remote_node, path):
+    def get_node_type(
+        self, old_local_node, local_node, old_remote_node, remote_node, path
+    ):
         """Return remote node type."""
         if remote_node is not None:
             return remote_node.node_type
         else:
             return None
 
-    def merge_node(self, old_local_node, local_node,
-                   old_remote_node, remote_node, node_type, merged_children):
+    def merge_node(
+        self,
+        old_local_node,
+        local_node,
+        old_remote_node,
+        remote_node,
+        node_type,
+        merged_children,
+    ):
         """Copy the remote node."""
         if remote_node is None:
             return None
         return MergeNode(
-            node_type=node_type, uuid=remote_node.uuid,
-            content_hash=remote_node.content_hash, children=merged_children)
+            node_type=node_type,
+            uuid=remote_node.uuid,
+            content_hash=remote_node.content_hash,
+            children=merged_children,
+        )

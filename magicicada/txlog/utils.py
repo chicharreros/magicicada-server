@@ -71,15 +71,21 @@ def update_last_row(worker_name, txlog):
     decorated with fsync_commit.
     """
     last_row, created = DBWorkerLastRow.objects.get_or_create(
-        worker_id=worker_name, defaults={'txlog': txlog})
+        worker_id=worker_name, defaults={'txlog': txlog}
+    )
     if not created:
         last_row.txlog = txlog
         last_row.save()
 
 
-def get_txn_recs(num_recs, last_id=0,
-                 worker_id=None, expire_secs=None,
-                 num_partitions=None, partition_id=None):
+def get_txn_recs(
+    num_recs,
+    last_id=0,
+    worker_id=None,
+    expire_secs=None,
+    num_partitions=None,
+    partition_id=None,
+):
     """Attempt to read num_recs records from the transaction log.
 
     Start from the row after last_id, plus any records whose ID is in the
@@ -102,11 +108,12 @@ def get_txn_recs(num_recs, last_id=0,
 
     if num_partitions is not None and partition_id is not None:
         unfilter_op_types = (
-            TransactionLog.OP_SHARE_ACCEPTED, TransactionLog.OP_SHARE_DELETED,
+            TransactionLog.OP_SHARE_ACCEPTED,
+            TransactionLog.OP_SHARE_DELETED,
         )
         txlogs = txlogs.extra(
             where=['(MOD(owner_id, %s) = %s OR op_type IN %s)'],
-            params=(num_partitions, partition_id, unfilter_op_types)
+            params=(num_partitions, partition_id, unfilter_op_types),
         )
 
     txlogs = txlogs.order_by('id')[:num_recs]
@@ -114,18 +121,27 @@ def get_txn_recs(num_recs, last_id=0,
     if worker_id is not None and expire_secs:
         threshold = now() - timedelta(seconds=expire_secs)
         DBWorkerUnseen.objects.filter(
-            worker_id=worker_id, created__gt=threshold)
+            worker_id=worker_id, created__gt=threshold
+        )
         # XXX Unsure how these unseen relate to the txlogs gathered above
 
     result = []
     for record in txlogs:
         result.append(
-            dict(txn_id=record.id, node_id=record.node_id,
-                 owner_id=record.owner_id, volume_id=record.volume_id,
-                 op_type=record.op_type, path=record.path,
-                 generation=record.generation, timestamp=record.timestamp,
-                 mimetype=record.mimetype, old_path=record.old_path,
-                 extra_data=record.extra_data))
+            dict(
+                txn_id=record.id,
+                node_id=record.node_id,
+                owner_id=record.owner_id,
+                volume_id=record.volume_id,
+                op_type=record.op_type,
+                path=record.path,
+                generation=record.generation,
+                timestamp=record.timestamp,
+                mimetype=record.mimetype,
+                old_path=record.old_path,
+                extra_data=record.extra_data,
+            )
+        )
 
     return result
 
@@ -137,8 +153,7 @@ def ichunk(iter, chunk):
         i += 1
 
 
-def delete_expired_unseen(worker_id, unseen_ids=None,
-                          expire_secs=None):
+def delete_expired_unseen(worker_id, unseen_ids=None, expire_secs=None):
     """Deletes expired unseen ids for a given worker id.
 
     If a list of unseen ids is given, also delete those explicitly.
@@ -147,7 +162,8 @@ def delete_expired_unseen(worker_id, unseen_ids=None,
         expire_secs = UNSEEN_EXPIRES
     threshold = now() - timedelta(seconds=expire_secs)
     unseen = DBWorkerUnseen.objects.filter(
-        Q(worker_id=worker_id, created__lt=threshold) | Q(id__in=unseen_ids))
+        Q(worker_id=worker_id, created__lt=threshold) | Q(id__in=unseen_ids)
+    )
     deleted = unseen.count()
     unseen.delete()
     return deleted
@@ -171,7 +187,8 @@ def delete_old_txlogs(timestamp_limit, quantity_limit=None):
     result = txlogs.count()
     if quantity_limit is not None and result > quantity_limit:
         txlogs = TransactionLog.objects.filter(
-            pk__in=txlogs.values_list('pk')[:quantity_limit])
+            pk__in=txlogs.values_list('pk')[:quantity_limit]
+        )
         result = quantity_limit
     txlogs.delete()
     return result
@@ -185,11 +202,13 @@ def delete_txlogs_slice(date, quantity_limit):
     precisely from the provided date (a datetime.date object). Also, the
     quantity_limit parameter is mandatory."""
     txlogs = TransactionLog.objects.filter(
-        timestamp__range=(date, date + timedelta(days=1))).order_by('id')
+        timestamp__range=(date, date + timedelta(days=1))
+    ).order_by('id')
     result = txlogs.count()
     if result > quantity_limit:
         txlogs = TransactionLog.objects.filter(
-            pk__in=txlogs.values_list('pk')[:quantity_limit])
+            pk__in=txlogs.values_list('pk')[:quantity_limit]
+        )
         result = quantity_limit
     txlogs.delete()
     return result
@@ -197,8 +216,9 @@ def delete_txlogs_slice(date, quantity_limit):
 
 def get_row_by_time(timestamp):
     """Return the smaller txlog row id in that timestamp (or greater)."""
-    txlog = TransactionLog.objects.filter(
-        timestamp__gte=timestamp).order_by('id')[:1]
+    txlog = TransactionLog.objects.filter(timestamp__gte=timestamp).order_by(
+        'id'
+    )[:1]
     if txlog.count() == 0:
         txid, tstamp = None, None
     else:

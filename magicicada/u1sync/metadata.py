@@ -30,8 +30,14 @@ from magicicada.u1sync.utils import safe_unlink
 class Metadata(object):
     """Object representing mirror metadata."""
 
-    def __init__(self, local_tree=None, remote_tree=None, share_uuid=None,
-                 root_uuid=None, path=None):
+    def __init__(
+        self,
+        local_tree=None,
+        remote_tree=None,
+        share_uuid=None,
+        root_uuid=None,
+        path=None,
+    ):
         """Populate fields."""
         self.local_tree = local_tree
         self.remote_tree = remote_tree
@@ -60,9 +66,13 @@ def read(metadata_dir):
     if remote_tree is None:
         remote_tree = MergeNode(node_type=DIRECTORY, children={})
 
-    return Metadata(local_tree=local_tree, remote_tree=remote_tree,
-                    share_uuid=share_uuid, root_uuid=root_uuid,
-                    path=path)
+    return Metadata(
+        local_tree=local_tree,
+        remote_tree=remote_tree,
+        share_uuid=share_uuid,
+        root_uuid=root_uuid,
+        path=path,
+    )
 
 
 def write(metadata_dir, info):
@@ -80,8 +90,9 @@ def write(metadata_dir, info):
     else:
         safe_unlink(root_uuid_file)
     write_string_file(path_file, info.path)
-    write_pickle_file(index_file, {"tree": info.local_tree,
-                                   "remote_tree": info.remote_tree})
+    write_pickle_file(
+        index_file, {"tree": info.local_tree, "remote_tree": info.remote_tree}
+    )
 
 
 def write_pickle_file(filename, value):

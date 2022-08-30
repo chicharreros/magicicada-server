@@ -127,7 +127,8 @@ class NullConsumer(object):
         if self.producer is not None:
             raise RuntimeError(
                 "Cannot register producer %s, because producer %s was not "
-                "unregistered." % (producer, self.producer))
+                "unregistered." % (producer, self.producer)
+            )
         self.producer = producer
         self.producerStreaming = streaming
         self.producer.consumer = self

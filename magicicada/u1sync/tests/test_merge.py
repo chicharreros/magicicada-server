@@ -24,7 +24,11 @@ from magicicadaprotocol.dircontent_pb2 import FILE, DIRECTORY
 
 from magicicada.u1sync.genericmerge import MergeNode, generic_merge
 from magicicada.u1sync.merge import (
-    merge_trees, ClobberLocalMerge, ClobberServerMerge, SyncMerge)
+    merge_trees,
+    ClobberLocalMerge,
+    ClobberServerMerge,
+    SyncMerge,
+)
 
 
 def accumulate_path(nodes, name, partial_parent):
@@ -42,68 +46,113 @@ class MergeTest(TestCase):
 
     def test_generic_merge(self):
         """Tests that generic merge behaves as expected."""
-        tree_a = MergeNode(DIRECTORY, children={
-            'foo': MergeNode(FILE, uuid=uuid.uuid4()),
-            'bar': MergeNode(FILE, uuid=uuid.uuid4()),
-        }, uuid=uuid.uuid4())
-        tree_b = MergeNode(DIRECTORY, children={
-            'bar': MergeNode(FILE, uuid=uuid.uuid4()),
-            'baz': MergeNode(FILE, uuid=uuid.uuid4()),
-        }, uuid=uuid.uuid4())
-        result = generic_merge(trees=[tree_a, tree_b],
-                               pre_merge=accumulate_path,
-                               post_merge=capture_merge,
-                               partial_parent="", name="ex")
-        expected_result = ([tree_a, tree_b], "ex", {
-            'foo': ([tree_a.children['foo'], None], "ex/foo", {}),
-            'bar': ([tree_a.children['bar'], tree_b.children['bar']],
-                    "ex/bar", {}),
-            'baz': ([None, tree_b.children['baz']], "ex/baz", {}),
-        })
+        tree_a = MergeNode(
+            DIRECTORY,
+            children={
+                'foo': MergeNode(FILE, uuid=uuid.uuid4()),
+                'bar': MergeNode(FILE, uuid=uuid.uuid4()),
+            },
+            uuid=uuid.uuid4(),
+        )
+        tree_b = MergeNode(
+            DIRECTORY,
+            children={
+                'bar': MergeNode(FILE, uuid=uuid.uuid4()),
+                'baz': MergeNode(FILE, uuid=uuid.uuid4()),
+            },
+            uuid=uuid.uuid4(),
+        )
+        result = generic_merge(
+            trees=[tree_a, tree_b],
+            pre_merge=accumulate_path,
+            post_merge=capture_merge,
+            partial_parent="",
+            name="ex",
+        )
+        expected_result = (
+            [tree_a, tree_b],
+            "ex",
+            {
+                'foo': ([tree_a.children['foo'], None], "ex/foo", {}),
+                'bar': (
+                    [tree_a.children['bar'], tree_b.children['bar']],
+                    "ex/bar",
+                    {},
+                ),
+                'baz': ([None, tree_b.children['baz']], "ex/baz", {}),
+            },
+        )
         self.assertEqual(expected_result, result)
 
     def test_clobber(self):
         """Tests clobbering merges."""
-        server_tree = MergeNode(DIRECTORY, children={
-            'foo': MergeNode(FILE, content_hash="dummy:abc"),
-            'bar': MergeNode(FILE, content_hash="dummy:xyz"),
-            'baz': MergeNode(FILE, content_hash="dummy:aaa"),
-        })
-        local_tree = MergeNode(DIRECTORY, children={
-            'foo': MergeNode(FILE, content_hash="dummy:cde"),
-            'bar': MergeNode(FILE, content_hash="dummy:zyx"),
-            'hoge': MergeNode(FILE, content_hash="dummy:bbb"),
-        })
-        result_tree = merge_trees(local_tree, local_tree,
-                                  server_tree, server_tree,
-                                  ClobberServerMerge())
+        server_tree = MergeNode(
+            DIRECTORY,
+            children={
+                'foo': MergeNode(FILE, content_hash="dummy:abc"),
+                'bar': MergeNode(FILE, content_hash="dummy:xyz"),
+                'baz': MergeNode(FILE, content_hash="dummy:aaa"),
+            },
+        )
+        local_tree = MergeNode(
+            DIRECTORY,
+            children={
+                'foo': MergeNode(FILE, content_hash="dummy:cde"),
+                'bar': MergeNode(FILE, content_hash="dummy:zyx"),
+                'hoge': MergeNode(FILE, content_hash="dummy:bbb"),
+            },
+        )
+        result_tree = merge_trees(
+            local_tree,
+            local_tree,
+            server_tree,
+            server_tree,
+            ClobberServerMerge(),
+        )
         self.assertEqual(local_tree, result_tree)
-        result_tree = merge_trees(local_tree, local_tree,
-                                  server_tree, server_tree,
-                                  ClobberLocalMerge())
+        result_tree = merge_trees(
+            local_tree,
+            local_tree,
+            server_tree,
+            server_tree,
+            ClobberLocalMerge(),
+        )
         self.assertEqual(server_tree, result_tree)
 
     def test_sync(self):
         """Test sync merges."""
-        server_tree = MergeNode(DIRECTORY, children={
-            'bar': MergeNode(FILE, content_hash="dummy:xyz"),
-            'baz': MergeNode(FILE, content_hash="dummy:aaa"),
-            'foo': MergeNode(FILE, content_hash="dummy:abc"),
-        })
+        server_tree = MergeNode(
+            DIRECTORY,
+            children={
+                'bar': MergeNode(FILE, content_hash="dummy:xyz"),
+                'baz': MergeNode(FILE, content_hash="dummy:aaa"),
+                'foo': MergeNode(FILE, content_hash="dummy:abc"),
+            },
+        )
         old_server_tree = MergeNode(DIRECTORY, children={})
-        local_tree = MergeNode(DIRECTORY, children={
-            'bar': MergeNode(FILE, content_hash="dummy:xyz"),
-            'foo': MergeNode(FILE, content_hash="dummy:abc"),
-            'hoge': MergeNode(FILE, content_hash="dummy:bbb"),
-        })
+        local_tree = MergeNode(
+            DIRECTORY,
+            children={
+                'bar': MergeNode(FILE, content_hash="dummy:xyz"),
+                'foo': MergeNode(FILE, content_hash="dummy:abc"),
+                'hoge': MergeNode(FILE, content_hash="dummy:bbb"),
+            },
+        )
         old_local_tree = MergeNode(DIRECTORY, children={})
-        expected_tree = MergeNode(DIRECTORY, children={
-            'bar': MergeNode(FILE, content_hash="dummy:xyz"),
-            'baz': MergeNode(FILE, content_hash="dummy:aaa"),
-            'foo': MergeNode(FILE, content_hash="dummy:abc"),
-            'hoge': MergeNode(FILE, content_hash="dummy:bbb"),
-        })
-        result_tree = merge_trees(old_local_tree, local_tree,
-                                  old_server_tree, server_tree,
-                                  SyncMerge())
+        expected_tree = MergeNode(
+            DIRECTORY,
+            children={
+                'bar': MergeNode(FILE, content_hash="dummy:xyz"),
+                'baz': MergeNode(FILE, content_hash="dummy:aaa"),
+                'foo': MergeNode(FILE, content_hash="dummy:abc"),
+                'hoge': MergeNode(FILE, content_hash="dummy:bbb"),
+            },
+        )
+        result_tree = merge_trees(
+            old_local_tree,
+            local_tree,
+            old_server_tree,
+            server_tree,
+            SyncMerge(),
+        )
         self.assertEqual(result_tree, expected_tree)

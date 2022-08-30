@@ -56,11 +56,19 @@ class ThreadedNonRPC(object):
             time_delta = time.time() - start_time
             logger.info(
                 "Call %s (user=%s) ended with error: %s (%s) - time: %s",
-                funcname, user_id, exc.__class__.__name__, exc, time_delta)
+                funcname,
+                user_id,
+                exc.__class__.__name__,
+                exc,
+                time_delta,
+            )
             raise
 
         time_delta = time.time() - start_time
         logger.info(
             "Call to %s (user=%s) ended OK - time: %s",
-            funcname, user_id, time_delta)
+            funcname,
+            user_id,
+            time_delta,
+        )
         defer.returnValue(result)

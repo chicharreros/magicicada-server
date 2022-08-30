@@ -42,7 +42,7 @@ class TestSharesSync(test_sync.TestSync):
             self.called = 1
             # this is probably a hack:
             # let the other subscribers go first
-            reactor.callLater(.1, self.deferred.callback, None)
+            reactor.callLater(0.1, self.deferred.callback, None)
 
     def handle_default(self, event_name, **kwargs):
         """Stub implementation."""
@@ -59,17 +59,27 @@ class TestSharesSync(test_sync.TestSync):
 
         # create two shares more for the tests.
         self.jane_share_id, self.jane_share_subtree = self.create_share(
-            shared_by='jane', dirname='TestSync', name='TestSyncShare')
+            shared_by='jane', dirname='TestSync', name='TestSyncShare'
+        )
         self.john_share_id, self.john_share_subtree = self.create_share(
-            shared_by='john', dirname='TestSync2', name='TestSyncShare2')
+            shared_by='john', dirname='TestSync2', name='TestSyncShare2'
+        )
         self.main.action_q.list_shares()
-        yield self.wait_for_nirvana(.2)
+        yield self.wait_for_nirvana(0.2)
 
         # get the share dir
-        wait_share_ok = defer.DeferredList([
-            self.wait_for('AQ_ANSWER_SHARE_OK', share_id=self.john_share_id),
-            self.wait_for('AQ_ANSWER_SHARE_OK', share_id=self.jane_share_id)],
-            fireOnOneErrback=True, consumeErrors=True)
+        wait_share_ok = defer.DeferredList(
+            [
+                self.wait_for(
+                    'AQ_ANSWER_SHARE_OK', share_id=self.john_share_id
+                ),
+                self.wait_for(
+                    'AQ_ANSWER_SHARE_OK', share_id=self.jane_share_id
+                ),
+            ],
+            fireOnOneErrback=True,
+            consumeErrors=True,
+        )
 
         vm = self.main.vm
         vm.accept_share(self.jane_share_id, True)
@@ -82,33 +92,43 @@ class TestSharesSync(test_sync.TestSync):
         yield vm.subscribe_share(self.john_share_id)
 
     def create_share(self, shared_by, dirname, name, access_level='Modify'):
-        """ Create the test share with Modify access_level """
+        """Create the test share with Modify access_level"""
         u = self.storage_users[shared_by]
         subtree = u.root.make_subdirectory(dirname)
-        share = subtree.share(self.storage_users['jack'].id, name,
-                              readonly=(access_level == 'View'))
+        share = subtree.share(
+            self.storage_users['jack'].id,
+            name,
+            readonly=(access_level == 'View'),
+        )
         return str(share.id), subtree
 
     def compare_dirs(self):
         "run rsync to compare directories, needs some work"
+
         def _compare():
             """spwan rsync and compare"""
             out = StringIO()
-            subprocess.call(["rsync", "-nric", self.jane_share_dir,
-                             self.source_dir], stdout=out)
+            subprocess.call(
+                ["rsync", "-nric", self.jane_share_dir, self.source_dir],
+                stdout=out,
+            )
             return not out.getvalue()
+
         return test_sync.deferToThread(_compare)
 
     def upload_server(self):
         """Upload files in source to the test share."""
         return test_sync.TestSync.upload_server(self, share=self.jane_share_id)
 
-    def compare_server(self, dir_name='jane_share_dir',
-                       share_id_name='jane_share_id'):
+    def compare_server(
+        self, dir_name='jane_share_dir', share_id_name='jane_share_id'
+    ):
         """Compare share with server."""
         return test_sync.TestSync.compare_server(
-            self, share=getattr(self, share_id_name),
-            target=getattr(self, dir_name))
+            self,
+            share=getattr(self, share_id_name),
+            target=getattr(self, dir_name),
+        )
 
 
 class TestSharesBasic(TestSharesSync, test_sync.TestBasic):
@@ -118,8 +138,10 @@ class TestSharesBasic(TestSharesSync, test_sync.TestBasic):
         """make sure compare fails if different"""
         open(self.source_dir + "/file", "w").close()
         d = self.compare_server("source_dir")
-        d.addCallbacks(lambda _: Failure(Exception("dirs matched, they dont")),
-                       lambda _: True)
+        d.addCallbacks(
+            lambda _: Failure(Exception("dirs matched, they dont")),
+            lambda _: True,
+        )
         return d
 
 
@@ -128,7 +150,7 @@ class TestSharesBasic2(TestSharesSync, test_sync.TestBasic2):
 
     @defer.inlineCallbacks
     def setUp(self):
-        """ Set the root_dir = share_dir"""
+        """Set the root_dir = share_dir"""
         yield super(TestSharesBasic2, self).setUp()
         self.root_dir = self.jane_share_dir
 
@@ -151,11 +173,13 @@ class TestShareServerBase(TestSharesSync, test_sync.TestServerBase):
         """Create a file in the server."""
         yield self.get_client_by_user(username)
         mkfile_req = yield self.client.make_file(
-            request.ROOT, parent, filename)
+            request.ROOT, parent, filename
+        )
 
         # data for putcontent
         params = get_put_content_params(
-            share=request.ROOT, node=mkfile_req.new_id)
+            share=request.ROOT, node=mkfile_req.new_id
+        )
         yield self.client.put_content(**params)
 
         yield self.main.wait_for_nirvana(last_event_interval=1)
@@ -164,12 +188,17 @@ class TestShareServerBase(TestSharesSync, test_sync.TestServerBase):
     def make_dir(self, username, dirname, parent):
         """Create a dir in the server."""
         d = self.get_client_by_user(username)
-        d.addCallback(lambda _: self.client.make_dir(
-            request.ROOT, parent, dirname))
         d.addCallback(
-            lambda _: self.main.wait_for_nirvana(last_event_interval=1))
-        d.addCallback(lambda _: self.check(username + '_share_dir',
-                                           username + '_share_id'))
+            lambda _: self.client.make_dir(request.ROOT, parent, dirname)
+        )
+        d.addCallback(
+            lambda _: self.main.wait_for_nirvana(last_event_interval=1)
+        )
+        d.addCallback(
+            lambda _: self.check(
+                username + '_share_dir', username + '_share_id'
+            )
+        )
         return d
 
     def check(self, share_dir, share_id):
@@ -180,8 +209,9 @@ class TestShareServerBase(TestSharesSync, test_sync.TestServerBase):
 
     def get_client_by_user(self, username):
         """Return the client for the user with token: username+'_token'."""
-        return self.get_client(username=username,
-                               root_id_name=username + '_root_id')
+        return self.get_client(
+            username=username, root_id_name=username + '_root_id'
+        )
 
 
 class TestClientMoveMultipleShares(TestShareServerBase):
@@ -232,8 +262,11 @@ class TestReadOnlyShares(TestShareServerBase):
 
         # create another share (ro) for this tests
         self.jane_ro_share_id, self.jane_ro_share_subtree = self.create_share(
-            shared_by='jane', dirname='TestJaneShareRO',
-            name='TestJaneShareRO', access_level='View')
+            shared_by='jane',
+            dirname='TestJaneShareRO',
+            name='TestJaneShareRO',
+            access_level='View',
+        )
         d = self.wait_for('AQ_SHARES_LIST')
         self.main.action_q.list_shares()
         yield d
@@ -248,9 +281,10 @@ class TestReadOnlyShares(TestShareServerBase):
 
     @defer.inlineCallbacks
     def test_new_dir(self):
-        """ adds a new (server-side) in a RO share (local)"""
+        """adds a new (server-side) in a RO share (local)"""
         yield self.get_client_by_user('jane')
         yield self.client.make_dir(
-            request.ROOT, self.jane_ro_share_subtree.id, "test_dir")
+            request.ROOT, self.jane_ro_share_subtree.id, "test_dir"
+        )
         yield self.main.wait_for_nirvana(last_event_interval=1)
         yield self.check('jane_ro_share_dir', 'jane_ro_share_id')

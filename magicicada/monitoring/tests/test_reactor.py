@@ -35,8 +35,10 @@ class ReactorInspectorTestCase(BaseTestCase, TwistedTestCase):
 
     def setUp(self):
         """Set up."""
+
         class Helper(object):
             """Fake object with a controllable call."""
+
             def __init__(self):
                 self.call_count = 1
                 self.calls = []
@@ -54,6 +56,7 @@ class ReactorInspectorTestCase(BaseTestCase, TwistedTestCase):
 
         class FakeMetrics(object):
             """Fake Metrics object that records calls."""
+
             def __init__(self):
                 """Initialize calls."""
                 self.calls = []
@@ -71,7 +74,7 @@ class ReactorInspectorTestCase(BaseTestCase, TwistedTestCase):
         self.helper = Helper()
         self.fake_metrics = FakeMetrics()
         self.patch(metrics, 'get_meter', lambda n: self.fake_metrics)
-        self.ri = ReactorInspector(self.helper.call, loop_time=.1)
+        self.ri = ReactorInspector(self.helper.call, loop_time=0.1)
         self.helper.ri = self.ri
 
     def run_ri(self, call_count=None, join=True):
@@ -122,7 +125,7 @@ class ReactorInspectorTestCase(BaseTestCase, TwistedTestCase):
         # dump frames in other thread, also
         def dumping_function():
             """Function with funny name to be checked later."""
-            time.sleep(.1)
+            time.sleep(0.1)
             self.ri.dump_frames()
             reactor.callFromThread(d.callback, True)
 
@@ -133,10 +136,10 @@ class ReactorInspectorTestCase(BaseTestCase, TwistedTestCase):
 
         # check
         self.handler.assert_not_logged("dumping_function")
+        self.handler.assert_debug("Dumping Python frame", "waiting_function")
         self.handler.assert_debug(
-            "Dumping Python frame", "waiting_function")
-        self.handler.assert_debug(
-            "Dumping Python frame", "reactor main thread")
+            "Dumping Python frame", "reactor main thread"
+        )
 
     def test_reactor_ok(self):
         """Reactor working fast."""
@@ -157,9 +160,12 @@ class ReactorInspectorTestCase(BaseTestCase, TwistedTestCase):
         self.run_ri(0)
         yield dump_frames_called
         log_line = self.handler.assert_critical(
-            "ReactorInspector", "detected unresponsive")
+            "ReactorInspector", "detected unresponsive"
+        )
         self.assertTrue(log_line)
-        self.assertTrue(log_line.args[-1] >= .1)  # waited for entire loop time
+        self.assertTrue(
+            log_line.args[-1] >= 0.1
+        )  # waited for entire loop time
         # Check the metrics
         expected_metric = ("gauge", "delay", log_line.args[-1])
         self.assertEqual([expected_metric], self.fake_metrics.calls)
@@ -170,9 +176,12 @@ class ReactorInspectorTestCase(BaseTestCase, TwistedTestCase):
         """Reactor resurrects after some loops."""
         self.run_ri(3)
         late_line = self.handler.assert_warning(
-            "ReactorInspector: late", "got: 0")
+            "ReactorInspector: late", "got: 0"
+        )
         self.assertTrue(late_line)
-        self.assertTrue(late_line.args[-1] >= .2)  # At least 2 cycles of delay
+        self.assertTrue(
+            late_line.args[-1] >= 0.2
+        )  # At least 2 cycles of delay
         # Check the metrics
         expected_metric = ("gauge", "delay", late_line.args[-1])
         self.assertEqual(expected_metric, self.fake_metrics.calls[-1])

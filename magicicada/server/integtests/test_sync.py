@@ -99,14 +99,21 @@ class TestSync(TestWithDatabase):
         self.share_source_dir = self.mktemp("source/share")
 
         self.patch(hash_queue, "HASHQUEUE_DELAY", 0.1)
-        connection_info = [{
-            'host': "localhost",
-            'port': self.ssl_port,
-            'use_ssl': True,
-            'disable_ssl_verify': True,
-        }]
-        self.main = Main(root_dir, shares_dir, data_dir, partials_dir,
-                         connection_info=connection_info)
+        connection_info = [
+            {
+                'host': "localhost",
+                'port': self.ssl_port,
+                'use_ssl': True,
+                'disable_ssl_verify': True,
+            }
+        ]
+        self.main = Main(
+            root_dir,
+            shares_dir,
+            data_dir,
+            partials_dir,
+            connection_info=connection_info,
+        )
         self.addCleanup(self.main.shutdown)
 
         self.eq = self.main.event_q
@@ -120,8 +127,9 @@ class TestSync(TestWithDatabase):
         yield d
 
         d = self.wait_for('SYS_SERVER_RESCAN_DONE')
-        self.eq.push('SYS_USER_CONNECT',
-                     access_token=self.access_tokens['jack'])
+        self.eq.push(
+            'SYS_USER_CONNECT', access_token=self.access_tokens['jack']
+        )
         self.eq.push('SYS_NET_CONNECTED')
         yield d
 
@@ -137,7 +145,8 @@ class TestSync(TestWithDatabase):
             if state.name in ("READY", "STANDOFF", "SHUTDOWN"):
                 d.callback(True)
             else:
-                reactor.callLater(.5, check)
+                reactor.callLater(0.5, check)
+
         check()
         return d
 
@@ -158,8 +167,10 @@ class TestSync(TestWithDatabase):
 
         # make sure no errors were reported, check for WARNING and above
         errs = "\n".join(
-            e.getMessage() for e in self.handler.records
-            if e.levelno >= logging.WARNING)
+            e.getMessage()
+            for e in self.handler.records
+            if e.levelno >= logging.WARNING
+        )
         if errs:
             raise Exception("Test ended with errors: \n\n" + errs)
 
@@ -169,33 +180,43 @@ class TestSync(TestWithDatabase):
         def _compare():
             """Spwan rsync and compare dirs."""
             cmd = ["rsync", "-nric", self.root_dir, self.source_dir]
-            output = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                                      env=os.environ).communicate()[0]
+            output = subprocess.Popen(
+                cmd, stdout=subprocess.PIPE, env=os.environ
+            ).communicate()[0]
             if output:
                 logger.debug("****\n%s\n****", output)
                 return False
             return True
+
         return deferToThread(_compare)
 
     def upload_server(self, share=None):
         """Upload self.source_dir to the server."""
+
         def _runit():
             """Worker."""
             c = self._u1sync_client()
             try:
                 if self.u1sync_init:
                     do_init(
-                        client=c, share_spec=share, directory=self.source_dir,
-                        subtree_path=None)
+                        client=c,
+                        share_spec=share,
+                        directory=self.source_dir,
+                        subtree_path=None,
+                    )
                     self.u1sync_init = False
                 do_sync(
-                    client=c, directory=self.source_dir,
-                    action="clobber-server", dry_run=False)
+                    client=c,
+                    directory=self.source_dir,
+                    action="clobber-server",
+                    dry_run=False,
+                )
             except Exception:
                 logger.exception(self.id() + '-> upload_server failed with:')
                 raise
             finally:
                 c.disconnect()
+
         return deferToThread(_runit)
 
     def compare_server(self, target=None, share=None):
@@ -207,8 +228,12 @@ class TestSync(TestWithDatabase):
             """worker"""
             c = self._u1sync_client()
             try:
-                do_diff(client=c, share_spec=share, directory=target,
-                        subtree_path=None)
+                do_diff(
+                    client=c,
+                    share_spec=share,
+                    directory=target,
+                    subtree_path=None,
+                )
             finally:
                 c.disconnect()
 
@@ -256,8 +281,13 @@ class TestBrokenNode(TestSync):
         afile = root.get_child_by_name("test_file")
         # create a "invalid" content blob
         content = self.factory.make_content_blob(
-            hash="", magic_hash="", storage_key=uuid.uuid4(), crc32=1, size=1,
-            deflated_size=1)
+            hash="",
+            magic_hash="",
+            storage_key=uuid.uuid4(),
+            crc32=1,
+            size=1,
+            deflated_size=1,
+        )
 
         # change the node
         afile.set_content(content)
@@ -302,8 +332,7 @@ class TestBasic(TestSync):
     def test_u1sync_failed_compare(self):
         """make sure compare fails if different"""
         open(self.source_dir + "/file", "w").close()
-        self.assertFailure(
-            self.compare_server(self.source_dir), TreesDiffer)
+        self.assertFailure(self.compare_server(self.source_dir), TreesDiffer)
 
         # wait for SD nirvana, as this test doesn't use it and we need
         # not to leave the reactor dirty with SD dance
@@ -429,6 +458,7 @@ class TestBasic2(TestSync):
             fd.write("HELLO WORLD")
             fd.close()
             d.callback(True)
+
         reactor.callLater(0, cont)
 
         d.addCallback(lambda _: self.check())
@@ -440,7 +470,7 @@ class TestBasic2(TestSync):
         fd = open(self.root_dir + "/test_file", "w")
         fd.write("HELLO WORLD" * 1000)
         fd.close()
-        yield self.main.wait_for_nirvana(.5)
+        yield self.main.wait_for_nirvana(0.5)
 
         fd = open(self.root_dir + "/test_file", "w")
         fd.write("X")
@@ -631,7 +661,7 @@ class TestClientDelete(TestSync):
             self.assertFalse(self.main.fs.has_metadata(path=filepath))
             self.assertIn(_node[0], self.main.fs.trash)
 
-        yield self.main.wait_for_nirvana(.5)
+        yield self.main.wait_for_nirvana(0.5)
         methinterf = MethodInterferer(self.main.fs, 'delete_to_trash')
         methinterf.insert_after(middle_check)
 
@@ -642,7 +672,7 @@ class TestClientDelete(TestSync):
         finally:
             methinterf.restore()
 
-        yield self.main.wait_for_nirvana(.5)
+        yield self.main.wait_for_nirvana(0.5)
 
         # it should only be our file in the directory
         self.assertNotIn(_node[0], self.main.fs.trash)
@@ -680,8 +710,9 @@ class TestServerBase(TestSync):
     """Utility for interacting with the server."""
 
     @defer.inlineCallbacks
-    def get_client(self, username='jack', root_id_name='root_id',
-                   client_name='client'):
+    def get_client(
+        self, username='jack', root_id_name='root_id', client_name='client'
+    ):
         """Return a deferred that will succeed with a connected client."""
         d = defer.Deferred()
         factory = ClientFactory(d)
@@ -693,8 +724,9 @@ class TestServerBase(TestSync):
         setattr(self, client_name, client)
         yield client.set_caps(REQUIRED_CAPS)
         auth_info = self.access_tokens[username]
-        yield client.simple_authenticate(auth_info['username'],
-                                         auth_info['password'])
+        yield client.simple_authenticate(
+            auth_info['username'], auth_info['password']
+        )
         root = yield client.get_root()
         setattr(self, root_id_name, root)
         defer.returnValue(client)
@@ -706,19 +738,28 @@ class TestServerBase(TestSync):
             content = content.encode('utf-8')
         client = getattr(self, client_name)
         req = yield client.get_delta(share_id, from_scratch=True)
-        dt = [dt for dt in req.response
-              if dt.node_id == node_id and dt.share_id == share_id][0]
+        dt = [
+            dt
+            for dt in req.response
+            if dt.node_id == node_id and dt.share_id == share_id
+        ][0]
         old_hash = dt.content_hash
         params = get_put_content_params(
-            data=content, share=share_id, node=node_id, previous_hash=old_hash)
+            data=content, share=share_id, node=node_id, previous_hash=old_hash
+        )
         yield client.put_content(**params)
 
     def clean_partials_and_conflicts(self):
         """remove all partial and conflicted files"""
+
         def match(s):
             """are they partial or conflict?"""
-            return (s.startswith(".u1partial.") or s.endswith("/.u1partial") or
-                    re.search(r"\.u1conflict(?:\.\d+)?$", s))
+            return (
+                s.startswith(".u1partial.")
+                or s.endswith("/.u1partial")
+                or re.search(r"\.u1conflict(?:\.\d+)?$", s)
+            )
+
         for root, dirs, files in os.walk(self.root_dir):
             for name in dirs:
                 if match(name):
@@ -736,11 +777,13 @@ class TestServerMove(TestServerBase):
         """test rename"""
         yield self.get_client()
         req = yield self.client.make_file(
-            request.ROOT, self.root_id, "test_file")
+            request.ROOT, self.root_id, "test_file"
+        )
         yield self.put_content(request.ROOT, req.new_id, "")
         yield self.main.wait_for_nirvana(last_event_interval=1)
         yield self.client.move(
-            request.ROOT, req.new_id, self.root_id, "test_file_moved")
+            request.ROOT, req.new_id, self.root_id, "test_file_moved"
+        )
         yield self.check()
 
     @defer.inlineCallbacks
@@ -748,10 +791,12 @@ class TestServerMove(TestServerBase):
         """test rename dir"""
         yield self.get_client()
         req = yield self.client.make_dir(
-            request.ROOT, self.root_id, "test_dir")
+            request.ROOT, self.root_id, "test_dir"
+        )
         yield self.main.wait_for_nirvana(last_event_interval=1)
         yield self.client.move(
-            request.ROOT, req.new_id, self.root_id, "test_dir_moved")
+            request.ROOT, req.new_id, self.root_id, "test_dir_moved"
+        )
         yield self.check()
 
     @defer.inlineCallbacks
@@ -759,17 +804,21 @@ class TestServerMove(TestServerBase):
         """test rename"""
         yield self.get_client()
         req1 = yield self.client.make_dir(
-            request.ROOT, self.root_id, "test_dir1")
+            request.ROOT, self.root_id, "test_dir1"
+        )
         yield self.main.wait_for_nirvana(last_event_interval=1)
 
         req2 = yield self.client.make_dir(
-            request.ROOT, self.root_id, "test_dir2")
+            request.ROOT, self.root_id, "test_dir2"
+        )
         req3 = yield self.client.make_file(
-            request.ROOT, req1.new_id, "test_file")
+            request.ROOT, req1.new_id, "test_file"
+        )
         yield self.put_content(request.ROOT, req3.new_id, "")
         yield self.main.wait_for_nirvana(last_event_interval=1)
         yield self.client.move(
-            request.ROOT, req3.new_id, req2.new_id, "test_file_moved")
+            request.ROOT, req3.new_id, req2.new_id, "test_file_moved"
+        )
         yield self.check()
 
 
@@ -789,11 +838,13 @@ class TestServerCornerCases(TestServerBase):
         """Two simultaneous changes on a dir."""
         yield self.get_client()
         req = yield self.client.make_file(
-            request.ROOT, self.root_id, "test_file")
+            request.ROOT, self.root_id, "test_file"
+        )
         yield self.put_content(request.ROOT, req.new_id, "")
 
         req = yield self.client.make_file(
-            request.ROOT, self.root_id, "test_file2")
+            request.ROOT, self.root_id, "test_file2"
+        )
         yield self.put_content(request.ROOT, req.new_id, "")
 
         yield self.check()
@@ -805,7 +856,8 @@ class TestServerCornerCases(TestServerBase):
         data_one = os.urandom(1000000)
         data_two = os.urandom(1000)
         req = yield self.client.make_file(
-            request.ROOT, self.root_id, "test_file")
+            request.ROOT, self.root_id, "test_file"
+        )
         yield self.put_content(request.ROOT, req.new_id, data_one)
         yield self.put_content(request.ROOT, req.new_id, data_two)
         yield self.check()
@@ -816,8 +868,9 @@ class TestServerCornerCases(TestServerBase):
         yield self.get_client()
         data_one = os.urandom(1000000)
         data_two = ""
-        req = yield self.client.make_file(request.ROOT,
-                                          self.root_id, "test_file")
+        req = yield self.client.make_file(
+            request.ROOT, self.root_id, "test_file"
+        )
         yield self.put_content(request.ROOT, req.new_id, data_one)
         yield self.put_content(request.ROOT, req.new_id, data_two)
         yield self.check()
@@ -827,8 +880,9 @@ class TestServerCornerCases(TestServerBase):
         """Upload a file and delete."""
         yield self.get_client()
         data_one = os.urandom(1000000)
-        req = yield self.client.make_file(request.ROOT,
-                                          self.root_id, "test_file")
+        req = yield self.client.make_file(
+            request.ROOT, self.root_id, "test_file"
+        )
         yield self.put_content(request.ROOT, req.new_id, data_one)
         yield self.client.unlink(request.ROOT, req.new_id)
         yield self.check()
@@ -838,7 +892,8 @@ class TestServerCornerCases(TestServerBase):
         """Upload a dir and delete."""
         yield self.get_client()
         req = yield self.client.make_dir(
-            request.ROOT, self.root_id, "test_dir")
+            request.ROOT, self.root_id, "test_dir"
+        )
         yield self.client.unlink(request.ROOT, req.new_id)
         yield self.check()
 
@@ -854,21 +909,23 @@ class TestServerCornerCases(TestServerBase):
         fh = open(foo_path, "wb")
         fh.write(data)
         fh.close()
-        yield self.main.wait_for_nirvana(.5)
+        yield self.main.wait_for_nirvana(0.5)
 
         # move "foo" to "bar", create a new "foo" with other
         # content, delete "bar"
         md_foo = self.main.fs.get_by_path(foo_path)
-        yield self.client.move(request.ROOT, md_foo.node_id,
-                               self.root_id, "bar")
+        yield self.client.move(
+            request.ROOT, md_foo.node_id, self.root_id, "bar"
+        )
         req = yield self.client.make_file(request.ROOT, self.root_id, "foo")
         yield self.put_content(request.ROOT, req.new_id, ":)")
-        yield self.client.unlink(request.ROOT,
-                                 md_foo.node_id)  # foo is bar now
-        yield self.main.wait_for_nirvana(.5)
+        yield self.client.unlink(
+            request.ROOT, md_foo.node_id
+        )  # foo is bar now
+        yield self.main.wait_for_nirvana(0.5)
 
         self.aq.rescan_from_scratch(request.ROOT)
-        yield self.main.wait_for_nirvana(.5)
+        yield self.main.wait_for_nirvana(0.5)
 
         # check locally and in the server
         # it should only be our file in the directory, with content ok
@@ -886,10 +943,12 @@ class TestServerMove2(TestServerBase):
         """test rename"""
         yield self.get_client()
         req = yield self.client.make_file(
-            request.ROOT, self.root_id, "test_file")
+            request.ROOT, self.root_id, "test_file"
+        )
         yield self.put_content(request.ROOT, req.new_id, "")
         yield self.client.move(
-            request.ROOT, req.new_id, self.root_id, "test_file_moved")
+            request.ROOT, req.new_id, self.root_id, "test_file_moved"
+        )
         yield self.check()
 
     @defer.inlineCallbacks
@@ -897,10 +956,12 @@ class TestServerMove2(TestServerBase):
         """test rename dir"""
         yield self.get_client()
         req = yield self.client.make_dir(
-            request.ROOT, self.root_id, "test_dir")
+            request.ROOT, self.root_id, "test_dir"
+        )
         yield self.main.wait_for_nirvana(last_event_interval=1)
         yield self.client.move(
-            request.ROOT, req.new_id, self.root_id, "test_dir_moved")
+            request.ROOT, req.new_id, self.root_id, "test_dir_moved"
+        )
         yield self.check()
 
     @defer.inlineCallbacks
@@ -908,16 +969,20 @@ class TestServerMove2(TestServerBase):
         """test change parent"""
         yield self.get_client()
         req1 = yield self.client.make_dir(
-            request.ROOT, self.root_id, "test_dir1")
+            request.ROOT, self.root_id, "test_dir1"
+        )
         yield self.main.wait_for_nirvana(last_event_interval=1)
         req2 = yield self.client.make_dir(
-            request.ROOT, self.root_id, "test_dir2")
+            request.ROOT, self.root_id, "test_dir2"
+        )
         req3 = yield self.client.make_file(
-            request.ROOT, req1.new_id, "test_file")
+            request.ROOT, req1.new_id, "test_file"
+        )
         yield self.put_content(request.ROOT, req3.new_id, "")
         yield self.main.wait_for_nirvana(last_event_interval=1)
         yield self.client.move(
-            request.ROOT, req3.new_id, req2.new_id, "test_file_moved")
+            request.ROOT, req3.new_id, req2.new_id, "test_file_moved"
+        )
         yield self.check()
 
 
@@ -971,10 +1036,10 @@ class TestClientMove(TestSync):
         os.mkdir(dirname1)
         dirname2 = os.path.join(self.root_dir, "test_dir_2")
         os.mkdir(dirname2)
-        yield self.main.wait_for_nirvana(.5)
+        yield self.main.wait_for_nirvana(0.5)
 
         os.rename(dirname1, os.path.join(dirname2, 'newdirname'))
-        yield self.main.wait_for_nirvana(.5)
+        yield self.main.wait_for_nirvana(0.5)
         yield self.check()
 
     @defer.inlineCallbacks
@@ -984,10 +1049,10 @@ class TestClientMove(TestSync):
         open(filename, 'w').close()
         dirname = os.path.join(self.root_dir, "test_dir")
         os.mkdir(dirname)
-        yield self.main.wait_for_nirvana(.5)
+        yield self.main.wait_for_nirvana(0.5)
 
         os.rename(filename, os.path.join(dirname, 'newfilename'))
-        yield self.main.wait_for_nirvana(.5)
+        yield self.main.wait_for_nirvana(0.5)
         yield self.check()
 
     @defer.inlineCallbacks
@@ -1007,7 +1072,7 @@ class TestClientMove(TestSync):
 
         # creates a dir.
         os.mkdir(dir1)
-        yield self.main.wait_for_nirvana(.5)
+        yield self.main.wait_for_nirvana(0.5)
 
         # creates a file in the dir, and moves the dir.
         fh = open(filepath1, "w")
@@ -1015,7 +1080,7 @@ class TestClientMove(TestSync):
         fh.close()
         os.rename(dir1, dir2)
         yield dfnew
-        yield self.main.wait_for_nirvana(.5)
+        yield self.main.wait_for_nirvana(0.5)
 
         # check that everything is ok: it should only be our file in the dir...
         files = os.listdir(dir2)
@@ -1059,15 +1124,16 @@ class TestClientMove(TestSync):
 
         # Create a testing dir
         os.mkdir(dir1)
-        yield self.main.wait_for_nirvana(.5)
+        yield self.main.wait_for_nirvana(0.5)
 
         # Creates a file in the dir
         with open(filepath1, "w") as fh:
             fh.write("foo")
-        yield self.main.wait_for_nirvana(.5)
+        yield self.main.wait_for_nirvana(0.5)
 
         def local_check(_):
             """Check that everything is ok"""
+
         # it should only be our file in the directory
         files = os.listdir(dir2)
         self.assertEqual(files, ["test_file"])
@@ -1110,7 +1176,7 @@ class TestClientMove(TestSync):
         fh.close()
 
         # wait dust to settle, check locally and in the server
-        yield self.main.wait_for_nirvana(.5)
+        yield self.main.wait_for_nirvana(0.5)
         files = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
         self.assertEqual(files, ["test_file"])
         yield self.compare_server()
@@ -1136,18 +1202,19 @@ class TestClientMove(TestSync):
             """Fake add watch."""
             added_watches.append(path)
             original_add_watch(path)
+
         self.eq.add_watch = fake
 
         dfnew = self.wait_for("LR_SCAN_ERROR")
         yield self.main.wait_for_nirvana()
         os.mkdir(dir1)
-        yield self.main.wait_for_nirvana(.5)
+        yield self.main.wait_for_nirvana(0.5)
 
         # creates a file in the dir, and moves the dir
         os.mkdir(os.path.join(dir1, "testdir"))
         os.rename(dir1, dir2)
         yield dfnew
-        yield self.main.wait_for_nirvana(.5)
+        yield self.main.wait_for_nirvana(0.5)
 
         # check that the watch was added for the correct directory
         self.assertIn(os.path.join(dir2, "testdir"), added_watches)
@@ -1178,11 +1245,13 @@ class TestTimings(TestServerBase):
         """
         raise SkipTest(
             'Transient failures in CI, see issue '
-            'https://github.com/chicharreros/magicicada-server/issues/38')
+            'https://github.com/chicharreros/magicicada-server/issues/38'
+        )
         dfnew = self.wait_for("SV_FILE_NEW")
         yield self.get_client()
-        req = yield self.client.make_file(request.ROOT, self.root_id,
-                                          "test_file")
+        req = yield self.client.make_file(
+            request.ROOT, self.root_id, "test_file"
+        )
         yield self.put_content(request.ROOT, req.new_id, ":)")
         yield dfnew
 
@@ -1216,7 +1285,8 @@ class TestConflict(TestServerBase):
 
         yield self.get_client()
         req = yield self.client.make_file(
-            request.ROOT, self.root_id, "test_file")
+            request.ROOT, self.root_id, "test_file"
+        )
         yield self.main.wait_for_nirvana(0.5)
 
         # let's put some content, for later have something to delete
@@ -1239,7 +1309,8 @@ class TestConflict(TestServerBase):
 
         yield self.get_client()
         req = yield self.client.make_file(
-                  request.ROOT, self.root_id, "test_file")
+            request.ROOT, self.root_id, "test_file"
+        )
         yield self.main.wait_for_nirvana(0.5)
 
         d = self.wait_for("AQ_DELTA_OK")
@@ -1268,8 +1339,7 @@ class TestConflict(TestServerBase):
 
         def content_check():
             """check that everything is in sync"""
-            self.assertRaises(IOError,
-                              open, self.root_dir + '/test_file')
+            self.assertRaises(IOError, open, self.root_dir + '/test_file')
             try:
                 with open(self.root_dir + '/test_file.u1conflict') as f:
                     data_in_conflict = f.read()
@@ -1282,8 +1352,9 @@ class TestConflict(TestServerBase):
                 self.assertEqual(data_in_conflict, data_conflict)
 
         yield self.get_client()
-        req = yield self.client.make_file(request.ROOT, self.root_id,
-                                          "test_file")
+        req = yield self.client.make_file(
+            request.ROOT, self.root_id, "test_file"
+        )
         yield self.main.wait_for_nirvana(last_event_interval=0.5)
         yield change_local(req)
         yield self.main.wait_for_nirvana(last_event_interval=0.5)
@@ -1300,7 +1371,8 @@ class TestConflict(TestServerBase):
 
         yield self.get_client()
         req = yield self.client.make_file(
-            request.ROOT, self.root_id, "test_file")
+            request.ROOT, self.root_id, "test_file"
+        )
         yield self.put_content(request.ROOT, req.new_id, data_one)
 
         f = open(self.root_dir + "/test_file", "wb")
@@ -1312,7 +1384,8 @@ class TestConflict(TestServerBase):
         data_one_local = open(self.root_dir + '/test_file', 'rb').read()
         try:
             data_conflict_local = open(
-                self.root_dir + '/test_file.u1conflict', 'rb').read()
+                self.root_dir + '/test_file.u1conflict', 'rb'
+            ).read()
         except IOError:
             self.assertEqual(data_one_local, data_conflict)
         else:
@@ -1352,8 +1425,9 @@ class TestConflict(TestServerBase):
         yield self.main.wait_for_nirvana(0.5)
         files = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
         self.assertEqual(files, ["test_dir"])
-        self.assertTrue(stat.S_ISDIR(
-                os.stat(self.root_dir + '/test_dir')[stat.ST_MODE]))
+        self.assertTrue(
+            stat.S_ISDIR(os.stat(self.root_dir + '/test_dir')[stat.ST_MODE])
+        )
 
     @defer.inlineCallbacks
     def test_double_make_conflict_w_dir_and_file(self):
@@ -1369,17 +1443,17 @@ class TestConflict(TestServerBase):
 
         yield self.main.wait_for_nirvana(last_event_interval=0.5)
 
-        self.assertTrue(stat.S_ISDIR(
-            os.stat(self.root_dir + '/test_file')[stat.ST_MODE]))
-        data_in_conflict = open(
-            self.root_dir + '/test_file.u1conflict').read()
+        self.assertTrue(
+            stat.S_ISDIR(os.stat(self.root_dir + '/test_file')[stat.ST_MODE])
+        )
+        data_in_conflict = open(self.root_dir + '/test_file.u1conflict').read()
         self.assertEqual(data_in_conflict, data_conflict)
 
     @defer.inlineCallbacks
     def test_makefile_problem_retry(self):
         """Problem in make_file (but it got to the server), so retry it."""
         yield self.get_client()
-        yield self.main.wait_for_nirvana(.5)
+        yield self.main.wait_for_nirvana(0.5)
 
         # nuke the client's method
         nuker = NukeAQClient(self.aq, 'put_content_request')
@@ -1394,7 +1468,7 @@ class TestConflict(TestServerBase):
         self.eq.push('SYS_NET_DISCONNECTED')
         nuker.restore()
         self.eq.push('SYS_NET_CONNECTED')
-        yield self.main.wait_for_nirvana(.5)
+        yield self.main.wait_for_nirvana(0.5)
 
         # it should only be our file in the directory
         files = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
@@ -1420,6 +1494,7 @@ class TestConflict(TestServerBase):
 
         class FakePutContent(orig_putcontent_class):
             """Fake to do something before sending first message."""
+
             @defer.inlineCallbacks
             def _start(self):
                 """Fake."""
@@ -1427,8 +1502,9 @@ class TestConflict(TestServerBase):
                 protocol_client.PutContent = orig_putcontent_class
 
                 # do something in the server
-                req = yield test.client.make_file(request.ROOT,
-                                                  test.root_id, "test_file")
+                req = yield test.client.make_file(
+                    request.ROOT, test.root_id, "test_file"
+                )
                 yield test.put_content(request.ROOT, req.new_id, data_server)
 
                 # keep walking, and release for the test
@@ -1440,7 +1516,7 @@ class TestConflict(TestServerBase):
         with open(test_file, "w") as fh:
             fh.write(data_local)
         yield d
-        yield self.main.wait_for_nirvana(.5)
+        yield self.main.wait_for_nirvana(0.5)
 
         # we should have both files...
         files = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
@@ -1461,7 +1537,7 @@ class TestConflict(TestServerBase):
 
         # now we fix it!
         os.rename(test_file + ".u1conflict", test_file)
-        yield self.main.wait_for_nirvana(.5)
+        yield self.main.wait_for_nirvana(0.5)
 
         # finally, only one file with right content
         files = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
@@ -1477,7 +1553,7 @@ class TestConflict(TestServerBase):
 
         # now we fix it, and wait
         os.rename(test_file + ".u1conflict", test_file + "_new")
-        yield self.main.wait_for_nirvana(.5)
+        yield self.main.wait_for_nirvana(0.5)
 
         # finally, only one file with right content
         files = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
@@ -1500,8 +1576,9 @@ class TestConflictOnServerSideDelete(TestServerBase):
     def create_and_check(self, _=None):
         """Create initial directory hierarchy."""
         self.local_dir = os.path.join(self.root_dir, self.dir_name)
-        self.local_dir_conflict = os.path.join(self.root_dir,
-                                               self.dir_name_conflict)
+        self.local_dir_conflict = os.path.join(
+            self.root_dir, self.dir_name_conflict
+        )
         self.local_file = os.path.join(self.local_dir, self.file_name)
 
         os.mkdir(self.local_dir)
@@ -1537,14 +1614,15 @@ class TestConflictOnServerSideDelete(TestServerBase):
 
         def no_conflict_check(_):
             """Check the absence of conflict, and the deletion of the node."""
+
         yield self.get_client()
         yield self.create_and_check()
-        yield self.main.wait_for_nirvana(.5)
+        yield self.main.wait_for_nirvana(0.5)
 
         yield self.unlink_dir_tree()
 
         yield self.update_state()
-        yield self.main.wait_for_nirvana(.5)
+        yield self.main.wait_for_nirvana(0.5)
 
         files = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
         self.assertEqual(files, [])
@@ -1554,7 +1632,7 @@ class TestConflictOnServerSideDelete(TestServerBase):
         """Conflict if there were local changes after server tree deletion."""
         client = yield self.get_client()
         self.create_and_check(client)
-        yield self.main.wait_for_nirvana(.5)
+        yield self.main.wait_for_nirvana(0.5)
         wait_hash = self.wait_for('HQ_HASH_NEW')
 
         self.unlink_dir_tree(None)
@@ -1569,7 +1647,7 @@ class TestConflictOnServerSideDelete(TestServerBase):
 
         yield wait_hash
         self.update_state(None)
-        yield self.main.wait_for_nirvana(.5)
+        yield self.main.wait_for_nirvana(0.5)
 
         files = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
         self.assertEqual(sorted(files), [self.dir_name_conflict])
@@ -1583,7 +1661,8 @@ class TestConflict2(TestServerBase):
         """local change after server change waiting for download."""
         yield self.get_client()
         req = yield self.client.make_dir(
-            request.ROOT, self.root_id, "test_dir")
+            request.ROOT, self.root_id, "test_dir"
+        )
         yield self.main.wait_for_nirvana(0.5)
         os.mkdir(self.root_dir + "/test_dir/test_dir")
         try:
@@ -1599,10 +1678,12 @@ class TestConflict2(TestServerBase):
     def test_local_delete_dir_while_downloading(self):
         """Remove tree locally when creating stuff in server."""
         yield self.get_client()
-        req = yield self.client.make_dir(request.ROOT, self.root_id,
-                                         "test_dir")
-        req2 = yield self.client.make_file(request.ROOT, req.new_id,
-                                           "test_file")
+        req = yield self.client.make_dir(
+            request.ROOT, self.root_id, "test_dir"
+        )
+        req2 = yield self.client.make_file(
+            request.ROOT, req.new_id, "test_file"
+        )
         yield self.main.wait_for_nirvana(last_event_interval=0.5)
         yield self.client.unlink(request.ROOT, req2.new_id)
         yield self.wait_for("AQ_DELTA_OK")
@@ -1618,6 +1699,7 @@ class TestConflict2(TestServerBase):
 
         class FakeProducer(object):
             """Just a holder."""
+
             finished = False
 
             def stopProducing(self):
@@ -1663,12 +1745,12 @@ class TestConflict2(TestServerBase):
 
         # release the internal deferred and let the first Upload continue
         fake_request.deferred.callback(real_pc_result)
-        yield self.wait_for_nirvana(.5)
+        yield self.wait_for_nirvana(0.5)
 
         # ask a delta from 1 (the make file), the server has gen=2, with older
         # hash, when downloaded it will generate the conflict
         self.aq.get_delta(request.ROOT, 1)
-        yield self.wait_for_nirvana(.5)
+        yield self.wait_for_nirvana(0.5)
 
         # no conflicts, and the server with correct data
         files = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
@@ -1744,7 +1826,7 @@ class TestConflict2(TestServerBase):
 
         # release the interfered MakeFile, and wait for everything to finish
         play_makefile()
-        yield self.wait_for_nirvana(.5)
+        yield self.wait_for_nirvana(0.5)
 
         # check that we don't have conflict, and all is the same with server
         files = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
@@ -1762,7 +1844,7 @@ class TestConflict2(TestServerBase):
         # create a secondary node to later overwrite the testing one
         with open(fname + 'tobemoved', 'w') as fh:
             fh.write('foo')
-        yield self.wait_for_nirvana(.5)
+        yield self.wait_for_nirvana(0.5)
 
         # nuke client's MakeFile, that will trigger us later to continue
         d1 = defer.Deferred()
@@ -1786,7 +1868,7 @@ class TestConflict2(TestServerBase):
 
         # release the interfered MakeFile, and wait for everything to finish
         play_makefile()
-        yield self.wait_for_nirvana(.5)
+        yield self.wait_for_nirvana(0.5)
 
         # check that we don't have conflict, and all is the same with server
         files = filter_symlinks(self.root_dir, os.listdir(self.root_dir))
@@ -1806,8 +1888,9 @@ class TestPartialRecover(TestServerBase):
 
         def remove_partial(*args):
             """Remove the node's .partial"""
-            mdobj = self.main.fs.get_by_path(os.path.join(self.root_dir,
-                                                          'test_file'))
+            mdobj = self.main.fs.get_by_path(
+                os.path.join(self.root_dir, 'test_file')
+            )
             p_name = mdobj.mdid + '.u1partial.' + os.path.basename(mdobj.path)
             os.remove(os.path.join(self.main.fs.partials_dir, p_name))
 
@@ -1824,8 +1907,9 @@ class TestPartialRecover(TestServerBase):
         nuker = MethodInterferer(self.main.fs, 'commit_partial')
         nuker.insert_before(remove_partial)
 
-        make_req = yield self.client.make_file(request.ROOT,
-                                               self.root_id, "test_file")
+        make_req = yield self.client.make_file(
+            request.ROOT, self.root_id, "test_file"
+        )
         yield self.put_content(request.ROOT, make_req.new_id, data_one)
         yield commited
         yield self.main.wait_for_nirvana(0)
@@ -1876,7 +1960,8 @@ class TestStupendous(TestServerBase):
         logger.info('TestStupendous, creating %s amount of files.' % amount)
         for i in range(amount):
             mk = yield self.client.make_file(
-                request.ROOT, self.root_id, 'test_%03x' % i)
+                request.ROOT, self.root_id, 'test_%03x' % i
+            )
             yield self.put_content(request.ROOT, mk.new_id, 'hola')
         yield super(TestStupendous, self).client_setup()
 
@@ -1915,7 +2000,8 @@ class TestMoveWhileInProgress(TestServerBase):
 
         yield self.get_client()
         req = yield self.client.make_file(
-            request.ROOT, self.root_id, "test_file")
+            request.ROOT, self.root_id, "test_file"
+        )
         yield self.main.wait_for_nirvana(0.5)
 
         # let's put some content, for later have something to delete
@@ -1926,8 +2012,9 @@ class TestMoveWhileInProgress(TestServerBase):
         yield self.put_content(request.ROOT, req.new_id, data_one)
         yield d
 
-        os.rename(self.root_dir + "/test_file",
-                  self.root_dir + "/test_file_new")
+        os.rename(
+            self.root_dir + "/test_file", self.root_dir + "/test_file_new"
+        )
 
         yield self.main.wait_for_nirvana(0.5)
         yield self.clean_partials_and_conflicts()
@@ -1939,17 +2026,16 @@ class TestMoveWhileInProgress(TestServerBase):
         # let's build ROOT/test_dir/test_dir in the server
         yield self.get_client()
         req = yield self.client.make_dir(
-            request.ROOT, self.root_id, "test_dir")
+            request.ROOT, self.root_id, "test_dir"
+        )
         yield self.main.wait_for_nirvana(0.5)
 
         d = self.wait_for("AQ_DELTA_OK")
-        yield self.client.make_dir(
-            request.ROOT, req.new_id, "inside_dir")
+        yield self.client.make_dir(request.ROOT, req.new_id, "inside_dir")
         yield d
 
         # change locally, wait, and compare
-        os.rename(self.root_dir + "/test_dir",
-                  self.root_dir + "/test_renamed")
+        os.rename(self.root_dir + "/test_dir", self.root_dir + "/test_renamed")
         yield self.main.wait_for_nirvana(0.5)
         yield self.clean_partials_and_conflicts()
         yield self.check()
@@ -1977,13 +2063,16 @@ class TestMoveWhileInProgress(TestServerBase):
         """test rename"""
         yield self.get_client()
         yield self.client.make_file(
-            request.ROOT, self.root_id, "test_file_moved")
+            request.ROOT, self.root_id, "test_file_moved"
+        )
         req = yield self.client.make_file(
-            request.ROOT, self.root_id, "test_file")
+            request.ROOT, self.root_id, "test_file"
+        )
         self.put_content(request.ROOT, req.new_id, "")
         yield self.main.wait_for_nirvana(last_event_interval=1)
         yield self.client.move(
-            request.ROOT, req.new_id, self.root_id, "test_file_moved")
+            request.ROOT, req.new_id, self.root_id, "test_file_moved"
+        )
         yield self.check()
 
     @defer.inlineCallbacks
@@ -2067,8 +2156,11 @@ class TestLocalRescan(TestServerBase):
                 return True
 
             # check if there's new info for this node
-            deltas = [dt for dt in kwargs['delta_content']
-                      if dt.node_id == req.new_id]
+            deltas = [
+                dt
+                for dt in kwargs['delta_content']
+                if dt.node_id == req.new_id
+            ]
             if len(deltas) != 1:
                 return True
             delta = deltas[0]
@@ -2114,7 +2206,7 @@ class TestLocalRescan(TestServerBase):
             with open(fname, 'w') as fh:
                 fh.write('hola')
             # need to wait until all is procesed before restoring the upload
-            yield self.main.wait_for_nirvana(.5)
+            yield self.main.wait_for_nirvana(0.5)
         finally:
             nuker.restore()
 
@@ -2138,8 +2230,9 @@ class TestLocalRescan(TestServerBase):
         nuker.nuke()
 
         try:
-            req = yield self.client.make_file(request.ROOT,
-                                              self.root_id, 'file.txt')
+            req = yield self.client.make_file(
+                request.ROOT, self.root_id, 'file.txt'
+            )
             yield self.put_content(request.ROOT, req.new_id, 'hola')
             yield self.main.wait_for_nirvana(0)
         finally:
@@ -2165,8 +2258,10 @@ class TestDownloadError(TestServerBase):
         """Tests that on a AQ_DOWNLOAD_ERROR (NOT_AVAILABLE) the .u1partial is
         deleted.
         """
-        def get_content_request(share, node, hash, offset=0,
-                                callback=None, node_attr_callback=None):
+
+        def get_content_request(
+            share, node, hash, offset=0, callback=None, node_attr_callback=None
+        ):
             """get_content_request that always fails with NOT_AVAILABLE"""
             message = protocol_pb2.Message()
             message.id = 10
@@ -2178,12 +2273,14 @@ class TestDownloadError(TestServerBase):
         nuker = NukeAQClient(self.aq, 'get_content_request')
         yield self.get_client()
         req = yield self.client.make_dir(
-            request.ROOT, self.root_id, "test_dir")
+            request.ROOT, self.root_id, "test_dir"
+        )
         yield nuker.nuke(get_content_request)
         yield self.wait_for_nirvana()
 
         self.assertFalse(
-            os.path.exists(os.path.join(self.root_dir, '.u1partial')))
+            os.path.exists(os.path.join(self.root_dir, '.u1partial'))
+        )
 
         yield nuker.restore()
         yield self.client.unlink(request.ROOT, req.new_id)
@@ -2194,8 +2291,10 @@ class TestDownloadError(TestServerBase):
         """Tests that on a AQ_DOWNLOAD_ERROR (misc error) the .u1partial isn't
         deleted.
         """
-        def get_content_request(share, node, hash, offset=0,
-                                callback=None, node_attr_callback=None):
+
+        def get_content_request(
+            share, node, hash, offset=0, callback=None, node_attr_callback=None
+        ):
             """get_content_request that always fails with PROTOCOL_ERROR"""
             message = protocol_pb2.Message()
             message.id = 10
@@ -2207,12 +2306,14 @@ class TestDownloadError(TestServerBase):
         nuker = NukeAQClient(self.aq, 'get_content_request')
         yield self.get_client()
         req = yield self.client.make_dir(
-            request.ROOT, self.root_id, "test_dir")
+            request.ROOT, self.root_id, "test_dir"
+        )
         yield nuker.nuke(get_content_request)
         yield self.wait_for_nirvana()
 
         self.assertFalse(
-            os.path.exists(os.path.join(self.root_dir, '.u1partial')))
+            os.path.exists(os.path.join(self.root_dir, '.u1partial'))
+        )
 
         yield nuker.restore()
         yield self.client.unlink(request.ROOT, req.new_id)
@@ -2224,6 +2325,7 @@ class TestOpenFiles(TestServerBase):
 
     class TestFileManager(object):
         """Handle the test file."""
+
         def __init__(self, filepath, test):
             self.filepath = filepath
             self.fh = None
@@ -2272,8 +2374,9 @@ class TestOpenFiles(TestServerBase):
 
         # get the node id and change it in the server
         mdobj = self.main.fs.get_by_path(filepath)
-        wait_download = self.wait_for("AQ_DOWNLOAD_FINISHED",
-                                      node_id=mdobj.node_id)
+        wait_download = self.wait_for(
+            "AQ_DOWNLOAD_FINISHED", node_id=mdobj.node_id
+        )
         yield self.put_content(request.ROOT, mdobj.node_id, ":)")
         yield self.main.wait_for_nirvana(0.5)
 
@@ -2315,7 +2418,7 @@ class TestOpenFiles(TestServerBase):
 
 
 class TestStartup(TestSync):
-    """Test startup of the syncdaemon """
+    """Test startup of the syncdaemon"""
 
     @defer.inlineCallbacks
     def test_connection_made(self):
@@ -2327,6 +2430,7 @@ class TestStartup(TestSync):
         yield self.main.wait_for('SYS_CONNECTION_LOST')
 
         # connect again and check
-        self.main.event_q.push('SYS_USER_CONNECT',
-                               auth_info=self.access_tokens['jack'])
+        self.main.event_q.push(
+            'SYS_USER_CONNECT', auth_info=self.access_tokens['jack']
+        )
         yield self.main.wait_for('SYS_ROOT_RECEIVED')

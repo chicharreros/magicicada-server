@@ -38,6 +38,7 @@ class TestManageUDF(TestWithDatabase):
 
     def test_create_udf_simple(self):
         """Create an UDF."""
+
         def auth(client):
             """Authenticate and test."""
             d = client.dummy_authenticate("open sesame")
@@ -50,6 +51,7 @@ class TestManageUDF(TestWithDatabase):
             d.addCallback(lambda _: client.create_udf("~", "myudf"))
             d.addCallback(check_result)
             d.addCallbacks(client.test_done, client.test_fail)
+
         return self.callback_test(auth)
 
     def test_create_udf_same_path(self):
@@ -67,46 +69,54 @@ class TestManageUDF(TestWithDatabase):
             d.addCallback(lambda _: client.create_udf("~", "myudf"))
             d.addCallback(check_result)
             d.addCallbacks(client.test_done, client.test_fail)
+
         return self.callback_test(auth)
 
     def test_create_udf_nested_inside(self):
         """Try to create two nested UDFs, the second being inside."""
+
         def auth(client):
             """Authenticate and test."""
             d = client.dummy_authenticate("open sesame")
 
             def check(failure):
                 """Checks the error returned."""
-                self.assertIsInstance(failure.value,
-                                      request.StorageRequestError)
+                self.assertIsInstance(
+                    failure.value, request.StorageRequestError
+                )
                 self.assertEqual(str(failure.value), 'NO_PERMISSION')
                 client.test_done(True)
 
             d.addCallback(lambda _: client.create_udf("~", "myudf"))
             d.addCallback(lambda _: client.create_udf("~/myudf/foo", "bar"))
             d.addCallbacks(client.test_fail, check)
+
         return self.callback_test(auth)
 
     def test_create_udf_nested_outside(self):
         """Try to create two nested UDFs, the second being outside."""
+
         def auth(client):
             """Authenticate and test."""
             d = client.dummy_authenticate("open sesame")
 
             def check(failure):
                 """Checks the error returned."""
-                self.assertIsInstance(failure.value,
-                                      request.StorageRequestError)
+                self.assertIsInstance(
+                    failure.value, request.StorageRequestError
+                )
                 self.assertEqual(str(failure.value), 'NO_PERMISSION')
                 client.test_done(True)
 
             d.addCallback(lambda _: client.create_udf("~/myudf/foo", "bar"))
             d.addCallback(lambda _: client.create_udf("~", "myudf"))
             d.addCallbacks(client.test_fail, check)
+
         return self.callback_test(auth)
 
     def test_create_udf_nested_overlapping(self):
         """Try to create two UDFs with overlapping names."""
+
         def auth(client):
             """Authenticate and test."""
             d = client.dummy_authenticate("open sesame")
@@ -114,20 +124,24 @@ class TestManageUDF(TestWithDatabase):
             d.addCallback(lambda _: client.create_udf("~/foobar", "myudf"))
             d.addCallback(lambda _: client.create_udf("~/fo", "myudf"))
             d.addCallbacks(client.test_done, client.test_fail)
+
         return self.callback_test(auth)
 
     def test_delete_udf(self):
         """Delete an UDF."""
+
         def auth(client):
             """Authenticate and test."""
             d = client.dummy_authenticate("open sesame")
             d.addCallback(lambda _: client.create_udf("~", "myudf"))
             d.addCallback(lambda r: client.delete_volume(r.volume_id))
             d.addCallbacks(client.test_done, client.test_fail)
+
         return self.callback_test(auth)
 
     def test_delete_udf_with_file(self):
         """Delete an UDF and all the files there."""
+
         @defer.inlineCallbacks
         def auth(client):
             """Authenticate and test."""
@@ -135,8 +149,9 @@ class TestManageUDF(TestWithDatabase):
 
             # create the udf and a file in it
             udf_req = yield client.create_udf("~", "myudf")
-            mk_req = yield client.make_file(udf_req.volume_id,
-                                            udf_req.node_id, "test_file")
+            mk_req = yield client.make_file(
+                udf_req.volume_id, udf_req.node_id, "test_file"
+            )
 
             # delete the udf
             yield client.delete_volume(udf_req.volume_id)
@@ -150,6 +165,7 @@ class TestManageUDF(TestWithDatabase):
 
     def test_delete_udf_with_dir(self):
         """Delete an UDF and all the dirs there."""
+
         @defer.inlineCallbacks
         def auth(client):
             """Authenticate and test."""
@@ -157,8 +173,9 @@ class TestManageUDF(TestWithDatabase):
 
             # create the udf and a file in it
             udf_req = yield client.create_udf("~", "myudf")
-            mk_req = yield client.make_dir(udf_req.volume_id,
-                                           udf_req.node_id, "test_dir")
+            mk_req = yield client.make_dir(
+                udf_req.volume_id, udf_req.node_id, "test_dir"
+            )
 
             # delete the udf
             yield client.delete_volume(udf_req.volume_id)
@@ -172,19 +189,22 @@ class TestManageUDF(TestWithDatabase):
 
     def test_delete_nonexistant_udf(self):
         """Delete an UDF that does not exist."""
+
         def auth(client):
             """Authenticate and test."""
             d = client.dummy_authenticate("open sesame")
 
             def check(failure):
                 """Checks the error returned."""
-                self.assertIsInstance(failure.value,
-                                      request.StorageRequestError)
+                self.assertIsInstance(
+                    failure.value, request.StorageRequestError
+                )
                 self.assertEqual(str(failure.value), 'DOES_NOT_EXIST')
                 client.test_done(True)
 
             d.addCallback(lambda _: client.delete_volume(uuid.uuid4()))
             d.addCallbacks(client.test_fail, check)
+
         return self.callback_test(auth)
 
     def test_notification_create_udf(self):
@@ -194,8 +214,9 @@ class TestManageUDF(TestWithDatabase):
             """First client login."""
             self._state.client1 = client
             d = client.dummy_authenticate("open sesame")
-            d.addCallback(lambda _: reactor.connectTCP(
-                'localhost', self.port, factory2))
+            d.addCallback(
+                lambda _: reactor.connectTCP('localhost', self.port, factory2)
+            )
             d.addCallback(lambda _: d2)  # will wait second connection
             d.addCallback(lambda _: client.create_udf("~", "moño"))
             d.addCallback(self.save_req, "udf")
@@ -210,13 +231,16 @@ class TestManageUDF(TestWithDatabase):
 
         def on_notification(new_udf):
             """Notification arrived."""
+
             def check_and_clean(_):
                 """Check and cleanup."""
                 # check
-                self.assertEqual(new_udf.volume_id,
-                                 uuid.UUID(self._state.udf.volume_id))
-                self.assertEqual(new_udf.node_id,
-                                 uuid.UUID(self._state.udf.node_id))
+                self.assertEqual(
+                    new_udf.volume_id, uuid.UUID(self._state.udf.volume_id)
+                )
+                self.assertEqual(
+                    new_udf.node_id, uuid.UUID(self._state.udf.node_id)
+                )
                 self.assertEqual(new_udf.suggested_path, "~/moño")
 
                 # cleanup
@@ -247,8 +271,9 @@ class TestManageUDF(TestWithDatabase):
             """First client login."""
             self._state.client1 = client
             d = client.dummy_authenticate("open sesame")
-            d.addCallback(lambda _: reactor.connectTCP(
-                'localhost', self.port, factory2))
+            d.addCallback(
+                lambda _: reactor.connectTCP('localhost', self.port, factory2)
+            )
             d.addCallback(lambda _: d2)  # will wait second connection
             d.addCallback(lambda _: client.create_udf("~", "moño"))
             d.addCallback(self.save_req, "udf")
@@ -264,10 +289,12 @@ class TestManageUDF(TestWithDatabase):
 
         def on_notification(deleted_udf_id):
             """Notification arrived."""
+
             def check_and_clean(_):
                 """Check and cleanup."""
-                self.assertEqual(deleted_udf_id,
-                                 uuid.UUID(self._state.udf.volume_id))
+                self.assertEqual(
+                    deleted_udf_id, uuid.UUID(self._state.udf.volume_id)
+                )
 
                 # cleanup
                 factory1.timeout.cancel()
@@ -296,36 +323,44 @@ class TestUDFsWithData(TestWithDatabase):
 
     def test_mkfile(self):
         """Create a file."""
+
         def auth(client):
             """Authenticate and test."""
             d = client.dummy_authenticate("open sesame")
             d.addCallback(lambda _: client.create_udf("~", "myudf"))
-            d.addCallback(lambda r: client.make_file(r.volume_id,
-                                                     r.node_id, "test_file"))
+            d.addCallback(
+                lambda r: client.make_file(r.volume_id, r.node_id, "test_file")
+            )
             d.addCallbacks(client.test_done, client.test_fail)
+
         return self.callback_test(auth)
 
     def test_mkdir(self):
         """Create a dir."""
+
         def auth(client):
             """Authenticate and test."""
             d = client.dummy_authenticate("open sesame")
             d.addCallback(lambda _: client.create_udf("~", "myudf"))
-            d.addCallback(lambda r: client.make_dir(r.volume_id,
-                                                    r.node_id, "test_dir"))
+            d.addCallback(
+                lambda r: client.make_dir(r.volume_id, r.node_id, "test_dir")
+            )
             d.addCallbacks(client.test_done, client.test_fail)
+
         return self.callback_test(auth)
 
     def test_unlink_udf_root(self):
         """Test unlinking the UDFs root."""
+
         def auth(client):
             """Authenticate and test."""
             d = client.dummy_authenticate("open sesame")
 
             def check(failure):
                 """Checks the error returned."""
-                self.assertIsInstance(failure.value,
-                                      request.StorageRequestError)
+                self.assertIsInstance(
+                    failure.value, request.StorageRequestError
+                )
                 self.assertEqual(str(failure.value), 'NO_PERMISSION')
                 client.test_done(True)
 
@@ -337,20 +372,25 @@ class TestUDFsWithData(TestWithDatabase):
 
     def test_unlink_normal_node(self):
         """Unlink a file inside the UDF."""
+
         def auth(client):
             """Authenticate and test."""
             d = client.dummy_authenticate("open sesame")
             d.addCallback(lambda _: client.create_udf("~", "myudf"))
             d.addCallback(self.save_req, "udf")
-            d.addCallback(lambda r: client.make_file(r.volume_id,
-                                                     r.node_id, "test_file"))
-            d.addCallback(lambda r: client.unlink(self._state.udf.volume_id,
-                                                  r.new_id))
+            d.addCallback(
+                lambda r: client.make_file(r.volume_id, r.node_id, "test_file")
+            )
+            d.addCallback(
+                lambda r: client.unlink(self._state.udf.volume_id, r.new_id)
+            )
             d.addCallbacks(client.test_done, client.test_fail)
+
         return self.callback_test(auth)
 
     def test_move_inside(self):
         """Move a file on inside the UDF."""
+
         def auth(client):
             """Authenticate and test."""
             d = client.dummy_authenticate("open sesame")
@@ -360,23 +400,34 @@ class TestUDFsWithData(TestWithDatabase):
             d.addCallback(self.save_req, "udf")
 
             # create a file in the udf, and also a subdir
-            d.addCallback(lambda r: client.make_dir(r.volume_id,
-                                                    r.node_id, "subdir"))
+            d.addCallback(
+                lambda r: client.make_dir(r.volume_id, r.node_id, "subdir")
+            )
             d.addCallback(self.save_req, "subdir")
-            d.addCallback(lambda _: client.make_file(self._state.udf.volume_id,
-                                                     self._state.udf.node_id,
-                                                     "test_file"))
+            d.addCallback(
+                lambda _: client.make_file(
+                    self._state.udf.volume_id,
+                    self._state.udf.node_id,
+                    "test_file",
+                )
+            )
 
             # move the file from the udf's root to the subdir
-            d.addCallback(lambda r: client.move(self._state.udf.volume_id,
-                                                r.new_id,
-                                                self._state.subdir.new_id,
-                                                "newname"))
+            d.addCallback(
+                lambda r: client.move(
+                    self._state.udf.volume_id,
+                    r.new_id,
+                    self._state.subdir.new_id,
+                    "newname",
+                )
+            )
             d.addCallbacks(client.test_done, client.test_fail)
+
         return self.callback_test(auth)
 
     def test_move_outside(self):
         """Make sure we cant move across roots."""
+
         def auth(client):
             """Authenticate and test."""
             d = client.dummy_authenticate("open sesame")
@@ -386,26 +437,36 @@ class TestUDFsWithData(TestWithDatabase):
             d.addCallback(self.save_req, "udf")
 
             # create a file in the udf
-            d.addCallback(lambda _: client.make_file(self._state.udf.volume_id,
-                                                     self._state.udf.node_id,
-                                                     "test_file"))
+            d.addCallback(
+                lambda _: client.make_file(
+                    self._state.udf.volume_id,
+                    self._state.udf.node_id,
+                    "test_file",
+                )
+            )
             d.addCallback(self.save_req, "newfile")
 
             # get the real root and move the file from the udf to it
             d.addCallback(lambda _: client.get_root())
-            d.addCallback(lambda root: client.move(self._state.udf.volume_id,
-                                                   self._state.newfile.new_id,
-                                                   root,
-                                                   "test_file"))
+            d.addCallback(
+                lambda root: client.move(
+                    self._state.udf.volume_id,
+                    self._state.newfile.new_id,
+                    root,
+                    "test_file",
+                )
+            )
 
             def check(failure):
                 """Checks the error returned."""
-                self.assertIsInstance(failure.value,
-                                      request.StorageRequestError)
+                self.assertIsInstance(
+                    failure.value, request.StorageRequestError
+                )
                 self.assertEqual(str(failure.value), 'DOES_NOT_EXIST')
                 client.test_done(True)
 
             d.addCallbacks(client.test_fail, check)
+
         return self.callback_test(auth)
 
     @defer.inlineCallbacks
@@ -417,14 +478,17 @@ class TestUDFsWithData(TestWithDatabase):
         udf = yield client.create_udf("~", "myudf")
         # create a file with content
         mkfile_req = yield client.make_file(
-            udf.volume_id, udf.node_id, "test_file")
+            udf.volume_id, udf.node_id, "test_file"
+        )
         params = get_put_content_params(
-            data, share=udf.volume_id, node=mkfile_req.new_id)
+            data, share=udf.volume_id, node=mkfile_req.new_id
+        )
         yield client.put_content(**params)
 
         # get the content
         content = yield client.get_content(
-            params['share'], params['node'], params['new_hash'])
+            params['share'], params['node'], params['new_hash']
+        )
         self.assertEqual(zlib.decompress(content.data), data)
 
     @defer.inlineCallbacks
@@ -436,14 +500,17 @@ class TestUDFsWithData(TestWithDatabase):
         udf = yield client.create_udf("~", "myudf")
         # create a file with content
         mkfile_req = yield client.make_file(
-            udf.volume_id, udf.node_id, "test_file")
+            udf.volume_id, udf.node_id, "test_file"
+        )
         params = get_put_content_params(
-            data, share=udf.volume_id, node=mkfile_req.new_id)
+            data, share=udf.volume_id, node=mkfile_req.new_id
+        )
         yield client.put_content(**params)
 
         # get the content
         content = yield client.get_content(
-            params['share'], params['node'], params['new_hash'])
+            params['share'], params['node'], params['new_hash']
+        )
         self.assertEqual(zlib.decompress(content.data), data)
 
     def test_notify_multi_clients(self):

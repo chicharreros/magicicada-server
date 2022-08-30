@@ -26,4 +26,5 @@ def get_lib_dir():
     """Build the main lib directory path"""
     return os.path.join(os.path.dirname(__file__), os.pardir, 'lib')
 
+
 sys.path.insert(0, get_lib_dir())

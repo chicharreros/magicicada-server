@@ -63,9 +63,16 @@ class TransactionLog(models.Model):
     OP_UDF_CREATED = 'udf_created'
     OP_UDF_DELETED = 'udf_deleted'
     OPERATIONS = [
-        OP_USER_CREATED, OP_DELETE, OP_MOVE, OP_PUT_CONTENT,
-        OP_SHARE_ACCEPTED, OP_SHARE_DELETED, OP_PUBLIC_ACCESS_CHANGED,
-        OP_UDF_CREATED, OP_UDF_DELETED]
+        OP_USER_CREATED,
+        OP_DELETE,
+        OP_MOVE,
+        OP_PUT_CONTENT,
+        OP_SHARE_ACCEPTED,
+        OP_SHARE_DELETED,
+        OP_PUBLIC_ACCESS_CHANGED,
+        OP_UDF_CREATED,
+        OP_UDF_DELETED,
+    ]
 
     # Most operations we care about are on nodes, but this can be None for
     # things like OP_USER_CREATED.
@@ -76,7 +83,8 @@ class TransactionLog(models.Model):
     # of the newly created user if it's a OP_USER_CREATED.
     owner_id = models.BigIntegerField()
     op_type = models.CharField(
-        max_length=256, choices=[(i, i) for i in OPERATIONS])
+        max_length=256, choices=[(i, i) for i in OPERATIONS]
+    )
     path = models.TextField(null=True)
     generation = models.BigIntegerField(null=True)
     timestamp = models.DateTimeField(default=now)
@@ -87,7 +95,10 @@ class TransactionLog(models.Model):
 
     def __unicode__(self):
         return 'TransactionLog: owner_id %r volume_id %r op_type %r' % (
-            self.owner_id, self.volume_id, self.op_type)
+            self.owner_id,
+            self.volume_id,
+            self.op_type,
+        )
 
     @property
     def extra_data_dict(self):
@@ -108,15 +119,20 @@ class TransactionLog(models.Model):
             # If this becomes a problem it can be done as a single INSERT, but
             # we'd need to duplicate the get_absolute_url() in plpython.
             for directory in udf.storageobject_set.filter(
-                    kind=StorageObject.DIRECTORY, status=STATUS_LIVE,
-                    public_uuid__isnull=False):
+                kind=StorageObject.DIRECTORY,
+                status=STATUS_LIVE,
+                public_uuid__isnull=False,
+            ):
                 cls.record_public_access_change(directory)
                 rows += 1
 
         nodes = StorageObject.objects.exclude(
-            kind=StorageObject.DIRECTORY).filter(
-                status=STATUS_LIVE, volume__status=STATUS_LIVE,
-                volume__owner__id=user.id)
+            kind=StorageObject.DIRECTORY
+        ).filter(
+            status=STATUS_LIVE,
+            volume__status=STATUS_LIVE,
+            volume__owner__id=user.id,
+        )
         for node in nodes:
             cls.record_put_content(node)
             rows += 1
@@ -124,7 +140,8 @@ class TransactionLog(models.Model):
         # Cannot create TransactionLogs for Shares in a single INSERT like
         # above because TransactionLogs and Shares live in separate databases.
         shares = Share.objects.filter(
-            shared_by=user, status=STATUS_LIVE, accepted=True)
+            shared_by=user, status=STATUS_LIVE, accepted=True
+        )
         for share in shares:
             cls.record_share_accepted(share)
             rows += 1
@@ -137,9 +154,14 @@ class TransactionLog(models.Model):
         when_created = get_epoch_secs(udf.when_created)
         extra_data = json.dumps(dict(when_created=when_created))
         txlog = cls.objects.create(
-            node_id=None, owner_id=udf.owner.id, volume_id=udf.id,
-            op_type=cls.OP_UDF_CREATED, path=udf.path,
-            generation=udf.generation, extra_data=extra_data)
+            node_id=None,
+            owner_id=udf.owner.id,
+            volume_id=udf.id,
+            op_type=cls.OP_UDF_CREATED,
+            path=udf.path,
+            generation=udf.generation,
+            extra_data=extra_data,
+        )
         return txlog
 
     @classmethod
@@ -156,12 +178,19 @@ class TransactionLog(models.Model):
         the generation of its children are not, so we use the UserVolume's
         generation in all TransactionLogs created.
         """
-        logs = [cls(
-            node_id=None, owner_id=udf.owner.id, volume_id=udf.id,
-            op_type=cls.OP_UDF_DELETED, path=udf.path,
-            generation=udf.generation)]
+        logs = [
+            cls(
+                node_id=None,
+                owner_id=udf.owner.id,
+                volume_id=udf.id,
+                op_type=cls.OP_UDF_DELETED,
+                path=udf.path,
+                generation=udf.generation,
+            )
+        ]
         logs += cls._record_unlink_tree(
-            udf.root_node, udf.generation, save=False)
+            udf.root_node, udf.generation, save=False
+        )
         cls.objects.bulk_create(logs)
         return len(logs)
 
@@ -177,12 +206,21 @@ class TransactionLog(models.Model):
         no node_id, volume_id, generation or path. And its owner_id will be
         the ID of the newly created user.
         """
-        extra_data = json.dumps(dict(
-            name=user.username, first_name=user.first_name,
-            last_name=user.last_name))
+        extra_data = json.dumps(
+            dict(
+                name=user.username,
+                first_name=user.first_name,
+                last_name=user.last_name,
+            )
+        )
         txlog = cls.objects.create(
-            node_id=None, owner_id=user.id, volume_id=None, path=None,
-            op_type=cls.OP_USER_CREATED, extra_data=extra_data)
+            node_id=None,
+            owner_id=user.id,
+            volume_id=None,
+            path=None,
+            op_type=cls.OP_USER_CREATED,
+            extra_data=extra_data,
+        )
         return txlog
 
     @classmethod
@@ -199,10 +237,15 @@ class TransactionLog(models.Model):
         """
         extra_data = cls.extra_data_new_node(node)
         txlog = cls.objects.create(
-            node_id=node.id, owner_id=node.volume.owner.id,
-            volume_id=node.volume.id, op_type=cls.OP_PUBLIC_ACCESS_CHANGED,
-            path=node.full_path, mimetype=node.mimetype or None,
-            generation=node.generation, extra_data=json.dumps(extra_data))
+            node_id=node.id,
+            owner_id=node.volume.owner.id,
+            volume_id=node.volume.id,
+            op_type=cls.OP_PUBLIC_ACCESS_CHANGED,
+            path=node.full_path,
+            mimetype=node.mimetype or None,
+            generation=node.generation,
+            extra_data=json.dumps(extra_data),
+        )
         return txlog
 
     @classmethod
@@ -214,10 +257,15 @@ class TransactionLog(models.Model):
         """
         extra_data = cls.extra_data_new_node(node)
         txlog = cls.objects.create(
-            node_id=node.id, owner_id=node.volume.owner.id,
-            volume_id=node.volume.id, op_type=cls.OP_PUT_CONTENT,
-            path=node.full_path, mimetype=node.mimetype or None,
-            generation=node.generation, extra_data=json.dumps(extra_data))
+            node_id=node.id,
+            owner_id=node.volume.owner.id,
+            volume_id=node.volume.id,
+            op_type=cls.OP_PUT_CONTENT,
+            path=node.full_path,
+            mimetype=node.mimetype or None,
+            generation=node.generation,
+            extra_data=json.dumps(extra_data),
+        )
         return txlog
 
     @classmethod
@@ -244,12 +292,17 @@ class TransactionLog(models.Model):
             public_uuid = str(public_uuid)
         when_created = get_epoch_secs(node.when_created)
         last_modified = get_epoch_secs(node.when_last_modified)
-        d = dict(public_uuid=public_uuid, when_created=when_created,
-                 last_modified=last_modified, kind=node.kind,
-                 volume_path=node.volume.path)
+        d = dict(
+            public_uuid=public_uuid,
+            when_created=when_created,
+            last_modified=last_modified,
+            kind=node.kind,
+            volume_path=node.volume.path,
+        )
         if node.kind == StorageObject.FILE:
             d['content_hash'] = (
-                node.content_blob.hash if node.content_blob else None)
+                node.content_blob.hash if node.content_blob else None
+            )
             d['size'] = getattr(node.content_blob, 'size', None)
             storage_key = getattr(node.content_blob, 'storage_key', None)
             d['storage_key'] = str(storage_key) if storage_key else None
@@ -279,15 +332,23 @@ class TransactionLog(models.Model):
         when_last_changed = share.when_last_changed
         shared_to = share.shared_to.id if share.shared_to else share.email
         extra_data = dict(
-            shared_to=shared_to, share_id=str(share.id),
-            share_name=share.name, access_level=share.access,
+            shared_to=shared_to,
+            share_id=str(share.id),
+            share_name=share.name,
+            access_level=share.access,
             when_shared=get_epoch_secs(share.when_shared),
-            when_last_changed=get_epoch_secs(when_last_changed))
+            when_last_changed=get_epoch_secs(when_last_changed),
+        )
         txlog = cls.objects.create(
-            node_id=node.id, owner_id=node.volume.owner.id,
-            volume_id=node.volume.id, op_type=op_type, path=node.full_path,
-            mimetype=node.mimetype or None, generation=None,
-            extra_data=json.dumps(extra_data))
+            node_id=node.id,
+            owner_id=node.volume.owner.id,
+            volume_id=node.volume.id,
+            op_type=op_type,
+            path=node.full_path,
+            mimetype=node.mimetype or None,
+            generation=None,
+            extra_data=json.dumps(extra_data),
+        )
         return txlog
 
     @classmethod
@@ -307,13 +368,19 @@ class TransactionLog(models.Model):
             TransactionLog.
         @return: The newly created TransactionLog or None.
         """
-        extra_data = json.dumps({
-            'kind': node.kind, 'volume_path': node.volume.path})
+        extra_data = json.dumps(
+            {'kind': node.kind, 'volume_path': node.volume.path}
+        )
         txlog = cls(
-            node_id=node.id, owner_id=node.volume.owner.id,
-            volume_id=node.volume.id, op_type=cls.OP_DELETE,
-            path=node.full_path, mimetype=node.mimetype or None,
-            generation=generation, extra_data=extra_data)
+            node_id=node.id,
+            owner_id=node.volume.owner.id,
+            volume_id=node.volume.id,
+            op_type=cls.OP_DELETE,
+            path=node.full_path,
+            mimetype=node.mimetype or None,
+            generation=generation,
+            extra_data=extra_data,
+        )
         if save:
             txlog.save()
         return txlog
@@ -322,12 +389,14 @@ class TransactionLog(models.Model):
     def record_unlink_tree(cls, directory, descendants):
         """See _record_unlink_tree."""
         logs = cls._record_unlink_tree(
-            directory, directory.generation, descendants)
+            directory, directory.generation, descendants
+        )
         return len(logs)
 
     @classmethod
     def _record_unlink_tree(
-            cls, directory, generation, descendants=None, save=True):
+        cls, directory, generation, descendants=None, save=True
+    ):
         """Create TransactionLog entries representing an unlink_tree operation.
 
         We create one TransactionLog entry for the given directory and each of
@@ -340,12 +409,14 @@ class TransactionLog(models.Model):
             created by this method.
         @return: The number of created TransactionLog entries.
         """
-        assert directory.kind == StorageObject.DIRECTORY, (
-            "The given node is not a directory.")
+        assert (
+            directory.kind == StorageObject.DIRECTORY
+        ), "The given node is not a directory."
         logs = [cls._record_unlink(directory, generation, save=False)]
         if descendants is None:
             descendants = directory.descendants.select_related(
-                'volume', 'volume__owner',
+                'volume',
+                'volume__owner',
             )
         # We use this code to explode UDF operations and in those cases we
         # will delete the root of a UDF, so we add this extra clause to
@@ -358,12 +429,20 @@ class TransactionLog(models.Model):
         # requires a DB patch.
         for node in descendants:
             extra_data = json.dumps(
-                {'kind': node.kind, 'volume_path': node.volume.path})
-            logs.append(cls(
-                node_id=node.id, owner_id=node.volume.owner.id,
-                volume_id=node.volume.id, op_type=cls.OP_DELETE,
-                path=node.full_path, generation=node.generation,
-                mimetype=node.mimetype or None, extra_data=extra_data))
+                {'kind': node.kind, 'volume_path': node.volume.path}
+            )
+            logs.append(
+                cls(
+                    node_id=node.id,
+                    owner_id=node.volume.owner.id,
+                    volume_id=node.volume.id,
+                    op_type=cls.OP_DELETE,
+                    path=node.full_path,
+                    generation=node.generation,
+                    mimetype=node.mimetype or None,
+                    extra_data=extra_data,
+                )
+            )
 
         if save:
             cls.objects.bulk_create(logs)
@@ -380,7 +459,8 @@ class TransactionLog(models.Model):
         """
         if node.parent == old_parent and node.name == old_name:
             raise ValueError(
-                "The old name and parent are the same as the current ones.")
+                "The old name and parent are the same as the current ones."
+            )
 
         old_parent_path = os.path.join(old_parent.full_path, old_name)
         new_parent_path = node.full_path
@@ -388,12 +468,19 @@ class TransactionLog(models.Model):
         # First, create a TransactionLog for the actual file/directory
         # being moved.
         extra_data = cls.extra_data_new_node(node)
-        logs = [cls(
-            node_id=node.id, owner_id=node.volume.owner.id,
-            volume_id=node.volume.id, op_type=cls.OP_MOVE,
-            path=new_parent_path, old_path=old_parent_path,
-            mimetype=node.mimetype or None, generation=node.generation,
-            extra_data=json.dumps(extra_data))]
+        logs = [
+            cls(
+                node_id=node.id,
+                owner_id=node.volume.owner.id,
+                volume_id=node.volume.id,
+                op_type=cls.OP_MOVE,
+                path=new_parent_path,
+                old_path=old_parent_path,
+                mimetype=node.mimetype or None,
+                generation=node.generation,
+                extra_data=json.dumps(extra_data),
+            )
+        ]
 
         if node.is_dir:
             # Now we generate a TransactionLog for every interesting
@@ -409,12 +496,19 @@ class TransactionLog(models.Model):
                 old_path = n.full_path
                 new_path = old_path.replace(old_parent_path, new_parent_path)
                 extra_data = cls.extra_data_new_node(n)
-                logs.append(cls(
-                    node_id=n.id, owner_id=n.volume.owner.id,
-                    volume_id=n.volume.id, op_type=cls.OP_MOVE,
-                    path=new_path, generation=node.generation,
-                    mimetype=n.mimetype or None,
-                    extra_data=json.dumps(extra_data), old_path=old_path))
+                logs.append(
+                    cls(
+                        node_id=n.id,
+                        owner_id=n.volume.owner.id,
+                        volume_id=n.volume.id,
+                        op_type=cls.OP_MOVE,
+                        path=new_path,
+                        generation=node.generation,
+                        mimetype=n.mimetype or None,
+                        extra_data=json.dumps(extra_data),
+                        old_path=old_path,
+                    )
+                )
 
         cls.objects.bulk_create(logs)
 
@@ -422,18 +516,26 @@ class TransactionLog(models.Model):
 
     def as_dict(self):
         result = dict(
-            txn_id=self.id, node_id=self.node_id, volume_id=self.volume_id,
-            owner_id=self.owner_id, op_type=self.op_type, path=self.path,
-            generation=self.generation, timestamp=self.timestamp,
-            mimetype=self.mimetype, old_path=self.old_path,
-            extra_data=self.extra_data)
+            txn_id=self.id,
+            node_id=self.node_id,
+            volume_id=self.volume_id,
+            owner_id=self.owner_id,
+            op_type=self.op_type,
+            path=self.path,
+            generation=self.generation,
+            timestamp=self.timestamp,
+            mimetype=self.mimetype,
+            old_path=self.old_path,
+            extra_data=self.extra_data,
+        )
         return result
 
 
 class DBWorkerLastRow(models.Model):
 
     txlog = models.ForeignKey(
-        TransactionLog, null=True, on_delete=models.CASCADE)
+        TransactionLog, null=True, on_delete=models.CASCADE
+    )
     worker_id = models.TextField()
 
 
@@ -451,7 +553,8 @@ def storage_object_content_changed(sender, instance, content_added, **kwargs):
 
 @receiver(node_moved, sender=StorageObject)
 def storage_object_node_moved(
-        sender, instance, old_name, old_parent, descendants, **kwargs):
+    sender, instance, old_name, old_parent, descendants, **kwargs
+):
     TransactionLog.record_move(instance, old_name, old_parent, descendants)
 
 

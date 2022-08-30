@@ -85,16 +85,18 @@ config_spec = {
 }
 
 workers = {}
-services = {
-    "development": {
-        "services": {}
-    }
-}
+services = {"development": {"services": {}}}
 
 if __name__ == '__main__':
     hostname = socket.gethostname()
     config_content = generate_server_config(
-        hostname, services, config_spec, TEMPLATES, None,
-        with_heartbeat=False, with_header=False)
+        hostname,
+        services,
+        config_spec,
+        TEMPLATES,
+        None,
+        with_heartbeat=False,
+        with_header=False,
+    )
     with open(os.path.join(TMP_DIR, 'services-supervisor.conf'), 'w') as f:
         f.write(config_content)

@@ -30,7 +30,6 @@ User = get_user_model()
 
 
 class Command(BaseCommand):
-
     def create(self, username, password, email, firstname, lastname, **kwargs):
         """Create a user."""
         try:
@@ -42,14 +41,25 @@ class Command(BaseCommand):
 
         # let's create it
         services.make_storage_user(
-            username, max_storage_bytes=2 ** 50, password=password,
-            email=email, first_name=firstname, last_name=lastname)
+            username,
+            max_storage_bytes=2**50,
+            password=password,
+            email=email,
+            first_name=firstname,
+            last_name=lastname,
+        )
 
         self.stdout.write('Success: User created ok')
 
     def update(
-            self, username, email=None, password=None, firstname=None,
-            lastname=None, **kwargs):
+        self,
+        username,
+        email=None,
+        password=None,
+        firstname=None,
+        lastname=None,
+        **kwargs
+    ):
         """Change information for a user."""
         try:
             user = User.objects.get(username=username)
@@ -98,7 +108,8 @@ class Command(BaseCommand):
         subparsers = parser.add_subparsers(help='User Management operations')
 
         p_create = subparsers.add_parser(
-            'create', help='Create a user.', cmd=self)
+            'create', help='Create a user.', cmd=self
+        )
         p_create.set_defaults(func=self.create)
         p_create.add_argument('username', type=str)
         p_create.add_argument('firstname', type=str)
@@ -107,7 +118,8 @@ class Command(BaseCommand):
         p_create.add_argument('password', type=str)
 
         p_update = subparsers.add_parser(
-            'update', help='Change information for a user.', cmd=self)
+            'update', help='Change information for a user.', cmd=self
+        )
         p_update.add_argument('username')
         p_update.set_defaults(func=self.update)
         p_update.add_argument('--email', type=str)
@@ -116,12 +128,14 @@ class Command(BaseCommand):
         p_update.add_argument('--password', type=str)
 
         p_delete = subparsers.add_parser(
-            'delete', help='Remove a user from the system.', cmd=self)
+            'delete', help='Remove a user from the system.', cmd=self
+        )
         p_delete.set_defaults(func=self.delete)
         p_delete.add_argument('username', type=str)
 
         p_show = subparsers.add_parser(
-            'show', help='Show information about an user.', cmd=self)
+            'show', help='Show information about an user.', cmd=self
+        )
         p_show.set_defaults(func=self.show)
         p_show.add_argument('username', type=str)
 

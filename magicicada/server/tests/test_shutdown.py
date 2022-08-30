@@ -42,6 +42,7 @@ class TestClient(StorageClient):
 
 class TestClientFactory(StorageClientFactory):
     """A test oriented protocol factory."""
+
     protocol = TestClient
 
 
@@ -54,13 +55,14 @@ class TestShutdown(TwistedTestCase, BaseTestCase):
         # make sure we start with clean state
         yield super(TestShutdown, self).setUp()
         # since storageusers are not automatically created, we need to create
-        self.usr0 = make_storage_user("dummy", 2 ** 20)
+        self.usr0 = make_storage_user("dummy", 2**20)
 
     @defer.inlineCallbacks
     def create_service(self):
         # create a server
         service = StorageServerService(
-            0, auth_provider_class=DummyAuthProvider, heartbeat_interval=0)
+            0, auth_provider_class=DummyAuthProvider, heartbeat_interval=0
+        )
         yield service.startService()
         self.addCleanup(service.stopService)
 
@@ -96,8 +98,15 @@ class TestShutdown(TwistedTestCase, BaseTestCase):
         empty_hash = get_hash(b'')
         # lose the connection if something wrong
         try:
-            yield client.put_content(request.ROOT, mkfile_req.new_id,
-                                     empty_hash, "fake_hash", 1234, 1000, None)
+            yield client.put_content(
+                request.ROOT,
+                mkfile_req.new_id,
+                empty_hash,
+                "fake_hash",
+                1234,
+                1000,
+                None,
+            )
         except Exception:
             client.transport.loseConnection()
 

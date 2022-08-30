@@ -45,15 +45,17 @@ from magicicada.testing.testcase import BaseTestCase
 
 class MockUser(object):
     """Fake user for testing."""
+
     id = 0
     visible_name = "Bob Smith"
     used_storage_bytes = 10
-    free_bytes = 2 ** 8
-    max_storage_bytes = 2 ** 10
+    free_bytes = 2**8
+    max_storage_bytes = 2**10
 
 
 class MockVolume(object):
     """Fake Volume for testing."""
+
     generation = 1
     id = uuid.uuid4()
     is_root = False
@@ -63,6 +65,7 @@ class MockVolume(object):
 
 class MockNode(object):
     """Fake Node for testing."""
+
     id = uuid.uuid4()
     nodekey = 'nodekey'
     kind = StorageObject.FILE
@@ -85,7 +88,9 @@ class MockNode(object):
 
     class _content(object):
         """Fake content within a Node."""
+
         size = 12000
+
     content = _content()
 
     def has_children(self):
@@ -94,6 +99,7 @@ class MockNode(object):
 
 class ResourceMapperTestCase(unittest.TestCase):
     """Test the resource mapper."""
+
     def setUp(self):
         super(ResourceMapperTestCase, self).setUp()
         self.mapper = ResourceMapper()
@@ -123,9 +129,9 @@ class ResourceMapperTestCase(unittest.TestCase):
         self.assertEqual(info['max_bytes'], user.max_storage_bytes)
         self.assertEqual(
             info['root_node_path'],
-            self.mapper.node(settings.ROOT_USERVOLUME_PATH))
-        self.assertEqual(
-            info['user_node_paths'], [self.mapper.node(udf.path)])
+            self.mapper.node(settings.ROOT_USERVOLUME_PATH),
+        )
+        self.assertEqual(info['user_node_paths'], [self.mapper.node(udf.path)])
 
     def test_volume_repr(self):
         """Test Rest conversion of a volume."""
@@ -137,21 +143,24 @@ class ResourceMapperTestCase(unittest.TestCase):
         self.assertEqual(info['generation'], udf.generation)
         self.assertEqual(info['node_path'], self.mapper.node(udf.path))
         self.assertEqual(
-            info['when_created'], date_formatter(udf.when_created))
+            info['when_created'], date_formatter(udf.when_created)
+        )
 
     def test_volume_with_delta_repr0(self):
         """Test Rest conversion of a vol with delta information, no nodes."""
         udf = MockVolume()
         nodes = []
         info = self.mapper.volume_repr(
-            volume=udf, from_generation=0, nodes=nodes)
+            volume=udf, from_generation=0, nodes=nodes
+        )
         self.assertEqual(info['resource_path'], '/volumes/~/Documents')
         self.assertEqual(info['type'], 'root' if udf.is_root else 'udf')
         self.assertEqual(info['path'], udf.path)
         self.assertEqual(info['generation'], udf.generation)
         self.assertEqual(info['node_path'], self.mapper.node(udf.path))
         self.assertEqual(
-            info['when_created'], date_formatter(udf.when_created))
+            info['when_created'], date_formatter(udf.when_created)
+        )
         self.assertEqual(info['delta']['from_generation'], 0)
         self.assertEqual(info['delta']['nodes'], nodes)
 
@@ -161,11 +170,13 @@ class ResourceMapperTestCase(unittest.TestCase):
         udf = MockVolume()
         nodes = [MockNode(), MockNode()]
         info = self.mapper.volume_repr(
-            volume=udf, from_generation=0, nodes=nodes)
+            volume=udf, from_generation=0, nodes=nodes
+        )
         self.assertEqual(info['delta']['from_generation'], 0)
         self.assertEqual(
             info['delta']['nodes'],
-            [self.mapper.node_repr(node) for node in nodes])
+            [self.mapper.node_repr(node) for node in nodes],
+        )
 
     def test_file_node_repr(self):
         """Test Rest conversion of a file node."""
@@ -175,21 +186,24 @@ class ResourceMapperTestCase(unittest.TestCase):
         self.assertEqual(info['kind'], f1.kind.lower())
         self.assertEqual(info['path'], f1.full_path)
         self.assertEqual(info['hash'], f1.content_hash)
+        self.assertEqual(info['when_created'], date_formatter(f1.when_created))
         self.assertEqual(
-            info['when_created'], date_formatter(f1.when_created))
-        self.assertEqual(
-            info['when_changed'], date_formatter(f1.when_last_modified))
+            info['when_changed'], date_formatter(f1.when_last_modified)
+        )
         self.assertEqual(info['generation'], f1.generation)
         self.assertEqual(info['generation_created'], f1.generation_created)
         self.assertEqual(info['public_url'], f1.public_url)
         self.assertEqual(info['is_public'], f1.is_public)
         self.assertEqual(
-            info['parent_path'], "/%s/a/b/c/d" % settings.ROOT_USERVOLUME_PATH)
+            info['parent_path'], "/%s/a/b/c/d" % settings.ROOT_USERVOLUME_PATH
+        )
         self.assertEqual(
-            info['volume_path'], "/volumes/%s" % settings.ROOT_USERVOLUME_PATH)
+            info['volume_path'], "/volumes/%s" % settings.ROOT_USERVOLUME_PATH
+        )
         self.assertEqual(
             info['content_path'],
-            '/content/%s/a/b/c/d/file.txt' % settings.ROOT_USERVOLUME_PATH)
+            '/content/%s/a/b/c/d/file.txt' % settings.ROOT_USERVOLUME_PATH,
+        )
         # make sure file specific rules apply
         self.assertTrue('has_children' not in info)
         self.assertEqual(info['is_live'], True)
@@ -202,20 +216,22 @@ class ResourceMapperTestCase(unittest.TestCase):
         self.assertEqual(info['key'], f1.nodekey)
         self.assertEqual(info['kind'], f1.kind.lower())
         self.assertEqual(info['path'], f1.full_path)
+        self.assertEqual(info['when_created'], date_formatter(f1.when_created))
         self.assertEqual(
-            info['when_created'], date_formatter(f1.when_created))
-        self.assertEqual(
-            info['when_changed'], date_formatter(f1.when_last_modified))
+            info['when_changed'], date_formatter(f1.when_last_modified)
+        )
         self.assertEqual(info['generation'], f1.generation)
         self.assertEqual(info['generation_created'], f1.generation_created)
         self.assertEqual(
-            info['parent_path'],
-            "/%s/a/b/c/d" % settings.ROOT_USERVOLUME_PATH)
+            info['parent_path'], "/%s/a/b/c/d" % settings.ROOT_USERVOLUME_PATH
+        )
         self.assertEqual(
-            info['volume_path'], "/volumes/%s" % settings.ROOT_USERVOLUME_PATH)
+            info['volume_path'], "/volumes/%s" % settings.ROOT_USERVOLUME_PATH
+        )
         self.assertEqual(
             info['content_path'],
-            '/content/%s/a/b/c/d/file.txt' % settings.ROOT_USERVOLUME_PATH)
+            '/content/%s/a/b/c/d/file.txt' % settings.ROOT_USERVOLUME_PATH,
+        )
         # make sure directory specific rules apply
         self.assertTrue('hash' not in info)
         self.assertTrue('is_public' not in info)
@@ -236,15 +252,17 @@ class ResourceMapperTestCase(unittest.TestCase):
         self.assertEqual(info['path'], f1.full_path)
         self.assertEqual(info['when_created'], date_formatter(f1.when_created))
         self.assertEqual(
-            info['when_changed'], date_formatter(f1.when_last_modified))
+            info['when_changed'], date_formatter(f1.when_last_modified)
+        )
         self.assertEqual(info['generation'], f1.generation)
         self.assertEqual(info['generation_created'], f1.generation_created)
         self.assertEqual(info['parent_path'], None)
         self.assertEqual(
-            info['volume_path'], "/volumes/%s" % settings.ROOT_USERVOLUME_PATH)
+            info['volume_path'], "/volumes/%s" % settings.ROOT_USERVOLUME_PATH
+        )
         self.assertEqual(
-            info['content_path'],
-            '/content/%s' % settings.ROOT_USERVOLUME_PATH)
+            info['content_path'], '/content/%s' % settings.ROOT_USERVOLUME_PATH
+        )
         # make sure directory specific rules apply
         self.assertTrue('hash' not in info)
         self.assertTrue('is_public' not in info)
@@ -259,8 +277,10 @@ class RestHelperTestCase(BaseTestCase):
     def setUp(self):
         super(RestHelperTestCase, self).setUp()
         self.user = make_storage_user(
-            username="bob", visible_name="bobby boo",
-            max_storage_bytes=2 * (2 ** 30))
+            username="bob",
+            visible_name="bobby boo",
+            max_storage_bytes=2 * (2**30),
+        )
         self.mapper = ResourceMapper()
         self.handler = self.add_memento_handler(logger, level=logging.INFO)
         self.helper = RestHelper(self.mapper)
@@ -282,8 +302,7 @@ class RestHelperTestCase(BaseTestCase):
         """Test get_volume."""
         volume_path = "~/Documents"
         udf = self.user.make_udf(volume_path)
-        info = self.helper.get_volume(user=self.user,
-                                      volume_path=volume_path)
+        info = self.helper.get_volume(user=self.user, volume_path=volume_path)
         self.assertEqual(info, self.mapper.volume_repr(udf))
         ids = [repr(self.user.id), repr(volume_path)]
         self.handler.assert_info("get_udf_by_path", *ids)
@@ -293,12 +312,12 @@ class RestHelperTestCase(BaseTestCase):
         volume_path = "~/Documents"
         udf = self.user.make_udf(volume_path)
         info = self.helper.get_volume(
-            user=self.user,
-            volume_path=volume_path,
-            from_generation=0)
+            user=self.user, volume_path=volume_path, from_generation=0
+        )
         self.assertEqual(
             info,
-            self.mapper.volume_repr(volume=udf, from_generation=0, nodes=[]))
+            self.mapper.volume_repr(volume=udf, from_generation=0, nodes=[]),
+        )
         ids = [repr(self.user.id), repr(volume_path)]
         self.handler.assert_info("get_udf_by_path", *ids)
         ids = [repr(x) for x in [self.user.id, udf.id, 0]]
@@ -311,17 +330,19 @@ class RestHelperTestCase(BaseTestCase):
         node0 = self.user.make_file_by_path("~/Documents/file0.txt")
         node1 = self.user.make_file_by_path("~/Documents/file1.txt")
         info = self.helper.get_volume(
-            user=self.user,
-            volume_path=volume_path,
-            from_generation=0)
+            user=self.user, volume_path=volume_path, from_generation=0
+        )
         udf = self.user.get_udf_by_path('~/Documents')
-        self.assertEqual(info, self.mapper.volume_repr(
-            volume=udf, from_generation=0, nodes=[node0, node1]))
+        self.assertEqual(
+            info,
+            self.mapper.volume_repr(
+                volume=udf, from_generation=0, nodes=[node0, node1]
+            ),
+        )
         node0.delete()
         info = self.helper.get_volume(
-            user=self.user,
-            volume_path=volume_path,
-            from_generation=0)
+            user=self.user, volume_path=volume_path, from_generation=0
+        )
         self.assertEqual(info['delta']['nodes'][1]['is_live'], False)
 
     def test_PUT_volume(self):
@@ -369,8 +390,7 @@ class RestHelperTestCase(BaseTestCase):
         """Test delete_volume."""
         udf = self.user.make_udf("~/Documents")
         self.helper.delete_volume(self.user, udf.path)
-        self.assertRaises(errors.DoesNotExist,
-                          self.user.get_udf, udf.id)
+        self.assertRaises(errors.DoesNotExist, self.user.get_udf, udf.id)
         ids = [repr(x) for x in [self.user.id, udf.path]]
         self.handler.assert_info("get_udf_by_path", *ids)
         ids = [repr(x) for x in [self.user.id, udf.id]]
@@ -390,7 +410,8 @@ class RestHelperTestCase(BaseTestCase):
         d1 = root.make_subdirectory("Documents")
         f1 = d1.make_file("file.txt")
         full_path = settings.ROOT_USERVOLUME_PATH + os.path.join(
-            d1.full_path, f1.name)
+            d1.full_path, f1.name
+        )
         info = self.helper.get_node(self.user, full_path)
         self.assertEqual(info['key'], f1.nodekey)
         self.assertEqual(info['path'], f1.full_path)
@@ -421,8 +442,9 @@ class RestHelperTestCase(BaseTestCase):
         f1 = root.make_file("file.txt")
         full_path = settings.ROOT_USERVOLUME_PATH + f1.full_path
         self.helper.delete_node(self.user, full_path)
-        self.assertRaises(errors.DoesNotExist,
-                          self.user.volume().get_node, f1.id)
+        self.assertRaises(
+            errors.DoesNotExist, self.user.volume().get_node, f1.id
+        )
         ids = [repr(x) for x in [self.user.id, full_path]]
         self.handler.assert_info("get_node_by_path", *ids)
         ids = [repr(x) for x in [self.user.id, f1.id, True]]
@@ -437,7 +459,8 @@ class RestHelperTestCase(BaseTestCase):
         expected = self.mapper.node_repr(root)
         expected['children'] = [self.mapper.node_repr(n) for n in files]
         info = self.helper.get_node(
-            self.user, full_path, include_children=True)
+            self.user, full_path, include_children=True
+        )
         self.assertEqual(info, expected)
         ids = [repr(x) for x in [self.user.id, full_path, True]]
         self.handler.assert_info("get_node", *ids)
@@ -448,8 +471,12 @@ class RestHelperTestCase(BaseTestCase):
         """Test get_node_children."""
         self.user.volume().root.make_file("file.txt")
         self.assertRaises(
-            FileNodeHasNoChildren, self.helper.get_node, self.user,
-            settings.ROOT_USERVOLUME_PATH + "/file.txt", include_children=True)
+            FileNodeHasNoChildren,
+            self.helper.get_node,
+            self.user,
+            settings.ROOT_USERVOLUME_PATH + "/file.txt",
+            include_children=True,
+        )
 
     def test_PUT_node_is_public(self):
         """Test put node to make existing file public."""
@@ -476,7 +503,8 @@ class RestHelperTestCase(BaseTestCase):
         self.assertEqual(node.is_public, False)
         self.assertEqual(info, self.mapper.node_repr(node))
         self.helper.metrics.make_all_assertions(
-            self, 'resthelper.put_node.change_public')
+            self, 'resthelper.put_node.change_public'
+        )
         self.helper.metrics = original_metrics
 
     def test_GET_public_files(self):
@@ -489,8 +517,7 @@ class RestHelperTestCase(BaseTestCase):
         node_rep['is_public'] = True
         info = self.helper.put_node(self.user, new_file_path, node_rep)
         self.assertEqual(self.helper.get_public_files(self.user), [info])
-        self.handler.assert_info(
-            "get_public_files", repr(self.user.id))
+        self.handler.assert_info("get_public_files", repr(self.user.id))
 
     def test_PUT_node_is_public_directory(self):
         """Test put node to make existing file public."""
@@ -499,8 +526,13 @@ class RestHelperTestCase(BaseTestCase):
         self.assertEqual(node.is_public, False)
         node_rep = self.mapper.node_repr(node)
         node_rep['is_public'] = True
-        self.assertRaises(CannotPublishDirectory,
-                          self.helper.put_node, self.user, dir_path, node_rep)
+        self.assertRaises(
+            CannotPublishDirectory,
+            self.helper.put_node,
+            self.user,
+            dir_path,
+            node_rep,
+        )
 
     def test_PUT_node_path(self):
         """Test put node with a new path."""
@@ -541,13 +573,15 @@ class RestHelperTestCase(BaseTestCase):
         new_file_path = settings.ROOT_USERVOLUME_PATH + "/a/b/c/file.txt"
         node = self.user.make_file_by_path(new_file_path)
         self.assertEqual(node.is_public, False)
-        info = self.helper.put_node(self.user, new_file_path,
-                                    {'is_public': True})
+        info = self.helper.put_node(
+            self.user, new_file_path, {'is_public': True}
+        )
         node.load()
         self.assertEqual(node.is_public, True)
         self.assertEqual(info, self.mapper.node_repr(node))
-        info = self.helper.put_node(self.user, new_file_path,
-                                    {'is_public': False})
+        info = self.helper.put_node(
+            self.user, new_file_path, {'is_public': False}
+        )
         node.load()
         self.assertEqual(node.is_public, False)
         self.assertEqual(info, self.mapper.node_repr(node))
@@ -556,8 +590,9 @@ class RestHelperTestCase(BaseTestCase):
         """Test put node with a new path with partial info."""
         new_file_path = settings.ROOT_USERVOLUME_PATH + "/a/b/c/file.txt"
         node = self.user.make_file_by_path(new_file_path)
-        info = self.helper.put_node(self.user, new_file_path,
-                                    {'path': "/a/newfile.txt"})
+        info = self.helper.put_node(
+            self.user, new_file_path, {'path': "/a/newfile.txt"}
+        )
         node.load()
         self.assertEqual(node.full_path, "/a/newfile.txt")
         self.assertEqual(info, self.mapper.node_repr(node))
@@ -567,8 +602,10 @@ class RestHelperTestCase(BaseTestCase):
         new_file_path = settings.ROOT_USERVOLUME_PATH + "/a/b/c/file.txt"
         node = self.user.make_file_by_path(new_file_path)
         info = self.helper.put_node(
-            self.user, new_file_path,
-            {'path': "/a/newfile.txt", 'is_public': True})
+            self.user,
+            new_file_path,
+            {'path': "/a/newfile.txt", 'is_public': True},
+        )
         node.load()
         self.assertEqual(node.full_path, "/a/newfile.txt")
         self.assertEqual(info, self.mapper.node_repr(node))
@@ -578,8 +615,9 @@ class RestHelperTestCase(BaseTestCase):
         new_file_path = settings.ROOT_USERVOLUME_PATH + "/a/b/c/file.txt"
         node = self.user.make_file_by_path(new_file_path)
         node_repr = self.mapper.node_repr(node)
-        info = self.helper.put_node(self.user, new_file_path,
-                                    dict(a=2, b='hi', c='ignored'))
+        info = self.helper.put_node(
+            self.user, new_file_path, dict(a=2, b='hi', c='ignored')
+        )
         node.load()
         # here nothing is changed and the info returned
         # matches the existing node_repr
@@ -589,11 +627,14 @@ class RestHelperTestCase(BaseTestCase):
     def test_PUT_node_new_file_magic(self):
         """Test put_node to make a new file with content."""
         cb = self.factory.make_content_blob(
-            content="FakeContent", magic_hash='magic')
+            content="FakeContent", magic_hash='magic'
+        )
         new_file_path = settings.ROOT_USERVOLUME_PATH + "/a/b/c/file.txt"
         info = self.helper.put_node(
-            self.user, new_file_path,
-            {'kind': 'file', 'hash': cb.hash, 'magic_hash': 'magic'})
+            self.user,
+            new_file_path,
+            {'kind': 'file', 'hash': cb.hash, 'magic_hash': 'magic'},
+        )
         node = self.user.get_node_by_path(new_file_path, with_content=True)
         self.assertEqual(node.kind, StorageObject.FILE)
         self.assertEqual(node.full_path, '/a/b/c/file.txt')
@@ -602,16 +643,22 @@ class RestHelperTestCase(BaseTestCase):
     def test_PUT_node_update_file_magic(self):
         """Test put_node to make a new file with content."""
         cb = self.factory.make_content_blob(
-            content="FakeContent", magic_hash='magic')
+            content="FakeContent", magic_hash='magic'
+        )
         new_file_path = settings.ROOT_USERVOLUME_PATH + "/a/b/c/file.txt"
         info = self.helper.put_node(
-            self.user, new_file_path,
-            {'kind': 'file', 'hash': cb.hash, 'magic_hash': 'magic'})
+            self.user,
+            new_file_path,
+            {'kind': 'file', 'hash': cb.hash, 'magic_hash': 'magic'},
+        )
         cb = self.factory.make_content_blob(
-            content="NewFakeContent", magic_hash='magic2')
+            content="NewFakeContent", magic_hash='magic2'
+        )
         info = self.helper.put_node(
-            self.user, new_file_path,
-            {'kind': 'file', 'hash': cb.hash, 'magic_hash': 'magic2'})
+            self.user,
+            new_file_path,
+            {'kind': 'file', 'hash': cb.hash, 'magic_hash': 'magic2'},
+        )
         node = self.user.get_node_by_path(new_file_path, with_content=True)
         self.assertEqual(node.kind, StorageObject.FILE)
         self.assertEqual(node.full_path, '/a/b/c/file.txt')
@@ -621,8 +668,7 @@ class RestHelperTestCase(BaseTestCase):
     def test_PUT_node_new_file(self):
         """Test put_node to make a new file."""
         new_file_path = settings.ROOT_USERVOLUME_PATH + "/a/b/c/file.txt"
-        info = self.helper.put_node(self.user, new_file_path,
-                                    {'kind': 'file'})
+        info = self.helper.put_node(self.user, new_file_path, {'kind': 'file'})
         node = self.user.get_node_by_path(new_file_path)
         self.assertEqual(node.kind, StorageObject.FILE)
         self.assertEqual(node.full_path, '/a/b/c/file.txt')
@@ -631,8 +677,9 @@ class RestHelperTestCase(BaseTestCase):
     def test_PUT_node_new_directory(self):
         """Test put_node to make a new directory."""
         new_file_path = settings.ROOT_USERVOLUME_PATH + "/a/b/c/file.txt"
-        info = self.helper.put_node(self.user, new_file_path,
-                                    {'kind': 'directory'})
+        info = self.helper.put_node(
+            self.user, new_file_path, {'kind': 'directory'}
+        )
         node = self.user.get_node_by_path(new_file_path)
         self.assertEqual(node.kind, StorageObject.DIRECTORY)
         self.assertEqual(node.full_path, '/a/b/c/file.txt')
@@ -641,13 +688,25 @@ class RestHelperTestCase(BaseTestCase):
     def test_PUT_node_exceptions(self):
         """Test put_node exceptions."""
         self.assertRaises(
-            InvalidKind, self.helper.put_node, self.user,
-            settings.ROOT_USERVOLUME_PATH + "/x", {"kind": "ABC"})
+            InvalidKind,
+            self.helper.put_node,
+            self.user,
+            settings.ROOT_USERVOLUME_PATH + "/x",
+            {"kind": "ABC"},
+        )
         # PUT to a non existent node.
-        self.assertRaises(errors.DoesNotExist,
-                          self.helper.put_node,
-                          self.user, "~/Ubuntu/x", {})
+        self.assertRaises(
+            errors.DoesNotExist,
+            self.helper.put_node,
+            self.user,
+            "~/Ubuntu/x",
+            {},
+        )
         # PUT to a non existent node.
-        self.assertRaises(errors.DoesNotExist,
-                          self.helper.put_node,
-                          self.user, settings.ROOT_USERVOLUME_PATH + "/x", {})
+        self.assertRaises(
+            errors.DoesNotExist,
+            self.helper.put_node,
+            self.user,
+            settings.ROOT_USERVOLUME_PATH + "/x",
+            {},
+        )

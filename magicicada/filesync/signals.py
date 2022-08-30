@@ -19,20 +19,25 @@ import django.dispatch
 
 
 content_changed = django.dispatch.Signal(
-    providing_args=['instance', 'content_added', 'new_size', 'enforce_quota'])
+    providing_args=['instance', 'content_added', 'new_size', 'enforce_quota']
+)
 
 node_moved = django.dispatch.Signal(
-    providing_args=['instance', 'old_name', 'old_parent', 'descendants'])
+    providing_args=['instance', 'old_name', 'old_parent', 'descendants']
+)
 
 pre_kill = django.dispatch.Signal(providing_args=['instance'])
 
 post_kill = django.dispatch.Signal(providing_args=['instance'])
 
 pre_unlink_tree = django.dispatch.Signal(
-    providing_args=['instance', 'descendants'])
+    providing_args=['instance', 'descendants']
+)
 
 post_unlink_tree = django.dispatch.Signal(
-    providing_args=['instance', 'descendants'])
+    providing_args=['instance', 'descendants']
+)
 
 public_access_changed = django.dispatch.Signal(
-    providing_args=['instance', 'public'])
+    providing_args=['instance', 'public']
+)

@@ -57,8 +57,9 @@ class HeartbeatWriter(basic.LineOnlyReceiver):
         self.logger = logger
         self.reactor = reactor
         self.interval = interval
-        self.logger.info("Initialized HeartbeatWriter with: interval=%s",
-                         self.interval)
+        self.logger.info(
+            "Initialized HeartbeatWriter with: interval=%s", self.interval
+        )
         self.loop = task.LoopingCall(self.send)
         self.loop.clock = self.reactor
 
@@ -67,8 +68,9 @@ class HeartbeatWriter(basic.LineOnlyReceiver):
         if not self.transport:
             self.logger.warning("Can't send heartbeat without a transport.")
         else:
-            send_heartbeat(self.transport, time=self.reactor.seconds,
-                           flush=False)
+            send_heartbeat(
+                self.transport, time=self.reactor.seconds, flush=False
+            )
 
     def connectionMade(self):
         """We are connected, just send a heartbeat."""

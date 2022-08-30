@@ -36,6 +36,7 @@ from magicicada.server.testing import testcase
 
 class UploadTestCase(testcase.BaseProtocolTestCase):
     """Base test case for upload stuff."""
+
     auth_provider_class = DummyAuthProvider
 
     @defer.inlineCallbacks
@@ -50,6 +51,7 @@ class UploadTestCase(testcase.BaseProtocolTestCase):
         def slowScheduler(x):
             """A slower scheduler for our cooperator."""
             return reactor.callLater(0.1, x)
+
         self._cooperator = task.Cooperator(scheduler=slowScheduler)
 
     @defer.inlineCallbacks
@@ -71,9 +73,11 @@ class ProxyHashingProducerTest(UploadTestCase):
         consumer = ds.put("somenode")
         producer = upload.ProxyHashingProducer(consumer, True)
 
-        chunk_sz = 10
-        for part in range(0, len(message), chunk_sz):
-            yield producer.dataReceived(message[part:part + chunk_sz])
+        chunk_size = 10
+        for part in range(0, len(message), chunk_size):
+            yield producer.dataReceived(
+                message[part : part + chunk_size]  # noqa: E203
+            )
         producer.stopProducing()
         yield producer.flush_decompressor()
         consumer.commit()
@@ -82,12 +86,15 @@ class ProxyHashingProducerTest(UploadTestCase):
             self.assertEqual(fh.read(), message)
         hasher = content_hash_factory()
         hasher.update(data)
-        self.assertEqual(producer.hash_object.content_hash(),
-                         hasher.content_hash())
+        self.assertEqual(
+            producer.hash_object.content_hash(), hasher.content_hash()
+        )
         magic_hasher = magic_hash_factory()
         magic_hasher.update(data)
-        self.assertEqual(producer.magic_hash_object.content_hash()._magic_hash,
-                         magic_hasher.content_hash()._magic_hash)
+        self.assertEqual(
+            producer.magic_hash_object.content_hash()._magic_hash,
+            magic_hasher.content_hash()._magic_hash,
+        )
         self.assertEqual(producer.inflated_size, len(data))
         self.assertEqual(producer.crc32, crc32(data))
 
@@ -101,9 +108,11 @@ class ProxyHashingProducerTest(UploadTestCase):
         producer = upload.ProxyHashingProducer(consumer, False)
 
         # add chunks, but see that nothing is really being calculated
-        chunk_sz = 10
-        for part in range(0, len(message), chunk_sz):
-            yield producer.dataReceived(message[part:part + chunk_sz])
+        chunk_size = 10
+        for part in range(0, len(message), chunk_size):
+            yield producer.dataReceived(
+                message[part : part + chunk_size]  # noqa: E203
+            )
             self.assertEqual(producer.deflated_size, 0)
             self.assertEqual(producer.inflated_size, 0)
             self.assertEqual(producer.crc32, 0)
@@ -116,12 +125,15 @@ class ProxyHashingProducerTest(UploadTestCase):
             self.assertEqual(fh.read(), message)
         hasher = content_hash_factory()
         hasher.update(data)
-        self.assertEqual(producer.hash_object.content_hash(),
-                         hasher.content_hash())
+        self.assertEqual(
+            producer.hash_object.content_hash(), hasher.content_hash()
+        )
         magic_hasher = magic_hash_factory()
         magic_hasher.update(data)
-        self.assertEqual(producer.magic_hash_object.content_hash()._magic_hash,
-                         magic_hasher.content_hash()._magic_hash)
+        self.assertEqual(
+            producer.magic_hash_object.content_hash()._magic_hash,
+            magic_hasher.content_hash()._magic_hash,
+        )
         self.assertEqual(producer.inflated_size, len(data))
         self.assertEqual(producer.crc32, crc32(data))
 

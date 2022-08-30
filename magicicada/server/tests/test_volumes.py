@@ -32,6 +32,7 @@ class TestListVolumes(TestWithDatabase):
 
     def test_root_only(self):
         """Users have one volume by default: root."""
+
         @defer.inlineCallbacks
         def auth(client):
             """Authenticate and test."""
@@ -44,10 +45,12 @@ class TestListVolumes(TestWithDatabase):
             self.assertEqual(str(root.node_id), root_node_id)
             self.assertEqual(root.generation, 0)
             self.assertEqual(root.free_bytes, self.usr0.free_bytes)
+
         return self.callback_test(auth, add_default_callbacks=True)
 
     def test_root_only_with_generation(self):
         """Test that the Root volume gets it generation."""
+
         @defer.inlineCallbacks
         def auth(client):
             """Authenticate and test."""
@@ -62,6 +65,7 @@ class TestListVolumes(TestWithDatabase):
             self.assertEqual(str(root.node_id), root_node_id)
             self.assertEqual(root.generation, 1)
             self.assertEqual(root.free_bytes, self.usr0.free_bytes)
+
         return self.callback_test(auth, add_default_callbacks=True)
 
     def test_one_share_offered(self):
@@ -81,12 +85,16 @@ class TestListVolumes(TestWithDatabase):
             d.addCallback(lambda r: client.get_root())
             d.addCallback(self.save_req, "root")
 
-            d.addCallback(lambda r: client.create_share(r, self.usr1.username,
-                                                        "n1", Share.VIEW))
+            d.addCallback(
+                lambda r: client.create_share(
+                    r, self.usr1.username, "n1", Share.VIEW
+                )
+            )
 
             d.addCallback(lambda _: client.list_volumes())
             d.addCallback(check)
             d.addCallbacks(client.test_done, client.test_fail)
+
         return self.callback_test(auth)
 
     def _create_share(self, _, accept=False, dead=False, from_id=None):
@@ -130,10 +138,12 @@ class TestListVolumes(TestWithDatabase):
             d.addCallback(lambda _: client.list_volumes())
             d.addCallback(check)
             d.addCallbacks(client.test_done, client.test_fail)
+
         return self.callback_test(auth)
 
     def test_share_to_me_accepted(self):
         """A share offered to me should be in the volumes list if accepted."""
+
         @defer.inlineCallbacks
         def auth(client):
             """Authenticate and run the test."""
@@ -168,6 +178,7 @@ class TestListVolumes(TestWithDatabase):
 
     def test_share_to_me_accepted_with_generation(self):
         """A share offered to me should be in the volumes list if accepted."""
+
         @defer.inlineCallbacks
         def auth(client):
             """Authenticate and run the test."""
@@ -205,6 +216,7 @@ class TestListVolumes(TestWithDatabase):
 
     def test_udf(self):
         """An UDF should be in the volume list."""
+
         @defer.inlineCallbacks
         def auth(client):
             """Authenticate and test."""
@@ -261,6 +273,7 @@ class TestListVolumes(TestWithDatabase):
             d.addCallback(lambda _: client.list_volumes())
             d.addCallback(check)
             d.addCallbacks(client.test_done, client.test_fail)
+
         return self.callback_test(auth)
 
     def test_udf_dead(self):
@@ -288,6 +301,7 @@ class TestListVolumes(TestWithDatabase):
             d.addCallback(lambda _: client.list_volumes())
             d.addCallback(check)
             d.addCallbacks(client.test_done, client.test_fail)
+
         return self.callback_test(auth)
 
     def test_mixed(self):
@@ -350,47 +364,61 @@ class TestDataWithVolumes(TestWithDatabase):
 
     def test_same_names(self):
         """Be able to have same names in different roots."""
+
         def auth(client):
             """Authenticate and test."""
             d = client.dummy_authenticate("open sesame")
             d.addCallback(lambda _: client.get_root())
 
             # create a subdir in root
-            d.addCallback(lambda root: client.make_dir(request.ROOT,
-                                                       root, "subdir"))
+            d.addCallback(
+                lambda root: client.make_dir(request.ROOT, root, "subdir")
+            )
 
             # create the udf, with a dir of same name
             d.addCallback(lambda _: client.create_udf("~", "myudf"))
-            d.addCallback(lambda r: client.make_dir(r.volume_id,
-                                                    r.node_id, "subdir"))
+            d.addCallback(
+                lambda r: client.make_dir(r.volume_id, r.node_id, "subdir")
+            )
 
             d.addCallbacks(client.test_done, client.test_fail)
+
         return self.callback_test(auth)
 
     def test_unlink_same_path(self):
         """Unlink with similar paths, should work ok."""
+
         def auth(client):
             """Authenticate and test."""
             d = client.dummy_authenticate("open sesame")
             d.addCallback(lambda _: client.get_root())
 
             # create a subdir in root
-            d.addCallback(lambda root: client.make_dir(request.ROOT,
-                                                       root, "tdir1"))
+            d.addCallback(
+                lambda root: client.make_dir(request.ROOT, root, "tdir1")
+            )
             d.addCallback(self.save_req, "dir_del")
 
             # create the udf, with two subdirs
             d.addCallback(lambda _: client.create_udf("~", "myudf"))
             d.addCallback(self.save_req, "udf")
-            d.addCallback(lambda r: client.make_dir(r.volume_id,
-                                                    r.node_id, "tdir1"))
-            d.addCallback(lambda r: client.make_dir(self._state.udf.volume_id,
-                                                    r.new_id, "tdir2"))
+            d.addCallback(
+                lambda r: client.make_dir(r.volume_id, r.node_id, "tdir1")
+            )
+            d.addCallback(
+                lambda r: client.make_dir(
+                    self._state.udf.volume_id, r.new_id, "tdir2"
+                )
+            )
 
             # delete one dir in one volume
-            d.addCallback(lambda _: client.unlink(request.ROOT,
-                                                  self._state.dir_del.new_id))
+            d.addCallback(
+                lambda _: client.unlink(
+                    request.ROOT, self._state.dir_del.new_id
+                )
+            )
             d.addCallbacks(client.test_done, client.test_fail)
+
         return self.callback_test(auth)
 
 
@@ -399,6 +427,7 @@ class TestVolumesBasic(TestWithDatabase):
 
     def test_delete_root(self):
         """Test deletion of root volume."""
+
         def auth(client):
             """Authenticate and test."""
             d = client.dummy_authenticate("open sesame")
@@ -406,15 +435,19 @@ class TestVolumesBasic(TestWithDatabase):
 
             def check(failure):
                 """Checks the error returned."""
-                self.assertIsInstance(failure.value,
-                                      request.StorageRequestError)
+                self.assertIsInstance(
+                    failure.value, request.StorageRequestError
+                )
                 self.assertEqual(str(failure.value), 'NO_PERMISSION')
                 client.test_done(True)
+
             d.addCallbacks(client.test_fail, check)
+
         return self.callback_test(auth)
 
     def test_delete_bad_volume_id(self):
         """Test deletion of bad volume id."""
+
         def auth(client):
             """Authenticate and test."""
             d = client.dummy_authenticate("open sesame")
@@ -422,9 +455,12 @@ class TestVolumesBasic(TestWithDatabase):
 
             def check(failure):
                 """Checks the error returned."""
-                self.assertIsInstance(failure.value,
-                                      request.StorageRequestError)
+                self.assertIsInstance(
+                    failure.value, request.StorageRequestError
+                )
                 self.assertEqual(str(failure.value), 'DOES_NOT_EXIST')
                 client.test_done(True)
+
             d.addCallbacks(client.test_fail, check)
+
         return self.callback_test(auth)

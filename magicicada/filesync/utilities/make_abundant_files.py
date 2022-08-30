@@ -53,6 +53,7 @@ def main(username, sharer, wlist, num):
 
     if sys.stdout.isatty():
         import curses
+
         curses.setupterm()
         cols = curses.tigetnum('cols') - 1
         progbar = makeStatBar(cols, cols - 2)
@@ -61,10 +62,14 @@ def main(username, sharer, wlist, num):
         def progress(ll):
             """progress bar writer."""
             sys.stdout.write(
-                home + progbar((cols - 2) * (num - len(ll)) / num))
+                home + progbar((cols - 2) * (num - len(ll)) / num)
+            )
             sys.stdout.flush()
+
     else:
-        def progress(ll): return
+
+        def progress(ll):
+            return
 
     # UDF
     udf = user.make_udf('~/abundant-files')
@@ -124,7 +129,8 @@ def main(username, sharer, wlist, num):
         progress(sample)
         name = sample.pop()
         random.choice(folders).make_file_with_content(
-            name, fake_hash, 12345, 100, 10000, uuid.uuid4(), 'image/tiff')
+            name, fake_hash, 12345, 100, 10000, uuid.uuid4(), 'image/tiff'
+        )
 
     if sys.stdout.isatty():
         sys.stdout.write(home + curses.tigetstr('el'))
@@ -132,12 +138,19 @@ def main(username, sharer, wlist, num):
 
 if __name__ == '__main__':
     from optparse import OptionParser
+
     parser = OptionParser("%prog [options] username")
     parser.add_option("-w", "--wordlist", default="/usr/share/dict/words")
-    parser.add_option("-n", "--number", help="number of words to use",
-                      type="int", default=1000)
-    parser.add_option("-s", "--sharer", help="username with which to share",
-                      default="chico")
+    parser.add_option(
+        "-n",
+        "--number",
+        help="number of words to use",
+        type="int",
+        default=1000,
+    )
+    parser.add_option(
+        "-s", "--sharer", help="username with which to share", default="chico"
+    )
     (options, args) = parser.parse_args()
     if len(args) != 1:
         parser.error('missing username')

@@ -73,7 +73,8 @@ def get_magic_hash(data):
 
 
 def get_put_content_params(
-        data=None, deflated_data=None, share=request.ROOT, **overrides):
+    data=None, deflated_data=None, share=request.ROOT, **overrides
+):
     """Return the test data for put_content."""
     if data is None:
         data = os.urandom(1000)  # not terribly compressible
@@ -81,8 +82,9 @@ def get_put_content_params(
 
     if deflated_data is None:
         deflated_data = zlib.compress(data)
-    assert isinstance(deflated_data, bytes), (
-        'deflated_data should be bytes, got %s' % type(deflated_data))
+    assert isinstance(
+        deflated_data, bytes
+    ), 'deflated_data should be bytes, got %s' % type(deflated_data)
 
     params = overrides.copy()
     params.setdefault('share', share)
@@ -130,18 +132,23 @@ class BaseProtocolTestCase(TwistedTestCase):
         yield super(BaseProtocolTestCase, self).setUp()
         logger.info("starting test %s", self.id())
         self.ssl_cert = crypto.load_certificate(
-            crypto.FILETYPE_PEM, server_crt)
+            crypto.FILETYPE_PEM, server_crt
+        )
         if server_crt_chain:
             self.ssl_cert_chain = crypto.load_certificate(
-                crypto.FILETYPE_PEM, server_crt_chain)
+                crypto.FILETYPE_PEM, server_crt_chain
+            )
         else:
             self.ssl_cert_chain = None
         self.ssl_key = crypto.load_privatekey(crypto.FILETYPE_PEM, server_key)
 
         self._state = State()
         self.service = StorageServerService(
-            0, auth_provider_class=self.auth_provider_class, status_port=0,
-            heartbeat_interval=self.heartbeat_interval)
+            0,
+            auth_provider_class=self.auth_provider_class,
+            status_port=0,
+            heartbeat_interval=self.heartbeat_interval,
+        )
         yield self.service.startService()
 
     @defer.inlineCallbacks
@@ -175,17 +182,41 @@ class BaseProtocolTestCase(TwistedTestCase):
         root, _ = yield content_user.get_root()
         r = yield self.service.factory.content.rpc_dal.call(
             'make_file_with_content',
-            user_id=content_user.id, volume_id=user.root_volume_id,
-            parent_id=root, name="A new file", node_hash=EMPTY_HASH,
-            crc32=0, size=0, deflated_size=0, storage_key=None)
+            user_id=content_user.id,
+            volume_id=user.root_volume_id,
+            parent_id=root,
+            name="A new file",
+            node_hash=EMPTY_HASH,
+            crc32=0,
+            size=0,
+            deflated_size=0,
+            storage_key=None,
+        )
         node_id = r['node_id']
         node = yield content_user.get_node(user.root_volume_id, node_id, None)
-        args = (content_user, user.root_volume_id, node_id, node.content_hash,
-                hash_value, crc32_value, size)
+        args = (
+            content_user,
+            user.root_volume_id,
+            node_id,
+            node.content_hash,
+            hash_value,
+            crc32_value,
+            size,
+        )
         upload = yield DBUploadJob.make(*args)
         upload_job = UploadJob(
-            content_user, node, node.content_hash, hash_value, crc32_value,
-            size, deflated_size, None, False, magic_hash_value, upload)
+            content_user,
+            node,
+            node.content_hash,
+            hash_value,
+            crc32_value,
+            size,
+            deflated_size,
+            None,
+            False,
+            magic_hash_value,
+            upload,
+        )
         defer.returnValue((deflated_data, hash_value, upload_job))
 
 
@@ -198,8 +229,10 @@ class ClientTestHelper(object):
         if self.factory.pending_notifications < 0:
             self.test_fail(Exception("too many notifications"))
         else:
-            if (self.factory.test_success and
-                    self.factory.pending_notifications == 0):
+            if (
+                self.factory.test_success
+                and self.factory.pending_notifications == 0
+            ):
                 self._test_done("finished after notifications")
 
     def _test_done(self, result):
@@ -215,8 +248,10 @@ class ClientTestHelper(object):
 
     def test_done(self, result=None):
         """Finish test with success. Wait for pending notifications."""
-        if (self.factory.pending_notifications == 0 and
-                not self.factory.test_failed):
+        if (
+            self.factory.pending_notifications == 0
+            and not self.factory.test_failed
+        ):
             self._test_done(result)
         self.factory.test_success = True
 
@@ -224,8 +259,10 @@ class ClientTestHelper(object):
         """End test with error."""
         if not self.factory.test_failed:
             self.factory.test_failed = True
-            if (self.factory.timeout.active() and
-                    not self.factory.timeout.cancelled):
+            if (
+                self.factory.timeout.active()
+                and not self.factory.timeout.cancelled
+            ):
                 self.factory.timeout.cancel()
             self.transport.loseConnection()
             if not self.factory.test_deferred.called:
@@ -283,8 +320,15 @@ class SimpleFactory(StorageClientFactory):
 class FactoryHelper(object):
     """A StorageClientFactory with helper methods for testing clients."""
 
-    def __init__(self, cb_func, factory=SimpleFactory(), timeout=None,
-                 wait_notifications=0, caps=None, **kwargs):
+    def __init__(
+        self,
+        cb_func,
+        factory=SimpleFactory(),
+        timeout=None,
+        wait_notifications=0,
+        caps=None,
+        **kwargs
+    ):
         """create the instance"""
         self.factory = factory
         self.cb_func = cb_func
@@ -329,7 +373,8 @@ class FactoryHelper(object):
             p.transport.loseConnection()
         if self.test_success and self.pending_notifications > 0:
             self.test_deferred.errback(
-                Exception("timeout waiting for notifications"))
+                Exception("timeout waiting for notifications")
+            )
         else:
             self.test_deferred.errback(Exception("timeout"))
 
@@ -355,27 +400,42 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
         setattr(self._state, key, value)
         return value
 
-    def callback_test(self, func, wait_notifications=0,
-                      timeout=None, caps=PREFERRED_CAP,
-                      add_default_callbacks=False, use_ssl=False, **kwargs):
+    def callback_test(
+        self,
+        func,
+        wait_notifications=0,
+        timeout=None,
+        caps=PREFERRED_CAP,
+        add_default_callbacks=False,
+        use_ssl=False,
+        **kwargs
+    ):
         """Create a client and call callback on connection."""
         if add_default_callbacks:
+
             @wraps(func)
             def wrapped(client, **kwargs):
                 """Wrapper which wires up test_done/test_fail."""
                 d = func(client, **kwargs)
                 d.addCallbacks(client.test_done, client.test_fail)
                 return d
+
         else:
             wrapped = func
-        f = FactoryHelper(wrapped, factory=self.buildFactory(),
-                          wait_notifications=wait_notifications,
-                          timeout=timeout, caps=caps, **kwargs)
+        f = FactoryHelper(
+            wrapped,
+            factory=self.buildFactory(),
+            wait_notifications=wait_notifications,
+            timeout=timeout,
+            caps=caps,
+            **kwargs
+        )
         # there are 3 ways to connect to a server.
         # tcp and ssl will work in the tests
         if use_ssl:
-            reactor.connectSSL("localhost", self.ssl_port, f,
-                               ssl.ClientContextFactory())
+            reactor.connectSSL(
+                "localhost", self.ssl_port, f, ssl.ClientContextFactory()
+            )
         else:
             reactor.connectTCP("localhost", self.port, f)
 
@@ -403,7 +463,7 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
             return Failure(AssertionError(message))
 
         def errback(failure):
-            """Things broke. Lets see if this is good."""""
+            """Things broke. Lets see if this is good.""" ""
             if not failure.check(request.StorageProtocolError):
                 return failure
             message = getattr(failure.value, 'error_message', None)
@@ -466,20 +526,34 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
 
     @defer.inlineCallbacks
     def get_client_helper(
-            self, wait_notifications=0, timeout=None, caps=PREFERRED_CAP,
-            use_ssl=False, auth_token=None, name='a-client', **kwargs):
+        self,
+        wait_notifications=0,
+        timeout=None,
+        caps=PREFERRED_CAP,
+        use_ssl=False,
+        auth_token=None,
+        name='a-client',
+        **kwargs
+    ):
         """Simplify the testing code by getting a client for the user."""
         connect_d = defer.Deferred()
         factory = FactoryHelper(
-            connect_d.callback, factory=self.buildFactory(),
+            connect_d.callback,
+            factory=self.buildFactory(),
             wait_notifications=wait_notifications,
-            timeout=timeout, caps=caps, **kwargs)
+            timeout=timeout,
+            caps=caps,
+            **kwargs
+        )
 
         def wait_test_deferred():
             logger.info(
                 'TestWithDatabase.get_client_helper: client %r waiting for '
                 'deferred %r (already called? %s)',
-                name, factory.test_deferred, factory.test_deferred.called)
+                name,
+                factory.test_deferred,
+                factory.test_deferred.called,
+            )
             return factory.test_deferred
 
         self.addCleanup(wait_test_deferred)
@@ -488,8 +562,8 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
         # tcp and ssl will work in the tests
         if use_ssl:
             connector = reactor.connectSSL(
-                "localhost", self.ssl_port, factory,
-                ssl.ClientContextFactory())
+                "localhost", self.ssl_port, factory, ssl.ClientContextFactory()
+            )
         else:
             connector = reactor.connectTCP("localhost", self.port, factory)
         # https connect requires a working proxy and a server on
@@ -512,7 +586,9 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
         else:
             logger.warning(
                 'TestWithDatabase.get_client_helper, no authentication done '
-                '(auth_token: %r)', auth_token)
+                '(auth_token: %r)',
+                auth_token,
+            )
 
         defer.returnValue(client)
 

@@ -88,7 +88,11 @@ ci-test:
 clean:
 	rm -rf tmp/* _trial_temp $(ENV)
 
-lint: $(ENV)
+black:
+	$(ENV)/bin/black .
+
+lint:
+	$(ENV)/bin/black --check .
 	$(ENV)/bin/flake8 --exclude='migrations' $(SRC_DIR)
 
 start: $(ENV) start-base start-filesync-server-group publish-api-port

@@ -71,7 +71,8 @@ class SelectForUpdateTestCase(TransactionTestCase):
             """Try to update the locked record."""
             try:
                 StorageUser.objects.select_for_update(nowait=True).get(
-                    id=user.id)
+                    id=user.id
+                )
             except OperationalError:
                 self.failed = True
             connection.close()
@@ -79,7 +80,8 @@ class SelectForUpdateTestCase(TransactionTestCase):
         thread = threading.Thread(target=try_update)
         with transaction.atomic():
             user = StorageUser.objects.select_for_update(nowait=True).get(
-                id=user.id)
+                id=user.id
+            )
             thread.start()
             thread.join()
 
@@ -96,7 +98,8 @@ class SelectForUpdateTestCase(TransactionTestCase):
             """Try to update the locked record."""
             try:
                 StorageObject.objects.select_for_update(nowait=True).get(
-                    id=root_id)
+                    id=root_id
+                )
             except OperationalError:
                 self.failed = True
             connection.close()
@@ -104,7 +107,8 @@ class SelectForUpdateTestCase(TransactionTestCase):
         thread = threading.Thread(target=try_update)
         with transaction.atomic():
             StorageObject.objects.select_for_update(nowait=True).get(
-                id=root_id)
+                id=root_id
+            )
             thread.start()
             thread.join()
 
@@ -114,7 +118,8 @@ class SelectForUpdateTestCase(TransactionTestCase):
         """Make sure lock_tree_for_update locks the object."""
         user = self.factory.make_user(username='f')
         udf = self.factory.make_user_volume(
-            owner=user, path='~/Documents/Stuff/DirToUDF')
+            owner=user, path='~/Documents/Stuff/DirToUDF'
+        )
         root = udf.root_node
         child = root.make_subdirectory("subd-1")
         childx = root.make_subdirectory("subd-11")
@@ -135,7 +140,8 @@ class SelectForUpdateTestCase(TransactionTestCase):
             """Try to update the locked record."""
             try:
                 StorageObject.objects.select_for_update(nowait=True).get(
-                    id=node_id)
+                    id=node_id
+                )
             except OperationalError:
                 self.failed = True
             else:
@@ -145,7 +151,8 @@ class SelectForUpdateTestCase(TransactionTestCase):
         def test_it(node, fail):
             """Test the nodeid update"""
             thread = threading.Thread(
-                target=try_update, kwargs={'node_id': node.id})
+                target=try_update, kwargs={'node_id': node.id}
+            )
             with transaction.atomic():
                 # Query sets are lazy, force access to DB
                 list(child.lock_tree_for_update())
@@ -172,7 +179,8 @@ class SelectForUpdateTestCase(TransactionTestCase):
         child2 = child1.make_subdirectory("subd-1")
         # create files with the same paths but on a udf (different volume_id)
         udf = self.factory.make_user_volume(
-            owner=user, path='~/Documents/Stuff/DirToUDF')
+            owner=user, path='~/Documents/Stuff/DirToUDF'
+        )
         udf_child1 = udf.root_node.make_subdirectory("subd-1")
         udf_child2 = udf_child1.make_subdirectory("subd-1")
 
@@ -183,7 +191,8 @@ class SelectForUpdateTestCase(TransactionTestCase):
             """Try to update the locked record."""
             try:
                 StorageObject.objects.select_for_update(nowait=True).get(
-                    id=node_id)
+                    id=node_id
+                )
             except OperationalError:
                 self.failed = True
             else:
@@ -193,7 +202,8 @@ class SelectForUpdateTestCase(TransactionTestCase):
         def test_it(node, fail):
             """Test the nodeid update"""
             thread = threading.Thread(
-                target=try_update, kwargs={'node_id': node.id})
+                target=try_update, kwargs={'node_id': node.id}
+            )
             with transaction.atomic():
                 # Query sets are lazy, force access to DB
                 list(root.lock_tree_for_update())
@@ -222,7 +232,8 @@ class StorageUserTestCase(BaseTestCase):
     def test_storage_user_creation(self):
         """Confirm that the StorageUser table is created and working."""
         user = self.factory.make_user(
-            max_storage_bytes=2 * (2 ** 30), used_storage_bytes=2 ** 30)
+            max_storage_bytes=2 * (2**30), used_storage_bytes=2**30
+        )
 
         real = StorageUser.objects.get(id=user.id)
         self.assertEqual(user, real)
@@ -240,7 +251,8 @@ class StorageUserTestCase(BaseTestCase):
     def test_update_used_bytes_up_enforce_quota(self):
         """Quota can be bypassed when increasing used bytes."""
         user = self.factory.make_user(
-            max_storage_bytes=10, used_storage_bytes=5)
+            max_storage_bytes=10, used_storage_bytes=5
+        )
         user.update_used_bytes(10, enforce_quota=False)
 
         real = StorageUser.objects.get(id=user.id)
@@ -249,8 +261,11 @@ class StorageUserTestCase(BaseTestCase):
         self.assertEqual(user.used_storage_bytes, 15)
 
         self.assertRaises(
-            errors.QuotaExceeded, user.update_used_bytes, 10,
-            enforce_quota=True)
+            errors.QuotaExceeded,
+            user.update_used_bytes,
+            10,
+            enforce_quota=True,
+        )
 
     def test_update_used_bytes_down(self):
         """Basic test no errors, make sure used bytes is decreased."""
@@ -279,16 +294,20 @@ class SharingTestCase(BaseTestCase):
         self.assertEqual(name, 'name')
 
         self.factory.make_share(
-            owner=self.sharer, shared_to=self.user, name='name')
+            owner=self.sharer, shared_to=self.user, name='name'
+        )
         name = Share.objects.get_unique_name(self.user, name='name')
         self.assertEqual(name, 'name~1')
 
         self.factory.make_share(
-            owner=self.sharer, shared_to=self.user, name='name~1')
+            owner=self.sharer, shared_to=self.user, name='name~1'
+        )
         self.factory.make_share(
-            owner=self.sharer, shared_to=self.user, name='name~2')
+            owner=self.sharer, shared_to=self.user, name='name~2'
+        )
         self.factory.make_share(
-            owner=self.sharer, shared_to=self.user, name='name~3')
+            owner=self.sharer, shared_to=self.user, name='name~3'
+        )
 
         name = Share.objects.get_unique_name(self.user, name='name')
         self.assertEqual(name, 'name~4')
@@ -297,8 +316,11 @@ class SharingTestCase(BaseTestCase):
         """Test claiming a share offer that was sent to an email address."""
         root = StorageObject.objects.get_root(self.sharer)
         share = self.factory.make_share(
-            subtree=root, shared_to=None, name='For friend',
-            email='fake@example.com')
+            subtree=root,
+            shared_to=None,
+            name='For friend',
+            email='fake@example.com',
+        )
         assert share.shared_by == root.volume.owner
 
         # Sammy has shared 1 folder
@@ -312,8 +334,11 @@ class SharingTestCase(BaseTestCase):
         self.assertEqual(self.user.sharedto_folders.count(), 1)
         child = root.make_subdirectory("subd-1")
         share = self.factory.make_share(
-            subtree=child, shared_to=None, name='For friend',
-            email='fake@example.com')
+            subtree=child,
+            shared_to=None,
+            name='For friend',
+            email='fake@example.com',
+        )
         share.claim_share(self.user)
         self.assertEqual(share.name, 'For friend~1')
 
@@ -328,7 +353,8 @@ class SharingTestCase(BaseTestCase):
         root = StorageObject.objects.get_root(self.sharer)
 
         self.factory.make_share(
-            subtree=root, shared_to=self.user, name='Share Name')
+            subtree=root, shared_to=self.user, name='Share Name'
+        )
         # Sammy Should show sharing stuff
         self.assertEqual(self.sharer.sharedby_folders.count(), 1)
         # Seeing shares sherry smiles
@@ -371,10 +397,8 @@ class StorageObjectTestCase(BaseTestCase):
         root_node = StorageObject.objects.get_root(user)
         self.assertRaises(errors.StorageError, root_node.make_file, '')
         self.assertRaises(errors.StorageError, root_node.make_file, None)
-        self.assertRaises(
-            errors.StorageError, root_node.make_subdirectory, '')
-        self.assertRaises(
-            errors.StorageError, root_node.make_subdirectory, '')
+        self.assertRaises(errors.StorageError, root_node.make_subdirectory, '')
+        self.assertRaises(errors.StorageError, root_node.make_subdirectory, '')
 
     def test_create_a_node_in_a_root(self):
         """Create a regular node inside a standard root."""
@@ -410,10 +434,12 @@ class StorageObjectTestCase(BaseTestCase):
         """Test the is_public flag on storage objects."""
         obj = self.factory.make_file()
         self.assertFalse(
-            obj.is_public, 'Object should not be public by default')
+            obj.is_public, 'Object should not be public by default'
+        )
         obj.make_public()
         self.assertTrue(
-            obj.is_public, 'Should be possible to make object public')
+            obj.is_public, 'Should be possible to make object public'
+        )
 
     def test_update_generation(self):
         """Test update_generation."""
@@ -442,10 +468,12 @@ class StorageObjectTestCase(BaseTestCase):
         directories."""
         user = self.factory.make_user(username='f')
         root = StorageObject.objects.get_root(user)
-        self.assertRaises(errors.InvalidFilename,
-                          root.make_subdirectory, 'Beta/Licorice')
-        self.assertRaises(errors.InvalidFilename,
-                          root.make_file, 'Beta/Licorice')
+        self.assertRaises(
+            errors.InvalidFilename, root.make_subdirectory, 'Beta/Licorice'
+        )
+        self.assertRaises(
+            errors.InvalidFilename, root.make_file, 'Beta/Licorice'
+        )
 
     def test_live_children(self):
         """Test to make sure has_children works with different deletions."""
@@ -479,7 +507,8 @@ class StorageObjectTestCase(BaseTestCase):
         f5 = subdir.make_file('file5')
         self.assertItemsEqual(list(root.live_children), [subdir])
         self.assertItemsEqual(
-            list(subdir.live_children), [other, f2, f3, f4, f5])
+            list(subdir.live_children), [other, f2, f3, f4, f5]
+        )
 
         subdir.unlink_tree()
         self.assertFalse(root.live_children.exists())
@@ -496,8 +525,7 @@ class StorageObjectTestCase(BaseTestCase):
             if i % 2 == 0:
                 filenode.unlink()
 
-        self.assertEqual(
-            root.volume.owner.used_bytes, content.size * 5)
+        self.assertEqual(root.volume.owner.used_bytes, content.size * 5)
 
     def test_storage_stats_in_UDF(self):
         """Test the storage stats for a user using an UDF."""
@@ -566,7 +594,8 @@ class StorageObjectTestCase(BaseTestCase):
         """Tests that the path for an udf doesn't have trailing slashes."""
         user = self.factory.make_user()
         udf = self.factory.make_user_volume(
-            owner=user, path='~/Documents/Stuff/DirToUDF/')
+            owner=user, path='~/Documents/Stuff/DirToUDF/'
+        )
 
         self.assertEqual(udf.path, '~/Documents/Stuff/DirToUDF')
 
@@ -627,11 +656,13 @@ class StorageObjectTestCase(BaseTestCase):
         """Test that no move is allowed between volumes."""
         root = self.factory.make_root_volume().root_node
         udf = self.factory.make_user_volume(
-            owner=root.volume.owner, path='~/Documents/Stuff/DirToUDF')
+            owner=root.volume.owner, path='~/Documents/Stuff/DirToUDF'
+        )
 
         obj = root.make_file('file2.ext')
         self.assertRaises(
-            errors.StorageError, obj.move, udf.root_node, obj.name)
+            errors.StorageError, obj.move, udf.root_node, obj.name
+        )
 
     def test_path_move_dir(self):
         """Tests that the path changes when moving the dir."""
@@ -676,7 +707,8 @@ class StorageObjectTestCase(BaseTestCase):
         folder1 = folder.make_subdirectory('folder-1')
         folder1.make_file(
             'file-1',
-            content_blob=self.factory.make_content_blob(content='foo-1'))
+            content_blob=self.factory.make_content_blob(content='foo-1'),
+        )
         # folder
         # └── folder-1
         #     └── file1.txt
@@ -698,7 +730,8 @@ class StorageObjectTestCase(BaseTestCase):
             #     └── file3.txt
             folder1.make_file(
                 'file-2',
-                content_blob=self.factory.make_content_blob(content='foo-2'))
+                content_blob=self.factory.make_content_blob(content='foo-2'),
+            )
             folder11 = folder1.make_subdirectory('folder-1-1')
             folder11.make_subdirectory('folder-1-1-1')
             folder1.make_subdirectory('folder-1-2')
@@ -708,7 +741,8 @@ class StorageObjectTestCase(BaseTestCase):
             folder3 = folder.make_subdirectory('folder-3')
             folder3.make_file(
                 'file-3',
-                content_blob=self.factory.make_content_blob(content='foo-3'))
+                content_blob=self.factory.make_content_blob(content='foo-3'),
+            )
 
         def do_move():
             new_parent = future_parents[0]
@@ -737,13 +771,19 @@ class StorageObjectTestCase(BaseTestCase):
 
         # don't move to subdir 11
         self.assertRaises(
-            errors.InvalidFilename, udf.root_node.move, subdir11,
-            udf.root_node.name)
+            errors.InvalidFilename,
+            udf.root_node.move,
+            subdir11,
+            udf.root_node.name,
+        )
 
         # don't rename
         self.assertRaises(
-            errors.NoPermission, udf.root_node.move, udf.root_node.parent,
-            'new name')
+            errors.NoPermission,
+            udf.root_node.move,
+            udf.root_node.parent,
+            'new name',
+        )
 
     def test_get_descendants(self):
         """Test the get descendants method."""
@@ -756,7 +796,8 @@ class StorageObjectTestCase(BaseTestCase):
         r_sub2 = r_sub1.make_subdirectory('sub2')
         # an udf and three dirs in it
         udf = self.factory.make_user_volume(
-            owner=user, path='~/Documents/Stuff/DirToUDF')
+            owner=user, path='~/Documents/Stuff/DirToUDF'
+        )
         u_sub1 = udf.root_node.make_subdirectory('sub1')
         u_sub2 = u_sub1.make_subdirectory('sub2')
         u_sub3 = u_sub2.make_subdirectory('sub3')
@@ -783,7 +824,8 @@ class StorageObjectTestCase(BaseTestCase):
         r_sub2.make_file('sub2_file.ext')
         # an udf and three dirs in it
         udf = self.factory.make_user_volume(
-            owner=user, path='~/Documents/Stuff/DirToUDF')
+            owner=user, path='~/Documents/Stuff/DirToUDF'
+        )
         u_sub1 = udf.root_node.make_subdirectory('sub1')
         # create a few files
         u_sub1.make_file('sub1_file.ext')
@@ -795,22 +837,28 @@ class StorageObjectTestCase(BaseTestCase):
         u_sub4.unlink()
 
         self.assertEqual(
-            root.get_descendants(kind=StorageObject.FILE).count(), 2)
+            root.get_descendants(kind=StorageObject.FILE).count(), 2
+        )
         self.assertEqual(
-            root.get_descendants(kind=StorageObject.DIRECTORY).count(), 2)
+            root.get_descendants(kind=StorageObject.DIRECTORY).count(), 2
+        )
         self.assertEqual(root.get_descendants(kind=None).count(), 4)
         self.assertEqual(
-            udf.root_node.get_descendants(kind=StorageObject.FILE).count(),
-            3)
+            udf.root_node.get_descendants(kind=StorageObject.FILE).count(), 3
+        )
         self.assertEqual(
             udf.root_node.get_descendants(
-                kind=StorageObject.DIRECTORY).count(), 3)
+                kind=StorageObject.DIRECTORY
+            ).count(),
+            3,
+        )
         self.assertEqual(udf.root_node.get_descendants(kind=None).count(), 6)
 
     def test_tree_size(self):
         """Test to make sure tree size works"""
         user = self.factory.make_user(
-            username='a_test_user', max_storage_bytes=50 * (2 ** 30))
+            username='a_test_user', max_storage_bytes=50 * (2**30)
+        )
 
         root = StorageObject.objects.get_root(user)
         subdir = root.make_subdirectory('subdir')
@@ -853,7 +901,8 @@ class StorageObjectTestCase(BaseTestCase):
 
         # an udf and three dirs in it
         udf = self.factory.make_user_volume(
-            owner=root.volume.owner, path='~/Documents/Stuff/DirToUDF')
+            owner=root.volume.owner, path='~/Documents/Stuff/DirToUDF'
+        )
         u_sub1 = udf.root_node.make_subdirectory('sub1')
         u_sub2 = u_sub1.make_subdirectory('sub2')
         u_sub3 = u_sub2.make_subdirectory('sub3')
@@ -955,8 +1004,8 @@ class StorageObjectTestCase(BaseTestCase):
         subdir.unlink_tree()
 
         gen = StorageObject.objects.filter(
-            volume__owner=root.volume.owner).aggregate(
-                max_gen=models.Max('generation'))['max_gen']
+            volume__owner=root.volume.owner
+        ).aggregate(max_gen=models.Max('generation'))['max_gen']
         self.assertEqual(subdir.volume.generation, gen)
         self.assertEqual(subdir.status, STATUS_DEAD)
         for descendant in subdir.get_descendants(live_only=False):
@@ -984,7 +1033,8 @@ class StorageObjectTestCase(BaseTestCase):
 
         # an udf and three dirs in it
         udf = self.factory.make_user_volume(
-            owner=root.volume.owner, path='~/Documents/Stuff/DirToUDF')
+            owner=root.volume.owner, path='~/Documents/Stuff/DirToUDF'
+        )
         u_sub1 = udf.root_node.make_subdirectory('sub1')
         u_sub2 = u_sub1.make_subdirectory('sub2')
         u_sub2.make_subdirectory('sub3')
@@ -1065,7 +1115,8 @@ class StorageObjectTestCase(BaseTestCase):
         file1 = p2.make_file('file.txt')
 
         for descendant in root.get_descendants(
-                live_only=False, kind=StorageObject.DIRECTORY):
+            live_only=False, kind=StorageObject.DIRECTORY
+        ):
             self.assertTrue(descendant.live_children.exists())
             self.assertEqual(descendant.status, STATUS_LIVE)
 
@@ -1079,7 +1130,8 @@ class StorageObjectTestCase(BaseTestCase):
         file1.undelete()
 
         for descendant in root.get_descendants(
-                live_only=False, kind=StorageObject.DIRECTORY):
+            live_only=False, kind=StorageObject.DIRECTORY
+        ):
             self.assertTrue(descendant.live_children.exists())
             self.assertEqual(descendant.status, STATUS_LIVE)
 
@@ -1182,11 +1234,13 @@ class StorageObjectTestCase(BaseTestCase):
 
         subdir1.move(subdir2, subdir1.name)
         self.assertEqual(
-            StorageObject.objects.get(id=obj.id).path, '/subdir2/subdir1')
+            StorageObject.objects.get(id=obj.id).path, '/subdir2/subdir1'
+        )
 
         subdir2.move(subdir2.parent, 'newdir2name')
         self.assertEqual(
-            StorageObject.objects.get(id=obj.id).path, '/newdir2name/subdir1')
+            StorageObject.objects.get(id=obj.id).path, '/newdir2name/subdir1'
+        )
 
         subdir1.move(root, subdir1.name)
         self.assertEqual(obj.path, '/subdir1')
@@ -1244,8 +1298,7 @@ class StorageObjectTestCase(BaseTestCase):
         for i in range(100):
             subdir.make_file('File%s' % i, content_blob=content)
 
-        self.assertEqual(
-            root.volume.owner.used_bytes, content.size * 100)
+        self.assertEqual(root.volume.owner.used_bytes, content.size * 100)
 
     def test_update_used_bytes_udf(self):
         """Test the tracking of storage bytes used by a user in an UDF."""
@@ -1258,8 +1311,7 @@ class StorageObjectTestCase(BaseTestCase):
         for i in range(10):
             subdir.make_file('File%s' % i, content_blob=content)
 
-        self.assertEqual(
-            udf.owner.used_bytes, content.size * 10)
+        self.assertEqual(udf.owner.used_bytes, content.size * 10)
 
     def test_recalculate_used_bytes(self):
         """Test the recalculating used bytes."""
@@ -1310,8 +1362,7 @@ class StorageObjectTestCase(BaseTestCase):
             if i % 2:
                 filenode.unlink()
 
-        self.assertEqual(
-            root.volume.owner.used_bytes, content.size * 5)
+        self.assertEqual(root.volume.owner.used_bytes, content.size * 5)
 
         filenode = subdir.make_file('Blah', content_blob=content)
         filenode.volume.owner.max_storage_bytes = 0
@@ -1352,8 +1403,7 @@ class StorageObjectTestCase(BaseTestCase):
             if i % 2:
                 filenode.move(subdir2, filenode.name)
 
-        self.assertEqual(
-            root.volume.owner.used_bytes, content.size * 10)
+        self.assertEqual(root.volume.owner.used_bytes, content.size * 10)
 
     def test_update_last_modified_on_content(self):
         """Tests that when_last_modified is updated when the content changes"""
@@ -1385,7 +1435,7 @@ class StorageObjectTestCase(BaseTestCase):
         self.assertLessEqual(subdir.when_last_modified, after_dir)
 
     def test_max_used_bytes(self):
-        """Tests that used_storage_bytes accepts the max bigint value. """
+        """Tests that used_storage_bytes accepts the max bigint value."""
         user = self.factory.make_user(username='a_test_user')
         max_bigint = 9223372036854775807  # max bigint value
         user.used_storage_bytes = max_bigint
@@ -1396,13 +1446,15 @@ class StorageObjectTestCase(BaseTestCase):
         """Tests that a directory can't be moved into itself."""
         subdir = self.factory.make_directory()
         self.assertRaises(
-            errors.NoPermission, subdir.move, subdir, subdir.name)
+            errors.NoPermission, subdir.move, subdir, subdir.name
+        )
 
     def test_move_file_into_itself(self):
         """Tests that a file can't be moved into itself."""
         a_file = self.factory.make_file()
         self.assertRaises(
-            errors.NoPermission, a_file.move, a_file, a_file.name)
+            errors.NoPermission, a_file.move, a_file, a_file.name
+        )
 
     def test_move_no_op(self):
         """Do nothing when the new parent/name are equal the existing ones.
@@ -1429,10 +1481,12 @@ class StorageObjectTestCase(BaseTestCase):
         subdir = root.make_subdirectory('subdir')
         a_file = root.make_file('a_file')
         self.assertRaises(
-            errors.NotADirectory, subdir.move, a_file, subdir.name)
+            errors.NotADirectory, subdir.move, a_file, subdir.name
+        )
         b_file = root.make_file('b_file')
         self.assertRaises(
-            errors.NotADirectory, b_file.move, a_file, b_file.name)
+            errors.NotADirectory, b_file.move, a_file, b_file.name
+        )
 
     def test_move_to_child(self):
         """Tests that a node can't be moved to a child."""
@@ -1441,11 +1495,13 @@ class StorageObjectTestCase(BaseTestCase):
         subdir = root.make_subdirectory('subdir')
         subdir2 = subdir.make_subdirectory('subdir2')
         self.assertRaises(
-            errors.NoPermission, subdir.move, subdir2, subdir.name)
+            errors.NoPermission, subdir.move, subdir2, subdir.name
+        )
         # move to a child file
         a_file = subdir2.make_file('a_file')
         self.assertRaises(
-            errors.NotADirectory, subdir.move, a_file, a_file.name)
+            errors.NotADirectory, subdir.move, a_file, a_file.name
+        )
 
     def test_move_to_child_deeper(self):
         """Tests that a node can't be moved to a child."""
@@ -1455,11 +1511,13 @@ class StorageObjectTestCase(BaseTestCase):
         subdir1 = subdir.make_subdirectory('subdir1')
         subdir2 = subdir1.make_subdirectory('subdir2')
         self.assertRaises(
-            errors.NoPermission, subdir.move, subdir2, subdir.name)
+            errors.NoPermission, subdir.move, subdir2, subdir.name
+        )
         # move to a child file
         a_file = subdir2.make_file('a_file')
         self.assertRaises(
-            errors.NotADirectory, subdir.move, a_file, a_file.name)
+            errors.NotADirectory, subdir.move, a_file, a_file.name
+        )
 
     def test_move_to_inner_dir_specific_case(self):
         """Test a specific case of moving it down."""
@@ -1497,11 +1555,11 @@ class StorageObjectTestCase(BaseTestCase):
         user = self.factory.make_user()
         root_node = StorageObject.objects.get_root(user)
         expected = UserVolume.objects.get(
-            owner=user, storageobject__name=ROOT_NAME)
+            owner=user, storageobject__name=ROOT_NAME
+        )
         self.assertEqual(root_node.volume, expected)
         node = self.factory.make_directory(parent=root_node)
-        self.assertEqual(
-            node.volume, node.parent.volume)
+        self.assertEqual(node.volume, node.parent.volume)
 
     def test_volume_id_is_correct(self):
         """volume_id is the same as the node's parent."""
@@ -1527,8 +1585,12 @@ class StorageObjectTestCase(BaseTestCase):
         """The volume should be a valid instance."""
         user = self.factory.make_user()
 
-        kwargs = dict(owner=user, name='test.txt', volume=object(),
-                      kind=StorageObject.FILE)
+        kwargs = dict(
+            owner=user,
+            name='test.txt',
+            volume=object(),
+            kind=StorageObject.FILE,
+        )
         self.assertRaises(ValueError, StorageObject.objects.create, **kwargs)
 
     def test_get_node_parent_paths(self):
@@ -1563,7 +1625,8 @@ class StorageObjectTestCase(BaseTestCase):
         self.assertNotIn(dir6.id, pids)
         # 6 parents including root_id
         self.assertItemsEqual(
-            pids, [root.id, dir1.id, dir2.id, dir3.id, dir4.id, dir5.id])
+            pids, [root.id, dir1.id, dir2.id, dir3.id, dir4.id, dir5.id]
+        )
 
     def test_get_node_parentids_only_live(self):
         """Test that get_node_parentids only return Live nodes."""
@@ -1634,7 +1697,8 @@ class StorageObjectGenerationsTestCase(BaseTestCase):
         start_gen = self.volume.generation
         # when an object is created it increments the gen.
         node = StorageObject.objects.create(
-            name='n', kind=StorageObject.FILE, parent=self.root)
+            name='n', kind=StorageObject.FILE, parent=self.root
+        )
         self.assertEqual(node.generation, start_gen + 1)
 
     def test_make_public(self):
@@ -1750,11 +1814,12 @@ class MoveFromShareTestCase(BaseTestCase):
         share_id = uuid.uuid4()
         for i in range(10):
             node = self.factory.make_file(
-                owner=u, name='TheFile%s.txt' % i, generation=i)
+                owner=u, name='TheFile%s.txt' % i, generation=i
+            )
             MoveFromShare.objects.from_move(node, share_id)
         result = ShareVolumeDelta.objects.filter(
-            models.Q(share_id__isnull=True) |
-            models.Q(share_id=share_id))
+            models.Q(share_id__isnull=True) | models.Q(share_id=share_id)
+        )
         # it is 21 because of the root node
         self.assertEqual(result.count(), 21)
 
@@ -1771,7 +1836,8 @@ class ShareTestCase(BaseTestCase):
     def test_share_invalid_name(self):
         """Attempt to create a Share with an invalid filename."""
         self.assertRaises(
-            errors.InvalidFilename, Share.objects.create, name='bob/../../../')
+            errors.InvalidFilename, Share.objects.create, name='bob/../../../'
+        )
 
     def test_create_share(self):
         """Create a Share."""
@@ -1779,7 +1845,8 @@ class ShareTestCase(BaseTestCase):
 
         # see if creation goes ok
         share = self.factory.make_share(
-            subtree=self.root, shared_to=self.user2, name='foo')
+            subtree=self.root, shared_to=self.user2, name='foo'
+        )
         self.assertEqual(share.shared_by, self.user1)
         self.assertEqual(share.subtree, self.root)
         self.assertEqual(share.shared_to, self.user2)
@@ -1788,19 +1855,21 @@ class ShareTestCase(BaseTestCase):
 
         # with other access level
         share = self.factory.make_share(
-            subtree=self.root, shared_to=user3, name='bar',
-            access=Share.MODIFY)
+            subtree=self.root, shared_to=user3, name='bar', access=Share.MODIFY
+        )
         self.assertEqual(share.access, Share.MODIFY)
 
     def test_create_share_udf(self):
         """Create a Share in an UDF."""
         user3 = self.factory.make_user(username='user2')
         root = self.factory.make_user_volume(
-            owner=self.user1, path='~/Documents/Stuff/DirToUDF').root_node
+            owner=self.user1, path='~/Documents/Stuff/DirToUDF'
+        ).root_node
 
         # see if creation goes ok
         share = self.factory.make_share(
-            subtree=root, shared_to=self.user2, name='foo')
+            subtree=root, shared_to=self.user2, name='foo'
+        )
         self.assertEqual(share.shared_by, self.user1)
         self.assertEqual(share.subtree, root)
         self.assertEqual(share.shared_to, self.user2)
@@ -1809,7 +1878,8 @@ class ShareTestCase(BaseTestCase):
 
         # with other access level
         share = self.factory.make_share(
-            subtree=root, shared_to=user3, name='bar', access=Share.MODIFY)
+            subtree=root, shared_to=user3, name='bar', access=Share.MODIFY
+        )
         self.assertEqual(share.access, Share.MODIFY)
 
     def test_create_share_same_name(self):
@@ -1817,25 +1887,34 @@ class ShareTestCase(BaseTestCase):
         node = self.root.make_subdirectory('newdir')
 
         self.factory.make_share(
-            subtree=node, shared_to=self.user2, name='foo',
-            access=Share.MODIFY)
+            subtree=node, shared_to=self.user2, name='foo', access=Share.MODIFY
+        )
         self.assertRaises(
-            IntegrityError, self.factory.make_share, subtree=node,
-            shared_to=self.user2, name='foo', access=Share.MODIFY)
+            IntegrityError,
+            self.factory.make_share,
+            subtree=node,
+            shared_to=self.user2,
+            name='foo',
+            access=Share.MODIFY,
+        )
 
     def test_create_same_share_after_delete(self):
-        """ (re)creates a share after deleting it """
+        """(re)creates a share after deleting it"""
         self.root.make_subdirectory('newdir')
 
         # create and delete the share
         for x in range(3):
             share = self.factory.make_share(
-                subtree=self.root, shared_to=self.user2, name='foo',
-                access=Share.MODIFY)
+                subtree=self.root,
+                shared_to=self.user2,
+                name='foo',
+                access=Share.MODIFY,
+            )
             share.kill()
         # now make sure we have more than one share named 'foo' marked as dead
         dead_shares = Share.objects.filter(
-            shared_to=self.user2, name=share.name, status=STATUS_DEAD)
+            shared_to=self.user2, name=share.name, status=STATUS_DEAD
+        )
         self.assertTrue(dead_shares.exists())
         self.assertEqual(dead_shares.count(), 3)
 
@@ -1845,11 +1924,17 @@ class ShareTestCase(BaseTestCase):
 
         # attempt to share same subtree as different shares should fail
         self.factory.make_share(
-            subtree=node, shared_to=self.user2, name='share1')
+            subtree=node, shared_to=self.user2, name='share1'
+        )
         # we can not create another share using same or different access
         self.assertRaises(
-            IntegrityError, self.factory.make_share, subtree=node,
-            shared_to=self.user2, name='share2', access=access)
+            IntegrityError,
+            self.factory.make_share,
+            subtree=node,
+            shared_to=self.user2,
+            name='share2',
+            access=access,
+        )
 
     def test_multiple_shares_same_subtree_access_view(self):
         """Ensure only one share per subtree."""
@@ -1863,15 +1948,22 @@ class ShareTestCase(BaseTestCase):
         """Share on delete works correctly."""
         node = self.root.make_subdirectory('newdir')
         share1 = self.factory.make_share(
-            subtree=node, shared_to=self.user2, name='share1')
+            subtree=node, shared_to=self.user2, name='share1'
+        )
         # check behavior on delete
         share1.kill()
         self.factory.make_share(
-            subtree=node, shared_to=self.user2, name='share2')
+            subtree=node, shared_to=self.user2, name='share2'
+        )
         # we can not create another share using same or different access
         self.assertRaises(
-            IntegrityError, self.factory.make_share, subtree=node,
-            shared_to=self.user2, name='share1', access=access)
+            IntegrityError,
+            self.factory.make_share,
+            subtree=node,
+            shared_to=self.user2,
+            name='share1',
+            access=access,
+        )
 
     def test_delete_share_access_view(self):
         self._test_delete_share(access=Share.VIEW)
@@ -1884,9 +1976,11 @@ class ShareTestCase(BaseTestCase):
         node = self.root.make_subdirectory('newdir')
         # test creating shares for 'self' and others
         self.factory.make_share(
-            subtree=node, shared_to=self.user1, name='share1')
+            subtree=node, shared_to=self.user1, name='share1'
+        )
         self.factory.make_share(
-            subtree=node, shared_to=self.user2, name='share2')
+            subtree=node, shared_to=self.user2, name='share2'
+        )
 
 
 class UserVolumeTestCase(BaseTestCase):
@@ -1905,7 +1999,8 @@ class UserVolumeTestCase(BaseTestCase):
         self.assertEqual(volume.root_node.name, ROOT_NAME)
         self.assertEqual(
             StorageObject.objects.get(volume=volume, parent__isnull=True),
-            volume.root_node)
+            volume.root_node,
+        )
         self.assertTrue(volume.root_node.kind, StorageObject.DIRECTORY)
 
     def test_increment_generation(self):
@@ -1920,8 +2015,11 @@ class UserVolumeTestCase(BaseTestCase):
         """Create an UDF with a wrong node."""
         user = self.factory.make_user()
         self.assertRaises(
-            errors.InvalidVolumePath, UserVolume.objects.create,
-            owner=user, path='badpath')
+            errors.InvalidVolumePath,
+            UserVolume.objects.create,
+            owner=user,
+            path='badpath',
+        )
 
     def test_delete_volume(self):
         """Delete an UDF."""
@@ -1939,10 +2037,14 @@ class UserVolumeTestCase(BaseTestCase):
         """Create an UserVolume."""
         user = self.factory.make_user()
         self.assertRaises(
-            errors.NoPermission, self.factory.make_user_volume,
-            owner=user, path=settings.ROOT_USERVOLUME_PATH)
+            errors.NoPermission,
+            self.factory.make_user_volume,
+            owner=user,
+            path=settings.ROOT_USERVOLUME_PATH,
+        )
         volume = self.factory.make_user_volume(
-            owner=user, path='~/Documents/Stuff/DirToUDF')
+            owner=user, path='~/Documents/Stuff/DirToUDF'
+        )
         node = volume.root_node
 
         # check node properties
@@ -1985,8 +2087,8 @@ class UserVolumeTestCase(BaseTestCase):
         self.assertEqual(UserVolume.objects.get_root(user).root_node, node)
         self.assertEqual(StorageObject.objects.get_root(user), node)
         self.assertEqual(
-            StorageObject.objects.get(volume=volume, parent__isnull=True),
-            node)
+            StorageObject.objects.get(volume=volume, parent__isnull=True), node
+        )
 
         volume2, created = UserVolume.objects.get_or_create_root(owner=user)
         self.assertFalse(created)
@@ -2003,13 +2105,15 @@ class UserVolumeTestCase(BaseTestCase):
         """Add a subtree and 100 files to the volume"""
         content = self.factory.make_content_blob()
         self.factory.make_tree_and_files(
-            volume.root_node, name='SubDir', content=content, amount=10)
+            volume.root_node, name='SubDir', content=content, amount=10
+        )
         return content.size * 10
 
     def test_volume_size(self):
         """Test to make sure tree size works"""
         user = self.factory.make_user(
-            username='a_test_user', max_storage_bytes=50 * (2 ** 30))
+            username='a_test_user', max_storage_bytes=50 * (2**30)
+        )
         volume, _ = UserVolume.objects.get_or_create_root(owner=user)
         self.assertEqual(volume.volume_size(), 0)
 
@@ -2023,7 +2127,8 @@ class UserVolumeTestCase(BaseTestCase):
     def test_delete(self):
         """Test to make sure delete works."""
         user = self.factory.make_user(
-            username='a_test_user', max_storage_bytes=50 * (2 ** 30))
+            username='a_test_user', max_storage_bytes=50 * (2**30)
+        )
         volume, _ = UserVolume.objects.get_or_create_root(owner=user)
         self.add_tree_and_files(volume)
         # delete the volume.
@@ -2054,8 +2159,8 @@ class UploadJobTestCase(BaseTestCase):
         u = self.factory.make_user()
         obj = self.factory.make_file(owner=u, name='file.ext')
         job = UploadJob.objects.create(
-            node=obj, multipart_key=uuid.uuid4(), hash_hint='bar',
-            crc32_hint=0)
+            node=obj, multipart_key=uuid.uuid4(), hash_hint='bar', crc32_hint=0
+        )
         job.add_part(10)
         self.assertEqual(job.chunk_count, 1)
         self.assertEqual(job.uploaded_bytes, 10)
@@ -2068,8 +2173,8 @@ class UploadJobTestCase(BaseTestCase):
         u = self.factory.make_user()
         obj = self.factory.make_file(owner=u, name='file.ext')
         job = UploadJob.objects.create(
-            node=obj, multipart_key=uuid.uuid4(), hash_hint='bar',
-            crc32_hint=0)
+            node=obj, multipart_key=uuid.uuid4(), hash_hint='bar', crc32_hint=0
+        )
         job.add_part(10)
         same_job = UploadJob.objects.get(id=job.id)
         self.assertEqual(job.uploaded_bytes, same_job.uploaded_bytes)
@@ -2083,8 +2188,10 @@ class DownloadTestCase(BaseTestCase):
         """Test the Download class's constructor."""
         udf = self.factory.make_user_volume(path='~/Documents/Stuff/DirToUDF')
         download = Download.objects.create(
-            volume=udf, file_path='file_path',
-            download_url='http://download/url')
+            volume=udf,
+            file_path='file_path',
+            download_url='http://download/url',
+        )
         self.assertIsInstance(download.id, uuid.UUID)
         self.assertEqual(download.volume, udf)
         self.assertEqual(download.file_path, 'file_path')
@@ -2098,8 +2205,10 @@ class DownloadTestCase(BaseTestCase):
         """The set_status() method updates the timestamp."""
         udf = self.factory.make_user_volume(path='~/Documents/Stuff/DirToUDF')
         download = Download.objects.create(
-            volume=udf, file_path='file_path',
-            download_url='http://download/url')
+            volume=udf,
+            file_path='file_path',
+            download_url='http://download/url',
+        )
         old_timestamp = download.status_change_date
 
         download.status = Download.STATUS_DOWNLOADING
@@ -2111,16 +2220,19 @@ class DownloadTestCase(BaseTestCase):
 
 
 class ResumableUploadTest(BaseTestCase):
-    """Rest ResumableUpload """
+    """Rest ResumableUpload"""
 
     def test_constructor(self):
         user = self.factory.make_user(username='username')
         vol_path = '~/MyVolume/and/file/path.txt'
         storage_key = uuid.uuid4()
-        size = 1000 * (2 ** 30)
+        size = 1000 * (2**30)
         upload = self.factory.make_resumable_upload(
-            owner=user, volume_path=vol_path, size=size,
-            storage_key=storage_key)
+            owner=user,
+            volume_path=vol_path,
+            size=size,
+            storage_key=storage_key,
+        )
 
         u = ResumableUpload.objects.get(id=upload.id)
         self.assertEqual(u.owner, user)
@@ -2132,15 +2244,19 @@ class ResumableUploadTest(BaseTestCase):
     def test_add_part(self):
         user = self.factory.make_user(username='username')
         vol_path = '~/MyVolume/and/file/path.txt'
-        size = 1000 * (2 ** 30)
+        size = 1000 * (2**30)
         storage_key = uuid.uuid4()
         upload = self.factory.make_resumable_upload(
-            owner=user, volume_path=vol_path, size=size,
-            storage_key=storage_key)
+            owner=user,
+            volume_path=vol_path,
+            size=size,
+            storage_key=storage_key,
+        )
         upload.add_part(
-            10 * (2 ** 20), 'hash context', 'magic hash context', 55)
+            10 * (2**20), 'hash context', 'magic hash context', 55
+        )
         self.assertEqual(upload.part_count, 1)
-        self.assertEqual(upload.uploaded_bytes, 10 * (2 ** 20))
+        self.assertEqual(upload.uploaded_bytes, 10 * (2**20))
         self.assertEqual(upload.hash_context, 'hash context')
         self.assertEqual(upload.magic_hash_context, 'magic hash context')
         self.assertEqual(upload.crc_context, 55)
@@ -2169,19 +2285,18 @@ class AuxiliaryFunctionsTestCase(unittest.TestCase):
 
     def test_validatename_bytes(self):
         """Validate a name that are bytes."""
-        self.assertRaises(errors.InvalidFilename,
-                          validate_name, b'bytes')
+        self.assertRaises(errors.InvalidFilename, validate_name, b'bytes')
 
     def test_validatename_illegal_name(self):
         """Validate not allowed names."""
-        self.assertRaises(errors.InvalidFilename,
-                          validate_name, '.')
-        self.assertRaises(errors.InvalidFilename,
-                          validate_name, '..')
+        self.assertRaises(errors.InvalidFilename, validate_name, '.')
+        self.assertRaises(errors.InvalidFilename, validate_name, '..')
 
     def test_validatename_illegal_chars(self):
         """Validate names with illegal chars."""
-        self.assertRaises(errors.InvalidFilename,
-                          validate_name, 'with a / in it')
-        self.assertRaises(errors.InvalidFilename,
-                          validate_name, 'not \x00 null')
+        self.assertRaises(
+            errors.InvalidFilename, validate_name, 'with a / in it'
+        )
+        self.assertRaises(
+            errors.InvalidFilename, validate_name, 'not \x00 null'
+        )

@@ -56,7 +56,8 @@ class Factory(object):
 
     def get_unique_string(self, extra_length=6, prefix='string-'):
         return prefix + ''.join(
-            random.choice(BASE_CHARS) for i in range(extra_length))
+            random.choice(BASE_CHARS) for i in range(extra_length)
+        )
 
     def get_fake_hash(self, key=None):
         """Return a hashkey."""
@@ -67,8 +68,13 @@ class Factory(object):
         return 'sha1:' + hashlib.sha1(key).hexdigest()
 
     def make_user(
-            self, username=None, visible_name=None, max_storage_bytes=2 ** 20,
-            with_root=True, **kwargs):
+        self,
+        username=None,
+        visible_name=None,
+        max_storage_bytes=2**20,
+        with_root=True,
+        **kwargs
+    ):
         assert 'user_id' not in kwargs
         if username is None:
             username = self.get_unique_string(prefix='user-')
@@ -78,16 +84,27 @@ class Factory(object):
         else:
             first_name, _, last_name = visible_name.rpartition(' ')
         user = User.objects.create_user(
-            username=username, first_name=first_name, last_name=last_name,
-            max_storage_bytes=max_storage_bytes, **kwargs)
+            username=username,
+            first_name=first_name,
+            last_name=last_name,
+            max_storage_bytes=max_storage_bytes,
+            **kwargs
+        )
         if with_root:
             UserVolume.objects.get_or_create_root(user)
         return user
 
     def make_content_blob(
-            self, hash=None, crc32=1023, size=1024, deflated_size=10000,
-            storage_key=None, magic_hash='magic!', content=None,
-            status=STATUS_LIVE):
+        self,
+        hash=None,
+        crc32=1023,
+        size=1024,
+        deflated_size=10000,
+        storage_key=None,
+        magic_hash='magic!',
+        content=None,
+        status=STATUS_LIVE,
+    ):
         """Create content for a file node."""
         if content is None:
             content = 'Hola Mundo' + self.get_unique_string()
@@ -101,13 +118,26 @@ class Factory(object):
         assert isinstance(hash, str)
         assert isinstance(magic_hash, str)
         return ContentBlob.objects.create(
-            hash=hash, magic_hash=magic_hash, crc32=crc32, size=size,
-            deflated_size=deflated_size, status=status, content=content,
-            storage_key=storage_key)
+            hash=hash,
+            magic_hash=magic_hash,
+            crc32=crc32,
+            size=size,
+            deflated_size=deflated_size,
+            status=status,
+            content=content,
+            storage_key=storage_key,
+        )
 
     def make_file(
-            self, owner=None, parent=None, name=None, mimetype='text/plain',
-            public=False, content_blob=None, **kwargs):
+        self,
+        owner=None,
+        parent=None,
+        name=None,
+        mimetype='text/plain',
+        public=False,
+        content_blob=None,
+        **kwargs
+    ):
         """Create a file node."""
         if owner is None:
             owner = self.make_user()
@@ -121,8 +151,13 @@ class Factory(object):
         if not content_blob:
             content_blob = self.make_content_blob()
         nodefile = StorageObject.objects.create_file(
-            name=name, mimetype=mimetype, parent=parent, volume=volume,
-            content_blob=content_blob, **kwargs)
+            name=name,
+            mimetype=mimetype,
+            parent=parent,
+            volume=volume,
+            content_blob=content_blob,
+            **kwargs
+        )
         if public:
             nodefile.make_public()
         return nodefile
@@ -149,18 +184,28 @@ class Factory(object):
         return volume
 
     def make_user_volume(
-            self, owner=None, path=None, status=STATUS_LIVE, **kwargs):
+        self, owner=None, path=None, status=STATUS_LIVE, **kwargs
+    ):
         """Create a UDF node."""
         if owner is None:
             owner = self.make_user()
         if path is None:
             path = '~/' + self.get_unique_string(prefix='udf-')
         udf = UserVolume.objects.create(
-            owner=owner, path=path.rstrip('/'), status=status, **kwargs)
+            owner=owner, path=path.rstrip('/'), status=status, **kwargs
+        )
         return udf
 
-    def make_share(self, owner=None, subtree=None, name=None, shared_to=None,
-                   access=Share.VIEW, accepted=True, **kwargs):
+    def make_share(
+        self,
+        owner=None,
+        subtree=None,
+        name=None,
+        shared_to=None,
+        access=Share.VIEW,
+        accepted=True,
+        **kwargs
+    ):
         """Create a share node."""
         if subtree is not None:
             assert owner is None, 'Can not provide both subtree and owner'
@@ -173,8 +218,14 @@ class Factory(object):
         if name is None:
             name = self.get_unique_string(prefix='share-')
         return Share.objects.create(
-            subtree=subtree, shared_by=owner, shared_to=shared_to,
-            name=name, access=access, accepted=accepted, **kwargs)
+            subtree=subtree,
+            shared_by=owner,
+            shared_to=shared_to,
+            name=name,
+            access=access,
+            accepted=accepted,
+            **kwargs
+        )
 
     def make_move_from_share(self, owner=None, node=None, share=None):
         if node is None:
@@ -189,23 +240,34 @@ class Factory(object):
         return MoveFromShare.objects.from_move(node=node, share_id=share.id)
 
     def make_resumable_upload(
-            self, owner=None, volume_path=None, size=None, storage_key=None):
+        self, owner=None, volume_path=None, size=None, storage_key=None
+    ):
         if owner is None:
             owner = self.make_user()
         if volume_path is None:
             volume_path = '~/' + self.get_unique_string(
-                prefix='resumable-upload-volume-')
+                prefix='resumable-upload-volume-'
+            )
         if size is None:
             size = 100
         if storage_key is None:
             storage_key = uuid.uuid4()
         return ResumableUpload.objects.create(
-            owner=owner, volume_path=volume_path, size=size,
-            storage_key=storage_key)
+            owner=owner,
+            volume_path=volume_path,
+            size=size,
+            storage_key=storage_key,
+        )
 
     def make_upload_job(
-            self, node=None, crc32_hint=1024, hash_hint=None,
-            when_started=None, when_last_active=None, status=STATUS_DEAD):
+        self,
+        node=None,
+        crc32_hint=1024,
+        hash_hint=None,
+        when_started=None,
+        when_last_active=None,
+        status=STATUS_DEAD,
+    ):
         if node is None:
             node = self.make_file(name='file.ext')
         if hash_hint is None:
@@ -215,9 +277,13 @@ class Factory(object):
         if when_last_active is None:
             when_last_active = now()
         return UploadJob.objects.create(
-            node=node, crc32_hint=crc32_hint, hash_hint=hash_hint,
-            when_started=when_started, when_last_active=when_last_active,
-            status=status)
+            node=node,
+            crc32_hint=crc32_hint,
+            hash_hint=hash_hint,
+            when_started=when_started,
+            when_last_active=when_last_active,
+            status=status,
+        )
 
     def make_download(self, volume, **kwargs):
         return Download.objects.create(volume=volume, **kwargs)
@@ -232,9 +298,18 @@ class Factory(object):
         return sub
 
     def make_transaction_log(
-            self, node=None, owner=None, volume=None,
-            op_type=TransactionLog.OP_DELETE, path='', mimetype='text/plain',
-            generation=1, old_path=None, extra_data='', timestamp=None):
+        self,
+        node=None,
+        owner=None,
+        volume=None,
+        op_type=TransactionLog.OP_DELETE,
+        path='',
+        mimetype='text/plain',
+        generation=1,
+        old_path=None,
+        extra_data='',
+        timestamp=None,
+    ):
         """Create a transaction log."""
         if owner is None:
             owner = self.make_user()
@@ -243,9 +318,16 @@ class Factory(object):
         if volume is None:
             volume = node.volume
         kwargs = dict(
-            node_id=node.id, owner_id=owner.id, volume_id=volume.id,
-            op_type=op_type, path=old_path, mimetype=mimetype,
-            generation=generation, old_path=old_path, extra_data=extra_data)
+            node_id=node.id,
+            owner_id=owner.id,
+            volume_id=volume.id,
+            op_type=op_type,
+            path=old_path,
+            mimetype=mimetype,
+            generation=generation,
+            old_path=old_path,
+            extra_data=extra_data,
+        )
         if timestamp:
             kwargs['timestamp'] = timestamp
         return TransactionLog.objects.create(**kwargs)

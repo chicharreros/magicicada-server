@@ -61,6 +61,7 @@ class ConflictError(StorageServerError):
 
 class TryAgain(StorageServerError):
     """Error that results in a client TRY_AGAIN."""
+
     errno = protocol_pb2.Error.TRY_AGAIN
 
     def __init__(self, orig_error, msg=None):

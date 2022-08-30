@@ -35,9 +35,12 @@ logger = logging.getLogger(__name__)
 
 def report_reactor_stats(prefix="reactor"):
     """Report statistics about a twisted reactor."""
+
     def report():
-        return {prefix + ".readers": len(reactor.getReaders()),
-                prefix + ".writers": len(reactor.getWriters())}
+        return {
+            prefix + ".readers": len(reactor.getReaders()),
+            prefix + ".writers": len(reactor.getWriters()),
+        }
 
     update_wrapper(report, report_reactor_stats)
     return report
@@ -105,8 +108,11 @@ class StatsWorker(object):
         for key, value in reactor_report.items():
             self.metrics.gauge(key, value)
 
-        self.log("reactor readers: %(reactor.readers)s "
-                 "writers: %(reactor.writers)s", reactor_report)
+        self.log(
+            "reactor readers: %(reactor.readers)s "
+            "writers: %(reactor.writers)s",
+            reactor_report,
+        )
 
 
 class _Status(resource.Resource):
@@ -139,7 +145,8 @@ class _Status(resource.Resource):
         def on_error(failure):
             """Error callback"""
             logger.error(
-                "Error while getting status. %s", failure.getTraceback())
+                "Error while getting status. %s", failure.getTraceback()
+            )
             write_response(failure.getErrorMessage() + "\n", status_code=500)
 
         d.addCallbacks(on_success, on_error)
@@ -156,8 +163,9 @@ class _Status(resource.Resource):
         defer.returnValue('Status OK\n')
 
 
-def create_status_service(storage, parent_service, port,
-                          user_id=0, ssl_context_factory=None):
+def create_status_service(
+    storage, parent_service, port, user_id=0, ssl_context_factory=None
+):
     """Create the status service."""
     root = resource.Resource()
     root.putChild(b'status', _Status(storage, user_id))

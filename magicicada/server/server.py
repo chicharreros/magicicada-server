@@ -59,8 +59,16 @@ from magicicada.server.diskstorage import DiskStorage
 
 
 # this is the minimal cap we support (to avoid hardcoding it in the code)
-MIN_CAP = frozenset(['no-content', 'account-info', 'resumable-uploads',
-                     'fix462230', 'volumes', 'generations'])
+MIN_CAP = frozenset(
+    [
+        'no-content',
+        'account-info',
+        'resumable-uploads',
+        'fix462230',
+        'volumes',
+        'generations',
+    ]
+)
 
 # these are the capabilities combinations that we support
 SUPPORTED_CAPS = set([MIN_CAP])
@@ -122,8 +130,9 @@ class StorageLogger(object):
             username = self.protocol.user.username
             if isinstance(username, bytes):
                 username = username.decode('utf-8')
-            extra['userid'] = urllib.parse.quote(
-                username, ':~/').replace('%', '%%')
+            extra['userid'] = urllib.parse.quote(username, ':~/').replace(
+                '%', '%%'
+            )
         else:
             extra['userid'] = '-'
 
@@ -166,8 +175,11 @@ class StorageRequestLogger(StorageLogger):
 
     def log(self, lvl, message, *args, **kwargs):
         """Log."""
-        message = '%s %s - %s' % (self.request_class_name,
-                                  self.request_id, message)
+        message = '%s %s - %s' % (
+            self.request_class_name,
+            self.request_id,
+            message,
+        )
         super(StorageRequestLogger, self).log(lvl, message, *args, **kwargs)
 
 
@@ -206,7 +218,8 @@ class LoopingPing(object):
         self.running = True
 
         self.shutdown = reactor.callLater(
-            self.timeout, self._shutdown, reason='No Pong response.')
+            self.timeout, self._shutdown, reason='No Pong response.'
+        )
 
         self.next_loop = reactor.callLater(self.interval, self.schedule)
 
@@ -221,7 +234,8 @@ class LoopingPing(object):
             self.shutdown.reset(self.timeout)
         elif self.running:
             self.shutdown = reactor.callLater(
-                self.timeout, self._shutdown, reason='No Pong response.')
+                self.timeout, self._shutdown, reason='No Pong response.'
+            )
         if self.next_loop is not None and self.next_loop.active():
             self.next_loop.reset(self.interval)
         elif self.running:
@@ -277,9 +291,12 @@ class StorageServer(request.RequestHandler):
         self.shutting_down = False
         self.request_locked = False
         self.pending_requests = collections.deque()
-        self.ping_loop = LoopingPing(StorageServer.PING_INTERVAL,
-                                     StorageServer.PING_TIMEOUT,
-                                     settings.IDLE_TIMEOUT, self)
+        self.ping_loop = LoopingPing(
+            StorageServer.PING_INTERVAL,
+            StorageServer.PING_TIMEOUT,
+            settings.IDLE_TIMEOUT,
+            self,
+        )
 
         # capabilities that the server is working with
         self.working_caps = MIN_CAP
@@ -325,8 +342,12 @@ class StorageServer(request.RequestHandler):
 
     def _log_error(self, failure, where, exc_info=None):
         """Auxiliar method to log error."""
-        self.log.error('Unhandled %s when calling %r', failure,
-                       where.__name__, exc_info=exc_info)
+        self.log.error(
+            'Unhandled %s when calling %r',
+            failure,
+            where.__name__,
+            exc_info=exc_info,
+        )
 
     def schedule_request(self, request, callback, head=False):
         """Schedule this request to run."""
@@ -432,8 +453,10 @@ class StorageServer(request.RequestHandler):
     def processMessage(self, message):
         """Log errors from requests created by incoming messages."""
         # reset the ping loop if the message isn't a PING or a PONG
-        if message.type not in (protocol_pb2.Message.PING,
-                                protocol_pb2.Message.PONG):
+        if message.type not in (
+            protocol_pb2.Message.PING,
+            protocol_pb2.Message.PONG,
+        ):
             self.ping_loop.reset()
         try:
             result = super(StorageServer, self).processMessage(message)
@@ -583,6 +606,7 @@ class StorageServer(request.RequestHandler):
         # if this arrives to this Request Handler, it means that what
         # we're receiving messages that hit the network before
         # everything is properly cancelled, so we ignore it
+
     handle_EOF = handle_BYTES
 
     def handle_QUERY_CAPS(self, message):
@@ -648,8 +672,14 @@ class BaseRequestResponse(request.RequestResponse):
 class StorageServerRequestResponse(BaseRequestResponse):
     """Base class for all server request responses."""
 
-    __slots__ = ('_id', 'log', 'start_time', 'last_good_state_ts',
-                 'length', 'operation_data')
+    __slots__ = (
+        '_id',
+        'log',
+        'start_time',
+        'last_good_state_ts',
+        'length',
+        'operation_data',
+    )
 
     def __init__(self, protocol, message):
         """Create the request response. Setup logger."""
@@ -688,6 +718,7 @@ class StorageServerRequestResponse(BaseRequestResponse):
         It will be executed when the server has no further pending requests.
 
         """
+
         def _scheduled_start():
             """The scheduled call."""
             self.start_time = time.time()
@@ -706,7 +737,8 @@ class StorageServerRequestResponse(BaseRequestResponse):
         self.log.info('Request being scheduled')
         self.log.trace_message('IN: ', self.source_message)
         self.protocol.factory.metrics.increment(
-            'request_instances.%s' % self.__class__.__name__)
+            'request_instances.%s' % self.__class__.__name__
+        )
         self.protocol.schedule_request(self, _scheduled_start)
         self.protocol.check_poison('request_schedule')
 
@@ -723,8 +755,9 @@ class StorageServerRequestResponse(BaseRequestResponse):
     def cleanup(self):
         """remove the reference to self from the request handler"""
         super(StorageServerRequestResponse, self).cleanup()
-        self.protocol.factory.metrics.decrement('request_instances.%s' %
-                                                (self.__class__.__name__,))
+        self.protocol.factory.metrics.decrement(
+            'request_instances.%s' % (self.__class__.__name__,)
+        )
         self.protocol.release(self)
 
     def error(self, failure):
@@ -733,8 +766,9 @@ class StorageServerRequestResponse(BaseRequestResponse):
         try:
             if isinstance(failure, Exception):
                 failure = Failure(failure)
-            self.log.error('Request error',
-                           exc_info=(failure.type, failure.value, None))
+            self.log.error(
+                'Request error', exc_info=(failure.type, failure.value, None)
+            )
             super(BaseRequestResponse, self).error(failure)
         except Exception as e:
             msg = 'error() crashed when processing %s: %s'
@@ -744,7 +778,8 @@ class StorageServerRequestResponse(BaseRequestResponse):
             if self.start_time is not None:
                 delta = time.time() - self.start_time
                 self.protocol.factory.metrics.timing(
-                    '%s.request_error' % class_name, delta)
+                    '%s.request_error' % class_name, delta
+                )
                 self.protocol.factory.metrics.timing('request_error', delta)
 
             transferred = getattr(self, 'transferred', None)
@@ -772,8 +807,9 @@ class StorageServerRequestResponse(BaseRequestResponse):
 
             if self.start_time is not None:
                 delta = time.time() - self.start_time
-                factory.metrics.timing('%s.request_finished' % (class_name,),
-                                       delta)
+                factory.metrics.timing(
+                    '%s.request_finished' % (class_name,), delta
+                )
                 factory.metrics.timing('request_finished', delta)
 
                 # inform SLI metric here if operation has a valid length (some
@@ -781,7 +817,8 @@ class StorageServerRequestResponse(BaseRequestResponse):
                 # Put/GetContentResponse set it to None to not inform *here*)
                 if self.length:
                     self.protocol.factory.sli_metrics.timing(
-                        class_name, delta / self.length)
+                        class_name, delta / self.length
+                    )
 
             if transferred is not None:
                 msg = '%s.transferred' % (class_name,)
@@ -811,9 +848,11 @@ class StorageServerRequestResponse(BaseRequestResponse):
         if self.started:
             result = self._processMessage(message)
         else:
+
             def _process_later():
                 """Deferred call to process the message."""
                 self._processMessage(message)
+
             self.protocol.schedule_request(self, _process_later)
         return result
 
@@ -879,7 +918,6 @@ class SimpleRequestResponse(StorageServerRequestResponse):
         dataerror.QuotaExceeded: protocol_pb2.Error.QUOTA_EXCEEDED,
         dataerror.InvalidFilename: protocol_pb2.Error.INVALID_FILENAME,
         psycopg2.DataError: protocol_pb2.Error.INVALID_FILENAME,
-
         # violation of primary key, foreign key, or unique constraints
         dataerror.IntegrityError: protocol_pb2.Error.ALREADY_EXISTS,
     }
@@ -891,7 +929,8 @@ class SimpleRequestResponse(StorageServerRequestResponse):
 
     auth_required_error = 'Authentication required and the user is None.'
     upload_not_accepted_error = (
-        'This upload has not been accepted yet content is being sent.')
+        'This upload has not been accepted yet content is being sent.'
+    )
 
     def _process(self):
         """Process the request."""
@@ -906,8 +945,9 @@ class SimpleRequestResponse(StorageServerRequestResponse):
         if failure.check(*self.try_again_errors):
             failure = Failure(errors.TryAgain(failure.value))
 
-        foreign_errors = (self.generic_foreign_errors +
-                          self.expected_foreign_errors)
+        foreign_errors = (
+            self.generic_foreign_errors + self.expected_foreign_errors
+        )
         error = failure.check(errors.StorageServerError, *foreign_errors)
         comment = failure.getErrorMessage()
         if failure.check(errors.TryAgain):
@@ -927,8 +967,11 @@ class SimpleRequestResponse(StorageServerRequestResponse):
             free_bytes = failure.value.free_bytes
             volume_id = str(failure.value.volume_id or '')
             free_space_info = {'share_id': volume_id, 'free_bytes': free_bytes}
-            self.sendError(protocol_error, comment=comment,
-                           free_space_info=free_space_info)
+            self.sendError(
+                protocol_error,
+                comment=comment,
+                free_space_info=free_space_info,
+            )
             return  # the error has been consumed
 
         if error in self.protocol_errors:
@@ -937,8 +980,9 @@ class SimpleRequestResponse(StorageServerRequestResponse):
             self.sendError(protocol_error, comment=comment)
             return  # the error has been consumed
 
-        if (error == errors.StorageServerError and
-                not failure.check(errors.InternalError)):
+        if error == errors.StorageServerError and not failure.check(
+            errors.InternalError
+        ):
             # an error which corresponds directly to a protocol error
             self.sendError(failure.value.errno, comment=comment)
             return  # the error has been consumed
@@ -975,8 +1019,10 @@ class SimpleRequestResponse(StorageServerRequestResponse):
         self._log_start()
 
         if self.authentication_required and self.protocol.user is None:
-            self.sendError(protocol_pb2.Error.AUTHENTICATION_REQUIRED,
-                           comment=self.auth_required_error)
+            self.sendError(
+                protocol_pb2.Error.AUTHENTICATION_REQUIRED,
+                comment=self.auth_required_error,
+            )
             return self.done()
         else:
             d = maybeDeferred(self._process)
@@ -1004,11 +1050,16 @@ class ListShares(SimpleRequestResponse):
                 # return the protocol root instead of users real root
                 volume_id = request.ROOT
             share_resp = sharersp.ShareResponse.from_params(
-                share['id'], 'from_me', share['root_id'], share['name'],
+                share['id'],
+                'from_me',
+                share['root_id'],
+                share['name'],
                 share['shared_to_username'] or '',
                 share['shared_to_visible_name'] or '',
-                share['accepted'], share['access'],
-                subtree_volume_id=volume_id)
+                share['accepted'],
+                share['access'],
+                subtree_volume_id=volume_id,
+            )
             response = protocol_pb2.Message()
             response.type = protocol_pb2.Message.SHARES_INFO
             share_resp.dump_to_msg(response.shares)
@@ -1016,10 +1067,15 @@ class ListShares(SimpleRequestResponse):
 
         for share in shared_to:
             share_resp = sharersp.ShareResponse.from_params(
-                share['id'], 'to_me', share['root_id'], share['name'],
+                share['id'],
+                'to_me',
+                share['root_id'],
+                share['name'],
                 share['shared_by_username'] or '',
                 share['shared_by_visible_name'] or '',
-                share['accepted'], share['access'])
+                share['accepted'],
+                share['access'],
+            )
             response = protocol_pb2.Message()
             response.type = protocol_pb2.Message.SHARES_INFO
             share_resp.dump_to_msg(response.shares)
@@ -1032,7 +1088,9 @@ class ListShares(SimpleRequestResponse):
 
         # save data to be logged on operation end
         self.operation_data = 'shared_by=%d shared_to=%d' % (
-            len(shared_by), len(shared_to))
+            len(shared_by),
+            len(shared_to),
+        )
 
 
 class ShareAccepted(SimpleRequestResponse):
@@ -1098,8 +1156,9 @@ class CreateShare(SimpleRequestResponse):
         access_level = self._valid_access_levels[mes.access_level]
 
         create_share = self.protocol.user.create_share
-        share_id = yield create_share(mes.node, mes.share_to,
-                                      mes.name, access_level)
+        share_id = yield create_share(
+            mes.node, mes.share_to, mes.name, access_level
+        )
 
         # send the ok to the requesting client
         response = protocol_pb2.Message()
@@ -1109,7 +1168,9 @@ class CreateShare(SimpleRequestResponse):
 
         # save data to be logged on operation end
         self.operation_data = 'vol_id=%s access_level=%s' % (
-            share_id, access_level)
+            share_id,
+            access_level,
+        )
 
 
 class DeleteShare(SimpleRequestResponse):
@@ -1131,7 +1192,8 @@ class DeleteShare(SimpleRequestResponse):
     def _process(self):
         """Delete the share."""
         share_id = self.convert_share_id(
-            self.source_message.delete_share.share_id)
+            self.source_message.delete_share.share_id
+        )
         yield self.protocol.user.delete_share(share_id)
 
         # send the ok to the requesting client
@@ -1157,7 +1219,8 @@ class CreateUDF(SimpleRequestResponse):
         """Create the share."""
         mes = self.source_message.create_udf
         data = yield self.protocol.user.create_udf(
-            mes.path, mes.name, self.protocol.session_id)
+            mes.path, mes.name, self.protocol.session_id
+        )
         udf_id, udf_rootid, udf_path = data
 
         # send the ok to the requesting client
@@ -1198,7 +1261,8 @@ class DeleteVolume(SimpleRequestResponse):
         except ValueError:
             raise dataerror.DoesNotExist('No such volume %r' % volume_id)
         yield self.protocol.user.delete_volume(
-            vol_id, self.protocol.session_id)
+            vol_id, self.protocol.session_id
+        )
 
         # send the ok to the requesting client
         response = protocol_pb2.Message()
@@ -1235,10 +1299,15 @@ class ListVolumes(SimpleRequestResponse):
         for share in shares:
             direction = 'to_me'
             share_resp = sharersp.ShareResponse.from_params(
-                share['id'], direction, share['root_id'], share['name'],
+                share['id'],
+                direction,
+                share['root_id'],
+                share['name'],
                 share['shared_by_username'] or '',
                 share['shared_by_visible_name'] or '',
-                share['accepted'], share['access'])
+                share['accepted'],
+                share['access'],
+            )
             response = protocol_pb2.Message()
             response.type = protocol_pb2.Message.VOLUMES_INFO
             response.list_volumes.type = protocol_pb2.Volumes.SHARE
@@ -1266,7 +1335,10 @@ class ListVolumes(SimpleRequestResponse):
 
         # save data to be logged on operation end
         self.operation_data = 'root=%s shares=%d udfs=%d' % (
-            root_info['root_id'], len(shares), len(udfs))
+            root_info['root_id'],
+            len(shares),
+            len(udfs),
+        )
 
 
 class Unlink(SimpleRequestResponse):
@@ -1289,7 +1361,8 @@ class Unlink(SimpleRequestResponse):
         share_id = self.convert_share_id(self.source_message.unlink.share)
         node_id = self.source_message.unlink.node
         generation, kind, name, mime = yield self.protocol.user.unlink_node(
-            share_id, node_id, session_id=self.protocol.session_id)
+            share_id, node_id, session_id=self.protocol.session_id
+        )
 
         # answer the ok to original user
         response = protocol_pb2.Message()
@@ -1300,7 +1373,12 @@ class Unlink(SimpleRequestResponse):
         # save data to be logged on operation end
         extension = self._get_extension(name)
         self.operation_data = 'vol_id=%s node_id=%s type=%s mime=%r ext=%r' % (
-            share_id, node_id, kind, mime, extension)
+            share_id,
+            node_id,
+            kind,
+            mime,
+            extension,
+        )
 
 
 class ListPublicFiles(SimpleRequestResponse):
@@ -1353,11 +1431,13 @@ class ChangePublicAccess(SimpleRequestResponse):
     def _process(self):
         """Change the public access to a node."""
         share_id = self.convert_share_id(
-            self.source_message.change_public_access.share)
+            self.source_message.change_public_access.share
+        )
         node_id = self.source_message.change_public_access.node
         is_public = self.source_message.change_public_access.is_public
         public_url = yield self.protocol.user.change_public_access(
-            share_id, node_id, is_public, session_id=self.protocol.session_id)
+            share_id, node_id, is_public, session_id=self.protocol.session_id
+        )
 
         # answer the ok to original user
         response = protocol_pb2.Message()
@@ -1367,8 +1447,9 @@ class ChangePublicAccess(SimpleRequestResponse):
 
         # save data to be logged on operation end
         self.operation_data = (
-            'vol_id=%s node_id=%s is_public=%s public_url=%r' % (
-                share_id, node_id, is_public, public_url))
+            'vol_id=%s node_id=%s is_public=%s public_url=%r'
+            % (share_id, node_id, is_public, public_url)
+        )
 
 
 class BytesMessageProducer(object):
@@ -1384,28 +1465,31 @@ class BytesMessageProducer(object):
     def resumeProducing(self):
         """IPushProducer interface."""
         logger.trace(
-            'BytesMessageProducer resumed, http producer: %s', self.producer)
+            'BytesMessageProducer resumed, http producer: %s', self.producer
+        )
         if self.producer:
             self.producer.resumeProducing()
 
     def stopProducing(self):
         """IPushProducer interface."""
         logger.trace(
-            'BytesMessageProducer stopped, http producer: %s', self.producer)
+            'BytesMessageProducer stopped, http producer: %s', self.producer
+        )
         if self.producer:
             self.producer.stopProducing()
 
     def pauseProducing(self):
         """IPushProducer interface."""
         logger.trace(
-            'BytesMessageProducer paused, http producer: %s', self.producer)
+            'BytesMessageProducer paused, http producer: %s', self.producer
+        )
         if self.producer:
             self.producer.pauseProducing()
 
     def write(self, content):
         """Part of IConsumer."""
         p = 0
-        part = content[p:p + self.payload_size]
+        part = content[p : p + self.payload_size]  # noqa: E203
         while part:
             if self.request.cancelled:
                 # stop generating messages
@@ -1416,7 +1500,7 @@ class BytesMessageProducer(object):
             self.request.transferred += len(part)
             self.request.sendMessage(response)
             p += self.payload_size
-            part = content[p:p + self.payload_size]
+            part = content[p : p + self.payload_size]  # noqa: E203
         self.request.last_good_state_ts = time.time()
 
 
@@ -1432,22 +1516,29 @@ def cancel_filter(function):
     Note that you may receive RequestCancelledError in your
     'error_errback' func.
     """
+
     @wraps(function)
     def f(self, *args, **kwargs):
         """Function to be called from twisted when its time arrives."""
         if self.cancelled:
             raise request.RequestCancelledError(
                 'The request id=%d '
-                'is cancelled! (before calling %r)' % (self.id, function))
+                'is cancelled! (before calling %r)' % (self.id, function)
+            )
         return function(self, *args, **kwargs)
+
     return f
 
 
 class GetContentResponse(SimpleRequestResponse):
     """GET_CONTENT Request Response."""
 
-    __slots__ = ('cancel_message', 'message_producer',
-                 'transferred', 'init_time')
+    __slots__ = (
+        'cancel_message',
+        'message_producer',
+        'transferred',
+        'init_time',
+    )
 
     def __init__(self, protocol, message):
         super(GetContentResponse, self).__init__(protocol, message)
@@ -1502,7 +1593,8 @@ class GetContentResponse(SimpleRequestResponse):
             d = node.get_content(
                 user=self.protocol.user,
                 previous_hash=self.source_message.get_content.hash,
-                start=self.source_message.get_content.offset)
+                start=self.source_message.get_content.offset,
+            )
             return d
 
         def stop_if_cancelled(producer):
@@ -1523,20 +1615,26 @@ class GetContentResponse(SimpleRequestResponse):
 
             # save data to be logged on operation end
             self.operation_data = 'vol_id=%s node_id=%s hash=%s size=%s' % (
-                share_id, self.source_message.get_content.node,
-                node.content_hash, node.size)
+                share_id,
+                self.source_message.get_content.node,
+                node.content_hash,
+                node.size,
+            )
             return node
 
         if self.protocol.user is None:
-            self.sendError(protocol_pb2.Error.AUTHENTICATION_REQUIRED,
-                           comment=self.auth_required_error)
+            self.sendError(
+                protocol_pb2.Error.AUTHENTICATION_REQUIRED,
+                comment=self.auth_required_error,
+            )
             self.done()
         else:
             # get node
             d = self.protocol.user.get_node(
                 share_id,
                 self.source_message.get_content.node,
-                self.source_message.get_content.hash)
+                self.source_message.get_content.hash,
+            )
             d.addCallback(self.cancel_filter(get_node_attrs))
             # get content and validate hash
             d.addCallback(self.cancel_filter(get_content))
@@ -1553,7 +1651,8 @@ class GetContentResponse(SimpleRequestResponse):
         """Send node to the client."""
         delta = time.time() - self.init_time
         self.protocol.factory.sli_metrics.timing(
-            'GetContentResponseInit', delta)
+            'GetContentResponseInit', delta
+        )
 
         message_producer = BytesMessageProducer(producer, self)
         self.message_producer = message_producer
@@ -1588,8 +1687,13 @@ class GetContentResponse(SimpleRequestResponse):
 class PutContentResponse(SimpleRequestResponse):
     """PUT_CONTENT Request Response."""
 
-    __slots__ = ('cancel_message', 'upload_job', 'transferred',
-                 'state', 'init_time')
+    __slots__ = (
+        'cancel_message',
+        'upload_job',
+        'transferred',
+        'state',
+        'init_time',
+    )
 
     expected_foreign_errors = [dataerror.NoPermission, dataerror.QuotaExceeded]
 
@@ -1618,8 +1722,9 @@ class PutContentResponse(SimpleRequestResponse):
             calframe1 = inspect.getouterframes(curframe, 2)
             callers = [calframe1[i][3] for i in range(1, 4)]
             call_chain = ' -> '.join(reversed(callers))
-            self.log.warning('%s: called done() finished=%s',
-                             call_chain, self.finished)
+            self.log.warning(
+                '%s: called done() finished=%s', call_chain, self.finished
+            )
         else:
             super(PutContentResponse, self).done()
 
@@ -1634,8 +1739,10 @@ class PutContentResponse(SimpleRequestResponse):
         self._log_start()
 
         if self.protocol.user is None:
-            self.sendError(protocol_pb2.Error.AUTHENTICATION_REQUIRED,
-                           comment=self.auth_required_error)
+            self.sendError(
+                protocol_pb2.Error.AUTHENTICATION_REQUIRED,
+                comment=self.auth_required_error,
+            )
             self.state = self.states.done
             self.done()
         else:
@@ -1669,8 +1776,12 @@ class PutContentResponse(SimpleRequestResponse):
                 self.log.debug('Request cancelled: %s', exc)
                 return
 
-        self.log.warning('Error while in %s: %s (%s)', self.state,
-                         exc.__class__.__name__, exc)
+        self.log.warning(
+            'Error while in %s: %s (%s)',
+            self.state,
+            exc.__class__.__name__,
+            exc,
+        )
         if self.state in (self.states.error, self.states.done):
             # if already in error/done state, just ignore it (after logging)
             return
@@ -1720,8 +1831,11 @@ class PutContentResponse(SimpleRequestResponse):
             # just ignore the message
             return
 
-        self.log.warning('Received out-of-order message: state=%s  message=%s',
-                         self.state, message.type)
+        self.log.warning(
+            'Received out-of-order message: state=%s  message=%s',
+            self.state,
+            message.type,
+        )
 
     def _process_while_uploading(self, message):
         """Receive any messages while in UPLOADING."""
@@ -1733,7 +1847,8 @@ class PutContentResponse(SimpleRequestResponse):
         elif message.type == protocol_pb2.Message.EOF:
             self.state = self.states.commiting
             self.upload_job.add_operation(
-                self._commit_uploadjob, self._generic_error)
+                self._commit_uploadjob, self._generic_error
+            )
 
         elif message.type == protocol_pb2.Message.BYTES:
             # process BYTES, stay here in UPLOADING
@@ -1741,7 +1856,8 @@ class PutContentResponse(SimpleRequestResponse):
             self.transferred += len(received_bytes)
             self.upload_job.add_operation(
                 lambda _: self.upload_job.add_data(received_bytes),
-                self._generic_error)
+                self._generic_error,
+            )
             self.last_good_state_ts = time.time()
 
         else:
@@ -1800,8 +1916,9 @@ class PutContentResponse(SimpleRequestResponse):
             return
 
         # when commit's done, send the ok
-        self.protocol.factory.sli_metrics.timing('PutContentResponseCommit',
-                                                 time.time() - commit_time)
+        self.protocol.factory.sli_metrics.timing(
+            'PutContentResponseCommit', time.time() - commit_time
+        )
         response = protocol_pb2.Message()
         response.type = protocol_pb2.Message.OK
         response.new_generation = new_generation
@@ -1819,8 +1936,9 @@ class PutContentResponse(SimpleRequestResponse):
         if self.state in (self.states.done, self.states.canceling):
             # Manually canceling the upload because we were canceled
             # while getting the upload
-            self.log.debug('Manually canceling the upload job (in %s)',
-                           self.state)
+            self.log.debug(
+                'Manually canceling the upload job (in %s)', self.state
+            )
             yield self.upload_job.cancel()
             return
         yield self.upload_job.connect()
@@ -1841,9 +1959,11 @@ class PutContentResponse(SimpleRequestResponse):
 
         # save data to be logged on operation end
         self.operation_data = 'vol_id=%s node_id=%s hash=%s size=%s' % (
-            share_id, self.source_message.put_content.node,
+            share_id,
+            self.source_message.put_content.node,
             self.source_message.put_content.hash,
-            self.source_message.put_content.size)
+            self.source_message.put_content.size,
+        )
 
         # create upload reservation
         uploadjob = yield self.protocol.user.get_upload_job(
@@ -1856,7 +1976,8 @@ class PutContentResponse(SimpleRequestResponse):
             self.source_message.put_content.deflated_size,
             session_id=self.protocol.session_id,
             magic_hash=magic_hash,
-            upload_id=self.source_message.put_content.upload_id or None)
+            upload_id=self.source_message.put_content.upload_id or None,
+        )
         defer.returnValue(uploadjob)
 
     @cancel_filter
@@ -1864,7 +1985,8 @@ class PutContentResponse(SimpleRequestResponse):
         """Notify the client that he can start sending data."""
         delta = time.time() - self.init_time
         self.protocol.factory.sli_metrics.timing(
-            'PutContentResponseInit', delta)
+            'PutContentResponseInit', delta
+        )
         upload_type = self.upload_job.__class__.__name__
         offset = self.upload_job.offset
         response = protocol_pb2.Message()
@@ -1880,8 +2002,12 @@ class PutContentResponse(SimpleRequestResponse):
         factory = self.protocol.factory
         factory.metrics.meter('%s.upload.begin' % (upload_type,), 1)
         factory.metrics.gauge('%s.upload' % (upload_type,), offset)
-        self.log.debug('%s begin content from offset %d, storing to %s',
-                       upload_type, offset, self.upload_job.storage_key)
+        self.log.debug(
+            '%s begin content from offset %d, storing to %s',
+            upload_type,
+            offset,
+            self.upload_job.storage_key,
+        )
 
 
 class GetDeltaResponse(SimpleRequestResponse):
@@ -1902,7 +2028,8 @@ class GetDeltaResponse(SimpleRequestResponse):
         from_generation = msg.get_delta.from_generation
         delta_max_size = settings.DELTA_MAX_SIZE
         delta_info = yield self.protocol.user.get_delta(
-            share_id, from_generation, limit=delta_max_size)
+            share_id, from_generation, limit=delta_max_size
+        )
         nodes, vol_generation, free_bytes = delta_info
         yield self.send_delta_info(nodes, msg.get_delta.share)
         self.length = len(nodes)
@@ -1923,13 +2050,19 @@ class GetDeltaResponse(SimpleRequestResponse):
 
         # save data to be logged on operation end
         t = 'vol_id=%s from_gen=%s current_gen=%s nodes=%d free_bytes=%s' % (
-            share_id, from_generation, vol_generation, self.length, free_bytes)
+            share_id,
+            from_generation,
+            vol_generation,
+            self.length,
+            free_bytes,
+        )
         self.operation_data = t
 
     def send_delta_info(self, nodes, share_id):
         """Build and send the DELTA_INFO for each node."""
         return task.cooperate(
-            self._send_delta_info(nodes, share_id)).whenDone()
+            self._send_delta_info(nodes, share_id)
+        ).whenDone()
 
     def _send_delta_info(self, nodes, share_id):
         """Build and send the DELTA_INFO for each node."""
@@ -1980,7 +2113,8 @@ class RescanFromScratchResponse(GetDeltaResponse):
         share_id = self.convert_share_id(msg.get_delta.share)
         # get the first chunk
         delta_info = yield self.protocol.user.get_from_scratch(
-            share_id, limit=limit)
+            share_id, limit=limit
+        )
         # keep vol_generation and free_bytes for later
         nodes, vol_generation, free_bytes = delta_info
         self.length = len(nodes)
@@ -1990,8 +2124,11 @@ class RescanFromScratchResponse(GetDeltaResponse):
             # and request more
             last_path = (nodes[-1].path, nodes[-1].name)
             delta_info = yield self.protocol.user.get_from_scratch(
-                share_id, start_from_path=last_path, limit=limit,
-                max_generation=vol_generation)
+                share_id,
+                start_from_path=last_path,
+                limit=limit,
+                max_generation=vol_generation,
+            )
             # but don't overwrite vol_generation or free_bytes in case
             # something changes while fetching nodes
             nodes, _, _ = delta_info
@@ -2007,7 +2144,11 @@ class RescanFromScratchResponse(GetDeltaResponse):
 
         # save data to be logged on operation end
         t = 'vol_id=%s current_gen=%s nodes=%d free_bytes=%s' % (
-            share_id, vol_generation, self.length, free_bytes)
+            share_id,
+            vol_generation,
+            self.length,
+            free_bytes,
+        )
         self.operation_data = t
 
 
@@ -2041,8 +2182,8 @@ class QuerySetCapsResponse(SimpleRequestResponse):
             # get the redirecting info
             redirect = SUGGESTED_REDIRS.get(caps, {})
             red_host, red_port, red_srvr = [
-                redirect.get(x, '')
-                for x in ('hostname', 'port', 'srvrecord')]
+                redirect.get(x, '') for x in ('hostname', 'port', 'srvrecord')
+            ]
         else:
             accepted = False
             red_host = red_port = red_srvr = ''
@@ -2089,8 +2230,12 @@ class MoveResponse(SimpleRequestResponse):
         new_name = self.source_message.move.new_name
 
         generation, mimetype = yield self.protocol.user.move(
-            share_id, node_id, new_parent_id, new_name,
-            session_id=self.protocol.session_id)
+            share_id,
+            node_id,
+            new_parent_id,
+            new_name,
+            session_id=self.protocol.session_id,
+        )
 
         response = protocol_pb2.Message()
         response.new_generation = generation
@@ -2100,7 +2245,11 @@ class MoveResponse(SimpleRequestResponse):
         # save data to be logged on operation end
         extension = self._get_extension(new_name)
         self.operation_data = 'vol_id=%s node_id=%s mime=%r ext=%r' % (
-            share_id, node_id, mimetype, extension)
+            share_id,
+            node_id,
+            mimetype,
+            extension,
+        )
 
 
 class MakeResponse(SimpleRequestResponse):
@@ -2134,14 +2283,16 @@ class MakeResponse(SimpleRequestResponse):
         else:
             raise request.StorageProtocolError(
                 'Can not create from message '
-                '(type %s).' % self.source_message.type)
+                '(type %s).' % self.source_message.type
+            )
 
         share_id = self.convert_share_id(self.source_message.make.share)
         parent_id = self.source_message.make.parent_node
         name = self.source_message.make.name
         create_method = getattr(self.protocol.user, create_method_name)
-        d = create_method(share_id, parent_id, name,
-                          session_id=self.protocol.session_id)
+        d = create_method(
+            share_id, parent_id, name, session_id=self.protocol.session_id
+        )
         node_id, generation, mimetype = yield d
         response = protocol_pb2.Message()
         response.type = response_type
@@ -2154,7 +2305,12 @@ class MakeResponse(SimpleRequestResponse):
         # save data to be logged on operation end
         extension = self._get_extension(name)
         self.operation_data = 'type=%s vol_id=%s node_id=%s mime=%r ext=%r' % (
-            create_method_name, share_id, node_id, mimetype, extension)
+            create_method_name,
+            share_id,
+            node_id,
+            mimetype,
+            extension,
+        )
 
 
 class FreeSpaceResponse(SimpleRequestResponse):
@@ -2171,7 +2327,8 @@ class FreeSpaceResponse(SimpleRequestResponse):
 
         """
         share_id = self.convert_share_id(
-            self.source_message.free_space_inquiry.share_id)
+            self.source_message.free_space_inquiry.share_id
+        )
         free_bytes = yield self.protocol.user.get_free_bytes(share_id)
         response = protocol_pb2.Message()
         response.type = protocol_pb2.Message.FREE_SPACE_INFO
@@ -2180,7 +2337,9 @@ class FreeSpaceResponse(SimpleRequestResponse):
 
         # save data to be logged on operation end
         self.operation_data = 'vol_id=%s free_bytes=%s' % (
-            share_id, free_bytes)
+            share_id,
+            free_bytes,
+        )
 
 
 class AccountResponse(SimpleRequestResponse):
@@ -2216,19 +2375,20 @@ class AuthenticateResponse(SimpleRequestResponse):
 
         self.protocol.check_poison('authenticate_start')
         # get metadata and send stats
-        metadata = dict(
-            (m.key, m.value) for m in self.source_message.metadata)
+        metadata = dict((m.key, m.value) for m in self.source_message.metadata)
         if metadata:
             self.log.info('Client metadata: %s', metadata)
             for key in ('platform', 'version'):
                 if key in metadata:
                     value = self.not_allowed_re.sub('_', metadata[key])
-                    self.protocol.factory.metrics.meter('client.%s.%s' %
-                                                        (key, value), 1)
+                    self.protocol.factory.metrics.meter(
+                        'client.%s.%s' % (key, value), 1
+                    )
         # do auth
         auth_parameters = dict(
             (param.name, param.value)
-            for param in self.source_message.auth_parameters)
+            for param in self.source_message.auth_parameters
+        )
         user = None
         if self.protocol.factory.auth_provider is not None:
             authenticate = self.protocol.factory.auth_provider.authenticate
@@ -2277,13 +2437,15 @@ class Action(BaseRequestResponse):
         It will be executed when the server has no further pending requests.
 
         """
+
         def _scheduled_start():
             """The scheduled call."""
             super(Action, self).start()
 
         self.log.debug('Action being scheduled (%s)', self._callable)
-        self.protocol.factory.metrics.increment('action_instances.%s' %
-                                                (self.__class__.__name__,))
+        self.protocol.factory.metrics.increment(
+            'action_instances.%s' % (self.__class__.__name__,)
+        )
         self.protocol.schedule_request(self, _scheduled_start, head=head)
 
     def _start(self):
@@ -2296,8 +2458,9 @@ class Action(BaseRequestResponse):
         """Remove the reference to self from the request handler"""
         self.finished = True
         self.started = False
-        self.protocol.factory.metrics.decrement('action_instances.%s' %
-                                                (self.__class__.__name__,))
+        self.protocol.factory.metrics.decrement(
+            'action_instances.%s' % (self.__class__.__name__,)
+        )
         self.protocol.release(self)
 
     def done(self, result):
@@ -2326,19 +2489,26 @@ class StorageServerFactory(Factory):
 
     @cvar protocol: The class of the server.
     """
+
     protocol = StorageServer
     graceful_shutdown = settings.GRACEFUL_SHUTDOWN
 
-    def __init__(self, auth_provider_class=auth.DummyAuthProvider,
-                 content_class=content.ContentManager,
-                 reactor=reactor, servername=None, reactor_inspector=None):
+    def __init__(
+        self,
+        auth_provider_class=auth.DummyAuthProvider,
+        content_class=content.ContentManager,
+        reactor=reactor,
+        servername=None,
+        reactor_inspector=None,
+    ):
         """Create a StorageServerFactory."""
         self.auth_provider = auth_provider_class(self)
         self.content = content_class(self)
         self.diskstorage = DiskStorage(settings.STORAGE_BASEDIR)
         logger.info(
             'Started StorageServerFactory with DiskStorage at %s',
-            settings.STORAGE_BASEDIR)
+            settings.STORAGE_BASEDIR,
+        )
 
         self.metrics = metrics.get_meter('root')
         self.user_metrics = metrics.get_meter('user')
@@ -2352,25 +2522,32 @@ class StorageServerFactory(Factory):
         notif = notifier.get_notifier()
         notif.set_event_callback(
             notifier.UDFCreate,
-            self.event_callback_handler(self.deliver_udf_create))
+            self.event_callback_handler(self.deliver_udf_create),
+        )
         notif.set_event_callback(
             notifier.UDFDelete,
-            self.event_callback_handler(self.deliver_udf_delete))
+            self.event_callback_handler(self.deliver_udf_delete),
+        )
         notif.set_event_callback(
             notifier.ShareCreated,
-            self.event_callback_handler(self.deliver_share_created))
+            self.event_callback_handler(self.deliver_share_created),
+        )
         notif.set_event_callback(
             notifier.ShareAccepted,
-            self.event_callback_handler(self.deliver_share_accepted))
+            self.event_callback_handler(self.deliver_share_accepted),
+        )
         notif.set_event_callback(
             notifier.ShareDeclined,
-            self.event_callback_handler(self.deliver_share_declined))
+            self.event_callback_handler(self.deliver_share_declined),
+        )
         notif.set_event_callback(
             notifier.ShareDeleted,
-            self.event_callback_handler(self.deliver_share_deleted))
+            self.event_callback_handler(self.deliver_share_deleted),
+        )
         notif.set_event_callback(
             notifier.VolumeNewGeneration,
-            self.event_callback_handler(self.deliver_volume_new_generation))
+            self.event_callback_handler(self.deliver_volume_new_generation),
+        )
 
         self.protocols = []
         self.reactor = reactor
@@ -2395,10 +2572,12 @@ class StorageServerFactory(Factory):
 
         # log
         logger.error(
-            'Unhandled error in deferred! %s\nGot data:\n%r', msg, data)
+            'Unhandled error in deferred! %s\nGot data:\n%r', msg, data
+        )
 
     def event_callback_handler(self, func):
         """Wrap the event callback in an error handler."""
+
         @wraps(func)
         def wrapper(notif, **kwargs):
             """The wrapper."""
@@ -2407,11 +2586,16 @@ class StorageServerFactory(Factory):
                 """Handle error while processing a Notification."""
                 logger.error(
                     '%s in notification %r while calling %s(**%r)',
-                    failure.value, notif, func.__name__, kwargs)
+                    failure.value,
+                    notif,
+                    func.__name__,
+                    kwargs,
+                )
 
             d = defer.maybeDeferred(func, notif, **kwargs)
             d.addErrback(notification_error_handler)
             return d
+
         return wrapper
 
     @inlineCallbacks
@@ -2444,8 +2628,13 @@ class StorageServerFactory(Factory):
         if to_user is None:
             return
         share_resp = sharersp.NotifyShareHolder.from_params(
-            share_notif.share_id, share_notif.root_id, share_notif.name,
-            to_user.username, to_user.visible_name, share_notif.access)
+            share_notif.share_id,
+            share_notif.root_id,
+            share_notif.name,
+            to_user.username,
+            to_user.visible_name,
+            share_notif.access,
+        )
         proto_msg = protocol_pb2.Message()
         proto_msg.type = protocol_pb2.Message.NOTIFY_SHARE
         share_resp.dump_to_msg(proto_msg.notify_share)
@@ -2475,12 +2664,18 @@ class StorageServerFactory(Factory):
         if to_user and recipient_id == to_user.id:
             if by_user is None:
                 by_user = yield self.content.get_user_by_id(
-                    share_notif.shared_by_id, required=True)
+                    share_notif.shared_by_id, required=True
+                )
             share_resp = sharersp.ShareResponse.from_params(
-                str(share_notif.share_id), 'to_me', share_notif.root_id,
-                share_notif.name, by_user.username or '',
-                by_user.visible_name or '', protocol_pb2.ShareAccepted.YES,
-                share_notif.access)
+                str(share_notif.share_id),
+                'to_me',
+                share_notif.root_id,
+                share_notif.name,
+                by_user.username or '',
+                by_user.visible_name or '',
+                protocol_pb2.ShareAccepted.YES,
+                share_notif.access,
+            )
             resp = protocol_pb2.Message()
             resp.type = protocol_pb2.Message.VOLUME_CREATED
             resp.volume_created.type = protocol_pb2.Volumes.SHARE
@@ -2506,6 +2701,7 @@ class StorageServerFactory(Factory):
     @inlineCallbacks
     def deliver_share_deleted(self, share_notif):
         """Handle Share deletion notification."""
+
         def notif_filter(protocol):
             """Return True if the client should receive the notification."""
             return protocol.session_id != share_notif.source_session
@@ -2576,6 +2772,7 @@ class StorageServerFactory(Factory):
                 self.reactor.callLater(0.1, _wait)
             else:
                 d.callback(True)
+
         _wait()
         return d
 
@@ -2619,8 +2816,13 @@ def get_service_port(service):
 class StorageServerService(OrderedMultiService):
     """Wrap the whole TCP StorageServer mess as a single twisted serv."""
 
-    def __init__(self, port, auth_provider_class=None,
-                 status_port=0, heartbeat_interval=None):
+    def __init__(
+        self,
+        port,
+        auth_provider_class=None,
+        status_port=0,
+        heartbeat_interval=None,
+    ):
         """Create a StorageServerService.
 
         @param port: the port to listen on without ssl.
@@ -2636,7 +2838,8 @@ class StorageServerService(OrderedMultiService):
         logger.info('Starting %s', self.servername)
         logger.info(
             'protocol buffers implementation: %s',
-            os.environ.get('PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION', 'None'))
+            os.environ.get('PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION', 'None'),
+        )
 
         self.metrics = metrics.get_meter('service')
 
@@ -2649,7 +2852,8 @@ class StorageServerService(OrderedMultiService):
         self.factory = StorageServerFactory(
             auth_provider_class=auth_provider_class,
             servername=self.servername,
-            reactor_inspector=self._reactor_inspector)
+            reactor_inspector=self._reactor_inspector,
+        )
 
         self.tcp_service = TCPServer(port, self.factory)
         self.tcp_service.setName('TCP')
@@ -2657,7 +2861,8 @@ class StorageServerService(OrderedMultiService):
 
         # setup the status service
         self.status_service = stats.create_status_service(
-            self, listeners, status_port)
+            self, listeners, status_port
+        )
 
     @property
     def port(self):
@@ -2689,8 +2894,10 @@ class StorageServerService(OrderedMultiService):
         # only start the HeartbeatWriter if the interval is > 0
         if self.heartbeat_interval > 0:
             self.heartbeat_writer = stdio.StandardIO(
-                supervisor_utils.HeartbeatWriter(self.heartbeat_interval,
-                                                 logger))
+                supervisor_utils.HeartbeatWriter(
+                    self.heartbeat_interval, logger
+                )
+            )
 
     @inlineCallbacks
     def stopService(self):
@@ -2707,8 +2914,9 @@ class StorageServerService(OrderedMultiService):
         logger.info('- - - - - SERVER STOPPED')
 
 
-def create_service(status_port=None,
-                   auth_provider_class=auth.DummyAuthProvider):
+def create_service(
+    status_port=None, auth_provider_class=auth.DummyAuthProvider
+):
     """Start the StorageServer service."""
     # turn on heapy if must to
     if os.getenv('USE_HEAPY'):
@@ -2716,8 +2924,10 @@ def create_service(status_port=None,
         try:
             import guppy.heapy.RM
         except ImportError:
-            logger.warning('guppy-pe/heapy not available, remote monitor '
-                           'thread not started')
+            logger.warning(
+                'guppy-pe/heapy not available, remote monitor '
+                'thread not started'
+            )
         else:
             guppy.heapy.RM.on()
             logger.debug('activated heapy remote monitor')
@@ -2725,6 +2935,7 @@ def create_service(status_port=None,
     # set GC's debug
     if settings.GC_DEBUG:
         import gc
+
         gc.set_debug(gc.DEBUG_UNCOLLECTABLE)
         logger.debug('set gc debug on')
 
@@ -2733,5 +2944,6 @@ def create_service(status_port=None,
 
     # create the service
     service = StorageServerService(
-        settings.TCP_PORT, auth_provider_class, status_port)
+        settings.TCP_PORT, auth_provider_class, status_port
+    )
     return service

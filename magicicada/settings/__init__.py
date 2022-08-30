@@ -47,7 +47,8 @@ def get_file_content(folder, filename):
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+)
 
 
 # Quick-start development settings - unsuitable for production
@@ -274,7 +275,8 @@ SERVICE_GROUP = 'filesync'
 SERVICE_NAME = 'server'
 STORAGE_PROXY_PORT = None
 SYSLOG_FORMAT = (
-    '%(processName)-13s %(levelname)-8s %(name)s[%(process)d]: %(message)s')
+    '%(processName)-13s %(levelname)-8s %(name)s[%(process)d]: %(message)s'
+)
 
 
 # Server settings

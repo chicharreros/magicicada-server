@@ -49,7 +49,8 @@ class DAL(object):
 
         if user is None:
             raise FailedAuthentication(
-                "Bad parameters: %s" % repr(auth_parameters))
+                "Bad parameters: %s" % repr(auth_parameters)
+            )
 
         return dict(user_id=user.id)
 
@@ -57,8 +58,12 @@ class DAL(object):
         """Unlink a node."""
         user = self._get_user(user_id, session_id)
         node = user.volume(volume_id).node(node_id).delete()
-        return dict(generation=node.generation, kind=node.kind,
-                    name=node.name, mimetype=node.mimetype)
+        return dict(
+            generation=node.generation,
+            kind=node.kind,
+            name=node.name,
+            mimetype=node.mimetype,
+        )
 
     def list_volumes(self, user_id):
         """List all the volumes the user is involved.
@@ -79,10 +84,15 @@ class DAL(object):
         shares = []
         for share in user.get_shared_to(accepted=True):
             suser = share.shared_by
-            resp = dict(id=share.id, root_id=share.root_id, name=share.name,
-                        shared_by_username=suser.username,
-                        shared_by_visible_name=suser.visible_name,
-                        accepted=share.accepted, access=share.access)
+            resp = dict(
+                id=share.id,
+                root_id=share.root_id,
+                name=share.name,
+                shared_by_username=suser.username,
+                shared_by_visible_name=suser.visible_name,
+                accepted=share.accepted,
+                access=share.access,
+            )
             resp['free_bytes'] = suser.free_bytes
             resp['generation'] = share.get_generation()
             shares.append(resp)
@@ -90,12 +100,17 @@ class DAL(object):
         # udfs
         udfs = []
         for udf in user.get_udfs():
-            resp = dict(id=udf.id, root_id=udf.root_id, path=udf.path,
-                        generation=udf.generation)
+            resp = dict(
+                id=udf.id,
+                root_id=udf.root_id,
+                path=udf.path,
+                generation=udf.generation,
+            )
             udfs.append(resp)
 
-        result = dict(root=root_info, free_bytes=free_bytes,
-                      shares=shares, udfs=udfs)
+        result = dict(
+            root=root_info, free_bytes=free_bytes, shares=shares, udfs=udfs
+        )
         return result
 
     def list_public_files(self, user_id):
@@ -106,56 +121,79 @@ class DAL(object):
         result = dict(public_files=public_files)
         return result
 
-    def change_public_access(self, user_id, volume_id, node_id,
-                             is_public, session_id=None):
+    def change_public_access(
+        self, user_id, volume_id, node_id, is_public, session_id=None
+    ):
         """Change the public access for a node."""
         user = self._get_user(user_id, session_id)
         node = user.volume(volume_id).node(node_id)
         node = node.change_public_access(is_public)
         return dict(public_url=node.public_url)
 
-    def move(self, user_id, volume_id, node_id,
-             new_parent_id, new_name, session_id=None):
+    def move(
+        self,
+        user_id,
+        volume_id,
+        node_id,
+        new_parent_id,
+        new_name,
+        session_id=None,
+    ):
         """Move a node and/or rename it."""
         user = self._get_user(user_id, session_id)
         # If we get new_parent_id as str, generate a UUID from it
         # because StorageObject.move() expects it to be either a UUID or None.
         if isinstance(new_parent_id, str):
             new_parent_id = uuid.UUID(new_parent_id)
-        node = user.volume(volume_id).node(node_id).move(new_parent_id,
-                                                         new_name)
+        node = (
+            user.volume(volume_id).node(node_id).move(new_parent_id, new_name)
+        )
         return dict(generation=node.generation, mimetype=node.mimetype)
 
     def make_dir(self, user_id, volume_id, parent_id, name, session_id=None):
         """Make a subdirectory."""
         user = self._get_user(user_id, session_id)
         node = user.volume(volume_id).dir(parent_id).make_subdirectory(name)
-        return dict(generation=node.generation, node_id=node.id,
-                    mimetype=node.mimetype)
+        return dict(
+            generation=node.generation, node_id=node.id, mimetype=node.mimetype
+        )
 
     def make_file(self, user_id, volume_id, parent_id, name, session_id=None):
         """Make a no-content file."""
         user = self._get_user(user_id, session_id)
         node = user.volume(volume_id).dir(parent_id).make_file(name)
-        return dict(generation=node.generation, node_id=node.id,
-                    mimetype=node.mimetype)
+        return dict(
+            generation=node.generation, node_id=node.id, mimetype=node.mimetype
+        )
 
-    def make_file_with_content(self, user_id, volume_id, parent_id, name,
-                               node_hash, crc32, size, deflated_size,
-                               storage_key, session_id=None):
+    def make_file_with_content(
+        self,
+        user_id,
+        volume_id,
+        parent_id,
+        name,
+        node_hash,
+        crc32,
+        size,
+        deflated_size,
+        storage_key,
+        session_id=None,
+    ):
         """Make a file with associated content."""
         user = self._get_user(user_id, session_id)
         func = user.volume(volume_id).dir(parent_id).make_file_with_content
         node = func(name, node_hash, crc32, size, deflated_size, storage_key)
         return dict(generation=node.generation, node_id=node.id)
 
-    def create_share(self, user_id, node_id,
-                     to_username, share_name, readonly):
+    def create_share(
+        self, user_id, node_id, to_username, share_name, readonly
+    ):
         """Create a share."""
         user = self._get_user(user_id)
         to_user = services.get_storage_user(username=to_username)
-        share = user.volume().dir(node_id).share(to_user.id,
-                                                 share_name, readonly)
+        share = (
+            user.volume().dir(node_id).share(to_user.id, share_name, readonly)
+        )
         return dict(share_id=share.id)
 
     def delete_share(self, user_id, share_id):
@@ -197,10 +235,15 @@ class DAL(object):
             to_username = other_user.username if other_user else None
             to_visible_name = other_user.visible_name if other_user else None
 
-            resp = dict(id=share.id, root_id=share.root_id, name=share.name,
-                        shared_to_username=to_username,
-                        shared_to_visible_name=to_visible_name,
-                        accepted=share.accepted, access=share.access)
+            resp = dict(
+                id=share.id,
+                root_id=share.root_id,
+                name=share.name,
+                shared_to_username=to_username,
+                shared_to_visible_name=to_visible_name,
+                accepted=share.accepted,
+                access=share.access,
+            )
             shared_by.append(resp)
 
         # shared_to
@@ -211,10 +254,15 @@ class DAL(object):
             by_username = other_user.username if other_user else None
             by_visible_name = other_user.visible_name if other_user else None
 
-            resp = dict(id=share.id, root_id=share.root_id, name=share.name,
-                        shared_by_username=by_username,
-                        shared_by_visible_name=by_visible_name,
-                        accepted=share.accepted, access=share.access)
+            resp = dict(
+                id=share.id,
+                root_id=share.root_id,
+                name=share.name,
+                shared_by_username=by_username,
+                shared_by_visible_name=by_visible_name,
+                accepted=share.accepted,
+                access=share.access,
+            )
             shared_to.append(resp)
 
         return dict(shared_by=shared_by, shared_to=shared_to)
@@ -246,19 +294,26 @@ class DAL(object):
     def get_user_quota(self, user_id):
         """Get the quota info for an user."""
         user = self._get_user(user_id)
-        d = dict(max_storage_bytes=user.max_storage_bytes,
-                 used_storage_bytes=user.used_storage_bytes,
-                 free_bytes=user.free_bytes)
+        d = dict(
+            max_storage_bytes=user.max_storage_bytes,
+            used_storage_bytes=user.used_storage_bytes,
+            free_bytes=user.free_bytes,
+        )
         return d
 
     def get_share(self, user_id, share_id):
         """Get the share information for a given id."""
         user = self._get_user(user_id)
         share = user.get_share(share_id)
-        d = dict(share_id=share.id, share_root_id=share.root_id,
-                 name=share.name, shared_by_id=share.shared_by_id,
-                 shared_to_id=share.shared_to_id, accepted=share.accepted,
-                 access=share.access)
+        d = dict(
+            share_id=share.id,
+            share_root_id=share.root_id,
+            name=share.name,
+            shared_by_id=share.shared_by_id,
+            shared_to_id=share.shared_to_id,
+            accepted=share.accepted,
+            access=share.access,
+        )
         return d
 
     def get_root(self, user_id):
@@ -316,14 +371,25 @@ class DAL(object):
             storage_key = None
             has_content = False
 
-        d = dict(id=node.id, name=node.name, generation=node.generation,
-                 is_public=node.is_public, deflated_size=deflated_size,
-                 last_modified=node.when_last_modified, crc32=crc32,
-                 storage_key=storage_key, is_live=is_live,
-                 size=size, is_file=is_file, volume_id=node.vol_id,
-                 parent_id=node.parent_id, content_hash=node.content_hash,
-                 path=node.path, has_content=has_content,
-                 public_url=node.public_url)
+        d = dict(
+            id=node.id,
+            name=node.name,
+            generation=node.generation,
+            is_public=node.is_public,
+            deflated_size=deflated_size,
+            last_modified=node.when_last_modified,
+            crc32=crc32,
+            storage_key=storage_key,
+            is_live=is_live,
+            size=size,
+            is_file=is_file,
+            volume_id=node.vol_id,
+            parent_id=node.parent_id,
+            content_hash=node.content_hash,
+            path=node.path,
+            has_content=has_content,
+            public_url=node.public_url,
+        )
         return d
 
     def get_delta(self, user_id, volume_id, from_generation, limit):
@@ -334,31 +400,59 @@ class DAL(object):
         nodes = [self._process_node(n) for n in delta]
         return dict(vol_generation=vol_gen, free_bytes=free_bytes, nodes=nodes)
 
-    def get_from_scratch(self, user_id, volume_id, start_from_path=None,
-                         limit=None, max_generation=None):
+    def get_from_scratch(
+        self,
+        user_id,
+        volume_id,
+        start_from_path=None,
+        limit=None,
+        max_generation=None,
+    ):
         """Get all nodes from scratch."""
         user = self._get_user(user_id)
         vol_gen, free_bytes, nodes = user.volume(volume_id).get_from_scratch(
-            start_from_path=start_from_path, limit=limit,
-            max_generation=max_generation)
+            start_from_path=start_from_path,
+            limit=limit,
+            max_generation=max_generation,
+        )
         nodes = [self._process_node(n) for n in nodes]
         return dict(vol_generation=vol_gen, free_bytes=free_bytes, nodes=nodes)
 
     def get_user_data(self, user_id, session_id):
         """Get data from the user."""
         user = self._get_user(user_id, session_id)
-        return dict(root_volume_id=user.root_volume_id, username=user.username,
-                    visible_name=user.visible_name)
+        return dict(
+            root_volume_id=user.root_volume_id,
+            username=user.username,
+            visible_name=user.visible_name,
+        )
 
-    def make_content(self, user_id, volume_id, node_id, original_hash,
-                     hash_hint, crc32_hint, inflated_size_hint,
-                     deflated_size_hint, storage_key, magic_hash, session_id):
+    def make_content(
+        self,
+        user_id,
+        volume_id,
+        node_id,
+        original_hash,
+        hash_hint,
+        crc32_hint,
+        inflated_size_hint,
+        deflated_size_hint,
+        storage_key,
+        magic_hash,
+        session_id,
+    ):
         """Get node and make content for it."""
         user = self._get_user(user_id, session_id)
         node = user.volume(volume_id).get_node(node_id)
-        node.make_content(original_hash, hash_hint, crc32_hint,
-                          inflated_size_hint, deflated_size_hint,
-                          storage_key, magic_hash)
+        node.make_content(
+            original_hash,
+            hash_hint,
+            crc32_hint,
+            inflated_size_hint,
+            deflated_size_hint,
+            storage_key,
+            magic_hash,
+        )
         return dict(generation=node.generation)
 
     def _process_uploadjob(self, uj):
@@ -372,21 +466,36 @@ class DAL(object):
         )
         return d
 
-    def get_uploadjob(self, user_id, volume_id, node_id, uploadjob_id,
-                      hash_value, crc32):
+    def get_uploadjob(
+        self, user_id, volume_id, node_id, uploadjob_id, hash_value, crc32
+    ):
         """Make an upload job for a node."""
         user = self._get_user(user_id)
         node = user.volume(volume_id).get_node(node_id)
         uj = node.get_multipart_uploadjob(uploadjob_id, hash_value, crc32)
         return self._process_uploadjob(uj)
 
-    def make_uploadjob(self, user_id, volume_id, node_id, previous_hash,
-                       hash_value, crc32, inflated_size, multipart_key):
+    def make_uploadjob(
+        self,
+        user_id,
+        volume_id,
+        node_id,
+        previous_hash,
+        hash_value,
+        crc32,
+        inflated_size,
+        multipart_key,
+    ):
         """Make an upload job for a node."""
         user = self._get_user(user_id)
         node = user.volume(volume_id).get_node(node_id)
-        uj = node.make_uploadjob(previous_hash, hash_value, crc32,
-                                 inflated_size, multipart_key=multipart_key)
+        uj = node.make_uploadjob(
+            previous_hash,
+            hash_value,
+            crc32,
+            inflated_size,
+            multipart_key=multipart_key,
+        )
         return self._process_uploadjob(uj)
 
     def delete_uploadjob(self, user_id, volume_id, uploadjob_id):
@@ -396,8 +505,9 @@ class DAL(object):
         uj.delete()
         return {}
 
-    def add_part_to_uploadjob(self, user_id, volume_id, uploadjob_id,
-                              chunk_size):
+    def add_part_to_uploadjob(
+        self, user_id, volume_id, uploadjob_id, chunk_size
+    ):
         """Add a part to an upload job."""
         user = self._get_user(user_id)
         uj = user.volume(volume_id).get_uploadjob(uploadjob_id)

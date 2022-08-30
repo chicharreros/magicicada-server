@@ -27,6 +27,7 @@ from magicicada.server.testing.testcase import TestWithDatabase
 
 class FakeMetrics(object):
     """Fake Metrics object that records calls."""
+
     connection = None
 
     def __init__(self):
@@ -49,7 +50,7 @@ class TestStats(TestWithDatabase):
     def setUp(self):
         """Setup the test."""
         yield super(TestStats, self).setUp()
-        self.make_user('test user999', max_storage_bytes=2 ** 20)
+        self.make_user('test user999', max_storage_bytes=2**20)
         self.metrics = FakeMetrics()
         self.patch(metrics, 'get_meter', lambda n: self.metrics)
 
@@ -58,9 +59,14 @@ class TestStats(TestWithDatabase):
         stats_worker = StatsWorker(self.service, 10)
         # get the reactor
         from twisted.internet import reactor
+
         stats_worker.runtime_info()
         # check the reactor data
-        self.assertIn(('gauge', 'reactor.readers',
-                       len(reactor.getReaders())), self.metrics.calls)
-        self.assertIn(('gauge', 'reactor.writers',
-                       len(reactor.getWriters())), self.metrics.calls)
+        self.assertIn(
+            ('gauge', 'reactor.readers', len(reactor.getReaders())),
+            self.metrics.calls,
+        )
+        self.assertIn(
+            ('gauge', 'reactor.writers', len(reactor.getWriters())),
+            self.metrics.calls,
+        )

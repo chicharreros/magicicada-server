@@ -68,7 +68,8 @@ class DALTestCase(BaseTestCase):
     def test_auth_parameters_not_dict(self):
         bad_params = (1, 2, object(), 'foo')
         self.assertRaises(
-            AttributeError, self.backend.get_userid_from_token, bad_params)
+            AttributeError, self.backend.get_userid_from_token, bad_params
+        )
 
     def test_auth_parameters_empty_dict(self):
         bad_params = dict()
@@ -80,19 +81,28 @@ class DALTestCase(BaseTestCase):
         """Unlink a node."""
         # node, with a generation attribute
         node = mock.Mock(
-            generation=123, kind=StorageObject.FILE, mimetype='mime')
+            generation=123, kind=StorageObject.FILE, mimetype='mime'
+        )
         node.name = 'foo'
         # user, with the chained calls to the delete
         user = mock.Mock(name='user')
         user.volume.return_value.node.return_value.delete.return_value = node
         self.backend._get_user = lambda *a: user
 
-        kwargs = dict(user_id='user_id', volume_id='vol_id',
-                      node_id='node_id', session_id='session_id')
+        kwargs = dict(
+            user_id='user_id',
+            volume_id='vol_id',
+            node_id='node_id',
+            session_id='session_id',
+        )
         result = self.backend.unlink_node(**kwargs)
 
-        d = dict(generation=123, kind=StorageObject.FILE, name='foo',
-                 mimetype='mime')
+        d = dict(
+            generation=123,
+            kind=StorageObject.FILE,
+            name='foo',
+            mimetype='mime',
+        )
         self.assertEqual(result, d)
         expected_calls = [
             mock.call.volume('vol_id'),
@@ -112,10 +122,12 @@ class DALTestCase(BaseTestCase):
 
         result = self.backend.list_volumes('user_id')
 
-        self.assertEqual(sorted(result),
-                         ['free_bytes', 'root', 'shares', 'udfs'])
-        self.assertEqual(result['root'],
-                         dict(generation=123, root_id='root_id'))
+        self.assertEqual(
+            sorted(result), ['free_bytes', 'root', 'shares', 'udfs']
+        )
+        self.assertEqual(
+            result['root'], dict(generation=123, root_id='root_id')
+        )
         self.assertEqual(result['free_bytes'], 4567890)
         user.volume.return_value.get_volume.assert_called_once_with()
         user.get_shared_to.assert_called_once_with(accepted=True)
@@ -128,19 +140,29 @@ class DALTestCase(BaseTestCase):
 
         # one share
         sharedby1 = mock.Mock(
-            username='byusername1', visible_name='byvisible1', free_bytes=147)
+            username='byusername1', visible_name='byvisible1', free_bytes=147
+        )
         share1 = mock.Mock(
-            id='share1_id', root_id='share1_root_id', shared_by=sharedby1,
-            accepted=True, access=1)
+            id='share1_id',
+            root_id='share1_root_id',
+            shared_by=sharedby1,
+            accepted=True,
+            access=1,
+        )
         share1.name = 'name1'
         share1.get_generation.return_value = 6
 
         # other share
         sharedby2 = mock.Mock(
-            username='byusername2', visible_name='byvisible2', free_bytes=852)
+            username='byusername2', visible_name='byvisible2', free_bytes=852
+        )
         share2 = mock.Mock(
-            id='share2_id', root_id='share2_root_id', shared_by=sharedby2,
-            accepted=False, access=0)
+            id='share2_id',
+            root_id='share2_root_id',
+            shared_by=sharedby2,
+            accepted=False,
+            access=0,
+        )
         share2.name = 'name2'
         share2.get_generation.return_value = 8
 
@@ -190,10 +212,12 @@ class DALTestCase(BaseTestCase):
         root = mock.Mock(generation=123, root_id='root_id')
         # one udf
         udf1 = mock.Mock(
-            id='udf1_id', root_id='udf1_root_id', path='path1', generation=6)
+            id='udf1_id', root_id='udf1_root_id', path='path1', generation=6
+        )
         # other udf
         udf2 = mock.Mock(
-            id='udf2_id', root_id='udf2_root_id', path='path2', generation=8)
+            id='udf2_id', root_id='udf2_root_id', path='path2', generation=8
+        )
         # user
         user = mock.Mock(free_bytes=4567890)
         user.volume.return_value.get_volume.return_value = root
@@ -234,9 +258,13 @@ class DALTestCase(BaseTestCase):
         node_getter.change_public_access.return_value = node
         self.backend._get_user = lambda *a: user
 
-        kwargs = dict(user_id='user_id', volume_id='vol_id',
-                      node_id='node_id', is_public=True,
-                      session_id='session_id')
+        kwargs = dict(
+            user_id='user_id',
+            volume_id='vol_id',
+            node_id='node_id',
+            is_public=True,
+            session_id='session_id',
+        )
         result = self.backend.change_public_access(**kwargs)
 
         self.assertEqual(result, dict(public_url='test public url'))
@@ -251,26 +279,48 @@ class DALTestCase(BaseTestCase):
         """List public files."""
         # node 1
         content1 = mock.Mock(
-            size='size1', crc32='crc321', deflated_size='deflated_size1',
-            storage_key='storage_key1')
+            size='size1',
+            crc32='crc321',
+            deflated_size='deflated_size1',
+            storage_key='storage_key1',
+        )
         node1 = mock.Mock(
-            id='node_id1', path='path1', vol_id='volume_id1',
-            generation='generation1', is_public=True, parent_id='parent_id1',
-            status=STATUS_LIVE, content_hash='content_hash1',
-            kind=StorageObject.FILE, when_last_modified='last_modified1',
-            public_url='public url 1', content=content1)
+            id='node_id1',
+            path='path1',
+            vol_id='volume_id1',
+            generation='generation1',
+            is_public=True,
+            parent_id='parent_id1',
+            status=STATUS_LIVE,
+            content_hash='content_hash1',
+            kind=StorageObject.FILE,
+            when_last_modified='last_modified1',
+            public_url='public url 1',
+            content=content1,
+        )
         node1.name = 'name1'
 
         # node 2
         content2 = mock.Mock(
-            size='size2', crc32='crc322', deflated_size='deflated_size2',
-            storage_key='storage_key2')
+            size='size2',
+            crc32='crc322',
+            deflated_size='deflated_size2',
+            storage_key='storage_key2',
+        )
         node2 = mock.Mock(
-            id='node_id2', path='path2', vol_id='volume_id2',
-            generation='generation2', is_public=True, parent_id='parent_id2',
-            status=STATUS_DEAD, content_hash='content_hash2',
-            kind=StorageObject.DIRECTORY, when_last_modified='last_modified2',
-            public_url='public url 2', content=content2)
+            id='node_id2',
+            path='path2',
+            vol_id='volume_id2',
+            generation='generation2',
+            is_public=True,
+            parent_id='parent_id2',
+            status=STATUS_DEAD,
+            content_hash='content_hash2',
+            kind=StorageObject.DIRECTORY,
+            when_last_modified='last_modified2',
+            public_url='public url 2',
+            content=content2,
+        )
         node2.name = 'name2'
 
         # user
@@ -278,7 +328,9 @@ class DALTestCase(BaseTestCase):
         user.get_public_files.return_value = [node1, node2]
         self.backend._get_user = lambda *a: user
 
-        result = self.backend.list_public_files(user_id='user_id',)
+        result = self.backend.list_public_files(
+            user_id='user_id',
+        )
         node1, node2 = result['public_files']
 
         user.get_public_files.assert_called_once_with()
@@ -327,16 +379,22 @@ class DALTestCase(BaseTestCase):
         user.volume.return_value.node.return_value.move.return_value = node
         self.backend._get_user = lambda *a: user
 
-        kwargs = dict(user_id='user_id', volume_id='vol_id',
-                      node_id='node_id', new_parent_id=new_parent_id,
-                      new_name='new_name', session_id='session_id')
+        kwargs = dict(
+            user_id='user_id',
+            volume_id='vol_id',
+            node_id='node_id',
+            new_parent_id=new_parent_id,
+            new_name='new_name',
+            session_id='session_id',
+        )
         result = self.backend.move(**kwargs)
 
         self.assertEqual(result, dict(generation=123, mimetype='mime'))
         expected_calls = [
             mock.call.volume('vol_id'),
             mock.call.volume().node('node_id'),
-            mock.call.volume().node().move(new_parent_id, 'new_name')]
+            mock.call.volume().node().move(new_parent_id, 'new_name'),
+        ]
         self.assertEqual(user.mock_calls, expected_calls)
 
     def test_move_with_new_parent_id_as_str(self):
@@ -355,8 +413,13 @@ class DALTestCase(BaseTestCase):
         # Here we pass the new_parent_id as str but above we expect it to
         # be a UUID object.
         self.backend.move(
-            'user_id', 'vol_id', 'node_id', str(parent_id), 'new_name',
-            'session_id')
+            'user_id',
+            'vol_id',
+            'node_id',
+            str(parent_id),
+            'new_name',
+            'session_id',
+        )
 
         expected_calls = [
             mock.call.volume('vol_id'),
@@ -376,9 +439,13 @@ class DALTestCase(BaseTestCase):
         dir_getter.make_subdirectory.return_value = node
         self.backend._get_user = lambda *a: user
 
-        kwargs = dict(user_id='user_id', volume_id='vol_id',
-                      parent_id='parent_id', name='name',
-                      session_id='session_id')
+        kwargs = dict(
+            user_id='user_id',
+            volume_id='vol_id',
+            parent_id='parent_id',
+            name='name',
+            session_id='session_id',
+        )
         result = self.backend.make_dir(**kwargs)
 
         d = dict(generation=123, node_id='node_id', mimetype='mime')
@@ -400,9 +467,13 @@ class DALTestCase(BaseTestCase):
         user.volume.return_value.dir.return_value.make_file.return_value = node
         self.backend._get_user = lambda *a: user
 
-        kwargs = dict(user_id='user_id', volume_id='vol_id',
-                      parent_id='parent_id', name='name',
-                      session_id='session_id')
+        kwargs = dict(
+            user_id='user_id',
+            volume_id='vol_id',
+            parent_id='parent_id',
+            name='name',
+            session_id='session_id',
+        )
         result = self.backend.make_file(**kwargs)
 
         d = dict(generation=123, node_id='node_id', mimetype='mime')
@@ -425,19 +496,29 @@ class DALTestCase(BaseTestCase):
         dir_getter.make_file_with_content.return_value = node
         self.backend._get_user = lambda *a: user
 
-        kwargs = dict(user_id='user_id', volume_id='vol_id', name='name',
-                      parent_id='parent_id', crc32='crc32', size='size',
-                      node_hash='hash', deflated_size='deflated_size',
-                      storage_key='storage_key', session_id='session_id')
+        kwargs = dict(
+            user_id='user_id',
+            volume_id='vol_id',
+            name='name',
+            parent_id='parent_id',
+            crc32='crc32',
+            size='size',
+            node_hash='hash',
+            deflated_size='deflated_size',
+            storage_key='storage_key',
+            session_id='session_id',
+        )
         result = self.backend.make_file_with_content(**kwargs)
 
         self.assertEqual(result, dict(generation=123, node_id='node_id'))
         expected_calls = [
             mock.call.volume('vol_id'),
             mock.call.volume().dir('parent_id'),
-            mock.call.volume().dir().make_file_with_content(
-                'name', 'hash', 'crc32', 'size', 'deflated_size',
-                'storage_key'),
+            mock.call.volume()
+            .dir()
+            .make_file_with_content(
+                'name', 'hash', 'crc32', 'size', 'deflated_size', 'storage_key'
+            ),
         ]
         self.assertEqual(user.mock_calls, expected_calls)
 
@@ -471,7 +552,8 @@ class DALTestCase(BaseTestCase):
         self.backend._get_user = lambda *a: user
 
         result = self.backend.create_share(
-            'user_id', 'node_id', 'to_username', 'name', True)
+            'user_id', 'node_id', 'to_username', 'name', True
+        )
         self.assertEqual(result, dict(share_id='share_id'))
         fake.assert_called_once_with(username='to_username')
         expected_calls = [
@@ -515,15 +597,24 @@ class DALTestCase(BaseTestCase):
         """List shares, the shared_by part."""
         # one share
         sharedto1 = mock.Mock(
-            username='tousername1', visible_name='tovisible1')
+            username='tousername1', visible_name='tovisible1'
+        )
         share1 = mock.Mock(
-            id='share1_id', root_id='share1_root_id',
-            shared_to=sharedto1, accepted=True, access=1)
+            id='share1_id',
+            root_id='share1_root_id',
+            shared_to=sharedto1,
+            accepted=True,
+            access=1,
+        )
         share1.name = 'name1'
         # other share, without shared_to
         share2 = mock.Mock(
-            id='share2_id', root_id='share2_root_id',
-            shared_to=None, accepted=False, access=0)
+            id='share2_id',
+            root_id='share2_root_id',
+            shared_to=None,
+            accepted=False,
+            access=0,
+        )
         share2.name = 'name2'
         # user
         user = mock.Mock()
@@ -559,15 +650,26 @@ class DALTestCase(BaseTestCase):
         """List shares, the shared_to part."""
         # one share
         sharedby1 = mock.Mock(
-            username='byusername1', visible_name='byvisible1')
+            username='byusername1', visible_name='byvisible1'
+        )
         share1 = mock.Mock(
-            id='share1_id', root_id='share1_root_id', name='name1',
-            shared_by=sharedby1, accepted=True, access=1)
+            id='share1_id',
+            root_id='share1_root_id',
+            name='name1',
+            shared_by=sharedby1,
+            accepted=True,
+            access=1,
+        )
         share1.name = 'name1'
         # other share, without shared_by
         share2 = mock.Mock(
-            id='share2_id', root_id='share2_root_id', name='name2',
-            shared_by=None, accepted=False, access=0)
+            id='share2_id',
+            root_id='share2_root_id',
+            name='name2',
+            shared_by=None,
+            accepted=False,
+            access=0,
+        )
         share2.name = 'name2'
 
         # user
@@ -609,8 +711,9 @@ class DALTestCase(BaseTestCase):
         self.backend._get_user = lambda *a: user
 
         result = self.backend.create_udf('user_id', 'path', 'session_id')
-        should = dict(udf_id='udf_id', udf_root_id='udf_root_id',
-                      udf_path='udf_path')
+        should = dict(
+            udf_id='udf_id', udf_root_id='udf_root_id', udf_path='udf_path'
+        )
         self.assertEqual(result, should)
         user.make_udf.assert_called_once_with('path')
 
@@ -624,7 +727,8 @@ class DALTestCase(BaseTestCase):
         self.backend._get_user = lambda *a: user
 
         result = self.backend.delete_volume(
-            'user_id', 'volume_id', 'session_id')
+            'user_id', 'volume_id', 'session_id'
+        )
 
         self.assertEqual(result, {})
         share.delete.assert_called_once_with()
@@ -638,7 +742,8 @@ class DALTestCase(BaseTestCase):
         self.backend._get_user = lambda *a: user
 
         result = self.backend.delete_volume(
-            'user_id', 'volume_id', 'session_id')
+            'user_id', 'volume_id', 'session_id'
+        )
 
         self.assertEqual(result, {})
         user.get_share.assert_called_once_with('volume_id')
@@ -658,7 +763,8 @@ class DALTestCase(BaseTestCase):
             self.backend.delete_volume('user_id', volume_id, 'session_id')
 
         self.assertIn(
-            "Volume %r does not exist" % volume_id, str(ctx.exception))
+            "Volume %r does not exist" % volume_id, str(ctx.exception)
+        )
         user.get_share.assert_called_once_with(volume_id)
         user.delete_udf.assert_called_once_with(volume_id)
 
@@ -666,22 +772,28 @@ class DALTestCase(BaseTestCase):
         """Return the quota info for an user."""
         # the user
         user = mock.Mock(
-            max_storage_bytes=100, used_storage_bytes=80, free_bytes=20)
+            max_storage_bytes=100, used_storage_bytes=80, free_bytes=20
+        )
         self.backend._get_user = lambda *a: user
 
         result = self.backend.get_user_quota('user_id')
 
-        should = dict(max_storage_bytes=100, used_storage_bytes=80,
-                      free_bytes=20)
+        should = dict(
+            max_storage_bytes=100, used_storage_bytes=80, free_bytes=20
+        )
         self.assertEqual(result, should)
 
     def test_get_share(self):
         """Get a share."""
         # the share
         share = mock.Mock(
-            id='share_id', root_id='share_root_id',
-            shared_by_id='shared_by_id', shared_to_id='shared_to_id',
-            accepted=True, access=1)
+            id='share_id',
+            root_id='share_root_id',
+            shared_by_id='shared_by_id',
+            shared_to_id='shared_to_id',
+            accepted=True,
+            access=1,
+        )
         share.name = 'name'
         # user
         user = mock.Mock()
@@ -690,9 +802,15 @@ class DALTestCase(BaseTestCase):
 
         result = self.backend.get_share('user_id', 'share_id')
 
-        should = dict(share_id='share_id', share_root_id='share_root_id',
-                      name='name', shared_by_id='shared_by_id', accepted=True,
-                      shared_to_id='shared_to_id', access=1)
+        should = dict(
+            share_id='share_id',
+            share_root_id='share_root_id',
+            name='name',
+            shared_by_id='shared_by_id',
+            accepted=True,
+            shared_to_id='shared_to_id',
+            access=1,
+        )
         self.assertEqual(result, should)
         user.get_share.assert_called_once_with('share_id')
 
@@ -715,14 +833,26 @@ class DALTestCase(BaseTestCase):
         """Get a node."""
         # node
         content = mock.Mock(
-            size='size', crc32='crc32',
-            deflated_size='deflated_size', storage_key='storage_key')
+            size='size',
+            crc32='crc32',
+            deflated_size='deflated_size',
+            storage_key='storage_key',
+        )
         node = mock.Mock(
-            id='node_id', path='path', name='name', vol_id='volume_id',
-            parent_id='parent_id', status=STATUS_LIVE, generation='generation',
-            is_public=False, content_hash='content_hash', public_url=None,
-            kind=StorageObject.FILE, when_last_modified='last_modified',
-            content=content)
+            id='node_id',
+            path='path',
+            name='name',
+            vol_id='volume_id',
+            parent_id='parent_id',
+            status=STATUS_LIVE,
+            generation='generation',
+            is_public=False,
+            content_hash='content_hash',
+            public_url=None,
+            kind=StorageObject.FILE,
+            when_last_modified='last_modified',
+            content=content,
+        )
         node.name = 'name'
 
         # user
@@ -731,15 +861,28 @@ class DALTestCase(BaseTestCase):
         user.volume.return_value.get_node.return_value = node
 
         result = self.backend.get_node(
-            user_id='user_id', node_id='node_id', volume_id='volume_id')
+            user_id='user_id', node_id='node_id', volume_id='volume_id'
+        )
 
-        should = dict(id='node_id', name='name', parent_id='parent_id',
-                      is_public=False, is_live=True, is_file=True, size='size',
-                      last_modified='last_modified', crc32='crc32',
-                      generation='generation', content_hash='content_hash',
-                      deflated_size='deflated_size', storage_key='storage_key',
-                      volume_id='volume_id', path='path', has_content=True,
-                      public_url=None)
+        should = dict(
+            id='node_id',
+            name='name',
+            parent_id='parent_id',
+            is_public=False,
+            is_live=True,
+            is_file=True,
+            size='size',
+            last_modified='last_modified',
+            crc32='crc32',
+            generation='generation',
+            content_hash='content_hash',
+            deflated_size='deflated_size',
+            storage_key='storage_key',
+            volume_id='volume_id',
+            path='path',
+            has_content=True,
+            public_url=None,
+        )
         self.assertEqual(result, should)
         expected_calls = [
             mock.call.volume('volume_id'),
@@ -751,11 +894,20 @@ class DALTestCase(BaseTestCase):
         """Get a node that has no content."""
         # node
         node = mock.Mock(
-            id='node_id', path='path', name='name', vol_id='volume_id',
-            parent_id='parent_id', status=STATUS_LIVE, generation='generation',
-            is_public=False, content_hash='content_hash',
-            kind=StorageObject.FILE, when_last_modified='last_modified',
-            content=None, public_url=None)
+            id='node_id',
+            path='path',
+            name='name',
+            vol_id='volume_id',
+            parent_id='parent_id',
+            status=STATUS_LIVE,
+            generation='generation',
+            is_public=False,
+            content_hash='content_hash',
+            kind=StorageObject.FILE,
+            when_last_modified='last_modified',
+            content=None,
+            public_url=None,
+        )
         node.name = 'name'
 
         # user
@@ -764,14 +916,28 @@ class DALTestCase(BaseTestCase):
         user.volume.return_value.get_node.return_value = node
 
         result = self.backend.get_node(
-            user_id='user_id', node_id='node_id', volume_id='volume_id')
+            user_id='user_id', node_id='node_id', volume_id='volume_id'
+        )
 
-        should = dict(id='node_id', name='name', parent_id='parent_id',
-                      is_public=False, is_live=True, is_file=True, size=None,
-                      last_modified='last_modified', crc32=None,
-                      generation='generation', content_hash='content_hash',
-                      deflated_size=None, storage_key=None, public_url=None,
-                      volume_id='volume_id', path="path", has_content=False)
+        should = dict(
+            id='node_id',
+            name='name',
+            parent_id='parent_id',
+            is_public=False,
+            is_live=True,
+            is_file=True,
+            size=None,
+            last_modified='last_modified',
+            crc32=None,
+            generation='generation',
+            content_hash='content_hash',
+            deflated_size=None,
+            storage_key=None,
+            public_url=None,
+            volume_id='volume_id',
+            path="path",
+            has_content=False,
+        )
         self.assertEqual(result, should)
         expected_calls = [
             mock.call.volume('volume_id'),
@@ -783,11 +949,20 @@ class DALTestCase(BaseTestCase):
         """Get a node just giving the user."""
         # node
         node = mock.Mock(
-            id='node_id', path='path', name='name', vol_id='volume_id',
-            parent_id='parent_id', status=STATUS_LIVE, generation='generation',
-            is_public=False, content_hash='content_hash', public_url=None,
-            kind=StorageObject.FILE, when_last_modified='last_modified',
-            content=None)
+            id='node_id',
+            path='path',
+            name='name',
+            vol_id='volume_id',
+            parent_id='parent_id',
+            status=STATUS_LIVE,
+            generation='generation',
+            is_public=False,
+            content_hash='content_hash',
+            public_url=None,
+            kind=StorageObject.FILE,
+            when_last_modified='last_modified',
+            content=None,
+        )
         node.name = 'name'
         # user
         user = mock.Mock()
@@ -798,14 +973,28 @@ class DALTestCase(BaseTestCase):
         self.patch(backend.services, 'get_node', fake)
 
         result = self.backend.get_node_from_user(
-            user_id='user_id', node_id='node_id')
+            user_id='user_id', node_id='node_id'
+        )
 
-        should = dict(id='node_id', name='name', parent_id='parent_id',
-                      is_public=False, is_live=True, is_file=True, size=None,
-                      last_modified='last_modified', crc32=None,
-                      generation='generation', content_hash='content_hash',
-                      deflated_size=None, storage_key=None, public_url=None,
-                      volume_id='volume_id', path='path', has_content=False)
+        should = dict(
+            id='node_id',
+            name='name',
+            parent_id='parent_id',
+            is_public=False,
+            is_live=True,
+            is_file=True,
+            size=None,
+            last_modified='last_modified',
+            crc32=None,
+            generation='generation',
+            content_hash='content_hash',
+            deflated_size=None,
+            storage_key=None,
+            public_url=None,
+            volume_id='volume_id',
+            path='path',
+            has_content=False,
+        )
         self.assertEqual(result, should)
         fake.assert_called_once_with('node_id')
 
@@ -813,41 +1002,75 @@ class DALTestCase(BaseTestCase):
         """Get normal delta and from scratch."""
         # node 1
         content1 = mock.Mock(
-            size='size1', crc32='crc321', deflated_size='deflated_size1',
-            storage_key='storage_key1')
+            size='size1',
+            crc32='crc321',
+            deflated_size='deflated_size1',
+            storage_key='storage_key1',
+        )
         node1 = mock.Mock(
-            id='node_id1', path='path1', name='name1', vol_id='volume_id1',
-            generation='generation1', is_public=True, parent_id='parent_id1',
-            status=STATUS_LIVE, content_hash='content_hash1',
-            kind=StorageObject.FILE, when_last_modified='last_modified1',
-            content=content1, public_url='public url')
+            id='node_id1',
+            path='path1',
+            name='name1',
+            vol_id='volume_id1',
+            generation='generation1',
+            is_public=True,
+            parent_id='parent_id1',
+            status=STATUS_LIVE,
+            content_hash='content_hash1',
+            kind=StorageObject.FILE,
+            when_last_modified='last_modified1',
+            content=content1,
+            public_url='public url',
+        )
         node1.name = 'name1'
 
         # node 2
         content2 = mock.Mock(
-            size='size2', crc32='crc322', deflated_size='deflated_size2',
-            storage_key='storage_key2')
+            size='size2',
+            crc32='crc322',
+            deflated_size='deflated_size2',
+            storage_key='storage_key2',
+        )
         node2 = mock.Mock(
-            id='node_id2', path='path2', name='name2', vol_id='volume_id2',
-            generation='generation2', is_public=False, parent_id='parent_id2',
-            status=STATUS_DEAD, content_hash='content_hash2',
-            kind=StorageObject.DIRECTORY, when_last_modified='last_modified2',
-            content=content2, public_url=None)
+            id='node_id2',
+            path='path2',
+            name='name2',
+            vol_id='volume_id2',
+            generation='generation2',
+            is_public=False,
+            parent_id='parent_id2',
+            status=STATUS_DEAD,
+            content_hash='content_hash2',
+            kind=StorageObject.DIRECTORY,
+            when_last_modified='last_modified2',
+            content=content2,
+            public_url=None,
+        )
         node2.name = 'name2'
 
         # user
         user = mock.Mock()
         self.backend._get_user = lambda *a: user
         user.volume.return_value.get_delta.return_value = (
-            'vol_generation', 'free_bytes', [node1, node2])
+            'vol_generation',
+            'free_bytes',
+            [node1, node2],
+        )
         user.volume.return_value.get_from_scratch.return_value = (
-            'vol_generation', 'free_bytes', [node1, node2])
+            'vol_generation',
+            'free_bytes',
+            [node1, node2],
+        )
 
         result1 = self.backend.get_delta(
-            user_id='user_id', volume_id='volume_id',
-            from_generation='from_gen', limit='limit')
+            user_id='user_id',
+            volume_id='volume_id',
+            from_generation='from_gen',
+            limit='limit',
+        )
         result2 = self.backend.get_from_scratch(
-            user_id='user_id', volume_id='volume_id')
+            user_id='user_id', volume_id='volume_id'
+        )
 
         self.assertEqual(result1, result2)
         self.assertEqual(result1['vol_generation'], 'vol_generation')
@@ -857,7 +1080,8 @@ class DALTestCase(BaseTestCase):
             mock.call.volume().get_delta('from_gen', limit='limit'),
             mock.call.volume('volume_id'),
             mock.call.volume().get_from_scratch(
-                start_from_path=None, limit=None, max_generation=None),
+                start_from_path=None, limit=None, max_generation=None
+            ),
         ]
         self.assertEqual(user.mock_calls, expected_calls)
 
@@ -901,15 +1125,21 @@ class DALTestCase(BaseTestCase):
         """Get accessable nodes and their hashes."""
         # user
         user = mock.Mock(
-            root_volume_id='root_volume_id', username='username',
-            visible_name='visible_name')
+            root_volume_id='root_volume_id',
+            username='username',
+            visible_name='visible_name',
+        )
         self.backend._get_user = lambda *a: user
 
         result = self.backend.get_user_data(
-            user_id='user_id', session_id='session_id')
+            user_id='user_id', session_id='session_id'
+        )
 
-        should = dict(root_volume_id='root_volume_id', username='username',
-                      visible_name='visible_name')
+        should = dict(
+            root_volume_id='root_volume_id',
+            username='username',
+            visible_name='visible_name',
+        )
         self.assertEqual(result, should)
 
     def test_get_volume_id_normal(self):
@@ -922,7 +1152,8 @@ class DALTestCase(BaseTestCase):
         self.backend._get_user = lambda *a: user
 
         result = self.backend.get_volume_id(
-            user_id='user_id', node_id='node_id')
+            user_id='user_id', node_id='node_id'
+        )
 
         self.assertEqual(result, dict(volume_id='volume_id'))
         expected_calls = [
@@ -941,7 +1172,8 @@ class DALTestCase(BaseTestCase):
         self.backend._get_user = lambda *a: user
 
         result = self.backend.get_volume_id(
-            user_id='user_id', node_id='node_id')
+            user_id='user_id', node_id='node_id'
+        )
 
         self.assertEqual(result, dict(volume_id=None))
         expected_calls = [
@@ -959,23 +1191,36 @@ class DALTestCase(BaseTestCase):
         user.volume.return_value.get_node.return_value = node
         self.backend._get_user = lambda *a: user
 
-        d = dict(user_id='user_id', volume_id='volume_id',
-                 node_id='node_id', original_hash='original_hash',
-                 hash_hint='hash_hint', crc32_hint='crc32_hint',
-                 inflated_size_hint='inflated_size_hint',
-                 deflated_size_hint='deflated_size_hint',
-                 storage_key='storage_key', magic_hash='magic_hash',
-                 session_id=None)
+        d = dict(
+            user_id='user_id',
+            volume_id='volume_id',
+            node_id='node_id',
+            original_hash='original_hash',
+            hash_hint='hash_hint',
+            crc32_hint='crc32_hint',
+            inflated_size_hint='inflated_size_hint',
+            deflated_size_hint='deflated_size_hint',
+            storage_key='storage_key',
+            magic_hash='magic_hash',
+            session_id=None,
+        )
         result = self.backend.make_content(**d)
 
         self.assertEqual(result, dict(generation='new_generation'))
         expected_calls = [
             mock.call.volume('volume_id'),
             mock.call.volume().get_node('node_id'),
-            mock.call.volume().get_node().make_content(
-                'original_hash', 'hash_hint', 'crc32_hint',
-                'inflated_size_hint', 'deflated_size_hint', 'storage_key',
-                'magic_hash'),
+            mock.call.volume()
+            .get_node()
+            .make_content(
+                'original_hash',
+                'hash_hint',
+                'crc32_hint',
+                'inflated_size_hint',
+                'deflated_size_hint',
+                'storage_key',
+                'magic_hash',
+            ),
         ]
         self.assertEqual(user.mock_calls, expected_calls)
 
@@ -983,9 +1228,12 @@ class DALTestCase(BaseTestCase):
         """Get an upload_job."""
         # upload job
         uj = mock.Mock(
-            id='uj_id', uploaded_bytes='uploaded_bytes',
-            multipart_key='multipart_key', chunk_count='chunk_count',
-            when_last_active='when_last_active')
+            id='uj_id',
+            uploaded_bytes='uploaded_bytes',
+            multipart_key='multipart_key',
+            chunk_count='chunk_count',
+            when_last_active='when_last_active',
+        )
 
         # user
         user = mock.Mock()
@@ -993,20 +1241,30 @@ class DALTestCase(BaseTestCase):
         node_getter = user.volume.return_value.get_node.return_value
         node_getter.get_multipart_uploadjob.return_value = uj
 
-        d = dict(user_id='user_id', volume_id='volume_id',
-                 node_id='node_id', uploadjob_id='uploadjob_id',
-                 hash_value='hash_value', crc32='crc32')
+        d = dict(
+            user_id='user_id',
+            volume_id='volume_id',
+            node_id='node_id',
+            uploadjob_id='uploadjob_id',
+            hash_value='hash_value',
+            crc32='crc32',
+        )
         result = self.backend.get_uploadjob(**d)
 
-        should = dict(uploadjob_id='uj_id', uploaded_bytes='uploaded_bytes',
-                      multipart_key='multipart_key', chunk_count='chunk_count',
-                      when_last_active='when_last_active')
+        should = dict(
+            uploadjob_id='uj_id',
+            uploaded_bytes='uploaded_bytes',
+            multipart_key='multipart_key',
+            chunk_count='chunk_count',
+            when_last_active='when_last_active',
+        )
         self.assertEqual(result, should)
         expected_calls = [
             mock.call.volume('volume_id'),
             mock.call.volume().get_node('node_id'),
-            mock.call.volume().get_node().get_multipart_uploadjob(
-                'uploadjob_id', 'hash_value', 'crc32'),
+            mock.call.volume()
+            .get_node()
+            .get_multipart_uploadjob('uploadjob_id', 'hash_value', 'crc32'),
         ]
         self.assertEqual(user.mock_calls, expected_calls)
 
@@ -1014,9 +1272,12 @@ class DALTestCase(BaseTestCase):
         """Make an upload_job."""
         # upload job
         uj = mock.Mock(
-            id='uj_id', uploaded_bytes='uploaded_bytes',
-            multipart_key='multipart_key', chunk_count='chunk_count',
-            when_last_active='when_last_active')
+            id='uj_id',
+            uploaded_bytes='uploaded_bytes',
+            multipart_key='multipart_key',
+            chunk_count='chunk_count',
+            when_last_active='when_last_active',
+        )
 
         # user
         user = mock.Mock()
@@ -1024,23 +1285,38 @@ class DALTestCase(BaseTestCase):
         node_getter = user.volume.return_value.get_node.return_value
         node_getter.make_uploadjob.return_value = uj
 
-        d = dict(user_id='user_id', volume_id='volume_id',
-                 node_id='node_id', previous_hash='previous_hash',
-                 hash_value='hash_value', crc32='crc32',
-                 inflated_size='inflated_size',
-                 multipart_key='multipart_key')
+        d = dict(
+            user_id='user_id',
+            volume_id='volume_id',
+            node_id='node_id',
+            previous_hash='previous_hash',
+            hash_value='hash_value',
+            crc32='crc32',
+            inflated_size='inflated_size',
+            multipart_key='multipart_key',
+        )
         result = self.backend.make_uploadjob(**d)
 
-        should = dict(uploadjob_id='uj_id', uploaded_bytes='uploaded_bytes',
-                      multipart_key='multipart_key', chunk_count='chunk_count',
-                      when_last_active='when_last_active')
+        should = dict(
+            uploadjob_id='uj_id',
+            uploaded_bytes='uploaded_bytes',
+            multipart_key='multipart_key',
+            chunk_count='chunk_count',
+            when_last_active='when_last_active',
+        )
         self.assertEqual(result, should)
         expected_calls = [
             mock.call.volume('volume_id'),
             mock.call.volume().get_node('node_id'),
-            mock.call.volume().get_node().make_uploadjob(
-                'previous_hash', 'hash_value', 'crc32', 'inflated_size',
-                multipart_key='multipart_key'),
+            mock.call.volume()
+            .get_node()
+            .make_uploadjob(
+                'previous_hash',
+                'hash_value',
+                'crc32',
+                'inflated_size',
+                multipart_key='multipart_key',
+            ),
         ]
         self.assertEqual(user.mock_calls, expected_calls)
 
@@ -1053,8 +1329,11 @@ class DALTestCase(BaseTestCase):
         self.backend._get_user = lambda *a: user
         user.volume.return_value.get_uploadjob.return_value = uj
 
-        d = dict(user_id='user_id', uploadjob_id='uploadjob_id',
-                 volume_id='volume_id')
+        d = dict(
+            user_id='user_id',
+            uploadjob_id='uploadjob_id',
+            volume_id='volume_id',
+        )
         result = self.backend.delete_uploadjob(**d)
 
         self.assertEqual(result, {})
@@ -1074,8 +1353,12 @@ class DALTestCase(BaseTestCase):
         self.backend._get_user = lambda *a: user
         user.volume.return_value.get_uploadjob.return_value = uj
 
-        d = dict(user_id='user_id', uploadjob_id='uploadjob_id',
-                 chunk_size='chunk_size', volume_id='volume_id')
+        d = dict(
+            user_id='user_id',
+            uploadjob_id='uploadjob_id',
+            chunk_size='chunk_size',
+            volume_id='volume_id',
+        )
         result = self.backend.add_part_to_uploadjob(**d)
 
         self.assertEqual(result, {})
@@ -1095,8 +1378,11 @@ class DALTestCase(BaseTestCase):
         self.backend._get_user = lambda *a: user
         user.volume.return_value.get_uploadjob.return_value = uj
 
-        d = dict(user_id='user_id', uploadjob_id='uploadjob_id',
-                 volume_id='volume_id')
+        d = dict(
+            user_id='user_id',
+            uploadjob_id='uploadjob_id',
+            volume_id='volume_id',
+        )
         result = self.backend.touch_uploadjob(**d)
 
         self.assertEqual(result, dict(when_last_active='when_last_active'))
@@ -1115,10 +1401,11 @@ class DALTestCase(BaseTestCase):
         user.is_reusable_content.return_value = ('blob_exists', 'storage_key')
 
         result = self.backend.get_reusable_content(
-            user_id='user_id', hash_value='hash_value',
-            magic_hash='magic_hash')
+            user_id='user_id', hash_value='hash_value', magic_hash='magic_hash'
+        )
 
         should = dict(blob_exists='blob_exists', storage_key='storage_key')
         self.assertEqual(result, should)
         user.is_reusable_content.assert_called_once_with(
-            'hash_value', 'magic_hash')
+            'hash_value', 'magic_hash'
+        )

@@ -41,7 +41,7 @@ class MementoHandler(logging.Handler):
         self.records_by_level = defaultdict(list)
 
     def emit(self, record):
-        """ Just add the record to self.records. """
+        """Just add the record to self.records."""
         self.format(record)
         self.records.append(record)
         self.records_by_level[record.levelno].append(record)
@@ -79,11 +79,14 @@ class MementoHandler(logging.Handler):
             else:
                 missing.append(m)
         if missing:
-            error = ('Missing logging messsages for level %s:\n\n%s\n\n'
-                     'Existing records:\n\n%s')
+            error = (
+                'Missing logging messsages for level %s:\n\n%s\n\n'
+                'Existing records:\n\n%s'
+            )
             missing = '\n'.join(missing)
             current = '\n'.join(
-                r.getMessage() for r in self.records_by_level[level])
+                r.getMessage() for r in self.records_by_level[level]
+            )
             raise AssertionError(error % (level, missing, current))
 
         return result
@@ -193,10 +196,14 @@ class BaseTestCase(TransactionTestCase):
             return '\n\n'.join(i['sql'] for i in queries)
 
         if len(before) != len(after):
-            self.fail(msg % (
-                len(before), len(after),
-                str_queries(before.captured_queries),
-                str_queries(after.captured_queries)
-            ))
+            self.fail(
+                msg
+                % (
+                    len(before),
+                    len(after),
+                    str_queries(before.captured_queries),
+                    str_queries(after.captured_queries),
+                )
+            )
 
         return result

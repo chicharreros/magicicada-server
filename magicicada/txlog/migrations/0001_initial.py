@@ -10,36 +10,81 @@ class Migration(migrations.Migration):
 
     initial = True
 
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
             name='DBWorkerLastRow',
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                (
+                    'id',
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name='ID',
+                    ),
+                ),
                 ('worker_id', models.TextField()),
             ],
         ),
         migrations.CreateModel(
             name='DBWorkerUnseen',
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                (
+                    'id',
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name='ID',
+                    ),
+                ),
                 ('worker_id', models.TextField()),
-                ('created', models.DateTimeField(default=django.utils.timezone.now)),
+                (
+                    'created',
+                    models.DateTimeField(default=django.utils.timezone.now),
+                ),
             ],
         ),
         migrations.CreateModel(
             name='TransactionLog',
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                (
+                    'id',
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name='ID',
+                    ),
+                ),
                 ('node_id', models.UUIDField(null=True)),
                 ('volume_id', models.UUIDField(null=True)),
                 ('owner_id', models.BigIntegerField()),
-                ('op_type', models.CharField(choices=[('user_created', 'user_created'), ('delete', 'delete'), ('move', 'move'), ('put_content', 'put_content'), ('share_accepted', 'share_accepted'), ('share_deleted', 'share_deleted'), ('public_access_changed', 'public_access_changed'), ('udf_created', 'udf_created'), ('udf_deleted', 'udf_deleted')], max_length=256)),
+                (
+                    'op_type',
+                    models.CharField(
+                        choices=[
+                            ('user_created', 'user_created'),
+                            ('delete', 'delete'),
+                            ('move', 'move'),
+                            ('put_content', 'put_content'),
+                            ('share_accepted', 'share_accepted'),
+                            ('share_deleted', 'share_deleted'),
+                            ('public_access_changed', 'public_access_changed'),
+                            ('udf_created', 'udf_created'),
+                            ('udf_deleted', 'udf_deleted'),
+                        ],
+                        max_length=256,
+                    ),
+                ),
                 ('path', models.TextField(null=True)),
                 ('generation', models.BigIntegerField(null=True)),
-                ('timestamp', models.DateTimeField(default=django.utils.timezone.now)),
+                (
+                    'timestamp',
+                    models.DateTimeField(default=django.utils.timezone.now),
+                ),
                 ('mimetype', models.TextField(null=True)),
                 ('extra_data', models.TextField(null=True)),
                 ('old_path', models.TextField(null=True)),
@@ -48,6 +93,10 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='dbworkerlastrow',
             name='txlog',
-            field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='txlog.TransactionLog'),
+            field=models.ForeignKey(
+                null=True,
+                on_delete=django.db.models.deletion.CASCADE,
+                to='txlog.TransactionLog',
+            ),
         ),
     ]

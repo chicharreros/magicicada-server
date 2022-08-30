@@ -47,8 +47,9 @@ class QuerySetHelper(TestWithDatabase):
         if not should_accept and redirs is not None:
             self.assertEqual(req.redirect_hostname, redirs.get("hostname", ""))
             self.assertEqual(req.redirect_port, redirs.get("port", ""))
-            self.assertEqual(req.redirect_srvrecord,
-                             redirs.get("srvrecord", ""))
+            self.assertEqual(
+                req.redirect_srvrecord, redirs.get("srvrecord", "")
+            )
 
     def send(self, operation, to_send, should_accept, redirs=None):
         """Will send a query, and validate response."""
@@ -57,10 +58,14 @@ class QuerySetHelper(TestWithDatabase):
             """Simplify how this all is called."""
             op = getattr(client, operation + "_caps")
             d = op(to_send)
-            d.addCallback(lambda r: self.check_answer(
-                          r, operation, to_send, should_accept, redirs))
+            d.addCallback(
+                lambda r: self.check_answer(
+                    r, operation, to_send, should_accept, redirs
+                )
+            )
             d.addCallbacks(client.test_done, client.test_fail)
             return client
+
         return handy
 
 
@@ -80,20 +85,23 @@ class QueryCapabilitiesTestCase(QuerySetHelper):
     def test_query_one_present_bad(self):
         """Simple query, one capability present, bad."""
         self.patch(server, 'SUPPORTED_CAPS', set([frozenset(["foo"])]))
-        return self.callback_test(self.send("query", ["bar"], False),
-                                  caps=None)
+        return self.callback_test(
+            self.send("query", ["bar"], False), caps=None
+        )
 
     def test_query_two_present_ok(self):
         """Simple query, two capabilities present, ok."""
         self.patch(server, 'SUPPORTED_CAPS', set([frozenset(["foo", "bar"])]))
-        return self.callback_test(self.send("query", ["bar", "foo"], True),
-                                  caps=None)
+        return self.callback_test(
+            self.send("query", ["bar", "foo"], True), caps=None
+        )
 
     def test_query_two_present_bad(self):
         """Simple query, two capabilities present, bad."""
         self.patch(server, 'SUPPORTED_CAPS', set([frozenset(["foo", "bar"])]))
-        return self.callback_test(self.send("query", ["foo", "rab"], False),
-                                  caps=None)
+        return self.callback_test(
+            self.send("query", ["foo", "rab"], False), caps=None
+        )
 
     def test_query_insistent(self):
         """Repeated query."""
@@ -116,6 +124,7 @@ class QueryCapabilitiesTestCase(QuerySetHelper):
 
             d.addCallbacks(client.test_done, client.test_fail)
             return d
+
         return self.callback_test(queries, caps=None)
 
 
@@ -140,14 +149,16 @@ class SetCapabilitiesTestCase(QuerySetHelper):
     def test_set_two_present_ok(self):
         """Simple set, two capabilities present, ok."""
         self.patch(server, 'SUPPORTED_CAPS', set([frozenset(["foo", "bar"])]))
-        return self.callback_test(self.send("set", ["bar", "foo"], True),
-                                  caps=None)
+        return self.callback_test(
+            self.send("set", ["bar", "foo"], True), caps=None
+        )
 
     def test_set_two_present_bad(self):
         """Simple set, two capabilities present, bad."""
         self.patch(server, 'SUPPORTED_CAPS', set([frozenset(["foo", "bar"])]))
-        return self.callback_test(self.send("set", ["foo", "rab"], False),
-                                  caps=None)
+        return self.callback_test(
+            self.send("set", ["foo", "rab"], False), caps=None
+        )
 
     def test_set_insistent_ok(self):
         """Repeated set, allowed."""
@@ -166,11 +177,13 @@ class SetCapabilitiesTestCase(QuerySetHelper):
 
             # ok!
             d.addCallback(lambda _: client.set_caps(["foo", "bar"]))
-            d.addCallback(lambda r: self.check_answer(r, "set",
-                                                      ["foo", "bar"], True))
+            d.addCallback(
+                lambda r: self.check_answer(r, "set", ["foo", "bar"], True)
+            )
 
             d.addCallbacks(client.test_done, client.test_fail)
             return d
+
         return self.callback_test(queries, caps=None)
 
     def test_set_insistent_nop(self):
@@ -186,8 +199,9 @@ class SetCapabilitiesTestCase(QuerySetHelper):
 
             # ok!
             d.addCallback(lambda _: client.set_caps(["foo", "bar"]))
-            d.addCallback(lambda r: self.check_answer(r, "set",
-                                                      ["foo", "bar"], True))
+            d.addCallback(
+                lambda r: self.check_answer(r, "set", ["foo", "bar"], True)
+            )
 
             # after a succesful one, all others must fail!
             d.addCallback(lambda _: client.set_caps(["foo"]))
@@ -197,6 +211,7 @@ class SetCapabilitiesTestCase(QuerySetHelper):
 
             d.addCallbacks(client.test_done, client.test_fail)
             return d
+
         return self.callback_test(queries, caps=None)
 
 
@@ -207,48 +222,54 @@ class RedirectsTest(QuerySetHelper):
         """Don't get redirection because of emptiness."""
         self.patch(server, 'SUPPORTED_CAPS', set([frozenset(["foo"])]))
         self.patch(server, 'SUGGESTED_REDIRS', {})
-        return self.callback_test(self.send("set", ["bar"], False, {}),
-                                  caps=None)
+        return self.callback_test(
+            self.send("set", ["bar"], False, {}), caps=None
+        )
 
     def test_redirect_nothing_mismatch(self):
         """Don't get redirection because of mismatch."""
         self.patch(server, 'SUPPORTED_CAPS', set([frozenset(["foo"])]))
         redir = dict(hostname='a', port='b', srvrecord='c')
         self.patch(server, 'SUGGESTED_REDIRS', {frozenset({"bar"}): redir})
-        return self.callback_test(self.send("set", ["baz"], False, {}),
-                                  caps=None)
+        return self.callback_test(
+            self.send("set", ["baz"], False, {}), caps=None
+        )
 
     def test_redirect_ok_set(self):
         """Get a redirection in a set operation."""
         self.patch(server, 'SUPPORTED_CAPS', set([frozenset(["foo"])]))
         redir = dict(hostname='a', port='b', srvrecord='c')
         self.patch(server, 'SUGGESTED_REDIRS', {frozenset({"bar"}): redir})
-        return self.callback_test(self.send("set", ["bar"], False, redir),
-                                  caps=None)
+        return self.callback_test(
+            self.send("set", ["bar"], False, redir), caps=None
+        )
 
     def test_redirect_ok_query(self):
         """Get a redirection in a set operation."""
         self.patch(server, 'SUPPORTED_CAPS', set([frozenset(["foo"])]))
         redir = dict(hostname='a', port='b', srvrecord='c')
         self.patch(server, 'SUGGESTED_REDIRS', {frozenset({"bar"}): redir})
-        return self.callback_test(self.send("query", ["bar"], False, redir),
-                                  caps=None)
+        return self.callback_test(
+            self.send("query", ["bar"], False, redir), caps=None
+        )
 
     def test_redirect_combination_onlyhost(self):
         """Get a redirection to a host only."""
         self.patch(server, 'SUPPORTED_CAPS', set([frozenset(["foo"])]))
         redir = dict(hostname='a', port='b')
         self.patch(server, 'SUGGESTED_REDIRS', {frozenset({"bar"}): redir})
-        return self.callback_test(self.send("set", ["bar"], False, redir),
-                                  caps=None)
+        return self.callback_test(
+            self.send("set", ["bar"], False, redir), caps=None
+        )
 
     def test_redirect_combination_onlysrv(self):
         """Get a redirection to a srv record."""
         self.patch(server, 'SUPPORTED_CAPS', set([frozenset(["foo"])]))
         redir = dict(srvrecord='c')
         self.patch(server, 'SUGGESTED_REDIRS', {frozenset({"bar"}): redir})
-        return self.callback_test(self.send("set", ["bar"], False, redir),
-                                  caps=None)
+        return self.callback_test(
+            self.send("set", ["bar"], False, redir), caps=None
+        )
 
     def test_redirect_more_options(self):
         """Get a redirection even having more opptions."""
@@ -256,7 +277,10 @@ class RedirectsTest(QuerySetHelper):
         redir1 = dict(hostname='a', port='b', srvrecord='c')
         redir2 = dict(hostname='t', port='y', srvrecord='u')
         self.patch(
-            server, 'SUGGESTED_REDIRS',
-            {frozenset({"bar"}): redir1, frozenset({'gol'}): redir2})
-        return self.callback_test(self.send("set", ["bar"], False, redir1),
-                                  caps=None)
+            server,
+            'SUGGESTED_REDIRS',
+            {frozenset({"bar"}): redir1, frozenset({'gol'}): redir2},
+        )
+        return self.callback_test(
+            self.send("set", ["bar"], False, redir1), caps=None
+        )

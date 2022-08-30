@@ -23,6 +23,7 @@ import gc
 
 from django.conf import settings
 from django.utils.timezone import now
+
 try:
     from meliae import scanner
 except ImportError:
@@ -39,8 +40,15 @@ def meliae_dump():
 
     try:
         dump_dir = settings.LOG_FOLDER
-        filename = os.path.join(dump_dir, 'meliae-%s.json' % (
-            now().strftime("%Y%m%d%H%M%S",)))
+        filename = os.path.join(
+            dump_dir,
+            'meliae-%s.json'
+            % (
+                now().strftime(
+                    "%Y%m%d%H%M%S",
+                )
+            ),
+        )
         gc.collect()
         scanner.dump_all_objects(filename)
     except Exception as e:
@@ -73,7 +81,10 @@ def gc_dump():
             fh.write(line + "\n")
         fh.close()
         m = 'GC count is %s and %d garbage items written to: %s' % (
-            count, c, fname)
+            count,
+            c,
+            fname,
+        )
         return m
     except Exception as e:
         return "Error while trying to dump GC: %s" % (e,)

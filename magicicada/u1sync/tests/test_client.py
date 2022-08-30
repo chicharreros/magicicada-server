@@ -29,8 +29,11 @@ class SyncStorageClientTest(TestCase):
         """The connectionMade method should call the parent."""
         # set up everything
         called = []
-        self.patch(client.StorageClient, 'connectionMade',
-                   lambda s: called.append(True))
+        self.patch(
+            client.StorageClient,
+            'connectionMade',
+            lambda s: called.append(True),
+        )
         c = client.SyncStorageClient()
         obj = mock.Mock()
         obj.current_protocol.return_value = c
@@ -46,8 +49,11 @@ class SyncStorageClientTest(TestCase):
         """The connectionLost method should call the parent."""
         # set up everything
         called = []
-        self.patch(client.StorageClient, 'connectionLost',
-                   lambda s, r: called.append(True))
+        self.patch(
+            client.StorageClient,
+            'connectionLost',
+            lambda s, r: called.append(True),
+        )
         c = client.SyncStorageClient()
         obj = mock.Mock()
         obj.current_protocol.return_value = None

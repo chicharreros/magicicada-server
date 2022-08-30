@@ -43,14 +43,16 @@ class BaseTestCase(TwistedTestCase):
         self.assertEqual(t, "foo/s/i/m")
 
     def test_treepath_invalid(self):
-        self.assertRaises(ValueError,
-                          DiskStorage("foo")._get_treepath, "s/mple")
+        self.assertRaises(
+            ValueError, DiskStorage("foo")._get_treepath, "s/mple"
+        )
 
     def test_treepath_short(self):
         for n in range(DIRS_LEVELS):
             fname = "x" * n
-            self.assertRaises(ValueError,
-                              DiskStorage("foo")._get_treepath, fname)
+            self.assertRaises(
+                ValueError, DiskStorage("foo")._get_treepath, fname
+            )
 
     @defer.inlineCallbacks
     def test_get_node_ok(self):

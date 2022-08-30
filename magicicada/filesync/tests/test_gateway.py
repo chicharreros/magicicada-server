@@ -75,8 +75,9 @@ from magicicada.testing.testcase import BaseTestCase
 class FakeShare(object):
     """A share-like object."""
 
-    def __init__(self, id, name, root_id, shared_by_id, shared_to_id,
-                 access, accepted):
+    def __init__(
+        self, id, name, root_id, shared_by_id, shared_to_id, access, accepted
+    ):
         """Initialize an instance."""
         self.id = id
         self.name = name
@@ -141,13 +142,17 @@ class GatewayBaseTestCase(BaseTestCase):
         user = self.factory.make_user(locked=True)
         self.assertRaises(
             errors.LockedUserError,
-            self.gw.get_user, user.id, session_id='QWERTY')
+            self.gw.get_user,
+            user.id,
+            session_id='QWERTY',
+        )
 
     def test_get_user_locked_ignore_lock(self):
         """Test get_user with a locked user, but ignore the lock."""
         user = self.factory.make_user(locked=True)
         nuser = self.gw.get_user(
-            user.id, session_id='QWERTY', ignore_lock=True)
+            user.id, session_id='QWERTY', ignore_lock=True
+        )
         self.assertEqual(user.id, nuser.id)
 
     def test_split_in_list(self):
@@ -155,7 +160,7 @@ class GatewayBaseTestCase(BaseTestCase):
         biglist = [i for i in range(1000)]
         # test with various max sizes
         for i in range(3, 210):
-            sublists = utils.split_in_list(biglist, max=i)
+            sublists = utils.split_in_list(biglist, max_size=i)
             items = 0
             for s in sublists:
                 items += len(s)
@@ -168,9 +173,10 @@ class GatewayBaseTestCase(BaseTestCase):
         vol_id = uuid.uuid4()
         with fsync_commit():
             self.gw.queue_new_generation(1, vol_id, 3)
-        self.assertEqual(self.dummy_notifier.notifications, [
-            VolumeNewGeneration(1, vol_id, 3, self.gw.session_id)
-        ])
+        self.assertEqual(
+            self.dummy_notifier.notifications,
+            [VolumeNewGeneration(1, vol_id, 3, self.gw.session_id)],
+        )
 
     def _test_queue_share_event(self, event_class, method_name):
         """Test share events (generic form)."""
@@ -181,14 +187,31 @@ class GatewayBaseTestCase(BaseTestCase):
         shared_to_id = 11
         access = 'Read'
         accepted = 'False'
-        share = FakeShare(share_id, name, root_id, shared_by_id, shared_to_id,
-                          access, accepted)
+        share = FakeShare(
+            share_id,
+            name,
+            root_id,
+            shared_by_id,
+            shared_to_id,
+            access,
+            accepted,
+        )
         with fsync_commit():
             getattr(self.gw, method_name)(share)
-        self.assertEqual(self.dummy_notifier.notifications, [
-            event_class(share_id, name, root_id, shared_by_id, shared_to_id,
-                        access, accepted)
-        ])
+        self.assertEqual(
+            self.dummy_notifier.notifications,
+            [
+                event_class(
+                    share_id,
+                    name,
+                    root_id,
+                    shared_by_id,
+                    shared_to_id,
+                    access,
+                    accepted,
+                )
+            ],
+        )
 
     def test_queue_share_created(self):
         """Test event generated when a share is created."""
@@ -215,10 +238,18 @@ class GatewayBaseTestCase(BaseTestCase):
         udf = FakeUDF(owner_id, root_id, udf_id, suggested_path)
         with fsync_commit():
             self.gw.queue_udf_create(udf)
-        self.assertEqual(self.dummy_notifier.notifications, [
-            UDFCreate(owner_id, root_id, udf_id, suggested_path,
-                      self.gw.session_id)
-        ])
+        self.assertEqual(
+            self.dummy_notifier.notifications,
+            [
+                UDFCreate(
+                    owner_id,
+                    root_id,
+                    udf_id,
+                    suggested_path,
+                    self.gw.session_id,
+                )
+            ],
+        )
 
     def test_queue_udf_delete(self):
         """Test event generated when a UDF is deleted."""
@@ -230,7 +261,8 @@ class GatewayBaseTestCase(BaseTestCase):
         with fsync_commit():
             self.gw.queue_udf_delete(udf)
         self.assertEqual(
-            self.dummy_notifier.notifications, [UDFDelete(owner_id, udf_id)])
+            self.dummy_notifier.notifications, [UDFDelete(owner_id, udf_id)]
+        )
 
 
 class EventNotificationTest(BaseTestCase):
@@ -241,9 +273,11 @@ class EventNotificationTest(BaseTestCase):
         self.user = make_storage_user(username='user1')
         self.dummy_notifier = DummyNotifier()
         self.gw = GatewayBase(
-            session_id=uuid.uuid4(), notifier=self.dummy_notifier)
+            session_id=uuid.uuid4(), notifier=self.dummy_notifier
+        )
         self.vgw = ReadWriteVolumeGateway(
-            self.user, notifier=self.dummy_notifier)
+            self.user, notifier=self.dummy_notifier
+        )
         self.root = self.vgw.get_root()
 
     def setup_shares(self):
@@ -261,18 +295,34 @@ class EventNotificationTest(BaseTestCase):
 
         db_root_node = StorageObject.objects.get(id=root.id)
         self.share1 = self.factory.make_share(
-            subtree=db_root_node, shared_to=self.user1, name='Share1',
-            access=Share.MODIFY, accepted=True)
+            subtree=db_root_node,
+            shared_to=self.user1,
+            name='Share1',
+            access=Share.MODIFY,
+            accepted=True,
+        )
         self.share2 = self.factory.make_share(
-            subtree=db_root_node, shared_to=self.user2, name='Share2',
-            access=Share.MODIFY, accepted=True)
+            subtree=db_root_node,
+            shared_to=self.user2,
+            name='Share2',
+            access=Share.MODIFY,
+            accepted=True,
+        )
         self.share3 = self.factory.make_share(
-            subtree=StorageObject.objects.get(id=self.d1.id), accepted=True,
-            shared_to=self.user3, name='Share3', access=Share.VIEW)
+            subtree=StorageObject.objects.get(id=self.d1.id),
+            accepted=True,
+            shared_to=self.user3,
+            name='Share3',
+            access=Share.VIEW,
+        )
         # Note that only share1-3 are accepted
         self.share4 = self.factory.make_share(
-            subtree=StorageObject.objects.get(id=self.d2.id), accepted=False,
-            shared_to=self.user4, name='Share4', access=Share.MODIFY)
+            subtree=StorageObject.objects.get(id=self.d2.id),
+            accepted=False,
+            shared_to=self.user4,
+            name='Share4',
+            access=Share.MODIFY,
+        )
         self.dummy_notifier.reset()
 
     def test_queue_new_generation_generation_None(self):
@@ -280,9 +330,10 @@ class EventNotificationTest(BaseTestCase):
         vol_id = uuid.uuid4()
         with fsync_commit():
             self.gw.queue_new_generation(1, vol_id, None)
-        self.assertEqual(self.dummy_notifier.notifications, [
-            VolumeNewGeneration(1, vol_id, 0, self.gw.session_id)
-        ])
+        self.assertEqual(
+            self.dummy_notifier.notifications,
+            [VolumeNewGeneration(1, vol_id, 0, self.gw.session_id)],
+        )
 
     def test_handle_node_change_with_shares(self):
         """Test the handle_node_change."""
@@ -290,18 +341,39 @@ class EventNotificationTest(BaseTestCase):
         node = StorageObject.objects.get(id=self.d3.id)
         with fsync_commit():
             self.vgw.handle_node_change(node)
-        self.assertIn(VolumeNewGeneration(self.user.id, None, node.
-                                          generation, self.vgw.session_id),
-                      self.dummy_notifier.notifications)
-        self.assertIn(VolumeNewGeneration(self.user1.id, self.share1.id, node.
-                                          generation, self.vgw.session_id),
-                      self.dummy_notifier.notifications)
-        self.assertIn(VolumeNewGeneration(self.user2.id, self.share2.id, node.
-                                          generation, self.vgw.session_id),
-                      self.dummy_notifier.notifications)
-        self.assertIn(VolumeNewGeneration(self.user3.id, self.share3.id, node.
-                                          generation, self.vgw.session_id),
-                      self.dummy_notifier.notifications)
+        self.assertIn(
+            VolumeNewGeneration(
+                self.user.id, None, node.generation, self.vgw.session_id
+            ),
+            self.dummy_notifier.notifications,
+        )
+        self.assertIn(
+            VolumeNewGeneration(
+                self.user1.id,
+                self.share1.id,
+                node.generation,
+                self.vgw.session_id,
+            ),
+            self.dummy_notifier.notifications,
+        )
+        self.assertIn(
+            VolumeNewGeneration(
+                self.user2.id,
+                self.share2.id,
+                node.generation,
+                self.vgw.session_id,
+            ),
+            self.dummy_notifier.notifications,
+        )
+        self.assertIn(
+            VolumeNewGeneration(
+                self.user3.id,
+                self.share3.id,
+                node.generation,
+                self.vgw.session_id,
+            ),
+            self.dummy_notifier.notifications,
+        )
 
     def test_handle_node_change_from_share(self):
         """Test the handle_node_change."""
@@ -310,44 +382,67 @@ class EventNotificationTest(BaseTestCase):
         user1 = make_storage_user(username=self.user1.username)
         share = user1.get_share(self.share1.id)
         vgw = ReadWriteVolumeGateway(
-            user1, share=share, notifier=self.dummy_notifier)
+            user1, share=share, notifier=self.dummy_notifier
+        )
         with fsync_commit():
             vgw.handle_node_change(node)
 
-        self.assertIn(VolumeNewGeneration(self.user.id, None,
-                                          node.generation, vgw.session_id),
-                      self.dummy_notifier.notifications)
-        self.assertIn(VolumeNewGeneration(self.user3.id, self.share3.id,
-                                          node.generation, vgw.session_id),
-                      self.dummy_notifier.notifications)
-        self.assertIn(VolumeNewGeneration(self.user2.id, self.share2.id,
-                                          node.generation, vgw.session_id),
-                      self.dummy_notifier.notifications)
-        self.assertIn(VolumeNewGeneration(self.user1.id, self.share1.id,
-                                          node.generation, vgw.session_id),
-                      self.dummy_notifier.notifications)
+        self.assertIn(
+            VolumeNewGeneration(
+                self.user.id, None, node.generation, vgw.session_id
+            ),
+            self.dummy_notifier.notifications,
+        )
+        self.assertIn(
+            VolumeNewGeneration(
+                self.user3.id, self.share3.id, node.generation, vgw.session_id
+            ),
+            self.dummy_notifier.notifications,
+        )
+        self.assertIn(
+            VolumeNewGeneration(
+                self.user2.id, self.share2.id, node.generation, vgw.session_id
+            ),
+            self.dummy_notifier.notifications,
+        )
+        self.assertIn(
+            VolumeNewGeneration(
+                self.user1.id, self.share1.id, node.generation, vgw.session_id
+            ),
+            self.dummy_notifier.notifications,
+        )
 
     def test_make_file(self):
         """Make sure make_file sends a notification."""
         # the root node gets a notification as a directory content change
         with fsync_commit():
             f = self.vgw.make_file(self.root.id, 'filename')
-        self.assertEqual(self.dummy_notifier.notifications, [
-            VolumeNewGeneration(self.user.id, None, f.generation,
-                                self.vgw.session_id)
-        ])
+        self.assertEqual(
+            self.dummy_notifier.notifications,
+            [
+                VolumeNewGeneration(
+                    self.user.id, None, f.generation, self.vgw.session_id
+                )
+            ],
+        )
 
     def test_make_file_with_magic_content(self):
         """Make sure make_file with magic content sends a notification."""
         cb = self.factory.make_content_blob(
-            content='FakeContent', magic_hash='magic')
+            content='FakeContent', magic_hash='magic'
+        )
         with fsync_commit():
-            f = self.vgw.make_file(self.root.id, 'filename', hash=cb.hash,
-                                   magic_hash='magic')
-        self.assertEqual(self.dummy_notifier.notifications, [
-            VolumeNewGeneration(self.user.id, None, f.generation,
-                                self.vgw.session_id)
-        ])
+            f = self.vgw.make_file(
+                self.root.id, 'filename', hash=cb.hash, magic_hash='magic'
+            )
+        self.assertEqual(
+            self.dummy_notifier.notifications,
+            [
+                VolumeNewGeneration(
+                    self.user.id, None, f.generation, self.vgw.session_id
+                )
+            ],
+        )
 
     def test_make_file_twice_notification(self):
         """Make sure make_file doesn't sends notifications.
@@ -371,15 +466,19 @@ class EventNotificationTest(BaseTestCase):
         deflated_size = 10000
         with fsync_commit():
             f = self.vgw.make_file_with_content(
-                self.root.id, name, hash, crc, size, deflated_size,
-                storage_key)
+                self.root.id, name, hash, crc, size, deflated_size, storage_key
+            )
         self.dummy_notifier.reset()
         with fsync_commit():
             f = self.vgw.delete_node(f.id)
-        self.assertEqual(self.dummy_notifier.notifications, [
-            VolumeNewGeneration(self.user.id, None, f.generation,
-                                self.vgw.session_id)
-        ])
+        self.assertEqual(
+            self.dummy_notifier.notifications,
+            [
+                VolumeNewGeneration(
+                    self.user.id, None, f.generation, self.vgw.session_id
+                )
+            ],
+        )
 
     def test_restore_file_notifications(self):
         """Make sure restore_file sends notifications."""
@@ -391,26 +490,34 @@ class EventNotificationTest(BaseTestCase):
         deflated_size = 10000
         with fsync_commit():
             a_file = self.vgw.make_file_with_content(
-                self.root.id, name, hash, crc, size, deflated_size,
-                storage_key)
+                self.root.id, name, hash, crc, size, deflated_size, storage_key
+            )
             self.vgw.delete_node(a_file.id)
         self.dummy_notifier.reset()
         with fsync_commit():
             node = self.vgw.restore_node(a_file.id)
-        self.assertEqual(self.dummy_notifier.notifications, [
-            VolumeNewGeneration(self.user.id, None, node.generation,
-                                self.vgw.session_id)
-        ])
+        self.assertEqual(
+            self.dummy_notifier.notifications,
+            [
+                VolumeNewGeneration(
+                    self.user.id, None, node.generation, self.vgw.session_id
+                )
+            ],
+        )
 
     def test_make_subdirectory_notification(self):
         """Make sure make_subdirectory sends notifications."""
         # the root node gets a notification as a directory content change
         with fsync_commit():
             d = self.vgw.make_subdirectory(self.root.id, 'dirname')
-        self.assertEqual(self.dummy_notifier.notifications, [
-            VolumeNewGeneration(self.user.id, None, d.generation,
-                                self.vgw.session_id)
-        ])
+        self.assertEqual(
+            self.dummy_notifier.notifications,
+            [
+                VolumeNewGeneration(
+                    self.user.id, None, d.generation, self.vgw.session_id
+                )
+            ],
+        )
 
     def test_make_subdirectory_twice_notification(self):
         """Make sure make_subdirectory doesn't sends notifications.
@@ -431,10 +538,14 @@ class EventNotificationTest(BaseTestCase):
         self.dummy_notifier.reset()
         with fsync_commit():
             d = self.vgw.delete_node(d.id)
-        self.assertEqual(self.dummy_notifier.notifications, [
-            VolumeNewGeneration(self.user.id, None, d.generation,
-                                self.vgw.session_id)
-        ])
+        self.assertEqual(
+            self.dummy_notifier.notifications,
+            [
+                VolumeNewGeneration(
+                    self.user.id, None, d.generation, self.vgw.session_id
+                )
+            ],
+        )
 
     def test_move_notification_no_move(self):
         """Make sure no notifications are sent with noop moves."""
@@ -460,17 +571,23 @@ class EventNotificationTest(BaseTestCase):
             dira1 = self.vgw.make_subdirectory(root_id, 'dira1')
             dira2 = self.vgw.make_subdirectory(dira1.id, 'dira2')
             self.vgw.make_file_with_content(
-                dira1.id, name, hash, crc, size, deflated_size, storage_key)
+                dira1.id, name, hash, crc, size, deflated_size, storage_key
+            )
         self.dummy_notifier.reset()
         with fsync_commit():
             n = self.vgw.move_node(dira2.id, root_id, 'dira1')
         # we get two generations, one for the delete and one for the move
-        self.assertEqual(self.dummy_notifier.notifications, [
-            VolumeNewGeneration(self.user.id, None, n.generation - 1,
-                                self.vgw.session_id),
-            VolumeNewGeneration(self.user.id, None, n.generation,
-                                self.vgw.session_id),
-        ])
+        self.assertEqual(
+            self.dummy_notifier.notifications,
+            [
+                VolumeNewGeneration(
+                    self.user.id, None, n.generation - 1, self.vgw.session_id
+                ),
+                VolumeNewGeneration(
+                    self.user.id, None, n.generation, self.vgw.session_id
+                ),
+            ],
+        )
 
     def test_move_notification(self):
         """Make sure moves send the corrent notifications."""
@@ -481,10 +598,14 @@ class EventNotificationTest(BaseTestCase):
         self.dummy_notifier.reset()
         with fsync_commit():
             n = self.vgw.move_node(dira2.id, root_id, 'dirc1')
-        self.assertEqual(self.dummy_notifier.notifications, [
-            VolumeNewGeneration(self.user.id, None, n.generation,
-                                self.vgw.session_id)
-        ])
+        self.assertEqual(
+            self.dummy_notifier.notifications,
+            [
+                VolumeNewGeneration(
+                    self.user.id, None, n.generation, self.vgw.session_id
+                )
+            ],
+        )
 
     def test_make_file_with_content(self):
         """Ensure file creation with content sends corrent notifications."""
@@ -497,12 +618,23 @@ class EventNotificationTest(BaseTestCase):
         magic_hash = 'magic_hash'
         with fsync_commit():
             n = self.vgw.make_file_with_content(
-                self.root.id, name, hash, crc, size, deflated_size,
-                storage_key, magic_hash=magic_hash)
-        self.assertEqual(self.dummy_notifier.notifications, [
-            VolumeNewGeneration(self.user.id, None, n.generation,
-                                self.vgw.session_id)
-        ])
+                self.root.id,
+                name,
+                hash,
+                crc,
+                size,
+                deflated_size,
+                storage_key,
+                magic_hash=magic_hash,
+            )
+        self.assertEqual(
+            self.dummy_notifier.notifications,
+            [
+                VolumeNewGeneration(
+                    self.user.id, None, n.generation, self.vgw.session_id
+                )
+            ],
+        )
 
     def test_make_file_with_content_overwrite(self):
         """Make file with contentblob and overwite its existing content."""
@@ -514,19 +646,38 @@ class EventNotificationTest(BaseTestCase):
         deflated_size = 10000
         f = self.vgw.make_file_with_content
         with fsync_commit():
-            f(self.root.id, name, hash, crc, size, deflated_size,
-              storage_key, mimetype='image/tif')
+            f(
+                self.root.id,
+                name,
+                hash,
+                crc,
+                size,
+                deflated_size,
+                storage_key,
+                mimetype='image/tif',
+            )
         self.dummy_notifier.reset()
         size = 101
         newhash = self.factory.get_fake_hash('CXXYYY')
         newstorage_key = uuid.uuid4()
         with fsync_commit():
-            n = f(self.root.id, name, newhash, crc, size, deflated_size,
-                  newstorage_key)
-        self.assertEqual(self.dummy_notifier.notifications, [
-            VolumeNewGeneration(self.user.id, None, n.generation,
-                                self.vgw.session_id)
-        ])
+            n = f(
+                self.root.id,
+                name,
+                newhash,
+                crc,
+                size,
+                deflated_size,
+                newstorage_key,
+            )
+        self.assertEqual(
+            self.dummy_notifier.notifications,
+            [
+                VolumeNewGeneration(
+                    self.user.id, None, n.generation, self.vgw.session_id
+                )
+            ],
+        )
 
     def test_make_content(self):
         """Make sure make_content sends correct notifications."""
@@ -539,13 +690,23 @@ class EventNotificationTest(BaseTestCase):
         size = 11111
         def_size = 10000
         with fsync_commit():
-            newnode = self.vgw.make_content(filenode.id, filenode.content_hash,
-                                            new_hash, crc, size, def_size,
-                                            new_storage_key)
-        self.assertEqual(self.dummy_notifier.notifications, [
-            VolumeNewGeneration(self.user.id, None, newnode.generation,
-                                self.vgw.session_id)
-        ])
+            newnode = self.vgw.make_content(
+                filenode.id,
+                filenode.content_hash,
+                new_hash,
+                crc,
+                size,
+                def_size,
+                new_storage_key,
+            )
+        self.assertEqual(
+            self.dummy_notifier.notifications,
+            [
+                VolumeNewGeneration(
+                    self.user.id, None, newnode.generation, self.vgw.session_id
+                )
+            ],
+        )
 
     def test_change_public_access_no_node_update(self):
         """Test that change_public_access don't send a node_update event."""
@@ -554,10 +715,14 @@ class EventNotificationTest(BaseTestCase):
         self.dummy_notifier.reset()
         with fsync_commit():
             f = self.vgw.change_public_access(f.id, True)
-        self.assertEqual(self.dummy_notifier.notifications, [
-            VolumeNewGeneration(self.user.id, None, f.generation,
-                                self.vgw.session_id)
-        ])
+        self.assertEqual(
+            self.dummy_notifier.notifications,
+            [
+                VolumeNewGeneration(
+                    self.user.id, None, f.generation, self.vgw.session_id
+                )
+            ],
+        )
 
 
 class SystemGatewayTestCase(BaseTestCase):
@@ -570,7 +735,8 @@ class SystemGatewayTestCase(BaseTestCase):
     def test_create_or_update_user(self):
         """Test the basic make user method"""
         user = self.gw.create_or_update_user(
-            'username', visible_name='Visible Name', max_storage_bytes=1)
+            'username', visible_name='Visible Name', max_storage_bytes=1
+        )
         self.assertEqual(user.username, 'username')
         self.assertEqual(user.visible_name, 'Visible Name')
         self.assertEqual(user.max_storage_bytes, 1)
@@ -582,14 +748,16 @@ class SystemGatewayTestCase(BaseTestCase):
     def test_create_or_update_user_update(self):
         """Test the basic make user method"""
         user = self.gw.create_or_update_user(
-            'username', visible_name='Visible Name', max_storage_bytes=1)
+            'username', visible_name='Visible Name', max_storage_bytes=1
+        )
         # update the user info.
         usr = StorageUser.objects.get(id=user.id)
         usr.status = STATUS_DEAD
         usr.save()
         # creates for existing users
         user = self.gw.create_or_update_user(
-            'username', visible_name='Visible Name2', max_storage_bytes=2)
+            'username', visible_name='Visible Name2', max_storage_bytes=2
+        )
         # their quota and other infor should get updated
         self.assertEqual(user.username, 'username')
         self.assertEqual(user.visible_name, 'Visible Name2')
@@ -600,24 +768,36 @@ class SystemGatewayTestCase(BaseTestCase):
         user1 = self.factory.make_user(username='sharer')
         root = StorageObject.objects.get_root(user1)
         share = self.factory.make_share(
-            subtree=root, name='Share', access=Share.VIEW, accepted=False,
-            email='fake@example.com')
+            subtree=root,
+            name='Share',
+            access=Share.VIEW,
+            accepted=False,
+            email='fake@example.com',
+        )
         share = self.gw.get_shareoffer(share.id)
         # test with already accepted share_offer
         user2 = self.factory.make_user(username='sharee')
         self.gw.claim_shareoffer(
-            user2.id, user2.username, user2.get_full_name(), share.id)
-        self.assertRaises(errors.ShareAlreadyAccepted,
-                          self.gw.get_shareoffer, share.id)
+            user2.id, user2.username, user2.get_full_name(), share.id
+        )
+        self.assertRaises(
+            errors.ShareAlreadyAccepted, self.gw.get_shareoffer, share.id
+        )
         # non existent offer
-        self.assertRaises(errors.DoesNotExist, self.gw.get_shareoffer,
-                          uuid.uuid4())
+        self.assertRaises(
+            errors.DoesNotExist, self.gw.get_shareoffer, uuid.uuid4()
+        )
         # test with Dead (rescinded) share_offer
         share = self.factory.make_share(
-            subtree=root, name='Share3', access=Share.VIEW,
-            email='fake3@example.com', status=STATUS_DEAD)
+            subtree=root,
+            name='Share3',
+            access=Share.VIEW,
+            email='fake3@example.com',
+            status=STATUS_DEAD,
+        )
         self.assertRaises(
-            errors.DoesNotExist, self.gw.get_shareoffer, share.id)
+            errors.DoesNotExist, self.gw.get_shareoffer, share.id
+        )
 
     def test_claim_shareoffer(self):
         """Test that the claim_shareoffer function works properly.
@@ -632,16 +812,26 @@ class SystemGatewayTestCase(BaseTestCase):
         user1 = self.factory.make_user(username='sharer')
         root = StorageObject.objects.get_root(user1)
         share = self.factory.make_share(
-            subtree=root, name='Share', access=Share.VIEW, accepted=False,
-            email='fake@example.com')
+            subtree=root,
+            name='Share',
+            access=Share.VIEW,
+            accepted=False,
+            email='fake@example.com',
+        )
         # user can't accept their own share offer
         self.assertRaises(
-            errors.DoesNotExist, self.gw.claim_shareoffer, user1.id,
-            user1.username, user1.get_full_name(), share.id)
+            errors.DoesNotExist,
+            self.gw.claim_shareoffer,
+            user1.id,
+            user1.username,
+            user1.get_full_name(),
+            share.id,
+        )
         # basic test success...user already exist
         user2 = self.factory.make_user(username='sharee')
         self.gw.claim_shareoffer(
-            user2.id, user2.username, user2.get_full_name(), share.id)
+            user2.id, user2.username, user2.get_full_name(), share.id
+        )
         share = Share.objects.get(id=share.id)
         self.assertEqual(share.shared_to, user2)
         self.assertEqual(share.accepted, True)
@@ -649,19 +839,29 @@ class SystemGatewayTestCase(BaseTestCase):
         self.assertEqual(user2.is_active, True)
         # Exception raised when accepted twice
         self.assertRaises(
-            errors.ShareAlreadyAccepted, self.gw.claim_shareoffer, user2.id,
-            user2.username, user2.visible_name, share.id)
+            errors.ShareAlreadyAccepted,
+            self.gw.claim_shareoffer,
+            user2.id,
+            user2.username,
+            user2.visible_name,
+            share.id,
+        )
         # test with new user
         share = self.factory.make_share(
-            subtree=root, name='Share2', access=Share.VIEW, accepted=False,
-            email='fake2@example.com')
+            subtree=root,
+            name='Share2',
+            access=Share.VIEW,
+            accepted=False,
+            email='fake2@example.com',
+        )
         self.gw.claim_shareoffer(user2.id + 1, 'user3', 'user 3', share.id)
         user3 = self.gw.get_user(user2.id + 1)
         # the user is created, but is inactive
         self.assertEqual(user3.is_active, False)
         # subscribing will call something like this:
         u = self.gw.create_or_update_user(
-            'user3', visible_name='user 3', max_storage_bytes=2 * (2 ** 30))
+            'user3', visible_name='user 3', max_storage_bytes=2 * (2**30)
+        )
         user3 = self.gw.get_user(u.id)
         self.assertEqual(user3.is_active, True)
 
@@ -675,8 +875,12 @@ class SystemGatewayTestCase(BaseTestCase):
         user1 = self.factory.make_user(username='sharer')
         root = StorageObject.objects.get_root(user1)
         share = self.factory.make_share(
-            subtree=root, name='Share', access=Share.VIEW, accepted=False,
-            email='fake@example.com')
+            subtree=root,
+            name='Share',
+            access=Share.VIEW,
+            accepted=False,
+            email='fake@example.com',
+        )
         # user 2 does not exist
         self.gw.claim_shareoffer(user1.id + 1, 'sharee', 'Sharee', share.id)
         user2 = self.gw.get_user(user1.id + 1)
@@ -691,13 +895,16 @@ class SystemGatewayTestCase(BaseTestCase):
     def test_make_download(self):
         """The make_download() method creates a Download object."""
         user = self.gw.create_or_update_user(
-            'username', visible_name='Visible Name', max_storage_bytes=1)
+            'username', visible_name='Visible Name', max_storage_bytes=1
+        )
         udf = self.factory.make_user_volume(
-            owner=user._user, path='~/path/name')
+            owner=user._user, path='~/path/name'
+        )
         dl_url = 'http://download/url'
         dl_key = uuid.uuid4()
         download = self.gw.make_download(
-            user.id, udf.id, 'path', dl_url, dl_key)
+            user.id, udf.id, 'path', dl_url, dl_key
+        )
         self.assertTrue(isinstance(download, DAODownload))
         self.assertEqual(download.owner_id, user.id)
         self.assertEqual(download.volume_id, udf.id)
@@ -708,11 +915,14 @@ class SystemGatewayTestCase(BaseTestCase):
     def test_make_download_with_key(self):
         """The make_download_with_key() makes a Download object with a key."""
         user = self.gw.create_or_update_user(
-            'username', visible_name='Visible Name', max_storage_bytes=1)
+            'username', visible_name='Visible Name', max_storage_bytes=1
+        )
         udf = self.factory.make_user_volume(
-            owner=user._user, path='~/path/name')
+            owner=user._user, path='~/path/name'
+        )
         download = self.gw.make_download(
-            user.id, udf.id, 'path', 'http://download/url', ['key'])
+            user.id, udf.id, 'path', 'http://download/url', ['key']
+        )
         self.assertTrue(isinstance(download, DAODownload))
         self.assertEqual(download.owner_id, user.id)
         self.assertEqual(download.volume_id, udf.id)
@@ -725,56 +935,72 @@ class SystemGatewayTestCase(BaseTestCase):
         path and URL or key.
         """
         user = self.gw.create_or_update_user(
-            'username', visible_name='Visible Name', max_storage_bytes=1)
+            'username', visible_name='Visible Name', max_storage_bytes=1
+        )
         udf = self.factory.make_user_volume(
-            owner=user._user, path='~/path/name')
+            owner=user._user, path='~/path/name'
+        )
         download = self.gw.make_download(
-            user.id, udf.id, 'path', 'http://download/url')
+            user.id, udf.id, 'path', 'http://download/url'
+        )
 
         other_download = self.gw.get_download(
-            user.id, udf.id, 'path', 'http://download/url')
+            user.id, udf.id, 'path', 'http://download/url'
+        )
         self.assertEqual(other_download.id, download.id)
 
     def test_get_old_download_with_null_key(self):
         """Old Download records may have no download key."""
         user = self.gw.create_or_update_user(
-            'username', visible_name='Visible Name', max_storage_bytes=1)
+            'username', visible_name='Visible Name', max_storage_bytes=1
+        )
         udf = self.factory.make_user_volume(
-            owner=user._user, path='~/path/name')
+            owner=user._user, path='~/path/name'
+        )
         download_url = 'http://download/url'
         file_path = 'path'
 
         # force the insert of an old download (with the key set to NULL)
         # this is done manually because the updated model always sets the key
         db_download = self.factory.make_download(
-            volume=udf, file_path=file_path, download_url=download_url,
-            status=Download.STATUS_COMPLETE, status_change_date=now())
+            volume=udf,
+            file_path=file_path,
+            download_url=download_url,
+            status=Download.STATUS_COMPLETE,
+            status_change_date=now(),
+        )
         assert db_download.download_key is None
 
         download = self.gw.get_download(
-            user.id, udf.id, file_path, download_url)
+            user.id, udf.id, file_path, download_url
+        )
         self.assertEqual(download.id, db_download.id)
         self.assertIsNone(download.download_key)
 
     def test_get_old_song_with_multiple_download_records(self):
         """Old songs may have multiple download records. Get the latest."""
         user = self.gw.create_or_update_user(
-            'username', visible_name='Visible Name', max_storage_bytes=1)
+            'username', visible_name='Visible Name', max_storage_bytes=1
+        )
         udf = self.factory.make_user_volume(
-            owner=user._user, path='~/path/name')
+            owner=user._user, path='~/path/name'
+        )
 
         file_path = 'path'
         download_key = 'mydownloadkey'
         download1_url = 'http://download/url/1'
         download1 = self.gw.make_download(
-            user.id, udf.id, file_path, download1_url, download_key)
+            user.id, udf.id, file_path, download1_url, download_key
+        )
 
         download2_url = 'http://download/url/2'
         download2 = self.gw.make_download(
-            user.id, udf.id, file_path, download2_url, download_key)
+            user.id, udf.id, file_path, download2_url, download_key
+        )
         assert download1.status_change_date < download2.status_change_date
         download = self.gw.get_download(
-            user.id, udf.id, file_path, download1_url, download_key)
+            user.id, udf.id, file_path, download1_url, download_key
+        )
         self.assertNotEqual(download.id, download1.id)
         self.assertEqual(download.id, download2.id)
 
@@ -783,15 +1009,19 @@ class SystemGatewayTestCase(BaseTestCase):
         path and URL or key.
         """
         user = self.gw.create_or_update_user(
-            'username', visible_name='Visible Name', max_storage_bytes=1)
+            'username', visible_name='Visible Name', max_storage_bytes=1
+        )
         udf = self.factory.make_user_volume(
-            owner=user._user, path='~/path/name')
+            owner=user._user, path='~/path/name'
+        )
         key = ['some', 'key']
         download = self.gw.make_download(
-            user.id, udf.id, 'path', 'http://download/url', key)
+            user.id, udf.id, 'path', 'http://download/url', key
+        )
 
         other_download = self.gw.get_download(
-            user.id, udf.id, 'path', 'http://download/url', key)
+            user.id, udf.id, 'path', 'http://download/url', key
+        )
         self.assertEqual(other_download.id, download.id)
 
     def test_get_download_with_same_key_and_different_url(self):
@@ -799,16 +1029,20 @@ class SystemGatewayTestCase(BaseTestCase):
         path and URL or key.
         """
         user = self.gw.create_or_update_user(
-            'username', visible_name='Visible Name', max_storage_bytes=1)
+            'username', visible_name='Visible Name', max_storage_bytes=1
+        )
         udf = self.factory.make_user_volume(
-            owner=user._user, path='~/path/name')
+            owner=user._user, path='~/path/name'
+        )
         key = ['some', 'key']
         download = self.gw.make_download(
-            user.id, udf.id, 'path', 'http://download/url/1', key)
+            user.id, udf.id, 'path', 'http://download/url/1', key
+        )
 
         # request with same key and different URL
         other_download = self.gw.get_download(
-            user.id, udf.id, 'path', 'http://download/url/2', key)
+            user.id, udf.id, 'path', 'http://download/url/2', key
+        )
         self.assertEqual(other_download.id, download.id)
 
     def test_get_download_by_id(self):
@@ -816,11 +1050,14 @@ class SystemGatewayTestCase(BaseTestCase):
         owner ID and download ID.
         """
         user = self.gw.create_or_update_user(
-            'username', visible_name='Visible Name', max_storage_bytes=1)
+            'username', visible_name='Visible Name', max_storage_bytes=1
+        )
         udf = self.factory.make_user_volume(
-            owner=user._user, path='~/path/name')
+            owner=user._user, path='~/path/name'
+        )
         download = self.gw.make_download(
-            user.id, udf.id, 'path', 'http://download/url')
+            user.id, udf.id, 'path', 'http://download/url'
+        )
 
         other_download = self.gw.get_download_by_id(user.id, download.id)
         self.assertEqual(other_download.id, download.id)
@@ -828,64 +1065,81 @@ class SystemGatewayTestCase(BaseTestCase):
     def test_update_download_status(self):
         """The update_download() method can update a download's status."""
         user = self.gw.create_or_update_user(
-            'username', visible_name='Visible Name', max_storage_bytes=1)
+            'username', visible_name='Visible Name', max_storage_bytes=1
+        )
         udf = self.factory.make_user_volume(
-            owner=user._user, path='~/spath/name')
+            owner=user._user, path='~/spath/name'
+        )
         download = self.gw.make_download(
-            user.id, udf.id, 'path', 'http://download/url')
+            user.id, udf.id, 'path', 'http://download/url'
+        )
         new_download = self.gw.update_download(
-            download.owner_id, download.id,
-            status=Download.STATUS_DOWNLOADING)
-        self.assertEqual(
-            new_download.status, Download.STATUS_DOWNLOADING)
+            download.owner_id, download.id, status=Download.STATUS_DOWNLOADING
+        )
+        self.assertEqual(new_download.status, Download.STATUS_DOWNLOADING)
 
     def test_update_download_node_id(self):
         """The update_download() method can update a download's node_id."""
         user = self.gw.create_or_update_user(
-            'username', visible_name='Visible Name', max_storage_bytes=1)
+            'username', visible_name='Visible Name', max_storage_bytes=1
+        )
         udf = self.factory.make_user_volume(
-            owner=user._user, path='~/spath/name')
+            owner=user._user, path='~/spath/name'
+        )
         download = self.gw.make_download(
-            user.id, udf.id, 'path', 'http://download/url')
+            user.id, udf.id, 'path', 'http://download/url'
+        )
         a_file = udf.root_node.make_file('TheName')
         new_download = self.gw.update_download(
-            download.owner_id, download.id,
-            node_id=a_file.id)
+            download.owner_id, download.id, node_id=a_file.id
+        )
         self.assertEqual(new_download.node_id, a_file.id)
 
     def test_update_download_error_message(self):
         """The update_download() method can update a download's error
         message."""
         user = self.gw.create_or_update_user(
-            'username', visible_name='Visible Name', max_storage_bytes=1)
+            'username', visible_name='Visible Name', max_storage_bytes=1
+        )
         udf = self.factory.make_user_volume(
-            owner=user._user, path='~/path/name')
+            owner=user._user, path='~/path/name'
+        )
         download = self.gw.make_download(
-            user.id, udf.id, 'path', 'http://download/url')
+            user.id, udf.id, 'path', 'http://download/url'
+        )
         new_download = self.gw.update_download(
-            download.owner_id, download.id, error_message='error')
+            download.owner_id, download.id, error_message='error'
+        )
         self.assertEqual(new_download.error_message, 'error')
 
     def test_get_failed_download_ids(self):
         """Test get_failed_download_ids()"""
         user = self.gw.create_or_update_user(
-            'username', visible_name='Visible Name', max_storage_bytes=1)
+            'username', visible_name='Visible Name', max_storage_bytes=1
+        )
         download1 = self.gw.make_download(
-            user.id, user.root_volume.id, 'path', 'http://download/url')
+            user.id, user.root_volume.id, 'path', 'http://download/url'
+        )
         download2 = self.gw.make_download(
-            user.id, user.root_volume.id, 'path2', 'http://download/url2')
+            user.id, user.root_volume.id, 'path2', 'http://download/url2'
+        )
         download2 = self.gw.update_download(
-            user.id, download2.id, status=Download.STATUS_ERROR,
-            error_message='something died')
+            user.id,
+            download2.id,
+            status=Download.STATUS_ERROR,
+            error_message='something died',
+        )
         failed_downloads = self.gw.get_failed_downloads(
             start_date=download1.status_change_date,
-            end_date=download2.status_change_date)
+            end_date=download2.status_change_date,
+        )
         self.assertIn(download2.id, [d.id for d in failed_downloads])
 
     def test_get_node(self):
         """Test the get_node method."""
         user = self.gw.create_or_update_user(
-            'username', visible_name='Visible Name', max_storage_bytes=1)
+            'username', visible_name='Visible Name', max_storage_bytes=1
+        )
         sgw = SystemGateway()
         root = StorageObject.objects.get_root(user._user)
         node = root.make_file('TheName', mimetype='fakemime')
@@ -906,15 +1160,22 @@ class SystemGatewayTestCase(BaseTestCase):
         def_size = 100
         for uid in range(0, 10):
             suser = self.factory.make_user(
-                username='testuser_%d' % uid, max_storage_bytes=1024)
+                username='testuser_%d' % uid, max_storage_bytes=1024
+            )
             user = self.gw.get_user(suser.id)
             vgw = user._gateway.get_root_gateway()
             root = vgw.get_root()
             new_hash = self.factory.get_fake_hash(os.urandom(100))
             file1 = vgw.make_file(root.id, 'file1-%d' % uid)
-            up1 = vgw.make_uploadjob(file1.id, file1.content_hash, new_hash,
-                                     crc, size, def_size,
-                                     multipart_key=uuid.uuid4())
+            up1 = vgw.make_uploadjob(
+                file1.id,
+                file1.content_hash,
+                new_hash,
+                crc,
+                size,
+                def_size,
+                multipart_key=uuid.uuid4(),
+            )
             # change the when_started date for the test.
             uploadjob = UploadJob.objects.get(id=up1.id)
             uploadjob.when_last_active = right_now - timedelta(uid)
@@ -933,15 +1194,22 @@ class SystemGatewayTestCase(BaseTestCase):
         def_size = 100
         for uid in range(0, 10):
             suser = self.factory.make_user(
-                username='testuser_%d' % uid, max_storage_bytes=1024)
+                username='testuser_%d' % uid, max_storage_bytes=1024
+            )
             user = self.gw.get_user(suser.id)
             vgw = user._gateway.get_root_gateway()
             root = vgw.get_root()
             new_hash = self.factory.get_fake_hash(os.urandom(100))
             file1 = vgw.make_file(root.id, 'file1-%d' % uid)
-            up1 = vgw.make_uploadjob(file1.id, file1.content_hash, new_hash,
-                                     crc, size, def_size,
-                                     multipart_key=uuid.uuid4())
+            up1 = vgw.make_uploadjob(
+                file1.id,
+                file1.content_hash,
+                new_hash,
+                crc,
+                size,
+                def_size,
+                multipart_key=uuid.uuid4(),
+            )
             # change the when_started date for the test.
             uploadjob = UploadJob.objects.get(id=up1.id)
             uploadjob.when_last_active = right_now - timedelta(10)
@@ -970,31 +1238,39 @@ class SystemGatewayPublicFileTestCase(BaseTestCase):
         size = deflated_size = 10
         self.root = self.vgw.get_root()
         file1 = self.vgw.make_file_with_content(
-            self.root.id, name, hash, crc, size, deflated_size, storage_key,
-            mimetype='fakemime')
+            self.root.id,
+            name,
+            hash,
+            crc,
+            size,
+            deflated_size,
+            storage_key,
+            mimetype='fakemime',
+        )
         self.file = self.vgw._get_node_simple(file1.id, with_content=True)
 
     def get_get_public_file_DoesNotExist(self):
         """Get get_public_file with unknown key."""
         # DoesNotExist is raised for bad file IDs.
-        self.assertRaises(errors.DoesNotExist,
-                          self.gw.get_public_file, 'xyz')
+        self.assertRaises(errors.DoesNotExist, self.gw.get_public_file, 'xyz')
 
     def test_get_public_file_no_content(self):
         """Test get_public_file when file has no content."""
         file_dao = self.vgw.change_public_access(self.file.id, True)
         self.file.content_blob = None
         self.file.save()
-        self.assertRaises(errors.DoesNotExist,
-                          self.gw.get_public_file, file_dao.public_key)
+        self.assertRaises(
+            errors.DoesNotExist, self.gw.get_public_file, file_dao.public_key
+        )
 
     def test_get_public_file_no_storage_key(self):
         """Test get_public_file when file has no storage_key."""
         file_dao = self.vgw.change_public_access(self.file.id, True)
         self.file.content.storage_key = None
         self.file.save()
-        self.assertRaises(errors.DoesNotExist,
-                          self.gw.get_public_file, file_dao.public_key)
+        self.assertRaises(
+            errors.DoesNotExist, self.gw.get_public_file, file_dao.public_key
+        )
 
     def test_get_public_file(self):
         """Tests for get_public_file."""
@@ -1010,8 +1286,9 @@ class SystemGatewayPublicFileTestCase(BaseTestCase):
 
         # DoesNotExist is raised if that file is made private.
         file_dao = self.vgw.change_public_access(self.file.id, False)
-        self.assertRaises(errors.DoesNotExist,
-                          self.gw.get_public_file, public_key)
+        self.assertRaises(
+            errors.DoesNotExist, self.gw.get_public_file, public_key
+        )
 
         # public stays the same when set back to public
         file_dao = self.vgw.change_public_access(file_dao.id, True)
@@ -1021,7 +1298,8 @@ class SystemGatewayPublicFileTestCase(BaseTestCase):
         # DoesNotExist is raised if the underlying file is deleted.
         self.vgw.delete_node(self.file.id)
         self.assertRaises(
-            errors.DoesNotExist, self.gw.get_public_file, public_key)
+            errors.DoesNotExist, self.gw.get_public_file, public_key
+        )
 
     def test_get_public_file_user_locked(self):
         """get_public_file works with a locked user."""
@@ -1050,13 +1328,15 @@ class SystemGatewayPublicDirectoryTestCase(BaseTestCase):
     def get_get_public_directory_DoesNotExist(self):
         """Get get_public_file with unknown key."""
         # DoesNotExist is raised for bad IDs
-        self.assertRaises(errors.DoesNotExist,
-                          self.gw.get_public_directory, 'xyz')
+        self.assertRaises(
+            errors.DoesNotExist, self.gw.get_public_directory, 'xyz'
+        )
 
     def test_get_public_directory(self):
         """Tests for get_public_directory."""
         dir_dao = self.vgw.change_public_access(
-            self.dir.id, True, allow_directory=True)
+            self.dir.id, True, allow_directory=True
+        )
         self.assertIsNotNone(dir_dao.public_uuid)
         public_key = dir_dao.public_key
         # If I don't do this, the test fails
@@ -1069,7 +1349,8 @@ class SystemGatewayPublicDirectoryTestCase(BaseTestCase):
     def test_get_public_directory_user_locked(self):
         """get_public_directory also works with locked user."""
         dir_dao = self.vgw.change_public_access(
-            self.dir.id, True, allow_directory=True)
+            self.dir.id, True, allow_directory=True
+        )
         self.assertIsNotNone(dir_dao.public_uuid)
         public_key = dir_dao.public_key
         # If I don't do this, the test fails
@@ -1078,16 +1359,19 @@ class SystemGatewayPublicDirectoryTestCase(BaseTestCase):
         self.assertEqual(dir2.id, self.dir.id)
         # DoesNotExist is raised if that directory is made private
         self.vgw.change_public_access(self.dir.id, False, allow_directory=True)
-        self.assertRaises(errors.DoesNotExist,
-                          self.gw.get_public_directory, public_key)
+        self.assertRaises(
+            errors.DoesNotExist, self.gw.get_public_directory, public_key
+        )
         dir_dao = self.vgw.change_public_access(
-            dir_dao.id, True, allow_directory=True)
+            dir_dao.id, True, allow_directory=True
+        )
         self.assertIsNotNone(dir_dao.public_uuid)
         public_key = dir_dao.public_key
         # DoesNotExist is raised if the underlying directory is deleted
         self.vgw.delete_node(self.dir.id)
-        self.assertRaises(errors.DoesNotExist,
-                          self.gw.get_public_directory, public_key)
+        self.assertRaises(
+            errors.DoesNotExist, self.gw.get_public_directory, public_key
+        )
 
 
 class StorageUserGatewayTestCase(BaseTestCase):
@@ -1129,8 +1413,11 @@ class StorageUserGatewayTestCase(BaseTestCase):
         user1 = self.factory.make_user(username='sharer')
         root = StorageObject.objects.get_root(user1)
         share = self.factory.make_share(
-            subtree=root, shared_to=self.user._user, name='Share',
-            accepted=False)
+            subtree=root,
+            shared_to=self.user._user,
+            name='Share',
+            accepted=False,
+        )
         self.assertEqual(share.status, STATUS_LIVE)
         self.assertFalse(share.accepted)
         # this should succeed
@@ -1149,8 +1436,11 @@ class StorageUserGatewayTestCase(BaseTestCase):
         user1 = self.factory.make_user(username='sharer')
         root = StorageObject.objects.get_root(user1)
         share = self.factory.make_share(
-            subtree=root, shared_to=self.user._user, name='Share',
-            accepted=True)
+            subtree=root,
+            shared_to=self.user._user,
+            name='Share',
+            accepted=True,
+        )
         self.assertEqual(share.status, STATUS_LIVE)
         self.assertTrue(share.accepted)
         # this should succeed
@@ -1169,14 +1459,18 @@ class StorageUserGatewayTestCase(BaseTestCase):
         user1 = self.factory.make_user(username='sharer')
         root = StorageObject.objects.get_root(user1)
         share = self.factory.make_share(
-            subtree=root, shared_to=self.user._user, name='Share')
+            subtree=root, shared_to=self.user._user, name='Share'
+        )
         share = self.gw.get_share(share.id, accepted_only=False)
         self.assertEqual(share.status, STATUS_LIVE)
         self.gw.delete_share(share.id)
         # share is now inaccessible
         self.assertRaises(
-            errors.DoesNotExist, self.gw.get_share, share.id,
-            accepted_only=False)
+            errors.DoesNotExist,
+            self.gw.get_share,
+            share.id,
+            accepted_only=False,
+        )
         # make it live again so we can test it with the share-ee
         Share.objects.filter(id=share.id).update(status=STATUS_LIVE)
         # get user1's gateway and delete it
@@ -1212,19 +1506,23 @@ class StorageUserGatewayTestCase(BaseTestCase):
         # the shared_to property is also populated
         self.assertEqual(share_info[sharez.id].root_id, dir1.id)
         self.assertEqual(share_info[sharez.id].shared_to.id, usera.id)
-        self.assertEqual(share_info[sharez.id].shared_to.username,
-                         usera.username)
+        self.assertEqual(
+            share_info[sharez.id].shared_to.username, usera.username
+        )
         self.assertEqual(share_info[sharea.id].root_id, dir2.id)
         self.assertEqual(share_info[sharea.id].shared_to.id, usera.id)
-        self.assertEqual(share_info[sharea.id].shared_to.username,
-                         usera.username)
+        self.assertEqual(
+            share_info[sharea.id].shared_to.username, usera.username
+        )
         self.assertEqual(share_info[shareb.id].root_id, dir2.id)
         self.assertEqual(share_info[shareb.id].shared_to.id, userb.id)
-        self.assertEqual(share_info[shareb.id].shared_to.username,
-                         userb.username)
+        self.assertEqual(
+            share_info[shareb.id].shared_to.username, userb.username
+        )
         # can also get the unnaccepted shares
         shares = self.gw.get_shares_of_nodes(
-            [dir2.id, dir1.id] + fake_nodeids, accepted_only=False)
+            [dir2.id, dir1.id] + fake_nodeids, accepted_only=False
+        )
         shares = list(shares)
         self.assertEqual(len(shares), 4)
         share_info = dict([(share.id, share) for share in shares])
@@ -1244,10 +1542,8 @@ class StorageUserGatewayTestCase(BaseTestCase):
         """Test failures when making UDF"""
         self.gw.make_udf('~/a/b/c')
         self.gw.make_udf('~/a/b/cc')
-        self.assertRaises(errors.NoPermission,
-                          self.gw.make_udf, '~/a/b/c/d/e')
-        self.assertRaises(errors.NoPermission,
-                          self.gw.make_udf, '~/a/b')
+        self.assertRaises(errors.NoPermission, self.gw.make_udf, '~/a/b/c/d/e')
+        self.assertRaises(errors.NoPermission, self.gw.make_udf, '~/a/b')
 
     def test_get_udf(self):
         """Test make and get udf methods."""
@@ -1350,7 +1646,10 @@ class StorageUserGatewayTestCase(BaseTestCase):
         for s in [sharez, sharea, shareb, sharec]:
             self.assertRaises(
                 errors.DoesNotExist,
-                self.user._gateway.get_share, s.id, accepted_only=False)
+                self.user._gateway.get_share,
+                s.id,
+                accepted_only=False,
+            )
 
     def test_delete_related_shares_lotsofchildren(self):
         """Make sure the query splitting does it's job."""
@@ -1366,7 +1665,10 @@ class StorageUserGatewayTestCase(BaseTestCase):
         self.user._gateway.delete_related_shares(dir1)
         self.assertRaises(
             errors.DoesNotExist,
-            self.user._gateway.get_share, sharea.id, accepted_only=False)
+            self.user._gateway.get_share,
+            sharea.id,
+            accepted_only=False,
+        )
 
     def test_get_downloads(self):
         """Test get_downlods method."""
@@ -1374,7 +1676,8 @@ class StorageUserGatewayTestCase(BaseTestCase):
         self.assertEqual(dls, [])
         sysgw = SystemGateway()
         udf = self.factory.make_user_volume(
-            owner=self.user._user, path='~/path/name')
+            owner=self.user._user, path='~/path/name'
+        )
         dl_url = 'http://download/url'
         found_urls = {}
         for i in range(5):
@@ -1448,7 +1751,8 @@ class StorageUserGatewayTestCase(BaseTestCase):
         user1 = self.factory.make_user(username='sharer')
         root = StorageObject.objects.get_root(user1)
         share = self.factory.make_share(
-            subtree=root, shared_to=self.user._user, name='Share')
+            subtree=root, shared_to=self.user._user, name='Share'
+        )
         share = self.gw.get_share(share.id, accepted_only=False)
         self.assertEqual(0, self.gw.get_share_generation(share))
         # increase the generation
@@ -1461,7 +1765,8 @@ class StorageUserGatewayTestCase(BaseTestCase):
         user1 = self.factory.make_user(username='sharer')
         root = StorageObject.objects.get_root(user1)
         share = self.factory.make_share(
-            subtree=root, shared_to=self.user._user, name='Share')
+            subtree=root, shared_to=self.user._user, name='Share'
+        )
         vol = root.volume
         # force generation = None
         vol.generation = 0
@@ -1476,7 +1781,8 @@ class StorageUserGatewayTestCase(BaseTestCase):
     def test_reusable_content_no_blob(self):
         """No blob at all, can not reuse."""
         blobexists, storage_key = self.gw._get_reusable_content(
-            'hash_value', 'magic')
+            'hash_value', 'magic'
+        )
         self.assertFalse(blobexists)
         self.assertIsNone(storage_key)
 
@@ -1492,8 +1798,15 @@ class StorageUserGatewayTestCase(BaseTestCase):
         vgw = gw.get_root_gateway()
         root = vgw.get_root()
         n = vgw.make_file_with_content(
-            root.id, name, hash_value, crc, size, deflated_size, storage_key,
-            magic_hash=magic_hash)
+            root.id,
+            name,
+            hash_value,
+            crc,
+            size,
+            deflated_size,
+            storage_key,
+            magic_hash=magic_hash,
+        )
         return n
 
     def test_reusable_content_same_owner_no_magic(self):
@@ -1508,15 +1821,17 @@ class StorageUserGatewayTestCase(BaseTestCase):
         """Test update_content will reuse owned content."""
         hash_value = self.factory.get_fake_hash()
         node = self._make_file_with_content(hash_value, magic_hash='magic')
-        blobexists, storage_key = self.gw.is_reusable_content(hash_value,
-                                                              'magic')
+        blobexists, storage_key = self.gw.is_reusable_content(
+            hash_value, 'magic'
+        )
         self.assertTrue(blobexists)
         self.assertEqual(storage_key, node.content.storage_key)
 
     def test_reusable_content_different_owner_no_magic(self):
         """Test update_content will not reuse someone elses content."""
         user2 = make_storage_user(
-            username='testuserX', max_storage_bytes=2 ** 32)
+            username='testuserX', max_storage_bytes=2**32
+        )
         assert user2.id != self.user.id
 
         hash_value = self.factory.get_fake_hash()
@@ -1528,22 +1843,24 @@ class StorageUserGatewayTestCase(BaseTestCase):
     def test_reusable_content_different_owner_with_magic(self):
         """Test update_content will reuse someone elses content with magic."""
         user2 = make_storage_user(
-            username='testuserX', max_storage_bytes=2 ** 32)
+            username='testuserX', max_storage_bytes=2**32
+        )
         assert user2.id != self.user.id
 
         hash_value = self.factory.get_fake_hash()
         node = self._make_file_with_content(
-            hash_value, gw=user2._gateway, magic_hash='magic')
+            hash_value, gw=user2._gateway, magic_hash='magic'
+        )
         self.assertTrue(self.gw.is_reusable_content(hash_value, 'magic'))
-        blobexists, storage_key = self.gw.is_reusable_content(hash_value,
-                                                              'magic')
+        blobexists, storage_key = self.gw.is_reusable_content(
+            hash_value, 'magic'
+        )
         self.assertTrue(blobexists)
         self.assertEqual(storage_key, node.content.storage_key)
 
     def test__get_reusable_content_no_blob(self):
         """No blob at all, can not reuse."""
-        blobexists, blob = self.gw._get_reusable_content(
-            'hash_value', 'magic')
+        blobexists, blob = self.gw._get_reusable_content('hash_value', 'magic')
         self.assertFalse(blobexists)
         self.assertIsNone(blob)
 
@@ -1566,7 +1883,8 @@ class StorageUserGatewayTestCase(BaseTestCase):
     def test__get_reusable_content_different_owner_no_magic(self):
         """Test update_content will not reuse someone elses content."""
         user2 = make_storage_user(
-            username='testuserX', max_storage_bytes=2 ** 32)
+            username='testuserX', max_storage_bytes=2**32
+        )
         assert user2.id != self.user.id
 
         hash_value = self.factory.get_fake_hash()
@@ -1578,12 +1896,14 @@ class StorageUserGatewayTestCase(BaseTestCase):
     def test__get_reusable_content_different_owner_with_magic(self):
         """Test update_content will reuse someone elses content with magic."""
         user2 = make_storage_user(
-            username='testuserX', max_storage_bytes=2 ** 32)
+            username='testuserX', max_storage_bytes=2**32
+        )
         assert user2.id != self.user.id
 
         hash_value = self.factory.get_fake_hash()
         node = self._make_file_with_content(
-            hash_value, gw=user2._gateway, magic_hash='magic')
+            hash_value, gw=user2._gateway, magic_hash='magic'
+        )
         self.assertTrue(self.gw._get_reusable_content(hash_value, 'magic'))
         blobexists, blob = self.gw._get_reusable_content(hash_value, 'magic')
         self.assertTrue(blobexists)
@@ -1604,29 +1924,31 @@ class StorageUserGatewayTestCase(BaseTestCase):
             root = vgw.get_root()
             d1 = vgw.make_tree(root.id, '/a/path/without/pics1')
             vgw.make_file_with_content(
-                d1.id, 'picture.txt', hash_value, 100, 100, 1000,
-                uuid.uuid4())
+                d1.id, 'picture.txt', hash_value, 100, 100, 1000, uuid.uuid4()
+            )
             vgw.make_tree(root.id, '/a/path/with/pics2')
             d2 = vgw.make_tree(root.id, '/a/path/with/pics')
             if d2.volume_id != udf3.id:
                 expected_dirs.append(d2)
             vgw.make_file_with_content(
-                d2.id, 'picture1.jpg', hash_value, 100, 100, 100,
-                uuid.uuid4())
+                d2.id, 'picture1.jpg', hash_value, 100, 100, 100, uuid.uuid4()
+            )
             vgw.make_file_with_content(
-                d2.id, 'picture2.jpg', hash_value, 100, 100, 100,
-                uuid.uuid4())
+                d2.id, 'picture2.jpg', hash_value, 100, 100, 100, uuid.uuid4()
+            )
             vgw.make_file_with_content(
-                d2.id, 'picture3.jpg', hash_value, 100, 100, 100,
-                uuid.uuid4())
+                d2.id, 'picture3.jpg', hash_value, 100, 100, 100, uuid.uuid4()
+            )
             d3 = vgw.make_tree(root.id, '/a/path/with/pics4')
             vgw.make_file(d3.id, 'picture.jpg')  # no content
         # this udf's results should not show up
         self.gw.delete_udf(udf3.id)
         dirs = list(self.gw.get_photo_directories())
         self.assertEqual(len(dirs), 3)
-        self.assertEqual(set([(d.id, d.vol_type) for d in dirs]),
-                         set([(d.id, d.vol_type) for d in expected_dirs]))
+        self.assertEqual(
+            set([(d.id, d.vol_type) for d in dirs]),
+            set([(d.id, d.vol_type) for d in expected_dirs]),
+        )
 
 
 class ReadWriteVolumeGatewayUtilityTests(BaseTestCase):
@@ -1636,7 +1958,8 @@ class ReadWriteVolumeGatewayUtilityTests(BaseTestCase):
         super(ReadWriteVolumeGatewayUtilityTests, self).setUp()
         self.gw = SystemGateway()
         self.user = make_storage_user(
-            username='testuser', max_storage_bytes=2000)
+            username='testuser', max_storage_bytes=2000
+        )
         self.vgw = self.user._gateway.get_root_gateway()
         self.root = self.vgw.get_root()
 
@@ -1665,7 +1988,8 @@ class ReadWriteVolumeGatewayUtilityTests(BaseTestCase):
         # with a max_generation
         nodes_gen_10 = self.vgw.get_all_nodes(max_generation=10)
         self.assertEqual(
-            nodes_gen_10, [n for n in nodes if n.generation <= 10])
+            nodes_gen_10, [n for n in nodes if n.generation <= 10]
+        )
         nodes_gen_20 = self.vgw.get_all_nodes(max_generation=20)
         self.assertEqual(nodes_gen_20, nodes)
 
@@ -1675,12 +1999,16 @@ class ReadWriteVolumeGatewayUtilityTests(BaseTestCase):
         last_node = nodes_limit_5[-1]
         nodes_limit_5 += self.vgw.get_all_nodes(
             start_from_path=(last_node.path, last_node.name),
-            max_generation=10, limit=5)
+            max_generation=10,
+            limit=5,
+        )
         self.assertEqual(nodes_limit_5, nodes_gen_10[:10])
         last_node = nodes_limit_5[-1]
         nodes_limit_5 += self.vgw.get_all_nodes(
             start_from_path=(last_node.path, last_node.name),
-            max_generation=10, limit=5)
+            max_generation=10,
+            limit=5,
+        )
         self.assertEqual(nodes_limit_5, nodes_gen_10)
         # same but with the last gen.
         nodes_limit_10 = self.vgw.get_all_nodes(max_generation=20, limit=10)
@@ -1688,19 +2016,24 @@ class ReadWriteVolumeGatewayUtilityTests(BaseTestCase):
         last_node = nodes_limit_10[-1]
         nodes_limit_10 += self.vgw.get_all_nodes(
             start_from_path=(last_node.path, last_node.name),
-            max_generation=20, limit=10)
+            max_generation=20,
+            limit=10,
+        )
         self.assertEqual(nodes_limit_10, nodes[:20])
         last_node = nodes_limit_10[-1]
         nodes_limit_10 += self.vgw.get_all_nodes(
             start_from_path=(last_node.path, last_node.name),
-            max_generation=20, limit=10)
+            max_generation=20,
+            limit=10,
+        )
         self.assertEqual(nodes_limit_10, nodes)
 
     def test_get_all_nodes_only_from_volume(self):
         """Test get_all_nodes."""
         # make some files on a UDF...
         udf = self.factory.make_user_volume(
-            owner=self.user._user, path='~/thepath/thename')
+            owner=self.user._user, path='~/thepath/thename'
+        )
         udf_dao = DAOUserVolume(udf, self.user)
         udf_vgw = ReadWriteVolumeGateway(self.user, udf=udf_dao)
         udf_root_id = udf_vgw.get_root().id
@@ -1731,7 +2064,8 @@ class ReadWriteVolumeGatewayUtilityTests(BaseTestCase):
         # with a max_generation
         nodes_gen_10 = self.vgw.get_all_nodes(max_generation=10)
         self.assertEqual(
-            nodes_gen_10, [n for n in nodes if n.generation <= 10])
+            nodes_gen_10, [n for n in nodes if n.generation <= 10]
+        )
         nodes_gen_20 = self.vgw.get_all_nodes(max_generation=20)
         self.assertEqual(nodes_gen_20, nodes)
 
@@ -1741,12 +2075,16 @@ class ReadWriteVolumeGatewayUtilityTests(BaseTestCase):
         last_node = nodes_limit_5[-1]
         nodes_limit_5 += self.vgw.get_all_nodes(
             start_from_path=(last_node.path, last_node.name),
-            max_generation=10, limit=5)
+            max_generation=10,
+            limit=5,
+        )
         self.assertEqual(nodes_limit_5, nodes_gen_10[:10])
         last_node = nodes_limit_5[-1]
         nodes_limit_5 += self.vgw.get_all_nodes(
             start_from_path=(last_node.path, last_node.name),
-            max_generation=10, limit=5)
+            max_generation=10,
+            limit=5,
+        )
         self.assertEqual(nodes_limit_5, nodes_gen_10)
         # same but with the last gen.
         nodes_limit_10 = self.vgw.get_all_nodes(max_generation=20, limit=10)
@@ -1754,12 +2092,16 @@ class ReadWriteVolumeGatewayUtilityTests(BaseTestCase):
         last_node = nodes_limit_10[-1]
         nodes_limit_10 += self.vgw.get_all_nodes(
             start_from_path=(last_node.path, last_node.name),
-            max_generation=20, limit=10)
+            max_generation=20,
+            limit=10,
+        )
         self.assertEqual(nodes_limit_10, nodes[:20])
         last_node = nodes_limit_10[-1]
         nodes_limit_10 += self.vgw.get_all_nodes(
             start_from_path=(last_node.path, last_node.name),
-            max_generation=20, limit=10)
+            max_generation=20,
+            limit=10,
+        )
         self.assertEqual(nodes_limit_10, nodes)
 
     def test_get_all_nodes_kind(self):
@@ -1793,7 +2135,8 @@ class ReadWriteVolumeGatewayUtilityTests(BaseTestCase):
 
         def mkfile(i, m):
             return self.vgw.make_file_with_content(
-                root_id, 'file%s' % i, hash, 1, 1, 1, key, mimetype=m)
+                root_id, 'file%s' % i, hash, 1, 1, 1, key, mimetype=m
+            )
 
         # make a bunch of files with content
         nodes = [mkfile(i, 'image/tif') for i in range(10)]
@@ -1804,7 +2147,8 @@ class ReadWriteVolumeGatewayUtilityTests(BaseTestCase):
         self.assertEqual(len(all_nodes), 0)
         # this will only return the ones with the matching mimetype
         all_nodes = self.vgw.get_all_nodes(
-            mimetypes=['image/tif'], with_content=True)
+            mimetypes=['image/tif'], with_content=True
+        )
         self.assertEqual(len(all_nodes), 10)
         # sort them in the right order
         nodes.sort(key=attrgetter('path', 'name'))
@@ -1813,7 +2157,8 @@ class ReadWriteVolumeGatewayUtilityTests(BaseTestCase):
         nodes.extend(other_nodes)
         nodes.sort(key=attrgetter('path', 'name'))
         all_nodes = self.vgw.get_all_nodes(
-            mimetypes=['image/tif', 'fake'], with_content=True)
+            mimetypes=['image/tif', 'fake'], with_content=True
+        )
         self.assertEqual(len(all_nodes), 20)
         self.assertEqual(all_nodes, nodes)
 
@@ -1825,12 +2170,14 @@ class ReadWriteVolumeGatewayUtilityTests(BaseTestCase):
 
         def mkfile(i, m):
             return self.vgw.make_file_with_content(
-                root_id, 'file%s.tif' % i, hash, 1, 1, 1, key, mimetype=m)
+                root_id, 'file%s.tif' % i, hash, 1, 1, 1, key, mimetype=m
+            )
 
         # make a bunch of files with content
         [mkfile(i, 'image/tif') for i in range(10)]
         all_nodes = self.vgw.get_all_nodes(
-            kind=StorageObject.FILE, with_content=True)
+            kind=StorageObject.FILE, with_content=True
+        )
         self.assertEqual(len(all_nodes), 10)
         for n in all_nodes:
             self.assertEqual(n.content.hash, hash)
@@ -1843,12 +2190,14 @@ class ReadWriteVolumeGatewayUtilityTests(BaseTestCase):
 
         def mkfile(i, m):
             return self.vgw.make_file_with_content(
-                root_id, 'file%s.tif' % i, hash, 1, 1, 1, key, mimetype=m)
+                root_id, 'file%s.tif' % i, hash, 1, 1, 1, key, mimetype=m
+            )
 
         # make a bunch of files with content
         [mkfile(i, 'image/tif') for i in range(10)]
-        all_nodes = self.vgw.get_all_nodes(with_content=True,
-                                           mimetypes=['image/tif'])
+        all_nodes = self.vgw.get_all_nodes(
+            with_content=True, mimetypes=['image/tif']
+        )
         self.assertEqual(len(all_nodes), 10)
         for n in all_nodes:
             self.assertTrue(n.content.hash, hash)
@@ -1871,11 +2220,13 @@ class ReadWriteVolumeGatewayUtilityTests(BaseTestCase):
         nodes.sort(key=attrgetter('path', 'name'))
         # with a max_generation in the middle
         nodes_gen_10 = self.vgw.get_all_nodes(max_generation=10)
-        self.assertEqual(nodes_gen_10,
-                         [n for n in nodes if n.generation <= 10])
+        self.assertEqual(
+            nodes_gen_10, [n for n in nodes if n.generation <= 10]
+        )
         # with the last generation
         nodes_gen_20 = self.vgw.get_all_nodes(
-            max_generation=nodes[-1].generation)
+            max_generation=nodes[-1].generation
+        )
         self.assertEqual(nodes_gen_20, nodes)
 
     def test_get_all_nodes_with_limit(self):
@@ -1900,13 +2251,13 @@ class ReadWriteVolumeGatewayUtilityTests(BaseTestCase):
         self.assertEqual(nodes_limit_10, nodes[:10])
         last_node = nodes_limit_10[-1]
         nodes_limit_10 += self.vgw.get_all_nodes(
-            start_from_path=(last_node.path, last_node.name),
-            limit=10)
+            start_from_path=(last_node.path, last_node.name), limit=10
+        )
         self.assertEqual(nodes_limit_10, nodes[:20])
         last_node = nodes_limit_10[-1]
         nodes_limit_10 += self.vgw.get_all_nodes(
-            start_from_path=(last_node.path, last_node.name),
-            limit=10)
+            start_from_path=(last_node.path, last_node.name), limit=10
+        )
         self.assertEqual(nodes_limit_10, nodes)
 
     def test_get_all_nodes_with_max_generation_and_limit(self):
@@ -1935,12 +2286,16 @@ class ReadWriteVolumeGatewayUtilityTests(BaseTestCase):
         last_node = nodes_limit_5[-1]
         nodes_limit_5 += self.vgw.get_all_nodes(
             start_from_path=(last_node.path, last_node.name),
-            max_generation=10, limit=5)
+            max_generation=10,
+            limit=5,
+        )
         self.assertEqual(nodes_limit_5, nodes_gen_10[:10])
         last_node = nodes_limit_5[-1]
         nodes_limit_5 += self.vgw.get_all_nodes(
             start_from_path=(last_node.path, last_node.name),
-            max_generation=10, limit=5)
+            max_generation=10,
+            limit=5,
+        )
         self.assertEqual(nodes_limit_5, nodes_gen_10)
 
         # same but with the last generation
@@ -1949,20 +2304,26 @@ class ReadWriteVolumeGatewayUtilityTests(BaseTestCase):
         last_node = nodes_limit_10[-1]
         nodes_limit_10 += self.vgw.get_all_nodes(
             start_from_path=(last_node.path, last_node.name),
-            max_generation=20, limit=10)
+            max_generation=20,
+            limit=10,
+        )
         self.assertEqual(nodes_limit_10, nodes[:20])
         last_node = nodes_limit_10[-1]
         nodes_limit_10 += self.vgw.get_all_nodes(
             start_from_path=(last_node.path, last_node.name),
-            max_generation=20, limit=10)
+            max_generation=20,
+            limit=10,
+        )
         self.assertEqual(nodes_limit_10, nodes)
 
     def test_get_all_nodes_with_max_generation_and_limit_only_from_volume(
-            self):
+        self,
+    ):
         """Test get_all_nodes wiht max_generation and limit for a UDF."""
         # make some files on a UDF...
         udf = self.factory.make_user_volume(
-            owner=self.user._user, path='~/thepath/thename')
+            owner=self.user._user, path='~/thepath/thename'
+        )
         udf_dao = DAOUserVolume(udf, self.user)
         udf_vgw = ReadWriteVolumeGateway(self.user, udf=udf_dao)
         udf_root_id = udf_vgw.get_root().id
@@ -1987,7 +2348,8 @@ class ReadWriteVolumeGatewayUtilityTests(BaseTestCase):
         # with a max_generation
         nodes_gen_10 = udf_vgw.get_all_nodes(max_generation=10)
         self.assertEqual(
-            nodes_gen_10, [n for n in nodes if n.generation <= 10])
+            nodes_gen_10, [n for n in nodes if n.generation <= 10]
+        )
         nodes_gen_20 = udf_vgw.get_all_nodes(max_generation=20)
         self.assertEqual(nodes_gen_20, nodes)
 
@@ -1997,12 +2359,16 @@ class ReadWriteVolumeGatewayUtilityTests(BaseTestCase):
         last_node = nodes_limit_5[-1]
         nodes_limit_5 += udf_vgw.get_all_nodes(
             start_from_path=(last_node.path, last_node.name),
-            max_generation=10, limit=5)
+            max_generation=10,
+            limit=5,
+        )
         self.assertEqual(nodes_limit_5, nodes_gen_10[:10])
         last_node = nodes_limit_5[-1]
         nodes_limit_5 += udf_vgw.get_all_nodes(
             start_from_path=(last_node.path, last_node.name),
-            max_generation=10, limit=5)
+            max_generation=10,
+            limit=5,
+        )
         self.assertEqual(nodes_limit_5, nodes_gen_10)
         # same but with the last gen.
         nodes_limit_10 = udf_vgw.get_all_nodes(max_generation=20, limit=10)
@@ -2010,12 +2376,16 @@ class ReadWriteVolumeGatewayUtilityTests(BaseTestCase):
         last_node = nodes_limit_10[-1]
         nodes_limit_10 += udf_vgw.get_all_nodes(
             start_from_path=(last_node.path, last_node.name),
-            max_generation=20, limit=10)
+            max_generation=20,
+            limit=10,
+        )
         self.assertEqual(nodes_limit_10, nodes[:20])
         last_node = nodes_limit_10[-1]
         nodes_limit_10 += udf_vgw.get_all_nodes(
             start_from_path=(last_node.path, last_node.name),
-            max_generation=20, limit=10)
+            max_generation=20,
+            limit=10,
+        )
         self.assertEqual(nodes_limit_10, nodes)
 
     def test_get_all_nodes_chunked_with_changes(self):
@@ -2048,7 +2418,9 @@ class ReadWriteVolumeGatewayUtilityTests(BaseTestCase):
         last_node = nodes_limit_5[-1]
         nodes_limit_5 += self.vgw.get_all_nodes(
             start_from_path=(last_node.path, last_node.name),
-            max_generation=19, limit=5)
+            max_generation=19,
+            limit=5,
+        )
         self.assertEqual(nodes_limit_5, nodes[:10])
 
         # create a new file inside a existing dir.
@@ -2056,7 +2428,9 @@ class ReadWriteVolumeGatewayUtilityTests(BaseTestCase):
         last_node = nodes_limit_5[-1]
         nodes_limit_5 += self.vgw.get_all_nodes(
             start_from_path=(last_node.path, last_node.name),
-            max_generation=19, limit=5)
+            max_generation=19,
+            limit=5,
+        )
         self.assertEqual(nodes_limit_5, nodes[:15])
 
         # and also make a move
@@ -2065,8 +2439,8 @@ class ReadWriteVolumeGatewayUtilityTests(BaseTestCase):
         last_node = nodes_limit_5[-1]
         # get the rest of the result.
         nodes_limit_5 += self.vgw.get_all_nodes(
-            start_from_path=(last_node.path, last_node.name),
-            max_generation=19)
+            start_from_path=(last_node.path, last_node.name), max_generation=19
+        )
         self.assertEqual(nodes_limit_5, nodes_gen_19)
 
         # now move a node that should have been in the result,
@@ -2075,8 +2449,8 @@ class ReadWriteVolumeGatewayUtilityTests(BaseTestCase):
         self.vgw.move_node(to_move.id, nodes_gen_19[0].id, to_move.name)
         last_node = nodes_gen_19[-5]
         result = self.vgw.get_all_nodes(
-            start_from_path=(last_node.path, last_node.name),
-            max_generation=19)
+            start_from_path=(last_node.path, last_node.name), max_generation=19
+        )
         # check that it wasn't included in the result.
         self.assertEqual(result, nodes_gen_19[-4:-1])
 
@@ -2105,7 +2479,9 @@ class ReadWriteVolumeGatewayUtilityTests(BaseTestCase):
         last_node = nodes_limit_5[-1]
         nodes_limit_5 += self.vgw.get_all_nodes(
             start_from_path=(last_node.path, last_node.name),
-            max_generation=19, limit=5)
+            max_generation=19,
+            limit=5,
+        )
         self.assertEqual(nodes_limit_5, nodes[:10])
 
         # move a node that's already in the result
@@ -2115,8 +2491,8 @@ class ReadWriteVolumeGatewayUtilityTests(BaseTestCase):
         last_node = nodes_limit_5[-1]
         # get the rest of the result.
         nodes_limit_5 += self.vgw.get_all_nodes(
-            start_from_path=(last_node.path, last_node.name),
-            max_generation=19)
+            start_from_path=(last_node.path, last_node.name), max_generation=19
+        )
         # remove the moved node from the nodes_gen_19 list
         del nodes_gen_19[12]
         self.assertEqual(nodes_limit_5, nodes_gen_19)
@@ -2131,13 +2507,16 @@ class ReadWriteVolumeGatewayUtilityTests(BaseTestCase):
         # same but with the last generation
         nodes_limit_5 = self.vgw.get_all_nodes(
             start_from_path=(nodes[-1].path, nodes[-1].name),
-            max_generation=10, limit=5)
+            max_generation=10,
+            limit=5,
+        )
         self.assertEqual(nodes_limit_5, [])
 
     def test_get_all_nodes_chunked_only_root_in_volume(self):
         """Test chunked get_all_nodes with only one node, the root."""
         udf = self.factory.make_user_volume(
-            owner=self.user._user, path='~/thepath/thename')
+            owner=self.user._user, path='~/thepath/thename'
+        )
         udf_dao = DAOUserVolume(udf, self.user)
         udf_vgw = ReadWriteVolumeGateway(self.user, udf=udf_dao)
         # sort them in the right order
@@ -2147,7 +2526,9 @@ class ReadWriteVolumeGatewayUtilityTests(BaseTestCase):
         # same but with the last generation
         nodes_limit_5 = udf_vgw.get_all_nodes(
             start_from_path=(nodes[-1].path, nodes[-1].name),
-            max_generation=10, limit=5)
+            max_generation=10,
+            limit=5,
+        )
         self.assertEqual(nodes_limit_5, [])
 
     def test_get_deleted_files(self):
@@ -2253,16 +2634,19 @@ class ReadWriteVolumeGatewayUtilityTests(BaseTestCase):
         self.assertIsNone(a_file.public_uuid)
         # It now has a public ID
         self.assertIsNotNone(
-            self.vgw.change_public_access(a_file.id, True).public_uuid)
+            self.vgw.change_public_access(a_file.id, True).public_uuid
+        )
         # Disabled it, back to None
         self.assertIsNone(
-            self.vgw.change_public_access(a_file.id, False).public_uuid)
+            self.vgw.change_public_access(a_file.id, False).public_uuid
+        )
 
     def test_change_public_access_directory_nopermission(self):
         """Test that by default you can't make a directory public."""
         a_dir = self.vgw.make_tree(self.root.id, '/x')
-        self.assertRaises(errors.NoPermission,
-                          self.vgw.change_public_access, a_dir.id, True)
+        self.assertRaises(
+            errors.NoPermission, self.vgw.change_public_access, a_dir.id, True
+        )
 
     def test_change_public_access_directory(self):
         """Test that directories can be made public if explicitly requested."""
@@ -2271,7 +2655,8 @@ class ReadWriteVolumeGatewayUtilityTests(BaseTestCase):
         self.assertIsNone(a_dir.public_uuid)
         # It now has a public ID
         self.assertIsNotNone(
-            self.vgw.change_public_access(a_dir.id, True, True).public_uuid)
+            self.vgw.change_public_access(a_dir.id, True, True).public_uuid
+        )
 
 
 #
@@ -2283,6 +2668,7 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
     For each type of volume, override setup_volume.
     This class tests the user's root volume
     """
+
     def setUp(self):
         super(CommonReadWriteVolumeGatewayApiTest, self).setUp()
         self.gw = SystemGateway()
@@ -2297,13 +2683,16 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         self.vgw = self.user._gateway.get_root_gateway()
         self.root = StorageObject.objects.get(id=self.vgw.get_root().id)
         self.file = self.root.make_file(
-            name='TheName', mimetype='fakemime',
-            content_blob=self.factory.make_content_blob())
+            name='TheName',
+            mimetype='fakemime',
+            content_blob=self.factory.make_content_blob(),
+        )
 
     def tweak_users_quota(self, dao_user, max_bytes, used_bytes=0):
         """Utility to toy with the user's quota."""
         StorageUser.objects.filter(id=dao_user.id).update(
-            max_storage_bytes=max_bytes, used_storage_bytes=used_bytes)
+            max_storage_bytes=max_bytes, used_storage_bytes=used_bytes
+        )
         dao_user._load()
 
     def test_get_root(self):
@@ -2364,7 +2753,8 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
     def test__get_node_with_parent(self):
         nodes = StorageObject.objects.filter(id=self.file.id)
         result = self.vgw._node_finder(
-            nodes, with_parent=True, with_content=True)
+            nodes, with_parent=True, with_content=True
+        )
         node = self.vgw._get_node_from_result(result)
         self.assertEqual(node.id, self.file.id)
         self.assertEqual(node.content_hash, self.file.content_hash)
@@ -2379,14 +2769,17 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         # test some conditions with none:
         # no Directories
         result = self.vgw._get_children(
-            self.file.parent_id, kind=StorageObject.DIRECTORY)
+            self.file.parent_id, kind=StorageObject.DIRECTORY
+        )
         self.assertEqual(result.count(), 0)
         # Filter by mimetypes
         result = self.vgw._get_children(
-            self.file.parent_id, mimetypes=['bogusmime'])
+            self.file.parent_id, mimetypes=['bogusmime']
+        )
         self.assertEqual(result.count(), 0)
         result = self.vgw._get_children(
-            self.file.parent_id, mimetypes=['fakemime'])
+            self.file.parent_id, mimetypes=['fakemime']
+        )
         self.assertEqual(result.count(), 1)
         # only dead children
         self.file.status = STATUS_DEAD
@@ -2397,21 +2790,28 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
     def test_check_has_children(self):
         """Test the check_has_children function."""
         a_dir = self.vgw.make_subdirectory(
-            self.root.id, StorageObject.DIRECTORY)
+            self.root.id, StorageObject.DIRECTORY
+        )
         self.assertTrue(
-            self.vgw.check_has_children(self.root.id, StorageObject.FILE))
+            self.vgw.check_has_children(self.root.id, StorageObject.FILE)
+        )
         self.assertTrue(
-            self.vgw.check_has_children(self.root.id, StorageObject.DIRECTORY))
+            self.vgw.check_has_children(self.root.id, StorageObject.DIRECTORY)
+        )
         self.vgw.delete_node(self.file.id)
         self.assertFalse(
-            self.vgw.check_has_children(self.root.id, StorageObject.FILE))
+            self.vgw.check_has_children(self.root.id, StorageObject.FILE)
+        )
         self.assertTrue(
-            self.vgw.check_has_children(self.root.id, StorageObject.DIRECTORY))
+            self.vgw.check_has_children(self.root.id, StorageObject.DIRECTORY)
+        )
         self.vgw.delete_node(a_dir.id)
         self.assertFalse(
-            self.vgw.check_has_children(self.root.id, StorageObject.FILE))
+            self.vgw.check_has_children(self.root.id, StorageObject.FILE)
+        )
         self.assertFalse(
-            self.vgw.check_has_children(self.root.id, StorageObject.DIRECTORY))
+            self.vgw.check_has_children(self.root.id, StorageObject.DIRECTORY)
+        )
 
     def test_get_child_by_name(self):
         """Test the get_child_by_name method."""
@@ -2420,17 +2820,26 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         # invalid parent_id
         self.assertRaises(
             errors.DoesNotExist,
-            self.vgw.get_child_by_name, uuid.uuid4(), self.file.name)
+            self.vgw.get_child_by_name,
+            uuid.uuid4(),
+            self.file.name,
+        )
         # name not found
         self.assertRaises(
             errors.DoesNotExist,
-            self.vgw.get_child_by_name, self.file.parent_id, 'fake')
+            self.vgw.get_child_by_name,
+            self.file.parent_id,
+            'fake',
+        )
         # dead file
         self.file.status = STATUS_DEAD
         self.file.save()
         self.assertRaises(
             errors.DoesNotExist,
-            self.vgw.get_child_by_name, self.file.parent_id, self.file.name)
+            self.vgw.get_child_by_name,
+            self.file.parent_id,
+            self.file.name,
+        )
 
     def test_get_node(self):
         """Test get_node method."""
@@ -2442,8 +2851,12 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         self.assertEqual(node.content_hash, self.file.content_hash)
         self.assertEqual(node.mimetype, self.file.mimetype)
         self.assertRaises(errors.DoesNotExist, self.vgw.get_node, uuid.uuid4())
-        self.assertRaises(errors.HashMismatch, self.vgw.get_node, self.file.id,
-                          verify_hash='fake hash')
+        self.assertRaises(
+            errors.HashMismatch,
+            self.vgw.get_node,
+            self.file.id,
+            verify_hash='fake hash',
+        )
 
     def test_get_content(self):
         """Test get_content method."""
@@ -2467,30 +2880,49 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         self.assertIsNotNone(node.when_created)
         self.assertIsNotNone(node.when_last_modified)
         self.vgw.make_subdirectory(self.root.id, 'duplicatename')
-        self.assertRaises(errors.AlreadyExists,
-                          self.vgw.make_file, self.root.id, 'duplicatename')
+        self.assertRaises(
+            errors.AlreadyExists,
+            self.vgw.make_file,
+            self.root.id,
+            'duplicatename',
+        )
 
     def test_make_file_with_magic(self):
         """Test make_file method."""
         cb = self.factory.make_content_blob(
-            content='FakeContent', magic_hash='magic')
+            content='FakeContent', magic_hash='magic'
+        )
         # make enough room
         self.tweak_users_quota(self.owner, cb.deflated_size)
-        node = self.vgw.make_file(self.root.id, 'the file name',
-                                  hash=cb.hash, magic_hash=cb.magic_hash)
+        node = self.vgw.make_file(
+            self.root.id,
+            'the file name',
+            hash=cb.hash,
+            magic_hash=cb.magic_hash,
+        )
         self.assertEqual(node.content_hash, cb.hash)
 
     def test_make_file_with_magic_bad_hashes(self):
         """Test make_file method with a bad hash raises an exception."""
         # make a content blob with a magic hash
         cb = self.factory.make_content_blob(
-            content='FakeContent', magic_hash='magic')
-        self.assertRaises(errors.HashMismatch,
-                          self.vgw.make_file, self.root.id, 'name.txt',
-                          hash='wronghash')
-        self.assertRaises(errors.HashMismatch,
-                          self.vgw.make_file, self.root.id, 'name.txt',
-                          hash=cb.hash, magic_hash='wrong')
+            content='FakeContent', magic_hash='magic'
+        )
+        self.assertRaises(
+            errors.HashMismatch,
+            self.vgw.make_file,
+            self.root.id,
+            'name.txt',
+            hash='wronghash',
+        )
+        self.assertRaises(
+            errors.HashMismatch,
+            self.vgw.make_file,
+            self.root.id,
+            'name.txt',
+            hash=cb.hash,
+            magic_hash='wrong',
+        )
 
     def test_make_subdirectory(self):
         """Test make_subdirectory method."""
@@ -2504,7 +2936,10 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         self.vgw.make_file(self.root.id, 'duplicatename')
         self.assertRaises(
             errors.AlreadyExists,
-            self.vgw.make_subdirectory, self.root.id, 'duplicatename')
+            self.vgw.make_subdirectory,
+            self.root.id,
+            'duplicatename',
+        )
 
     def test_delete_file_node(self):
         """Test delete_node for files."""
@@ -2516,8 +2951,9 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
 
     def test_delete_root_node(self):
         # make sure we can't delete a root node
-        self.assertRaises(errors.NoPermission,
-                          self.vgw.delete_node, self.root.id)
+        self.assertRaises(
+            errors.NoPermission, self.vgw.delete_node, self.root.id
+        )
 
     def test_delete_directory_node(self):
         """Test delete_node for directories."""
@@ -2571,14 +3007,32 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         # expected failures
         f = self.vgw.make_uploadjob
         self.assertRaises(
-            errors.DoesNotExist, f,
-            uuid.uuid4(), a_file.content_hash, new_hash, crc, 300)
+            errors.DoesNotExist,
+            f,
+            uuid.uuid4(),
+            a_file.content_hash,
+            new_hash,
+            crc,
+            300,
+        )
         self.assertRaises(
-            errors.QuotaExceeded, f, a_file.id, a_file.content_hash, new_hash,
-            crc, self.user.free_bytes + 1)
+            errors.QuotaExceeded,
+            f,
+            a_file.id,
+            a_file.content_hash,
+            new_hash,
+            crc,
+            self.user.free_bytes + 1,
+        )
         self.assertRaises(
-            errors.HashMismatch, f,
-            a_file.id, 'WRONG OLD HASH', new_hash, crc, 300)
+            errors.HashMismatch,
+            f,
+            a_file.id,
+            'WRONG OLD HASH',
+            new_hash,
+            crc,
+            300,
+        )
         upload_job = f(a_file.id, a_file.content_hash, new_hash, crc, size)
         self.assertEqual(upload_job.storage_object_id, a_file.id)
         self.assertEqual(upload_job.hash_hint, new_hash)
@@ -2590,8 +3044,9 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         self.assertEqual(upload.id, upload_job.id)
         # make sure delete works
         self.vgw.delete_uploadjob(upload_job.id)
-        self.assertRaises(errors.DoesNotExist,
-                          self.vgw.get_uploadjob, upload_job.id)
+        self.assertRaises(
+            errors.DoesNotExist, self.vgw.get_uploadjob, upload_job.id
+        )
 
     def test_make_uploadjob_enforces_quota(self):
         """Test make_uploadjob enforces quota check (or not)."""
@@ -2601,10 +3056,23 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         size = self.user.free_bytes + 1
         f = self.vgw.make_uploadjob
         self.assertRaises(
-            errors.QuotaExceeded, f, a_file.id, a_file.content_hash,
-            new_hash, crc, size, enforce_quota=True)
-        upload_job = f(a_file.id, a_file.content_hash, new_hash, crc,
-                       size, enforce_quota=False)
+            errors.QuotaExceeded,
+            f,
+            a_file.id,
+            a_file.content_hash,
+            new_hash,
+            crc,
+            size,
+            enforce_quota=True,
+        )
+        upload_job = f(
+            a_file.id,
+            a_file.content_hash,
+            new_hash,
+            crc,
+            size,
+            enforce_quota=False,
+        )
         self.assertTrue(upload_job is not None)
 
     def test_get_user_uploadjobs(self):
@@ -2618,11 +3086,14 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         crc = 12345
         size = 100
         self.vgw.make_uploadjob(
-            file1.id, file1.content_hash, new_hash, crc, size)
+            file1.id, file1.content_hash, new_hash, crc, size
+        )
         self.vgw.make_uploadjob(
-            file1.id, file1.content_hash, new_hash, crc, size)
+            file1.id, file1.content_hash, new_hash, crc, size
+        )
         self.vgw.make_uploadjob(
-            file2.id, file2.content_hash, new_hash, crc, size)
+            file2.id, file2.content_hash, new_hash, crc, size
+        )
         jobs = list(self.vgw.get_user_uploadjobs())
         self.assertEqual(len(jobs), 3)
         jobs = list(self.vgw.get_user_uploadjobs(node_id=file1.id))
@@ -2638,31 +3109,60 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         new_hash = self.factory.get_fake_hash()
         crc = 12345
         size = 100
-        upj1 = self.vgw.make_uploadjob(file1.id, file1.content_hash, new_hash,
-                                       crc, size, multipart_key=uuid.uuid4())
-        upj2 = self.vgw.make_uploadjob(file1.id, file1.content_hash, new_hash,
-                                       crc, size, multipart_key=uuid.uuid4())
-        upj3 = self.vgw.make_uploadjob(file2.id, file2.content_hash, new_hash,
-                                       crc, size, multipart_key=uuid.uuid4())
-        job = self.vgw.get_user_multipart_uploadjob(file1.id,
-                                                    upj1.multipart_key)
+        upj1 = self.vgw.make_uploadjob(
+            file1.id,
+            file1.content_hash,
+            new_hash,
+            crc,
+            size,
+            multipart_key=uuid.uuid4(),
+        )
+        upj2 = self.vgw.make_uploadjob(
+            file1.id,
+            file1.content_hash,
+            new_hash,
+            crc,
+            size,
+            multipart_key=uuid.uuid4(),
+        )
+        upj3 = self.vgw.make_uploadjob(
+            file2.id,
+            file2.content_hash,
+            new_hash,
+            crc,
+            size,
+            multipart_key=uuid.uuid4(),
+        )
+        job = self.vgw.get_user_multipart_uploadjob(
+            file1.id, upj1.multipart_key
+        )
         self.assertEqual(job.id, upj1.id)
         job = self.vgw.get_user_multipart_uploadjob(
-            file1.id, upj2.multipart_key, new_hash, crc)
+            file1.id, upj2.multipart_key, new_hash, crc
+        )
         self.assertEqual(job.id, upj2.id)
         # with a file_id without any uploadjob
-        self.assertRaises(errors.DoesNotExist,
-                          self.vgw.get_user_multipart_uploadjob,
-                          file3.id, upj1.multipart_key)
+        self.assertRaises(
+            errors.DoesNotExist,
+            self.vgw.get_user_multipart_uploadjob,
+            file3.id,
+            upj1.multipart_key,
+        )
         # with a file_id with an uploadjob, but wrong upload_id
-        self.assertRaises(errors.DoesNotExist,
-                          self.vgw.get_user_multipart_uploadjob,
-                          file1.id, upj3.multipart_key)
+        self.assertRaises(
+            errors.DoesNotExist,
+            self.vgw.get_user_multipart_uploadjob,
+            file1.id,
+            upj3.multipart_key,
+        )
         # with a wrong content_hash
-        self.assertRaises(errors.DoesNotExist,
-                          self.vgw.get_user_multipart_uploadjob,
-                          file1.id, upj1.multipart_key,
-                          hash_hint='sha1:foobar')
+        self.assertRaises(
+            errors.DoesNotExist,
+            self.vgw.get_user_multipart_uploadjob,
+            file1.id,
+            upj1.multipart_key,
+            hash_hint='sha1:foobar',
+        )
 
     def test_add_uploadjob_part(self):
         """Test add_uploadjob_part."""
@@ -2671,8 +3171,13 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         crc = 12345
         size = 100
         job = self.vgw.make_uploadjob(
-            file1.id, file1.content_hash, new_hash, crc, size,
-            multipart_key=uuid.uuid4())
+            file1.id,
+            file1.content_hash,
+            new_hash,
+            crc,
+            size,
+            multipart_key=uuid.uuid4(),
+        )
         job = self.vgw.add_uploadjob_part(job.id, 10)
         self.assertEqual(job.uploaded_bytes, 10)
         self.assertEqual(job.chunk_count, 1)
@@ -2687,8 +3192,13 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         crc = 12345
         size = 100
         job = self.vgw.make_uploadjob(
-            file1.id, file1.content_hash, new_hash, crc, size,
-            multipart_key=uuid.uuid4())
+            file1.id,
+            file1.content_hash,
+            new_hash,
+            crc,
+            size,
+            multipart_key=uuid.uuid4(),
+        )
         new_last_active = now() + timedelta(1)
         self.vgw.set_uploadjob_when_last_active(job.id, new_last_active)
         up_job = self.vgw.get_uploadjob(job.id)
@@ -2707,19 +3217,44 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         def_size = 10000
 
         # if we don't provide a storage_key, a content_blob is expected
-        self.assertRaises(errors.ContentMissing, self.vgw.make_content,
-                          file_id, old_hash, new_hash,
-                          crc, size, def_size, None)
+        self.assertRaises(
+            errors.ContentMissing,
+            self.vgw.make_content,
+            file_id,
+            old_hash,
+            new_hash,
+            crc,
+            size,
+            def_size,
+            None,
+        )
 
         # the content hash must match
-        self.assertRaises(errors.HashMismatch, self.vgw.make_content,
-                          file_id, 'YYYY', new_hash, crc, size, def_size, None)
+        self.assertRaises(
+            errors.HashMismatch,
+            self.vgw.make_content,
+            file_id,
+            'YYYY',
+            new_hash,
+            crc,
+            size,
+            def_size,
+            None,
+        )
 
         # after the upload job was created/started, the users quota was reduced
         self.tweak_users_quota(self.owner, size - 1)
-        self.assertRaises(errors.QuotaExceeded, self.vgw.make_content,
-                          file_id, old_hash, new_hash,
-                          crc, size, def_size, new_storage_key)
+        self.assertRaises(
+            errors.QuotaExceeded,
+            self.vgw.make_content,
+            file_id,
+            old_hash,
+            new_hash,
+            crc,
+            size,
+            def_size,
+            new_storage_key,
+        )
 
     def test_make_content_simple(self):
         """Test make_content."""
@@ -2736,8 +3271,16 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         # fix their quota and clear former contents...
         original_free_bytes = self.owner.free_bytes
         assert original_free_bytes > size
-        self.vgw.make_content(file_id, old_hash, new_hash, crc, size, def_size,
-                              new_storage_key, magic_hash=magic_hash)
+        self.vgw.make_content(
+            file_id,
+            old_hash,
+            new_hash,
+            crc,
+            size,
+            def_size,
+            new_storage_key,
+            magic_hash=magic_hash,
+        )
 
         # reload the file and make sure it looks correct
         file_node._load()
@@ -2751,9 +3294,17 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
 
         # test deleted node before commiting upload...
         self.vgw.delete_node(file_id)
-        self.assertRaises(errors.DoesNotExist, self.vgw.make_content,
-                          file_id, old_hash, new_hash,
-                          crc, size, def_size, new_storage_key)
+        self.assertRaises(
+            errors.DoesNotExist,
+            self.vgw.make_content,
+            file_id,
+            old_hash,
+            new_hash,
+            crc,
+            size,
+            def_size,
+            new_storage_key,
+        )
 
     def test_make_content_updates_contentblob(self):
         """Contentblob is updated if needed when making content."""
@@ -2766,13 +3317,28 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         magic_hash = 'magic_hash'
 
         # call it without the magic hash, as before
-        n = self.vgw.make_content(filenode.id, filenode.content_hash, new_hash,
-                                  crc, size, def_size, new_storage_key)
+        n = self.vgw.make_content(
+            filenode.id,
+            filenode.content_hash,
+            new_hash,
+            crc,
+            size,
+            def_size,
+            new_storage_key,
+        )
         assert n.content.magic_hash is None
 
         # call it with the magic hash
-        n = self.vgw.make_content(filenode.id, new_hash, new_hash, crc, size,
-                                  def_size, new_storage_key, magic_hash)
+        n = self.vgw.make_content(
+            filenode.id,
+            new_hash,
+            new_hash,
+            crc,
+            size,
+            def_size,
+            new_storage_key,
+            magic_hash,
+        )
         assert n.content.magic_hash == magic_hash
 
         # reload the file and make sure it was stored ok
@@ -2787,9 +3353,17 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         crc = 12345
         size = def_size = 100
         self.tweak_users_quota(self.owner, size - 1)
-        self.assertRaises(errors.QuotaExceeded, self.vgw.make_content,
-                          filenode.id, filenode.content_hash, new_hash,
-                          crc, size, def_size, new_storage_key)
+        self.assertRaises(
+            errors.QuotaExceeded,
+            self.vgw.make_content,
+            filenode.id,
+            filenode.content_hash,
+            new_hash,
+            crc,
+            size,
+            def_size,
+            new_storage_key,
+        )
 
     def test_make_get_content(self):
         """Test the make and get content."""
@@ -2799,8 +3373,9 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         size = 100
         def_size = 10000
         magic_hash = 'magic_hash'
-        content = self.vgw._make_content(hash, crc, size, def_size, key,
-                                         magic_hash)
+        content = self.vgw._make_content(
+            hash, crc, size, def_size, key, magic_hash
+        )
         content = self.vgw.get_content(content.hash)
         self.assertEqual(content.hash, hash)
         self.assertEqual(content.crc32, crc)
@@ -2820,7 +3395,14 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         #    So we should NEVER set a content blob to Dead
         self.assertRaises(
             IntegrityError,
-            self.vgw._make_content, hash, crc, size, def_size, key, magic_hash)
+            self.vgw._make_content,
+            hash,
+            crc,
+            size,
+            def_size,
+            key,
+            magic_hash,
+        )
 
     def test_make_file_with_content_enforce_quota(self):
         """Make file with contentblob.
@@ -2833,8 +3415,16 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         storage_key = uuid.uuid4()
         crc = 12345
         self.assertRaises(
-            errors.QuotaExceeded, self.vgw.make_file_with_content,
-            self.root.id, name, hash, crc, 3000, 3000, storage_key)
+            errors.QuotaExceeded,
+            self.vgw.make_file_with_content,
+            self.root.id,
+            name,
+            hash,
+            crc,
+            3000,
+            3000,
+            storage_key,
+        )
 
     def test_make_file_with_content(self):
         """Make file with contentblob.
@@ -2850,8 +3440,16 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         deflated_size = 1
         magic_hash = 'magic_hash'
         node = self.vgw.make_file_with_content(
-            self.root.id, name, hash, crc, size, deflated_size,
-            storage_key, mimetype='image/tif', magic_hash=magic_hash)
+            self.root.id,
+            name,
+            hash,
+            crc,
+            size,
+            deflated_size,
+            storage_key,
+            mimetype='image/tif',
+            magic_hash=magic_hash,
+        )
         a_file = self.vgw.get_node(node.id)
         self.assertEqual(a_file.name, 'filename')
         self.assertEqual(a_file.mimetype, 'image/tif')
@@ -2872,8 +3470,16 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         size = 100
         deflated_size = 10000
         f = self.vgw.make_file_with_content
-        node = f(self.root.id, name, hash, crc, size, deflated_size,
-                 storage_key, is_public=True)
+        node = f(
+            self.root.id,
+            name,
+            hash,
+            crc,
+            size,
+            deflated_size,
+            storage_key,
+            is_public=True,
+        )
         a_file = self.vgw.get_node(node.id, with_content=True)
         self.assertIsNotNone(a_file.public_url)
 
@@ -2887,14 +3493,30 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         deflated_size = 10000
         magic_hash = 'magic_hash'
         f = self.vgw.make_file_with_content
-        node1 = f(self.root.id, name, hash, crc, size, deflated_size,
-                  storage_key, mimetype='image/tif')
+        node1 = f(
+            self.root.id,
+            name,
+            hash,
+            crc,
+            size,
+            deflated_size,
+            storage_key,
+            mimetype='image/tif',
+        )
         newhash = self.factory.get_fake_hash('ZZZYYY')
         newstorage_key = uuid.uuid4()
         self.assertNotEqual(newhash, hash)
         self.assertNotEqual(newstorage_key, storage_key)
-        f(self.root.id, name, newhash, crc, size,
-          deflated_size, newstorage_key, magic_hash=magic_hash)
+        f(
+            self.root.id,
+            name,
+            newhash,
+            crc,
+            size,
+            deflated_size,
+            newstorage_key,
+            magic_hash=magic_hash,
+        )
         node2 = self.vgw.get_node(node1.id)
         self.assertEqual(node2.id, node2.id)
         self.assertEqual(node2.content_hash, newhash)
@@ -2903,9 +3525,17 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
 
         # test hashcheck when trying to overwrite with a wrong hash
         self.assertRaises(
-            errors.HashMismatch, f, self.root.id, name, newhash, crc, size,
-            deflated_size, newstorage_key,
-            previous_hash=self.factory.get_fake_hash('ABC'))
+            errors.HashMismatch,
+            f,
+            self.root.id,
+            name,
+            newhash,
+            crc,
+            size,
+            deflated_size,
+            newstorage_key,
+            previous_hash=self.factory.get_fake_hash('ABC'),
+        )
 
     def test_make_file_with_same_content_updates_contentblob(self):
         """Make file for the same content update the contentblob if needed."""
@@ -2918,14 +3548,22 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         magic_hash = 'magic_hash'
 
         # create it without magic hash, as old times
-        n = self.vgw.make_file_with_content(self.root.id, name, hash, crc,
-                                            size, deflated_size, storage_key)
+        n = self.vgw.make_file_with_content(
+            self.root.id, name, hash, crc, size, deflated_size, storage_key
+        )
         assert n.content.magic_hash is None, n.content.magic_hash
 
         # create with same content, now with magic_hash
-        n = self.vgw.make_file_with_content(self.root.id, name, hash, crc,
-                                            size, deflated_size, storage_key,
-                                            magic_hash=magic_hash)
+        n = self.vgw.make_file_with_content(
+            self.root.id,
+            name,
+            hash,
+            crc,
+            size,
+            deflated_size,
+            storage_key,
+            magic_hash=magic_hash,
+        )
 
         # import pdb; pdb.set_trace()
         # assert ContentBlob.objects.get(hash=hash)
@@ -2943,11 +3581,29 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         crc = 12345
         size = deflated_size = 10000
         f = self.vgw.make_file_with_content
-        self.assertRaises(errors.QuotaExceeded, f, self.root.id, name, hash,
-                          crc, size, deflated_size, storage_key,
-                          enforce_quota=True)
-        node = f(self.root.id, name, hash, crc, size, deflated_size,
-                 storage_key, mimetype='image/tif', enforce_quota=False)
+        self.assertRaises(
+            errors.QuotaExceeded,
+            f,
+            self.root.id,
+            name,
+            hash,
+            crc,
+            size,
+            deflated_size,
+            storage_key,
+            enforce_quota=True,
+        )
+        node = f(
+            self.root.id,
+            name,
+            hash,
+            crc,
+            size,
+            deflated_size,
+            storage_key,
+            mimetype='image/tif',
+            enforce_quota=False,
+        )
         self.assertTrue(node is not None)
 
     def test_move_node_nochange(self):
@@ -2972,19 +3628,31 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         dirb4 = self.vgw.make_subdirectory(dirb3.id, 'dirb4')
         dirb5 = self.vgw.make_subdirectory(dirb4.id, 'dirb5')
         self.vgw.make_subdirectory(dirb5.id, 'dirb6')
-        self.assertRaises(errors.DoesNotExist,
-                          self.vgw.move_node, uuid.uuid4(), dira2.id, 'name')
-        self.assertRaises(errors.DoesNotExist,
-                          self.vgw.move_node, dira1.id, uuid.uuid4(), 'name')
-        self.assertRaises(errors.NoPermission,
-                          self.vgw.move_node, dira1.id, dira2.id, 'name')
+        self.assertRaises(
+            errors.DoesNotExist,
+            self.vgw.move_node,
+            uuid.uuid4(),
+            dira2.id,
+            'name',
+        )
+        self.assertRaises(
+            errors.DoesNotExist,
+            self.vgw.move_node,
+            dira1.id,
+            uuid.uuid4(),
+            'name',
+        )
+        self.assertRaises(
+            errors.NoPermission, self.vgw.move_node, dira1.id, dira2.id, 'name'
+        )
         dira1 = self.vgw.move_node(dira1.id, dirb1.id, 'newname')
         self.assertEqual(dira1.parent_id, dirb1.id)
         self.assertEqual(dira1.name, 'newname')
         dira6 = self.vgw.get_node(dira6.id)
         path = posixpath.join(
             self.vgw.get_root().full_path,
-            'dirb1/newname/dira2/dira3/dira4/dira5')
+            'dirb1/newname/dira2/dira3/dira4/dira5',
+        )
         self.assertEqual(dira6.path, path)
         dirb2 = self.vgw.get_node(dirb2.id)
         # make sure moving with the same name deletes old node and descendants
@@ -3025,8 +3693,15 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         hash = self.factory.get_fake_hash()
         key = uuid.uuid4()
         self.vgw.make_file_with_content(
-            dir3.id, 'file4.tif', hash, 123, 100, 1000, key,
-            mimetype='image/tif')
+            dir3.id,
+            'file4.tif',
+            hash,
+            123,
+            100,
+            1000,
+            key,
+            mimetype='image/tif',
+        )
         # filename with a space in it
         file5 = self.vgw.make_file(root_id, 'space! ')
         # the basic use cases
@@ -3041,7 +3716,8 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         f2 = self.vgw.get_node_by_path('/dir1/file2.mp3')
         self.assertEqual(f2.id, file2.id)
         d3 = self.vgw.get_node_by_path(
-            '/dir1/dir2/dir3', kind=StorageObject.DIRECTORY)
+            '/dir1/dir2/dir3', kind=StorageObject.DIRECTORY
+        )
         self.assertEqual(d3.id, dir3.id)
         f3 = self.vgw.get_node_by_path('/dir1/dir2/file3.mp3')
         self.assertEqual(f3.id, file3.id)
@@ -3064,14 +3740,20 @@ class CommonReadWriteVolumeGatewayApiTest(BaseTestCase):
         self.assertRaises(errors.StorageError, self.vgw.get_node_by_path, ' ')
         # test DoesNotExistCondtions
         self.assertRaises(
-            errors.DoesNotExist,
-            self.vgw.get_node_by_path, '/X..Y/')
+            errors.DoesNotExist, self.vgw.get_node_by_path, '/X..Y/'
+        )
         self.assertRaises(
             errors.DoesNotExist,
-            self.vgw.get_node_by_path, '/dir1', kind=StorageObject.FILE)
+            self.vgw.get_node_by_path,
+            '/dir1',
+            kind=StorageObject.FILE,
+        )
         self.assertRaises(
-            errors.DoesNotExist, self.vgw.get_node_by_path, '/file1.txt',
-            kind=StorageObject.DIRECTORY)
+            errors.DoesNotExist,
+            self.vgw.get_node_by_path,
+            '/file1.txt',
+            kind=StorageObject.DIRECTORY,
+        )
 
     def test_get_generation_delta(self):
         """Test get generation delta limiter."""
@@ -3168,6 +3850,7 @@ class UDFReadWriteVolumeGatewayApiTest(CommonReadWriteVolumeGatewayApiTest):
     For each type of volume, override setup_volume. This class tests the user's
     root volume
     """
+
     def setup_volume(self):
         """Setup the volume used for this test case."""
         self.gw = SystemGateway()
@@ -3176,13 +3859,16 @@ class UDFReadWriteVolumeGatewayApiTest(CommonReadWriteVolumeGatewayApiTest):
         self.owner = self.user
         # make a test file in the database
         udf = self.factory.make_user_volume(
-            owner=user, path='~/thepath/thename')
+            owner=user, path='~/thepath/thename'
+        )
         udf_dao = DAOUserVolume(udf, self.user)
         self.vgw = ReadWriteVolumeGateway(self.user, udf=udf_dao)
         self.root = StorageObject.objects.get(id=self.vgw.get_root().id)
         self.file = self.root.make_file(
-            'TheName', content_blob=self.factory.make_content_blob(),
-            mimetype='fakemime')
+            'TheName',
+            content_blob=self.factory.make_content_blob(),
+            mimetype='fakemime',
+        )
 
 
 class ShareReadWriteVolumeGatewayApiTest(CommonReadWriteVolumeGatewayApiTest):
@@ -3195,22 +3881,27 @@ class ShareReadWriteVolumeGatewayApiTest(CommonReadWriteVolumeGatewayApiTest):
     def setup_volume(self):
         """Setup the volume used for this test case."""
         # create another user and share a folder with self.user
-        sharer = make_storage_user(
-            username='sharer', max_storage_bytes=2000)
+        sharer = make_storage_user(username='sharer', max_storage_bytes=2000)
         self.owner = sharer
         root = StorageObject.objects.get_root(sharer._user)
         rw_node = root.make_subdirectory('WriteMe')
         # share a node with the user with modify access
         rw_share = self.factory.make_share(
-            subtree=rw_node, shared_to=self.user._user, name='WriteShare',
-            access=Share.MODIFY)
+            subtree=rw_node,
+            shared_to=self.user._user,
+            name='WriteShare',
+            access=Share.MODIFY,
+        )
         rw_share.accept()
         share_dao = SharedDirectory(rw_share, by_user=sharer)
         self.vgw = ReadWriteVolumeGateway(self.user, share=share_dao)
         self.root = StorageObject.objects.get(id=self.vgw.get_root().id)
         self.file = self.root.make_file(
-            'TheName', content_blob=self.factory.make_content_blob(),
-            mimetype='fakemime')
+            'TheName',
+            content_blob=self.factory.make_content_blob(),
+            mimetype='fakemime',
+        )
+
 
 #
 # Test the features and failures that make the volumes unique
@@ -3233,8 +3924,10 @@ class RootReadWriteVolumeGatewayTestCase(BaseTestCase):
         vgw = self.user._gateway.get_root_gateway()
         root = StorageObject.objects.get(id=vgw.get_root().id)
         self.file = root.make_file(
-            'TheName', content_blob=self.factory.make_content_blob(),
-            mimetype='fakemime')
+            'TheName',
+            content_blob=self.factory.make_content_blob(),
+            mimetype='fakemime',
+        )
 
     def test_root_volume(self):
         """Test the Root Volume."""
@@ -3276,12 +3969,20 @@ class RootReadWriteVolumeGatewayTestCase(BaseTestCase):
         # test some obvious error conditions
         # can't share files
         self.assertRaises(
-            errors.NotADirectory, vgw.make_share, a_file.id, 'hi',
-            user_id=sharer.id)
+            errors.NotADirectory,
+            vgw.make_share,
+            a_file.id,
+            'hi',
+            user_id=sharer.id,
+        )
         # user doesn't exist
         self.assertRaises(
-            errors.DoesNotExist, vgw.make_share, a_dir.id, 'hi',
-            user_id=sharer.id + 1)
+            errors.DoesNotExist,
+            vgw.make_share,
+            a_dir.id,
+            'hi',
+            user_id=sharer.id + 1,
+        )
         share = vgw.make_share(a_dir.id, 'hi', user_id=sharer.id)
         self.assertEqual(share.root_id, a_dir.id)
         self.assertEqual(share.accepted, False)
@@ -3295,8 +3996,9 @@ class RootReadWriteVolumeGatewayTestCase(BaseTestCase):
         a_dir = vgw.make_subdirectory(vgw.get_root().id, 'the dir')
         vgw.make_file(vgw.get_root().id, 'the file')
         # test some obvious error conditions
-        share = vgw.make_share(a_dir.id, 'hi', user_id=None,
-                               email='fake@email.com')
+        share = vgw.make_share(
+            a_dir.id, 'hi', user_id=None, email='fake@email.com'
+        )
         self.assertEqual(share.root_id, a_dir.id)
         self.assertEqual(share.accepted, False)
         self.assertIsNone(share.shared_to_id)
@@ -3323,7 +4025,8 @@ class UDFReadWriteVolumeGatewayTestCase(BaseTestCase):
         self.user = self.gw.get_user(db_user.id, session_id='QWERTY')
         # make a test file in the database
         self.udf = self.factory.make_user_volume(
-            owner=db_user, path='~/thepath/thename')
+            owner=db_user, path='~/thepath/thename'
+        )
         udf_dao = DAOUserVolume(self.udf, self.user)
         self.vgw = ReadWriteVolumeGateway(self.user, udf=udf_dao)
         self.root = StorageObject.objects.get(id=self.vgw.get_root().id)
@@ -3357,13 +4060,15 @@ class UDFReadWriteVolumeGatewayTestCase(BaseTestCase):
         # if the status is dead, the root is not acceptable
         udf.status = STATUS_DEAD
         udf_dao = DAOUserVolume(udf, self.user)
-        self.assertRaises(errors.NoPermission,
-                          ReadWriteVolumeGateway, self.user, udf=udf_dao)
+        self.assertRaises(
+            errors.NoPermission, ReadWriteVolumeGateway, self.user, udf=udf_dao
+        )
         udf.status = STATUS_LIVE
         # the owners must match
         udf_dao.owner_id = 1000
-        self.assertRaises(errors.NoPermission,
-                          ReadWriteVolumeGateway, self.user, udf=udf_dao)
+        self.assertRaises(
+            errors.NoPermission, ReadWriteVolumeGateway, self.user, udf=udf_dao
+        )
         udf_dao.owner_id = self.user.id
         # the node for the UDF must be live
         node.status = STATUS_DEAD
@@ -3384,19 +4089,22 @@ class UDFReadWriteVolumeGatewayTestCase(BaseTestCase):
         user2 = make_storage_user(username='sharer')
         a_dir = self.vgw.make_subdirectory(self.root.id, 'the dir')
         share = self.vgw.make_share(
-            a_dir.id, 'hi', user_id=user2.id, readonly=False)
+            a_dir.id, 'hi', user_id=user2.id, readonly=False
+        )
         share = StorageUserGateway(user2).accept_share(share.id)
         vgw = ReadWriteVolumeGateway(user2, share=share)
         # after the share is deleted, it should be inaccessible
         StorageUserGateway(self.user).delete_share(share.id)
-        self.assertRaises(errors.DoesNotExist,
-                          vgw.make_file, a_dir.id, 'file.txt')
+        self.assertRaises(
+            errors.DoesNotExist, vgw.make_file, a_dir.id, 'file.txt'
+        )
 
     def test_make_share_offer(self):
         """Test make_share."""
         a_dir = self.vgw.make_subdirectory(self.root.id, 'the dir')
-        share = self.vgw.make_share(a_dir.id, 'hi', user_id=None,
-                                    email='fake@email.com')
+        share = self.vgw.make_share(
+            a_dir.id, 'hi', user_id=None, email='fake@email.com'
+        )
         self.assertEqual(share.root_id, a_dir.id)
         self.assertEqual(share.accepted, False)
         self.assertIsNone(share.shared_to_id)
@@ -3408,13 +4116,25 @@ class UDFReadWriteVolumeGatewayTestCase(BaseTestCase):
         a_dir = gw.make_subdirectory(gw.get_root().id, 'dirname')
         a_file = gw.make_file(gw.get_root().id, 'FileName')
         self.assertRaises(errors.DoesNotExist, self.vgw.get_node, a_dir.id)
-        self.assertRaises(errors.DoesNotExist,
-                          self.vgw.make_file, a_dir.id, 'filename')
-        self.assertRaises(errors.DoesNotExist,
-                          self.vgw.make_subdirectory, a_dir.id, 'filename')
-        self.assertRaises(errors.DoesNotExist, self.vgw.make_uploadjob,
-                          a_file.id, a_file.content_hash,
-                          self.factory.get_fake_hash(), 1, 1, 1)
+        self.assertRaises(
+            errors.DoesNotExist, self.vgw.make_file, a_dir.id, 'filename'
+        )
+        self.assertRaises(
+            errors.DoesNotExist,
+            self.vgw.make_subdirectory,
+            a_dir.id,
+            'filename',
+        )
+        self.assertRaises(
+            errors.DoesNotExist,
+            self.vgw.make_uploadjob,
+            a_file.id,
+            a_file.content_hash,
+            self.factory.get_fake_hash(),
+            1,
+            1,
+            1,
+        )
 
     def test_undelete_volume(self):
         """Test Undelete Volume from a UDF."""
@@ -3450,11 +4170,17 @@ class ShareGatewayTestCase(BaseTestCase):
         self.file = self.r_node.make_file('A File for uploads')
         self.rw_node = root.make_subdirectory('WriteMe')
         self.r_share = self.factory.make_share(
-            subtree=self.r_node, shared_to=user, name='NoWriteShare',
-            access=Share.VIEW)
+            subtree=self.r_node,
+            shared_to=user,
+            name='NoWriteShare',
+            access=Share.VIEW,
+        )
         self.rw_share = self.factory.make_share(
-            subtree=self.rw_node, shared_to=user, name='WriteShare',
-            access=Share.MODIFY)
+            subtree=self.rw_node,
+            shared_to=user,
+            name='WriteShare',
+            access=Share.MODIFY,
+        )
         self.r_share.accept()
         self.rw_share.accept()
 
@@ -3507,11 +4233,15 @@ class ShareGatewayTestCase(BaseTestCase):
     def test_user_gateway_get_share(self):
         """Test UserGateway get_share methods."""
         wrong_share = self.factory.make_share(
-            subtree=self.rw_node, shared_to=self.othersharee,
-            name='WriteShare', access=Share.VIEW)
+            subtree=self.rw_node,
+            shared_to=self.othersharee,
+            name='WriteShare',
+            access=Share.VIEW,
+        )
         # test with a share offer
         shareoffer = self.factory.make_share(
-            subtree=self.r_node, name='offer', email='fake@example.com')
+            subtree=self.r_node, name='offer', email='fake@example.com'
+        )
         so = self.sharer._gateway.get_share(shareoffer.id, accepted_only=False)
         self.assertEqual(so.id, shareoffer.id)
         self.assertIsNone(so.shared_to, None)
@@ -3525,8 +4255,9 @@ class ShareGatewayTestCase(BaseTestCase):
         self.assertEqual(r_share.id, self.r_share.id)
         self.assertEqual(r_share.shared_to.id, self.user.id)
         self.assertEqual(r_share.shared_by.id, self.sharer.id)
-        self.assertRaises(errors.DoesNotExist,
-                          self.user._gateway.get_share, wrong_share.id)
+        self.assertRaises(
+            errors.DoesNotExist, self.user._gateway.get_share, wrong_share.id
+        )
 
     def test_modify_share_permissions(self):
         """Test permissions for a writable share ReadWriteVolumeGateway."""
@@ -3547,44 +4278,58 @@ class ShareGatewayTestCase(BaseTestCase):
     def test_wrong_share(self):
         """Test when share is for another user."""
         wrong_share = self.factory.make_share(
-            subtree=self.rw_node, shared_to=self.othersharee,
-            name='WriteShare', access=Share.VIEW)
+            subtree=self.rw_node,
+            shared_to=self.othersharee,
+            name='WriteShare',
+            access=Share.VIEW,
+        )
         share_dao = SharedDirectory(wrong_share, by_user=self.sharer)
         self.assertNotEqual(share_dao.shared_to_id, self.user.id)
-        self.assertRaises(errors.NoPermission,
-                          ReadWriteVolumeGateway, self.user, share=share_dao)
+        self.assertRaises(
+            errors.NoPermission,
+            ReadWriteVolumeGateway,
+            self.user,
+            share=share_dao,
+        )
 
     def test_share_not_accepted(self):
         """Shares that exist but are not accepted don't work."""
         self.r_share.accepted = False
         share_dao = SharedDirectory(self.r_share, by_user=self.sharer)
-        self.assertRaises(errors.NoPermission,
-                          ReadWriteVolumeGateway, self.user, share=share_dao)
+        self.assertRaises(
+            errors.NoPermission,
+            ReadWriteVolumeGateway,
+            self.user,
+            share=share_dao,
+        )
 
     def test_dead_share(self):
         """Dead shares share no files."""
         self.r_share.status = STATUS_DEAD
         share_dao = SharedDirectory(self.r_share, by_user=self.sharer)
-        self.assertRaises(errors.NoPermission, ReadWriteVolumeGateway,
-                          self.user, share=share_dao)
+        self.assertRaises(
+            errors.NoPermission,
+            ReadWriteVolumeGateway,
+            self.user,
+            share=share_dao,
+        )
 
     def test_readonly_share_fail(self):
         """Test make sure updates can't happen on a read only share"""
         share_dao = SharedDirectory(self.r_share, by_user=self.sharer)
         vgw = ReadWriteVolumeGateway(self.user, share=share_dao)
         root_id = vgw.get_root().id
-        self.assertRaises(errors.NoPermission,
-                          vgw.make_file, root_id, 'name')
-        self.assertRaises(errors.NoPermission,
-                          vgw.make_subdirectory, root_id, 'name')
+        self.assertRaises(errors.NoPermission, vgw.make_file, root_id, 'name')
+        self.assertRaises(
+            errors.NoPermission, vgw.make_subdirectory, root_id, 'name'
+        )
         a_file = self.r_node.make_file('filename')
         dira = self.r_node.make_subdirectory('dirname')
-        self.assertRaises(errors.NoPermission,
-                          vgw.delete_node, dira.id)
-        self.assertRaises(errors.NoPermission,
-                          vgw.restore_node, dira.id)
-        self.assertRaises(errors.NoPermission,
-                          vgw.move_node, a_file.id, root_id, 'new name')
+        self.assertRaises(errors.NoPermission, vgw.delete_node, dira.id)
+        self.assertRaises(errors.NoPermission, vgw.restore_node, dira.id)
+        self.assertRaises(
+            errors.NoPermission, vgw.move_node, a_file.id, root_id, 'new name'
+        )
 
     def test_node_get_update_decendant(self):
         """Test to make sure that nodes on shares can be created and accessed
@@ -3612,53 +4357,63 @@ class ShareGatewayTestCase(BaseTestCase):
         on the volume."""
         share_dao = SharedDirectory(self.rw_share, by_user=self.sharer)
         sgw = ReadWriteVolumeGateway(self.user, share=share_dao)
-        self.assertRaises(errors.DoesNotExist,
-                          sgw.make_subdirectory, uuid.uuid4(), 'name')
-        self.assertRaises(errors.DoesNotExist,
-                          sgw.make_subdirectory, uuid.uuid4(), 'name')
+        self.assertRaises(
+            errors.DoesNotExist, sgw.make_subdirectory, uuid.uuid4(), 'name'
+        )
+        self.assertRaises(
+            errors.DoesNotExist, sgw.make_subdirectory, uuid.uuid4(), 'name'
+        )
         # now create some files from the sharer but are not in the shared
         # directory
         vgw = self.user._gateway.get_root_gateway()
         a_dir = vgw.make_subdirectory(vgw.get_root().id, 'DirName')
         a_file = vgw.make_file(a_dir.id, 'TheName')
         # we shouldn't be able to use these nodes on the share gateway
-        self.assertRaises(errors.DoesNotExist,
-                          sgw.get_node, a_dir.id)
-        self.assertRaises(errors.DoesNotExist,
-                          sgw.get_node, a_file.id)
-        self.assertRaises(errors.DoesNotExist,
-                          sgw.make_subdirectory, a_dir.id, 'name')
-        self.assertRaises(errors.DoesNotExist,
-                          sgw.make_subdirectory, a_file.id, 'name')
-        self.assertRaises(errors.DoesNotExist,
-                          sgw.make_file, a_dir.id, 'name')
-        self.assertRaises(errors.DoesNotExist,
-                          sgw.make_file, a_file.id, 'name')
+        self.assertRaises(errors.DoesNotExist, sgw.get_node, a_dir.id)
+        self.assertRaises(errors.DoesNotExist, sgw.get_node, a_file.id)
+        self.assertRaises(
+            errors.DoesNotExist, sgw.make_subdirectory, a_dir.id, 'name'
+        )
+        self.assertRaises(
+            errors.DoesNotExist, sgw.make_subdirectory, a_file.id, 'name'
+        )
+        self.assertRaises(errors.DoesNotExist, sgw.make_file, a_dir.id, 'name')
+        self.assertRaises(
+            errors.DoesNotExist, sgw.make_file, a_file.id, 'name'
+        )
 
     def test_share_on_share_error(self):
         """Make sure you can't share nodes from a shared volume."""
         share_dao = SharedDirectory(self.rw_share, by_user=self.sharer)
         sgw = ReadWriteVolumeGateway(self.user, share=share_dao)
         d1 = sgw.make_subdirectory(sgw.get_root().id, 'hi')
-        self.assertRaises(errors.NoPermission, sgw.make_share, d1.id, 'hi',
-                          user_id=3)
+        self.assertRaises(
+            errors.NoPermission, sgw.make_share, d1.id, 'hi', user_id=3
+        )
 
     def test_public_from_share_error(self):
         """Users cant make public files shared."""
         share_dao = SharedDirectory(self.rw_share, by_user=self.sharer)
         sgw = ReadWriteVolumeGateway(self.user, share=share_dao)
         a_file = sgw.make_file(sgw.get_root().id, 'hi')
-        self.assertRaises(errors.NoPermission,
-                          sgw.change_public_access, a_file.id, True)
+        self.assertRaises(
+            errors.NoPermission, sgw.change_public_access, a_file.id, True
+        )
 
     def test_upload_readonly(self):
         """Test get_uploadjob should fail on readonly share."""
         share_dao = SharedDirectory(self.r_share, by_user=self.sharer)
         sgw = ReadWriteVolumeGateway(self.user, share=share_dao)
         self.assertRaises(
-            errors.NoPermission, sgw.make_uploadjob,
-            self.file.id, self.file.content_hash, self.factory.get_fake_hash(),
-            1, 1, 1)
+            errors.NoPermission,
+            sgw.make_uploadjob,
+            self.file.id,
+            self.file.content_hash,
+            self.factory.get_fake_hash(),
+            1,
+            1,
+            1,
+        )
 
     def test_get_all_nodes_with_max_generation(self):
         """Test get_all_nodes with max_generation."""
@@ -3680,11 +4435,11 @@ class ShareGatewayTestCase(BaseTestCase):
         nodes.sort(key=attrgetter('path', 'name'))
         # with a max_generation in the middle
         nodes_gen_10 = sgw.get_all_nodes(max_generation=10)
-        self.assertEqual(nodes_gen_10,
-                         [n for n in nodes if n.generation <= 10])
+        self.assertEqual(
+            nodes_gen_10, [n for n in nodes if n.generation <= 10]
+        )
         # with the last generation
-        nodes_gen_20 = sgw.get_all_nodes(
-            max_generation=nodes[-1].generation)
+        nodes_gen_20 = sgw.get_all_nodes(max_generation=nodes[-1].generation)
         self.assertEqual(nodes_gen_20, nodes)
 
     def test_get_all_nodes_with_limit(self):
@@ -3711,13 +4466,13 @@ class ShareGatewayTestCase(BaseTestCase):
         self.assertEqual(nodes_limit_10, nodes[:10])
         last_node = nodes_limit_10[-1]
         nodes_limit_10 += sgw.get_all_nodes(
-            start_from_path=(last_node.path, last_node.name),
-            limit=10)
+            start_from_path=(last_node.path, last_node.name), limit=10
+        )
         self.assertEqual(nodes_limit_10, nodes[:20])
         last_node = nodes_limit_10[-1]
         nodes_limit_10 += sgw.get_all_nodes(
-            start_from_path=(last_node.path, last_node.name),
-            limit=10)
+            start_from_path=(last_node.path, last_node.name), limit=10
+        )
         self.assertEqual(nodes_limit_10, nodes)
 
     def test_get_all_nodes_with_max_generation_and_limit(self):
@@ -3747,12 +4502,16 @@ class ShareGatewayTestCase(BaseTestCase):
         last_node = nodes_limit_5[-1]
         nodes_limit_5 += sgw.get_all_nodes(
             start_from_path=(last_node.path, last_node.name),
-            max_generation=10, limit=5)
+            max_generation=10,
+            limit=5,
+        )
         self.assertEqual(nodes_limit_5, nodes_gen_10[:10])
         last_node = nodes_limit_5[-1]
         nodes_limit_5 += sgw.get_all_nodes(
             start_from_path=(last_node.path, last_node.name),
-            max_generation=10, limit=5)
+            max_generation=10,
+            limit=5,
+        )
         self.assertEqual(nodes_limit_5, nodes_gen_10)
 
         # same but with the last generation
@@ -3762,12 +4521,16 @@ class ShareGatewayTestCase(BaseTestCase):
         last_node = nodes_limit_10[-1]
         nodes_limit_10 += sgw.get_all_nodes(
             start_from_path=(last_node.path, last_node.name),
-            max_generation=20, limit=10)
+            max_generation=20,
+            limit=10,
+        )
         self.assertEqual(nodes_limit_10, nodes_20[:20])
         last_node = nodes_limit_10[-1]
         nodes_limit_10 += sgw.get_all_nodes(
             start_from_path=(last_node.path, last_node.name),
-            max_generation=20, limit=10)
+            max_generation=20,
+            limit=10,
+        )
         self.assertEqual(nodes_limit_10, nodes_20)
 
     def test_get_all_nodes_in_shared_root(self):
@@ -3788,7 +4551,9 @@ class ShareGatewayTestCase(BaseTestCase):
         last_node = nodes[-1]
         no_nodes = sgw.get_all_nodes(
             start_from_path=(last_node.path, last_node.name),
-            max_generation=10, limit=5)
+            max_generation=10,
+            limit=5,
+        )
         self.assertEqual(0, len(no_nodes))
         self.assertEqual(2, len(nodes))
         self.assertEqual([s_root.id, afile.id], [n.id for n in nodes])
@@ -3828,7 +4593,9 @@ class ShareGatewayTestCase(BaseTestCase):
         last_node = nodes_limit_5[-1]
         nodes_limit_5 += sgw.get_all_nodes(
             start_from_path=(last_node.path, last_node.name),
-            max_generation=19, limit=5)
+            max_generation=19,
+            limit=5,
+        )
 
         self.assertEqual(nodes_limit_5, nodes[:10])
 
@@ -3838,7 +4605,9 @@ class ShareGatewayTestCase(BaseTestCase):
         last_node = nodes_limit_5[-1]
         nodes_limit_5 += sgw.get_all_nodes(
             start_from_path=(last_node.path, last_node.name),
-            max_generation=19, limit=5)
+            max_generation=19,
+            limit=5,
+        )
         self.assertEqual(nodes_limit_5, nodes[:15])
 
         # and also make a move
@@ -3847,8 +4616,8 @@ class ShareGatewayTestCase(BaseTestCase):
         last_node = nodes_limit_5[-1]
         # get the rest of the result.
         nodes_limit_5 += sgw.get_all_nodes(
-            start_from_path=(last_node.path, last_node.name),
-            max_generation=19)
+            start_from_path=(last_node.path, last_node.name), max_generation=19
+        )
         self.assertEqual(nodes_limit_5, nodes_gen_19)
 
         # now move a node that should have been in the result,
@@ -3857,8 +4626,8 @@ class ShareGatewayTestCase(BaseTestCase):
         sgw.move_node(to_move.id, nodes_gen_19[0].id, to_move.name)
         last_node = nodes_gen_19[-5]
         result = sgw.get_all_nodes(
-            start_from_path=(last_node.path, last_node.name),
-            max_generation=19)
+            start_from_path=(last_node.path, last_node.name), max_generation=19
+        )
         # check that it wasn't included in the result.
         self.assertEqual(result, nodes_gen_19[-4:-1])
 
@@ -3892,7 +4661,9 @@ class ShareGatewayTestCase(BaseTestCase):
         last_node = nodes_limit_5[-1]
         nodes_limit_5 += sgw.get_all_nodes(
             start_from_path=(last_node.path, last_node.name),
-            max_generation=19, limit=5)
+            max_generation=19,
+            limit=5,
+        )
         self.assertEqual(nodes_limit_5, nodes[:10])
 
         # move a node that's already in the result
@@ -3902,8 +4673,8 @@ class ShareGatewayTestCase(BaseTestCase):
         last_node = nodes_limit_5[-1]
         # get the rest of the result.
         nodes_limit_5 += sgw.get_all_nodes(
-            start_from_path=(last_node.path, last_node.name),
-            max_generation=19)
+            start_from_path=(last_node.path, last_node.name), max_generation=19
+        )
         # remove the moved node from the nodes_gen_19 list
         del nodes_gen_19[12]
         self.assertEqual(nodes_limit_5, nodes_gen_19)
@@ -3919,7 +4690,9 @@ class ShareGatewayTestCase(BaseTestCase):
         # same but with the last generation
         nodes_limit_5 = sgw.get_all_nodes(
             start_from_path=(nodes[-1].path, nodes[-1].name),
-            max_generation=10, limit=5)
+            max_generation=10,
+            limit=5,
+        )
         self.assertEqual(nodes_limit_5, [])
 
 
@@ -4001,8 +4774,14 @@ class GenerationsTestCase(BaseTestCase):
         size = 100
         deflated_size = 10000
         a_file = self.vgw.make_file_with_content(
-            self.vgw.get_root().id, name, a_hash, crc, size, deflated_size,
-            storage_key)
+            self.vgw.get_root().id,
+            name,
+            a_hash,
+            crc,
+            size,
+            deflated_size,
+            storage_key,
+        )
         self.assertEqual(self.volume.generation, 2)
         self.assertEqual(a_file.generation, 2)
 
@@ -4013,8 +4792,15 @@ class GenerationsTestCase(BaseTestCase):
         crc = 12345
         size = 11111
         def_size = 10000
-        self.vgw.make_content(filenode.id, filenode.content_hash, new_hash,
-                              crc, size, def_size, uuid.uuid4())
+        self.vgw.make_content(
+            filenode.id,
+            filenode.content_hash,
+            new_hash,
+            crc,
+            size,
+            def_size,
+            uuid.uuid4(),
+        )
         f1 = StorageObject.objects.get(id=filenode.id)
         self.assertEqual(self.volume.generation, 2)
         self.assertEqual(f1.generation, 2)
@@ -4055,16 +4841,24 @@ class GenerationsTestCase(BaseTestCase):
         user2_root_id = user2_gw.get_root().id
         assert user2_root_id != root_id, 'roots between users should be diff'
         share = user2_gw.make_share(
-            user2_root_id, 'Shared', self.user.id, readonly=False)
+            user2_root_id, 'Shared', self.user.id, readonly=False
+        )
 
         share = self.user_gw.accept_share(share.id)
         user_share_gw = self.user_gw.get_volume_gateway(share=share)
         sh_file1 = user_share_gw.make_file_with_content(
-            user_share_gw.get_root().id, 'shared-file.txt',
-            self.factory.get_fake_hash(), 1234, 100, 10, uuid.uuid4(),
-            'text/lame')
+            user_share_gw.get_root().id,
+            'shared-file.txt',
+            self.factory.get_fake_hash(),
+            1234,
+            100,
+            10,
+            uuid.uuid4(),
+            'text/lame',
+        )
         sh_dir = user_share_gw.make_subdirectory(
-            user_share_gw.get_root().id, 'shared-dir')
+            user_share_gw.get_root().id, 'shared-dir'
+        )
 
         # get the deltas
         root_delta = list(self.vgw.get_generation_delta(0))
@@ -4078,11 +4872,13 @@ class GenerationsTestCase(BaseTestCase):
         # self.assertEqual(root_delta[2].content.size, 100)
         # self.assertTrue(root_dir in root_delta)
         self.assertItemsEqual(
-            [d.id for d in root_delta], [root_file1.id, root_dir.id])
+            [d.id for d in root_delta], [root_file1.id, root_dir.id]
+        )
 
         udf_delta = list(udf_gw.get_generation_delta(0))
         self.assertItemsEqual(
-            [d.id for d in udf_delta], [udf_file1.id, udf_dir.id])
+            [d.id for d in udf_delta], [udf_file1.id, udf_dir.id]
+        )
 
         sh_delta = list(user_share_gw.get_generation_delta(0))
         # XXX: for the same reason explained above, the share delta has one
@@ -4093,7 +4889,8 @@ class GenerationsTestCase(BaseTestCase):
         # # check that the content is there for share deltas
         # self.assertEqual(sh_delta[2].content.size, 100)
         self.assertItemsEqual(
-            [d.id for d in sh_delta], [sh_file1.id, sh_dir.id])
+            [d.id for d in sh_delta], [sh_file1.id, sh_dir.id]
+        )
 
     def test_deltas_for_shares_with_moves(self):
         """Test deltas for shares where nodes have been moved out of them."""
@@ -4201,42 +4998,81 @@ class MetricsTestCase(BaseTestCase):
     def test_supervised_methods_volume_gateways(self):
         """Assure all these methods are supervised by timing decorator."""
         superv = [
-            'get_root', 'get_user_volume', 'get_generation_delta', 'get_node',
-            'get_node_by_path', 'get_all_nodes',
-            'get_deleted_files', 'get_children',
-            'get_child_by_name', 'get_content', 'get_uploadjob',
-            'get_user_uploadjobs', 'get_user_multipart_uploadjob',
-            'get_directories_with_mimetypes', 'check_has_children',
-            'make_file', 'make_subdirectory', 'make_tree', 'make_share',
-            'delete_node', 'restore_node', 'move_node', 'make_uploadjob',
-            'make_file_with_content', 'make_content', 'delete_uploadjob',
+            'get_root',
+            'get_user_volume',
+            'get_generation_delta',
+            'get_node',
+            'get_node_by_path',
+            'get_all_nodes',
+            'get_deleted_files',
+            'get_children',
+            'get_child_by_name',
+            'get_content',
+            'get_uploadjob',
+            'get_user_uploadjobs',
+            'get_user_multipart_uploadjob',
+            'get_directories_with_mimetypes',
+            'check_has_children',
+            'make_file',
+            'make_subdirectory',
+            'make_tree',
+            'make_share',
+            'delete_node',
+            'restore_node',
+            'move_node',
+            'make_uploadjob',
+            'make_file_with_content',
+            'make_content',
+            'delete_uploadjob',
             'add_uploadjob_part',
-            'set_uploadjob_when_last_active', 'change_public_access',
-            'get_node_parent_ids', 'undelete_volume',
+            'set_uploadjob_when_last_active',
+            'change_public_access',
+            'get_node_parent_ids',
+            'undelete_volume',
         ]
         for methname in superv:
             meth = getattr(self.gw, methname)
-            self.assertTrue(self._is_decorated(meth, timing_metric),
-                            '%r is not decorated' % (methname,))
+            self.assertTrue(
+                self._is_decorated(meth, timing_metric),
+                '%r is not decorated' % (methname,),
+            )
 
     def test_supervised_methods_storage_user(self):
         """Assure all these methods are supervised by timing decorator."""
         superv = [
-            'update', 'recalculate_quota', 'get_udf_gateway',
-            'get_share_gateway', 'get_volume_gateway', 'get_share',
-            'get_shared_by', 'get_shares_of_nodes', 'get_shared_to',
-            'accept_share', 'decline_share', 'delete_share',
-            'set_share_access', 'delete_related_shares', 'make_udf',
-            'get_udf_by_path', 'delete_udf', 'get_udf', 'get_udfs',
-            'get_downloads', 'get_public_files', 'get_public_folders',
-            'get_share_generation', 'get_photo_directories',
+            'update',
+            'recalculate_quota',
+            'get_udf_gateway',
+            'get_share_gateway',
+            'get_volume_gateway',
+            'get_share',
+            'get_shared_by',
+            'get_shares_of_nodes',
+            'get_shared_to',
+            'accept_share',
+            'decline_share',
+            'delete_share',
+            'set_share_access',
+            'delete_related_shares',
+            'make_udf',
+            'get_udf_by_path',
+            'delete_udf',
+            'get_udf',
+            'get_udfs',
+            'get_downloads',
+            'get_public_files',
+            'get_public_folders',
+            'get_share_generation',
+            'get_photo_directories',
             'is_reusable_content',
         ]
         gw = StorageUserGateway(self.user)
         for methname in superv:
             meth = getattr(gw, methname)
-            self.assertTrue(self._is_decorated(meth, timing_metric),
-                            '%r is not decorated' % (methname,))
+            self.assertTrue(
+                self._is_decorated(meth, timing_metric),
+                '%r is not decorated' % (methname,),
+            )
 
     def test_call_simple_ok(self):
         """Supervise a successful operation and see all is reported ok."""
@@ -4290,7 +5126,8 @@ class MetricsTestCase(BaseTestCase):
         # make a share from default user to other user and accept it
         root_id = self.gw.get_root().id
         share = self.gw.make_share(
-            root_id, 'hi', user_id=other_user.id, readonly=False)
+            root_id, 'hi', user_id=other_user.id, readonly=False
+        )
         share = StorageUserGateway(other_user).accept_share(share.id)
 
         # do the operation in the gw from the share
@@ -4308,7 +5145,6 @@ class MetricsTestCase(BaseTestCase):
 
 
 class TestVolumeGenerationUniqueKeyViolation(BaseTestCase):
-
     def test_fix_udfs_with_gen_out_of_sync(self):
         obj = self.factory.make_file()
         obj.generation = obj.volume.generation + 1

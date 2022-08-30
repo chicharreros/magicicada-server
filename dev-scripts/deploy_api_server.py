@@ -54,8 +54,7 @@ def cleanup():
 def main():
     """Start the server."""
 
-    status_port = int(
-        os.getenv('API_STATUS_PORT', settings.STATUS_PORT))
+    status_port = int(os.getenv('API_STATUS_PORT', settings.STATUS_PORT))
     service = server.create_service(status_port)
 
     yield service.startService()
@@ -74,6 +73,7 @@ def main():
 
     atexit.register(cleanup)
     reactor.addSystemEventTrigger("before", "shutdown", service.stopService)
+
 
 if __name__ == "__main__":
     reactor.callWhenRunning(main)

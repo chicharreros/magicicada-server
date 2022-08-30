@@ -227,6 +227,7 @@ class TestRescanFromScratch(GenerationsTestCase):
             for d in dirs:
                 d.delete()
             from operator import attrgetter
+
             nodes.sort(key=attrgetter('path', 'name'))
             nodes.insert(0, self.usr0.volume().get_root())
             req = yield client.get_delta(request.ROOT, from_scratch=True)

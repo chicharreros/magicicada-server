@@ -21,6 +21,6 @@ import re
 METADATA_DIR_NAME = ".ubuntuone-sync"
 
 # filenames to ignore
-SPECIAL_FILE_RE = re.compile(".*\\.("
-                             "(u1)?partial|part|"
-                             "(u1)?conflict(\\.[0-9]+)?)$")
+SPECIAL_FILE_RE = re.compile(
+    ".*\\.(" "(u1)?partial|part|" "(u1)?conflict(\\.[0-9]+)?)$"
+)
