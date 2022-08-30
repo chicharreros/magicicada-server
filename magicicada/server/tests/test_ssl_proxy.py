@@ -44,18 +44,27 @@ class SSLProxyServiceTest(TestWithDatabase):
     def setUp(self):
         yield super(SSLProxyServiceTest, self).setUp()
         self.handler = self.add_memento_handler(
-            ssl_proxy.logger, level=logging.DEBUG)
+            ssl_proxy.logger, level=logging.DEBUG
+        )
         self.metrics = MetricReceiver()
         self.patch(metrics, 'get_meter', lambda n: self.metrics)
         self.patch(
-            settings, 'HEARTBEAT_INTERVAL', self.ssl_proxy_heartbeat_interval)
+            settings, 'HEARTBEAT_INTERVAL', self.ssl_proxy_heartbeat_interval
+        )
 
     @defer.inlineCallbacks
     def test_start_stop(self):
         """Test for start/stoService."""
         ssl_service = ssl_proxy.ProxyService(
-            self.ssl_cert, self.ssl_key, self.ssl_cert_chain, 0,  # port
-            "localhost", self.port, "ssl-proxy-test", 0)
+            self.ssl_cert,
+            self.ssl_key,
+            self.ssl_cert_chain,
+            0,  # port
+            "localhost",
+            self.port,
+            "ssl-proxy-test",
+            0,
+        )
         # mimic what twistd will call when running the .tac file
         yield ssl_service.privilegedStartService()
         yield ssl_service.stopService()
@@ -70,16 +79,24 @@ class SSLProxyTestCase(TestWithDatabase):
     def setUp(self):
         yield super(SSLProxyTestCase, self).setUp()
         self.handler = self.add_memento_handler(
-            ssl_proxy.logger, level=logging.DEBUG)
+            ssl_proxy.logger, level=logging.DEBUG
+        )
         self.ssl_service = ssl_proxy.ProxyService(
-            self.ssl_cert, self.ssl_key, self.ssl_cert_chain,
-            ssl_port=0, dest_host="localhost", dest_port=self.port,
-            server_name="ssl-proxy-test", status_port=6666)
+            self.ssl_cert,
+            self.ssl_key,
+            self.ssl_cert_chain,
+            ssl_port=0,
+            dest_host="localhost",
+            dest_port=self.port,
+            server_name="ssl-proxy-test",
+            status_port=6666,
+        )
         # keep metrics in our MetricReceiver
         self.metrics = MetricReceiver()
         self.patch(metrics, 'get_meter', lambda n: self.metrics)
         self.patch(
-            settings, 'HEARTBEAT_INTERVAL', self.ssl_proxy_heartbeat_interval)
+            settings, 'HEARTBEAT_INTERVAL', self.ssl_proxy_heartbeat_interval
+        )
         yield self.ssl_service.startService()
         self.addCleanup(self.ssl_service.stopService)
 
@@ -113,8 +130,9 @@ class BasicSSLProxyTestCase(SSLProxyTestCase):
         def auth(client):
             yield client.protocol_version()
 
-        return self.callback_test(auth, add_default_callbacks=True,
-                                  use_ssl=True)
+        return self.callback_test(
+            auth, add_default_callbacks=True, use_ssl=True
+        )
 
     @defer.inlineCallbacks
     def test_ssl_handshake_backend_dead(self):
@@ -137,17 +155,20 @@ class BasicSSLProxyTestCase(SSLProxyTestCase):
         f = StorageClientFactory()
         # connect to the servr
         reactor.connectSSL(
-            "localhost", self.ssl_port, f, ssl.ClientContextFactory())
+            "localhost", self.ssl_port, f, ssl.ClientContextFactory()
+        )
         storage_client = yield client_d
         # try to do anything and fail with ConnectionDone
         yield self.assertFailure(
-            storage_client.set_caps(PREFERRED_CAP), txerror.ConnectionDone)
+            storage_client.set_caps(PREFERRED_CAP), txerror.ConnectionDone
+        )
 
     @defer.inlineCallbacks
     def test_server_status_ok(self):
         """Check that server status page works."""
         page = yield self.get_url(
-            "http://localhost:%i/status" % self.ssl_service.status_port)
+            "http://localhost:%i/status" % self.ssl_service.status_port
+        )
         self.assertEqual("OK", page['response'])
 
     @defer.inlineCallbacks
@@ -156,11 +177,13 @@ class BasicSSLProxyTestCase(SSLProxyTestCase):
         # shutdown the tcp port of the storage server.
         self.service.tcp_service.stopService()
         result = yield self.get_url(
-            "http://localhost:%i/status" % self.ssl_service.status_port)
+            "http://localhost:%i/status" % self.ssl_service.status_port
+        )
         self.assertEqual(503, result['status'])
         self.assertEqual("Service Unavailable", result['message'])
         self.assertIn(
-            'Connection was refused by other side: 111', result['response'])
+            'Connection was refused by other side: 111', result['response']
+        )
 
     def test_heartbeat_disabled(self):
         """Test that the hearbeat is disabled."""
@@ -176,8 +199,11 @@ class SSLProxyHeartbeatTestCase(SSLProxyTestCase):
     def setUp(self):
         self.stdout = StringIO()
         send_heartbeat = supervisor_utils.send_heartbeat
-        self.patch(supervisor_utils, 'send_heartbeat',
-                   lambda *a, **kw: send_heartbeat(out=self.stdout))
+        self.patch(
+            supervisor_utils,
+            'send_heartbeat',
+            lambda *a, **kw: send_heartbeat(out=self.stdout),
+        )
         yield super(SSLProxyHeartbeatTestCase, self).setUp()
 
     @defer.inlineCallbacks
@@ -207,8 +233,9 @@ class ProxyServerTest(TestCase):
         transport = self.server.transport = mock.Mock()
         self.server.factory = ssl_proxy.SSLProxyFactory(0, 'host', 0)
         called = []
-        self.patch(reactor, 'connectTCP',
-                   lambda *a: called.append('connectTCP'))
+        self.patch(
+            reactor, 'connectTCP', lambda *a: called.append('connectTCP')
+        )
         transport.getPeer.return_value = "host:port info"
 
         self.server.connectionMade()
@@ -254,6 +281,7 @@ class SSLProxyMetricsTestCase(SSLProxyTestCase):
     """Tests for ssl proxy metrics using real connections."""
 
     from twisted.internet.base import DelayedCall
+
     DelayedCall.debug = True
 
     @defer.inlineCallbacks
@@ -337,7 +365,8 @@ class SSLProxyMetricsTestCase(SSLProxyTestCase):
                 d.callback(None)
 
             self.patch(
-                self.protocols[0].peer, 'connectionLost', connectionLost)
+                self.protocols[0].peer, 'connectionLost', connectionLost
+            )
             self.service.factory.protocols[0].shutdown()
             client.test_done('ok')
 
@@ -360,7 +389,8 @@ class SSLProxyMetricsTestCase(SSLProxyTestCase):
                 d.callback(None)
 
             self.patch(
-                self.protocols[0].peer, 'connectionLost', connectionLost)
+                self.protocols[0].peer, 'connectionLost', connectionLost
+            )
             self.service.factory.protocols[0].shutdown()
             client.test_done('ok')
 

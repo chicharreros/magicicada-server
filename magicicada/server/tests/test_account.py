@@ -32,8 +32,10 @@ class QuotaTest(TestWithDatabase):
     def test_quota(self):
         """Test quota info."""
         usr2 = services.make_storage_user(
-            "otheruser", visible_name="Other User",
-            max_storage_bytes=self.usr0.max_storage_bytes * 10)
+            "otheruser",
+            visible_name="Other User",
+            max_storage_bytes=self.usr0.max_storage_bytes * 10,
+        )
         share = usr2.root.share(self.usr0.id, "a share", readonly=True)
 
         @defer.inlineCallbacks
@@ -46,17 +48,19 @@ class QuotaTest(TestWithDatabase):
             result = yield client.get_free_space(str(share.id))
             self.assertEqual(usr2.free_bytes, result.free_bytes)
             self.assertEqual(str(share.id), result.share_id)
-        return self.callback_test(do_test,
-                                  add_default_callbacks=True)
+
+        return self.callback_test(do_test, add_default_callbacks=True)
 
     def test_over_quota(self):
         """Test that 0 bytes free (versus a negative number) is reported
         when over quota."""
         f = self.factory.make_file(
-            owner=StorageUser.objects.get(id=self.usr0.id))
+            owner=StorageUser.objects.get(id=self.usr0.id)
+        )
         # need to do something that just can't happen normally
         StorageUser.objects.filter(id=self.usr0.id).update(
-            max_storage_bytes=f.content.size - 1)
+            max_storage_bytes=f.content.size - 1
+        )
 
         @defer.inlineCallbacks
         def do_test(client):
@@ -65,8 +69,8 @@ class QuotaTest(TestWithDatabase):
             result = yield client.get_free_space(request.ROOT)
             self.assertEqual(0, result.free_bytes)
             self.assertEqual(request.ROOT, result.share_id)
-        return self.callback_test(do_test,
-                                  add_default_callbacks=True)
+
+        return self.callback_test(do_test, add_default_callbacks=True)
 
     def test_account_info(self):
         """Test account info."""
@@ -77,5 +81,7 @@ class QuotaTest(TestWithDatabase):
             yield client.dummy_authenticate("open sesame")
             result = yield client.get_account_info()
             self.assertEqual(
-                self.usr0.max_storage_bytes, result.purchased_bytes)
+                self.usr0.max_storage_bytes, result.purchased_bytes
+            )
+
         return self.callback_test(do_test, add_default_callbacks=True)

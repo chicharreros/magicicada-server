@@ -81,14 +81,16 @@ class ResourceMapper(object):
     def node(self, volume_path, node_path=''):
         """Map the node resource."""
         node_path = "" if node_path == "/" else node_path
-        return self.mapping["NODE_INFO"] % dict(volume_path=volume_path,
-                                                node_path=node_path)
+        return self.mapping["NODE_INFO"] % dict(
+            volume_path=volume_path, node_path=node_path
+        )
 
     def content(self, volume_path, node_path):
         """Map the file content resource."""
         node_path = "" if node_path == "/" else node_path
-        return self.mapping["FILE_CONTENT"] % dict(volume_path=volume_path,
-                                                   node_path=node_path)
+        return self.mapping["FILE_CONTENT"] % dict(
+            volume_path=volume_path, node_path=node_path
+        )
 
     def user_repr(self, user, udfs=None):
         """Return a serializable representation of a user."""
@@ -100,10 +102,10 @@ class ResourceMapper(object):
             used_bytes=user.used_storage_bytes,
             max_bytes=user.max_storage_bytes,
             root_node_path=self.node(settings.ROOT_USERVOLUME_PATH, ''),
-            user_node_paths=[self.node(u.path) for u in udfs])
+            user_node_paths=[self.node(u.path) for u in udfs],
+        )
 
-    def volume_repr(self, volume,
-                    from_generation=None, nodes=None):
+    def volume_repr(self, volume, from_generation=None, nodes=None):
         """Return a serializable representation of a volume."""
         repr_ = dict(
             resource_path=self.volume(volume.path),
@@ -112,11 +114,13 @@ class ResourceMapper(object):
             generation=volume.generation,
             node_path=self.node(volume.path),
             content_path=self.content(volume.path, ""),
-            when_created=date_formatter(volume.when_created))
+            when_created=date_formatter(volume.when_created),
+        )
         if from_generation is not None and nodes is not None:
             delta = dict(
                 from_generation=from_generation,
-                nodes=[self.node_repr(node) for node in nodes])
+                nodes=[self.node_repr(node) for node in nodes],
+            )
             repr_['delta'] = delta
         return repr_
 
@@ -145,11 +149,14 @@ class ResourceMapper(object):
             content_path=self.content(volume_path, node.full_path),
         )
         if node.kind == StorageObject.FILE:
-            info.update(dict(
-                hash=node.content_hash,
-                public_url=node.public_url,
-                is_public=node.is_public,
-                size=node.content.size if node.content else None))
+            info.update(
+                dict(
+                    hash=node.content_hash,
+                    public_url=node.public_url,
+                    is_public=node.is_public,
+                    size=node.content.size if node.content else None,
+                )
+            )
         else:
             info['has_children'] = node.has_children()
         return info
@@ -193,12 +200,16 @@ class RestHelper(object):
         volume = user.get_udf_by_path(volume_path)
         if from_generation is not None:
             volume_proxy = VolumeProxy(volume.id, user)
-            self.log_dal("get_delta", user, volume_id=volume.id,
-                         from_generation=from_generation)
+            self.log_dal(
+                "get_delta",
+                user,
+                volume_id=volume.id,
+                from_generation=from_generation,
+            )
             generation, _, delta_nodes = volume_proxy.get_delta(
-                from_generation)
-            return self.map.volume_repr(
-                volume, from_generation, delta_nodes)
+                from_generation
+            )
+            return self.map.volume_repr(volume, from_generation, delta_nodes)
         else:
             return self.map.volume_repr(volume)
 
@@ -217,15 +228,17 @@ class RestHelper(object):
 
     def get_node(self, user, node_path, include_children=False):
         """GET a Node Representation."""
-        self.log_dal("get_node_by_path", user, node_path=node_path,
-                     with_content=True)
+        self.log_dal(
+            "get_node_by_path", user, node_path=node_path, with_content=True
+        )
         node = user.get_node_by_path(node_path, with_content=True)
         node_info = self.map.node_repr(node)
         if include_children:
             if node.kind == StorageObject.FILE:
                 raise FileNodeHasNoChildren("Files have no Children")
-            self.log_dal("get_children", user, node_id=node.id,
-                         with_content=True)
+            self.log_dal(
+                "get_children", user, node_id=node.id, with_content=True
+            )
             children = node.get_children(with_content=True)
             node_info['children'] = [self.map.node_repr(n) for n in children]
         return node_info
@@ -270,18 +283,22 @@ class RestHelper(object):
             # update the file
             self.log_dal("make_file_by_path", user, node_path=node_path)
             node = user.make_file_by_path(
-                node_path, hash=hash, magic_hash=magic_hash)
+                node_path, hash=hash, magic_hash=magic_hash
+            )
         elif node is None:
             if node_repr.get('kind'):
                 # we must be creating a node if only kind is passed
                 if node_repr['kind'].lower() == 'file':
-                    self.log_dal("make_file_by_path",
-                                 user, node_path=node_path)
+                    self.log_dal(
+                        "make_file_by_path", user, node_path=node_path
+                    )
                     node = user.make_file_by_path(
-                        node_path, hash=hash, magic_hash=magic_hash)
+                        node_path, hash=hash, magic_hash=magic_hash
+                    )
                 elif node_repr['kind'].lower() == 'directory':
-                    self.log_dal("make_tree_by_path",
-                                 user, node_path=node_path)
+                    self.log_dal(
+                        "make_tree_by_path", user, node_path=node_path
+                    )
                     node = user.make_tree_by_path(node_path)
                 else:
                     raise InvalidKind("Invalid node Kind")
@@ -294,23 +311,36 @@ class RestHelper(object):
         if new_path:
             new_path, new_name = os.path.split(new_path)
             if node.name != new_name or node.path != new_path:
-                self.log_dal("get_node_by_path", user, volume_id=node.vol_id,
-                             path=new_path)
+                self.log_dal(
+                    "get_node_by_path",
+                    user,
+                    volume_id=node.vol_id,
+                    path=new_path,
+                )
                 parent = user.volume(node.vol_id).get_node_by_path(new_path)
-                self.log_dal("move", user, node_id=node.id,
-                             parent_id=parent.id, new_name=new_name)
+                self.log_dal(
+                    "move",
+                    user,
+                    node_id=node.id,
+                    parent_id=parent.id,
+                    new_name=new_name,
+                )
                 node.move(parent.id, new_name)
         # are we changing it's public status?
         is_public = node_repr.get('is_public')
         if is_public is not None:
             if node.kind == StorageObject.DIRECTORY:
                 raise CannotPublishDirectory("Directories cant be public.")
-            self.log_dal("change_public_access", user, node_id=node.id,
-                         is_public=is_public)
+            self.log_dal(
+                "change_public_access",
+                user,
+                node_id=node.id,
+                is_public=is_public,
+            )
             node.change_public_access(is_public)
             if self.metrics:
                 self.metrics.report(
-                    'resthelper.put_node.change_public',
-                    str(user.id), "d")
+                    'resthelper.put_node.change_public', str(user.id), "d"
+                )
         node.load(with_content=True)
         return self.map.node_repr(node)

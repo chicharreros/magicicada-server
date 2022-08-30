@@ -60,9 +60,12 @@ from magicicada.testing.testcase import BaseTestCase
 
 ROOT_DIR = os.getcwd()
 SD_CONFIG_DIR = os.path.join(
-    ROOT_DIR, '.sourcecode', 'magicicada-client', 'data')
-SD_CONFIGS = [os.path.join(SD_CONFIG_DIR, 'syncdaemon.conf'),
-              os.path.join(SD_CONFIG_DIR, 'syncdaemon-dev.conf')]
+    ROOT_DIR, '.sourcecode', 'magicicada-client', 'data'
+)
+SD_CONFIGS = [
+    os.path.join(SD_CONFIG_DIR, 'syncdaemon.conf'),
+    os.path.join(SD_CONFIG_DIR, 'syncdaemon-dev.conf'),
+]
 TESTS_DIR = os.getcwd() + "/tmp/sync_tests"
 
 _marker = object()
@@ -112,8 +115,10 @@ class ReallyAttentiveListener(object):
         """
         for ev, kw in reversed(self.q):
             if ev == 'SV_HASH_NEW':
-                if kw.get('node_id') == node_id \
-                        and kw.get('share_id') == share_id:
+                if (
+                    kw.get('node_id') == node_id
+                    and kw.get('share_id') == share_id
+                ):
                     return kw.get('hash')
         raise ValueError("no hash for %s in %s" % (node_id, self.q))
 
@@ -123,8 +128,9 @@ class ReallyAttentiveListener(object):
             if ev == 'AQ_RESCAN_FROM_SCRATCH_OK':
                 if kw.get('volume_id') == volume_id:
                     return kw
-        raise ValueError("no AQ_RESCAN_FROM_SCRATCH_OK for %s in %s" %
-                         (volume_id, self.q))
+        raise ValueError(
+            "no AQ_RESCAN_FROM_SCRATCH_OK for %s in %s" % (volume_id, self.q)
+        )
 
     def get_id_for_marker(self, marker, default=_marker):
         """
@@ -200,21 +206,24 @@ class ReallyFakeMain(main.Main):
         self.hash_q = FakedHashQueue()
         self.db = tritcask.Tritcask(self.tritcask_dir)
         self.vm = DumbVolumeManager(self)
-        self.fs = FileSystemManager(self.fsmdir, self.partials_dir, self.vm,
-                                    self.db)
+        self.fs = FileSystemManager(
+            self.fsmdir, self.partials_dir, self.vm, self.db
+        )
         self.event_q = EventQueue(self.fs)
         self.event_q.subscribe(self.vm)
         self.fs.register_eq(self.event_q)
         self.sync = Sync(self)
-        connection_info = [{
-            'host': '127.0.0.1',
-            'port': port,
-            'use_ssl': False,
-            'disable_ssl_verify': True,
-        }]
+        connection_info = [
+            {
+                'host': '127.0.0.1',
+                'port': port,
+                'use_ssl': False,
+                'disable_ssl_verify': True,
+            }
+        ]
         self.action_q = ActionQueue(self.event_q, self, connection_info)
         self.state_manager = main.StateManager(self, handshake_timeout=30)
-        self.state_manager.connection.waiting_timeout = .1
+        self.state_manager.connection.waiting_timeout = 0.1
         self.vm.init_root()
 
     def server_rescan(self):
@@ -231,10 +240,12 @@ def failure_ignore(*failures):
     It marks a test method such that failures during the test will not be
     marked as failures of the test itself, but simply ignored.
     """
+
     def wrapper(func):
         """The wrapper function."""
         func.failure_ignore = failures
         return func
+
     return wrapper
 
 
@@ -245,18 +256,21 @@ def failure_expected(failure):
     marked as failures of the test itself, but rather the opposite: it is
     the lack of the failure that is a failure.
     """
+
     def wrapper(func):
         """The wrapper function."""
         func.failure_expected = failure
         return func
+
     return wrapper
 
 
 class WaitingHelpingHandler(object):
     """An auxiliary class that helps wait for events."""
 
-    def __init__(self, event_queue, waiting_events, waiting_kwargs,
-                 result=None):
+    def __init__(
+        self, event_queue, waiting_events, waiting_kwargs, result=None
+    ):
         self.deferred = defer.Deferred()
         self.event_queue = event_queue
         self.result = result
@@ -294,14 +308,18 @@ class FakeNetworkManager(dbus.service.Object):
 
     def __init__(self, bus):
         self.bus = bus
-        self.bus.request_name('org.freedesktop.NetworkManager',
-                              flags=dbus.bus.NAME_FLAG_REPLACE_EXISTING |
-                              dbus.bus.NAME_FLAG_DO_NOT_QUEUE |
-                              dbus.bus.NAME_FLAG_ALLOW_REPLACEMENT)
-        self.busName = dbus.service.BusName('org.freedesktop.NetworkManager',
-                                            bus=self.bus)
+        self.bus.request_name(
+            'org.freedesktop.NetworkManager',
+            flags=dbus.bus.NAME_FLAG_REPLACE_EXISTING
+            | dbus.bus.NAME_FLAG_DO_NOT_QUEUE
+            | dbus.bus.NAME_FLAG_ALLOW_REPLACEMENT,
+        )
+        self.busName = dbus.service.BusName(
+            'org.freedesktop.NetworkManager', bus=self.bus
+        )
         super(FakeNetworkManager, self).__init__(
-            self.busName, object_path=self.path)
+            self.busName, object_path=self.path
+        )
 
     def shutdown(self):
         """Shutdown the fake NetworkManager."""
@@ -320,9 +338,12 @@ class FakeNetworkManager(dbus.service.Object):
         """Emits the signal StateChanged(4)."""
         self.StateChanged(20)
 
-    @dbus.service.method(dbus.PROPERTIES_IFACE,
-                         in_signature='ss', out_signature='v',
-                         async_callbacks=('reply_handler', 'error_handler'))
+    @dbus.service.method(
+        dbus.PROPERTIES_IFACE,
+        in_signature='ss',
+        out_signature='v',
+        async_callbacks=('reply_handler', 'error_handler'),
+    )
     def Get(self, interface, propname, reply_handler=None, error_handler=None):
         """Fake dbus's Get method to get at the State property."""
         try:
@@ -342,6 +363,7 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
     Large chunks have been copy-pasted from
     server.testing.testcase.TestWithDatabase, hence the name.
     """
+
     auth_provider_class = SimpleAuthProvider
     _do_teardown_eq = False
     _ignore_cancelled_downloads = False
@@ -357,8 +379,9 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
         # Set up the main loop and bus connection
         self.loop = DBusGMainLoop(set_as_default=True)
         bus_address = os.environ.get('DBUS_SESSION_BUS_ADDRESS', None)
-        self.bus = dbus.bus.BusConnection(address_or_type=bus_address,
-                                          mainloop=self.loop)
+        self.bus = dbus.bus.BusConnection(
+            address_or_type=bus_address, mainloop=self.loop
+        )
 
         # Monkeypatch the dbus.SessionBus/SystemBus methods, to ensure we
         # always point at our own private bus instance.
@@ -369,13 +392,19 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
         self.addCleanup(self.nm.shutdown)
 
         # start the ssl proxy
-        self.ssl_service = ssl_proxy.ProxyService(self.ssl_cert, self.ssl_key,
-                                                  self.ssl_cert_chain,
-                                                  0,  # port
-                                                  "localhost", self.port,
-                                                  "ssl-proxy-test", 0)
+        self.ssl_service = ssl_proxy.ProxyService(
+            self.ssl_cert,
+            self.ssl_key,
+            self.ssl_cert_chain,
+            0,  # port
+            "localhost",
+            self.port,
+            "ssl-proxy-test",
+            0,
+        )
         self.patch(
-            settings, 'HEARTBEAT_INTERVAL', self.ssl_proxy_heartbeat_interval)
+            settings, 'HEARTBEAT_INTERVAL', self.ssl_proxy_heartbeat_interval
+        )
         yield self.ssl_service.startService()
 
         if os.path.exists(self.tmpdir):
@@ -427,7 +456,9 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
         failure_expected = getattr(test_method, 'failure_expected', False)
         if failure_expected and failure_expected != self.failed:
             msg = "test method %r should've failed with %s and " % (
-                self._testMethodName, failure_expected)
+                self._testMethodName,
+                failure_expected,
+            )
             if self.failed:
                 msg += 'instead failed with: %s' % self.failed
             else:
@@ -438,14 +469,16 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
             failure_ignore = getattr(test_method, 'failure_ignore', ())
             if self.failed and self.failed not in failure_ignore:
                 msg = "test method %r failed with: %s" % (
-                    self._testMethodName, self.failed)
+                    self._testMethodName,
+                    self.failed,
+                )
                 self.fail(msg)
 
         if os.path.exists(self.tmpdir):
             self.rmtree(self.tmpdir)
 
     def mktemp(self, name='temp'):
-        """ Customized mktemp that accepts an optional name argument. """
+        """Customized mktemp that accepts an optional name argument."""
         tempdir = os.path.join(self.tmpdir, name)
         if os.path.exists(tempdir):
             self.rmtree(tempdir)
@@ -490,18 +523,20 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
         """SSL port."""
         return self.ssl_service.port
 
-    def nuke_client_method(self, method_name, callback,
-                           method_retval_cb=defer.Deferred):
+    def nuke_client_method(
+        self, method_name, callback, method_retval_cb=defer.Deferred
+    ):
         """Nuke the client method, call the callback, and de-nuke it."""
         self.patch(
-            self.aq.client, method_name, lambda *_, **__: method_retval_cb())
+            self.aq.client, method_name, lambda *_, **__: method_retval_cb()
+        )
         return callback()
 
     def wait_for(self, *waiting_events, **waiting_kwargs):
         """defer until event appears"""
-        return WaitingHelpingHandler(self.main.event_q,
-                                     waiting_events,
-                                     waiting_kwargs).deferred
+        return WaitingHelpingHandler(
+            self.main.event_q, waiting_events, waiting_kwargs
+        ).deferred
 
     def handle_default(self, event, *args, **kwargs):
         """Default event handler.
@@ -515,7 +550,7 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
         elif 'failure' in kwargs:
             self.failed = str(kwargs['failure'].value)
 
-    def wait_for_nirvana(self, last_event_interval=.5):
+    def wait_for_nirvana(self, last_event_interval=0.5):
         """Get a deferred that will fire when there are no more
         events or transfers."""
         return self.main.wait_for_nirvana(last_event_interval)
@@ -525,8 +560,9 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
         d = self.wait_for('SYS_CONNECTION_MADE')
         self.eq.push('SYS_INIT_DONE')
         self.eq.push('SYS_LOCAL_RESCAN_DONE')
-        self.eq.push('SYS_USER_CONNECT',
-                     access_token=self.access_tokens['jack'])
+        self.eq.push(
+            'SYS_USER_CONNECT', access_token=self.access_tokens['jack']
+        )
         if do_connect:
             self.eq.push('SYS_NET_CONNECTED')
         return d
@@ -544,11 +580,13 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
         msg = 'None of %s were found in %s'
         self.assertTrue(
             any(e in self.listener.q for e in events_and_kwargs),
-            msg % (events_and_kwargs, self.listener.q))
+            msg % (events_and_kwargs, self.listener.q),
+        )
 
 
 class _Placeholder(object):
     """Object you can use in eq comparison w'out knowing equality with what."""
+
     def __init__(self, label):
         self.label = label
 
@@ -558,10 +596,15 @@ class _Placeholder(object):
 
 class _HashPlaceholder(_Placeholder):
     """A placeholder for a hash"""
+
     def __eq__(self, other):
-        return all((isinstance(other, str),
-                    other.startswith('sha1:'),
-                    len(other) == 45))
+        return all(
+            (
+                isinstance(other, str),
+                other.startswith('sha1:'),
+                len(other) == 45,
+            )
+        )
 
 
 class _UUIDPlaceholder(_Placeholder):
@@ -620,10 +663,10 @@ anUUID = _UUIDPlaceholder('an UUID')
 aShareUUID = _UUIDPlaceholder('a share UUID', ('',))
 anEmptyShareList = _ShareListPlaceholder('an empty share list', [])
 aShareInfo = _TypedPlaceholder('a share info', sharersp.NotifyShareHolder)
-aGetContentRequest = _TypedPlaceholder('a get_content request',
-                                       client.GetContent)
-anAQCommand = _TypedPlaceholder('an action queue command',
-                                ActionQueueCommand)
+aGetContentRequest = _TypedPlaceholder(
+    'a get_content request', client.GetContent
+)
+anAQCommand = _TypedPlaceholder('an action queue command', ActionQueueCommand)
 
 
 def get_aq_params(data_len=1000, **overrides):
@@ -639,6 +682,7 @@ def get_aq_params(data_len=1000, **overrides):
 
 class TestBase(TestWithDatabase):
     """Base class for TestMeta and TestContent."""
+
     client = None
 
     @defer.inlineCallbacks
@@ -650,7 +694,7 @@ class TestBase(TestWithDatabase):
         self.client = self.aq.client
         self.assertFalse(self.client.factory.connector is None)
         self.root = yield self.client.get_root()
-        yield self.wait_for_nirvana(.5)
+        yield self.wait_for_nirvana(0.5)
 
     @defer.inlineCallbacks
     def _gmk(self, what, name, parent, default_id, path):
@@ -660,14 +704,19 @@ class TestBase(TestWithDatabase):
         if parent is None:
             parent = self.root
         parent_path = self.main.fs.get_by_node_id(request.ROOT, parent).path
-        mdid = self.main.fs.create(os.path.join(parent_path, path),
-                                   request.ROOT)
+        mdid = self.main.fs.create(
+            os.path.join(parent_path, path), request.ROOT
+        )
         marker = MDMarker(mdid)
         meth = getattr(self.aq, 'make_' + what)
         meth(request.ROOT, parent, name, marker, mdid)
-        yield self.wait_for('AQ_FILE_NEW_OK', 'AQ_FILE_NEW_ERROR',
-                            'AQ_DIR_NEW_OK', 'AQ_DIR_NEW_ERROR',
-                            marker=marker)
+        yield self.wait_for(
+            'AQ_FILE_NEW_OK',
+            'AQ_FILE_NEW_ERROR',
+            'AQ_DIR_NEW_OK',
+            'AQ_DIR_NEW_ERROR',
+            marker=marker,
+        )
 
         node_id = self.listener.get_id_for_marker(marker, default_id)
         defer.returnValue((mdid, node_id))
@@ -687,14 +736,23 @@ class TestBase(TestWithDatabase):
         mdid, node_id = yield self._mkfile(filename, path=path)
         params = get_aq_params(node_id=node_id, mdid=mdid)
         wait_upload = self.wait_for(
-            'AQ_UPLOAD_FINISHED', share_id=params['share_id'],
-            hash=params['hash'], node_id=node_id)
+            'AQ_UPLOAD_FINISHED',
+            share_id=params['share_id'],
+            hash=params['hash'],
+            node_id=node_id,
+        )
         orig_open_file = self.main.fs.open_file
         self.main.fs.open_file = lambda _: params['fd']
 
         self.aq.upload(
-            params['share_id'], node_id, params['previous_hash'],
-            params['hash'], params['crc32'], params['size'], mdid)
+            params['share_id'],
+            node_id,
+            params['previous_hash'],
+            params['hash'],
+            params['crc32'],
+            params['size'],
+            mdid,
+        )
         self.main.fs.open_file = orig_open_file
         yield wait_upload
         defer.returnValue(params)
@@ -707,14 +765,22 @@ class FakeResolver(ResolverBase):
     """
 
     def _lookup(self, name, cls, qtype, timeout):
-        """ do the fake lookup. """
+        """do the fake lookup."""
         hostname = 'fs-%s.server.com'
-        rr = dns.RRHeader(name=hostname % '0', type=qtype, cls=cls, ttl=60,
-                          payload=dns.Record_SRV(target=hostname % '0',
-                                                 port=443))
-        rr1 = dns.RRHeader(name=hostname % '1', type=qtype, cls=cls, ttl=60,
-                           payload=dns.Record_SRV(target=hostname % '1',
-                                                  port=443))
+        rr = dns.RRHeader(
+            name=hostname % '0',
+            type=qtype,
+            cls=cls,
+            ttl=60,
+            payload=dns.Record_SRV(target=hostname % '0', port=443),
+        )
+        rr1 = dns.RRHeader(
+            name=hostname % '1',
+            type=qtype,
+            cls=cls,
+            ttl=60,
+            payload=dns.Record_SRV(target=hostname % '1', port=443),
+        )
         results = [rr, rr1]
         authority = []
         addtional = []
@@ -738,6 +804,7 @@ class MethodInterferer(object):
             r = self.old(*args, **kwargs)
             func(*args, **kwargs)
             return r
+
         setattr(self.obj, self.meth, middle)
 
     def insert_before(self, func):
@@ -748,14 +815,17 @@ class MethodInterferer(object):
             """Helper/worker func."""
             if func(*args, **kwargs):
                 return self.old(*args, **kwargs)
+
         setattr(self.obj, self.meth, middle)
 
     def nuke(self, func=None):
         """Nukes the method"""
         self.old = getattr(self.obj, self.meth)
         if func is None:
+
             def func(*args, **kwargs):
                 return None
+
         setattr(self.obj, self.meth, func)
 
     def restore(self):
@@ -796,8 +866,10 @@ class NukeAQClient(object):
         """Nukes the method"""
         self.old = getattr(self.aq.client, self.meth)
         if func is None:
+
             def func(*args, **kwargs):
                 return defer.Deferred
+
         setattr(self.aq.client, self.meth, func)
 
     def restore(self):
@@ -811,6 +883,7 @@ class NukeAQClient(object):
 
 class FakeGetContent(object):
     """Helper class that haves self.deferred"""
+
     def __init__(self, deferred, share, node, hash):
         """initialize it"""
         self.deferred = deferred

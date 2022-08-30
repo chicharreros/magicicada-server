@@ -50,6 +50,7 @@ class RequiredCapsDecoratorTests(TestCase):
 
         class FakeTest(TestCase):
             """Testcase to test the decorator"""
+
             @required_caps([], validate=False)
             def test_method(innerself):
                 """test method that allways fails"""
@@ -66,6 +67,7 @@ class RequiredCapsDecoratorTests(TestCase):
 
         class FakeTest(TestCase):
             """Testcase to test the decorator"""
+
             @required_caps(server_module.MIN_CAP)
             def test_method(innerself):
                 """Test method that always pass."""
@@ -85,6 +87,7 @@ class RequiredCapsDecoratorTests(TestCase):
 
         class FakeTest(TestCase):
             """Testcase to test the decorator"""
+
             @required_caps(['supercalifragilistico'], validate=False)
             def test_method(innerself):
                 """test method that always pass"""
@@ -102,6 +105,7 @@ class RequiredCapsDecoratorTests(TestCase):
 
         class FakeTest(TestCase):
             """Testcase to test the decorator"""
+
             @required_caps([], ['supercalifragilistico', 'foo'], ['foo'])
             def test_method(innerself):
                 """test method that always pass"""
@@ -116,6 +120,7 @@ class RequiredCapsDecoratorTests(TestCase):
 
 class TestClientCapabilities(TestWithDatabase):
     """Test the client side of query/set capabilities"""
+
     client = None
 
     # just to restore original values
@@ -135,8 +140,9 @@ class TestClientCapabilities(TestWithDatabase):
         d = self.wait_for('SYS_CONNECTION_MADE')
         self.eq.push('SYS_INIT_DONE')
         self.eq.push('SYS_LOCAL_RESCAN_DONE')
-        self.eq.push('SYS_USER_CONNECT',
-                     access_token=self.access_tokens['jack'])
+        self.eq.push(
+            'SYS_USER_CONNECT', access_token=self.access_tokens['jack']
+        )
         self.eq.push('SYS_NET_CONNECTED')
         return d
 
@@ -157,4 +163,5 @@ class TestClientCapabilities(TestWithDatabase):
         yield needed_event
         self.assertInListenerEvents(
             'SYS_SET_CAPABILITIES_ERROR',
-            {'error': "The server doesn't have the requested capabilities"})
+            {'error': "The server doesn't have the requested capabilities"},
+        )

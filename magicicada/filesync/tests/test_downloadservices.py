@@ -39,28 +39,31 @@ class DownloadServicesTestCase(BaseTestCase):
     def get_or_make_it(self):
         """Make the download."""
         return downloadservices.get_or_make_download(
-            self.user.id, self.volume_id, self.fpath, self.dl_url, self.dl_key)
+            self.user.id, self.volume_id, self.fpath, self.dl_url, self.dl_key
+        )
 
     def test_get_failed_downloads(self):
         """Test the get_failed_downloads() function."""
         # Create downloads
         udf1 = self.user.make_udf("~/path/name")
         d1 = downloadservices.make_download(
-            self.user.id, udf1.id, "path/file", "http://example.com")
-        downloadservices.download_error(
-            self.user.id, d1.id, "download failed")
+            self.user.id, udf1.id, "path/file", "http://example.com"
+        )
+        downloadservices.download_error(self.user.id, d1.id, "download failed")
         user2 = services.make_storage_user("user2", 10 * 23)
         udf2 = user2.make_udf("~/path/name")
         d2 = downloadservices.make_download(
-            user2.id, udf2.id, "path/file", "http://example.com")
+            user2.id, udf2.id, "path/file", "http://example.com"
+        )
         downloadservices.download_error(user2.id, d2.id, "download failed")
         # Finally, a failed download that will be outside the time window.
         d3 = downloadservices.make_download(
-            user2.id, udf2.id, "path/file2", "http://example.com")
+            user2.id, udf2.id, "path/file2", "http://example.com"
+        )
         downloadservices.download_error(user2.id, d3.id, "download failed")
         result = downloadservices.get_failed_downloads(
-            start_date=d1.status_change_date,
-            end_date=d3.status_change_date)
+            start_date=d1.status_change_date, end_date=d3.status_change_date
+        )
         download_ids = [download.id for download in result]
         self.assertTrue(d1.id in download_ids)
         self.assertTrue(d2.id in download_ids)
@@ -90,12 +93,18 @@ class DownloadServicesTestCase(BaseTestCase):
         size = deflated_size = 300
         dl = self.get_or_make_it()
         downloadservices.download_complete(
-            self.user.id, dl.id, hash, crc, size,
-            deflated_size, mime, storage_key)
+            self.user.id,
+            dl.id,
+            hash,
+            crc,
+            size,
+            deflated_size,
+            mime,
+            storage_key,
+        )
         dl = downloadservices.get_download_by_id(self.user.id, dl.id)
         self.assertEqual(dl.status, Download.STATUS_COMPLETE)
-        f = self.user.volume().get_node_by_path(
-            self.fpath, with_content=True)
+        f = self.user.volume().get_node_by_path(self.fpath, with_content=True)
         self.assertEqual(f.full_path, self.fpath)
         self.assertEqual(f.content_hash, hash)
         self.assertEqual(f.content.storage_key, storage_key)
@@ -104,7 +113,8 @@ class DownloadServicesTestCase(BaseTestCase):
     def test_get_or_make_download(self):
         """Test get_or_make_download."""
         dl = downloadservices.get_or_make_download(
-            self.user.id, self.volume_id, self.fpath, self.dl_url, self.dl_key)
+            self.user.id, self.volume_id, self.fpath, self.dl_url, self.dl_key
+        )
         self.assertEqual(dl.owner_id, self.user.id)
         self.assertEqual(dl.volume_id, self.volume_id)
         self.assertEqual(dl.file_path, self.fpath)
@@ -112,17 +122,20 @@ class DownloadServicesTestCase(BaseTestCase):
         self.assertEqual(dl.download_key, repr(self.dl_key))
         # do it again, make sure we get the same one
         dl2 = downloadservices.get_or_make_download(
-            self.user.id, self.volume_id, self.fpath, self.dl_url, self.dl_key)
+            self.user.id, self.volume_id, self.fpath, self.dl_url, self.dl_key
+        )
         self.assertEqual(dl.id, dl2.id)
 
     def test_get_status(self):
         """Test get_status."""
         status = downloadservices.get_status(
-            self.user.id, self.volume_id, self.fpath, self.dl_url, self.dl_key)
+            self.user.id, self.volume_id, self.fpath, self.dl_url, self.dl_key
+        )
         self.assertEqual(status, downloadservices.UNKNOWN)
         dl = self.get_or_make_it()
         status = downloadservices.get_status(
-            self.user.id, self.volume_id, self.fpath, self.dl_url, self.dl_key)
+            self.user.id, self.volume_id, self.fpath, self.dl_url, self.dl_key
+        )
         self.assertEqual(status, Download.STATUS_QUEUED)
         # go ahead and complete it and create a file
         mime = 'image/tif'
@@ -132,16 +145,25 @@ class DownloadServicesTestCase(BaseTestCase):
         size = deflated_size = 300
         dl = self.get_or_make_it()
         downloadservices.download_complete(
-            self.user.id, dl.id, hash, crc, size,
-            deflated_size, mime, storage_key)
+            self.user.id,
+            dl.id,
+            hash,
+            crc,
+            size,
+            deflated_size,
+            mime,
+            storage_key,
+        )
         status = downloadservices.get_status(
-            self.user.id, self.volume_id, self.fpath, self.dl_url, self.dl_key)
+            self.user.id, self.volume_id, self.fpath, self.dl_url, self.dl_key
+        )
         self.assertEqual(status, Download.STATUS_COMPLETE)
         # delete the file
         f = self.user.volume().get_node_by_path(self.fpath)
         f.delete()
         status = downloadservices.get_status(
-            self.user.id, self.volume_id, self.fpath, self.dl_url, self.dl_key)
+            self.user.id, self.volume_id, self.fpath, self.dl_url, self.dl_key
+        )
         self.assertEqual(status, downloadservices.DOWNLOADED_NOT_PRESENT)
 
     def test_get_status_by_id(self):
@@ -159,8 +181,15 @@ class DownloadServicesTestCase(BaseTestCase):
         size = deflated_size = 300
         dl = self.get_or_make_it()
         downloadservices.download_complete(
-            self.user.id, dl.id, hash, crc, size,
-            deflated_size, mime, storage_key)
+            self.user.id,
+            dl.id,
+            hash,
+            crc,
+            size,
+            deflated_size,
+            mime,
+            storage_key,
+        )
         status = downloadservices.get_status_by_id(self.user.id, dl.id)
         self.assertEqual(status, Download.STATUS_COMPLETE)
         # delete the file

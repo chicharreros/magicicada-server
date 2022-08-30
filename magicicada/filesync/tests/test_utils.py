@@ -77,23 +77,35 @@ class NodeKeyTests(unittest.TestCase):
 
     def test_parse_nodekey_short_node_id(self):
         """paerse_nodekey() fails if the node ID is too short."""
-        self.assertRaises(NodeKeyParseError, parse_nodekey,
-                          'FXtKUSyIT-aM4wi5gVMFTQ:W2S8fgrBTa')
+        self.assertRaises(
+            NodeKeyParseError,
+            parse_nodekey,
+            'FXtKUSyIT-aM4wi5gVMFTQ:W2S8fgrBTa',
+        )
 
     def test_parse_nodekey_long_node_id(self):
         """paerse_nodekey() fails if the node ID is too long."""
-        self.assertRaises(NodeKeyParseError, parse_nodekey,
-                          '%s:%sAAA' % (VOLUME_KEY, NODE_KEY))
+        self.assertRaises(
+            NodeKeyParseError,
+            parse_nodekey,
+            '%s:%sAAA' % (VOLUME_KEY, NODE_KEY),
+        )
 
     def test_parse_nodekey_short_volume_id(self):
         """paerse_nodekey() fails if the volume ID is too short."""
-        self.assertRaises(NodeKeyParseError, parse_nodekey,
-                          'FXtKUSyIT-aM4wi5gV:W2S8fgrBTaaHW6BjvdYrrA')
+        self.assertRaises(
+            NodeKeyParseError,
+            parse_nodekey,
+            'FXtKUSyIT-aM4wi5gV:W2S8fgrBTaaHW6BjvdYrrA',
+        )
 
     def test_parse_nodekey_long_volume_id(self):
         """paerse_nodekey() fails if the volume ID is too long."""
-        self.assertRaises(NodeKeyParseError, parse_nodekey,
-                          '%sAAA:%s' % (VOLUME_KEY, NODE_KEY))
+        self.assertRaises(
+            NodeKeyParseError,
+            parse_nodekey,
+            '%sAAA:%s' % (VOLUME_KEY, NODE_KEY),
+        )
 
     def test_parse_nodekey_empty_volume_id(self):
         """parse_nodekey() accepts an empty volume ID component."""
@@ -103,13 +115,13 @@ class NodeKeyTests(unittest.TestCase):
 
     def test_parse_nodekey_empty_node_id(self):
         """parse_nodekey() fails on an empty node ID component."""
-        self.assertRaises(NodeKeyParseError, parse_nodekey,
-                          '%s:' % VOLUME_KEY)
+        self.assertRaises(NodeKeyParseError, parse_nodekey, '%s:' % VOLUME_KEY)
 
     def test_parse_nodekey_bad_chars(self):
         """parse_nodekey() fails on bad characters."""
-        self.assertRaises(NodeKeyParseError, parse_nodekey,
-                          '$%W2S8fgrBTaaHW6BjvdYr')
+        self.assertRaises(
+            NodeKeyParseError, parse_nodekey, '$%W2S8fgrBTaaHW6BjvdYr'
+        )
 
     def test_get_node_public_key(self):
         """Test get_node_public_key."""
@@ -117,7 +129,8 @@ class NodeKeyTests(unittest.TestCase):
         node.public_uuid = uuid.UUID(int=12)
         self.assertEqual(
             get_node_public_key(node),
-            encode_base62(node.public_uuid.int, padded_to=22))
+            encode_base62(node.public_uuid.int, padded_to=22),
+        )
 
     def test_get_public_url(self):
         """Test get_public_url function."""
@@ -128,7 +141,8 @@ class NodeKeyTests(unittest.TestCase):
         key = encode_base62(node.public_uuid.int, padded_to=22)
         self.assertEqual(
             get_public_file_url(node),
-            '%s/%s' % (settings.PUBLIC_URL_PREFIX, key))
+            '%s/%s' % (settings.PUBLIC_URL_PREFIX, key),
+        )
 
 
 class Base62Tests(unittest.TestCase):
@@ -169,6 +183,7 @@ class Base62Tests(unittest.TestCase):
 
 class FakeNode(object):
     """A fake node for testing."""
+
     public_id = None
     public_uuid = None
 
@@ -186,8 +201,9 @@ class KeywordsTests(unittest.TestCase):
 
     def test_basic_path(self):
         path = (
-            settings.ROOT_USERVOLUME_PATH +
-            '/is/the path/path! for/my%$files/here.txt')
+            settings.ROOT_USERVOLUME_PATH
+            + '/is/the path/path! for/my%$files/here.txt'
+        )
         # result should not include base directory and should be sorted
         expected = ['files', 'for', 'is', 'here', 'path', 'the', 'txt', 'my']
         self.do_test(path, expected)
@@ -196,14 +212,31 @@ class KeywordsTests(unittest.TestCase):
         path = '~/Documents/is/the path/path! for/my%$files/here.txt'
         # result should include documents and should be sorted
         expected = [
-            'documents', 'files', 'for', 'is', 'here', 'path', 'the', 'txt',
-            'my']
+            'documents',
+            'files',
+            'for',
+            'is',
+            'here',
+            'path',
+            'the',
+            'txt',
+            'my',
+        ]
         self.do_test(path, expected)
 
     def test_normalized_path(self):
         path = '~/Da\u0304ta/is/the foo/path! fo\u0304r/my%$bar/hero\u0304.txt'
         # non-ascii character should be normalized
         expected = [
-            'data', 'foo', 'bar', 'for', 'is', 'hero', 'path', 'the', 'txt',
-            'my']
+            'data',
+            'foo',
+            'bar',
+            'for',
+            'is',
+            'hero',
+            'path',
+            'the',
+            'txt',
+            'my',
+        ]
         self.do_test(path, expected)

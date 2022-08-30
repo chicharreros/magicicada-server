@@ -44,8 +44,9 @@ def write_conf(tpl, inet_http_server_port):
 
     conf = template % template_vars
 
-    conf_file_path = os.path.join(TMP_DIR,
-                                  os.path.basename(tpl).replace('.tpl', ''))
+    conf_file_path = os.path.join(
+        TMP_DIR, os.path.basename(tpl).replace('.tpl', '')
+    )
 
     with open(conf_file_path, 'w') as conf_file:
         conf_file.write(conf)
@@ -67,7 +68,7 @@ def main(tpls):
     print("Starting supervisor [%s]" % main_name)
 
     # get port
-    inet_http_server_port, = local.allocate_ports(1)
+    (inet_http_server_port,) = local.allocate_ports(1)
     local.register_local_port(port_name, inet_http_server_port)
 
     conf_file_path = write_conf(main_tpl, inet_http_server_port)

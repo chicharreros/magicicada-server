@@ -30,7 +30,8 @@ class AdminServicesTestCase(BaseTestCase):
         usernames = ['bob', 'bobby', 'inez', 'juan', 'tim']
         for name in usernames:
             services.make_storage_user(
-                username=name, max_storage_bytes=2 ** 30)
+                username=name, max_storage_bytes=2**30
+            )
 
     def test_StorageUserFinder(self):
         """Test the StorageUserFinder."""

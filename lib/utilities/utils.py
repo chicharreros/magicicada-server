@@ -56,7 +56,7 @@ def is_running(proc_name, pidfile, service, timeout=1):
 
 
 def os_exec(*args):
-    """Wrapper for os.execv() that catches execution errors """
+    """Wrapper for os.execv() that catches execution errors"""
     try:
         os.execv(args[0], args)
         os._exit(1)

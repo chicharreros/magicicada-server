@@ -34,6 +34,7 @@ import dbus.mainloop.glib  # this is black magic. DO NOT REMOVE!
 from distutils.spawn import find_executable
 
 from twisted.internet import glib2reactor
+
 glib2reactor.install()  # NOQA: before any reactor import
 
 from django.conf import settings  # noqa
@@ -61,13 +62,18 @@ if not _dbus:
 def start_DBus():
     """Start our own session bus daemon for testing."""
     config_file = os.path.join(os.getcwd(), "configs", "dbus-session.conf")
-    dbus_args = ["--fork",
-                 "--config-file=" + config_file,
-                 "--print-address=1",
-                 "--print-pid=2"]
-    p = subprocess.Popen([_dbus] + dbus_args, bufsize=4096,
-                         stdout=subprocess.PIPE,
-                         stderr=subprocess.PIPE)
+    dbus_args = [
+        "--fork",
+        "--config-file=" + config_file,
+        "--print-address=1",
+        "--print-pid=2",
+    ]
+    p = subprocess.Popen(
+        [_dbus] + dbus_args,
+        bufsize=4096,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
 
     dbus_address = "".join(p.stdout.readlines()).strip()
     dbus_pid = int("".join(p.stderr.readlines()).strip())
@@ -97,13 +103,19 @@ def create_syncdaemon(username, procnum, homedir, pidfile):
     # start dbus
     debug(prefix, 'Starting DBus...')
     (dbus_pid, dbus_address) = start_DBus()
-    debug(prefix, 'DBus started with (dbus_pid, dbus_address):',
-          dbus_pid, dbus_address)
+    debug(
+        prefix,
+        'DBus started with (dbus_pid, dbus_address):',
+        dbus_pid,
+        dbus_address,
+    )
 
     # run the client
-    env = dict(DBUS_SESSION_BUS_ADDRESS=dbus_address,
-               PYTHONPATH=LIB_DIR,
-               XDG_CACHE_HOME="tmp/xdg_cache%d" % procnum)
+    env = dict(
+        DBUS_SESSION_BUS_ADDRESS=dbus_address,
+        PYTHONPATH=LIB_DIR,
+        XDG_CACHE_HOME="tmp/xdg_cache%d" % procnum,
+    )
     value = (dbus_pid, dbus_address)
     debug(prefix, "Putting in pidfile %s values %s" % (pidfile, value))
     with open(pidfile, 'w') as f:
@@ -115,7 +127,10 @@ def create_syncdaemon(username, procnum, homedir, pidfile):
         os.path.join(CLIENT_DIR, 'bin', 'ubuntuone-syncdaemon'),
         username,
         params=("--send_events_over_dbus", "--udf_autosubscribe=true"),
-        environ=env, homedir=homedir, verbose=True)
+        environ=env,
+        homedir=homedir,
+        verbose=True,
+    )
 
 
 class SyncDaemonToolProxy(object):
@@ -145,7 +160,8 @@ class SyncDaemon(object):
         sd_home = 'syncdaemon-home-%d-%s' % (procnum, timestamp)
         self.homedir = os.path.join(TMP_DIR, sd_home, username)
         self.rootdir = os.path.join(
-            self.homedir, settings.ROOT_USERVOLUME_NAME)
+            self.homedir, settings.ROOT_USERVOLUME_NAME
+        )
         self.pidfile = PID_FILENAME % procnum
         self.events = []
         self.sdt = None
@@ -163,8 +179,10 @@ class SyncDaemon(object):
         for i in range(10):
             if os.path.exists(self.pidfile):
                 break
-            self.debug("Process' pid file doesn't exist, sleeping 2 second",
-                       self.pidfile)
+            self.debug(
+                "Process' pid file doesn't exist, sleeping 2 second",
+                self.pidfile,
+            )
             time.sleep(2)
         else:
             ValueError("ERROR: couldn't see the pidfile: %r" % (self.pidfile,))
@@ -183,16 +201,18 @@ class SyncDaemon(object):
         """Connects the syncdaemon."""
         self.debug("Starting SyncDaemon", self.procnum)
         args = (self.username, self.procnum, self.homedir, self.pidfile)
-        self._proc = multiprocessing.Process(target=create_syncdaemon,
-                                             args=args)
+        self._proc = multiprocessing.Process(
+            target=create_syncdaemon, args=args
+        )
         self.debug("Process created:", self._proc)
         self._proc.start()
         self.debug("Process started.")
 
         self._dbus_pid, self._dbus_address = self.parse_daemon_data()
         self._dbus_pid = int(self._dbus_pid)
-        self.debug("Daemon data parsed, values:",
-                   self._dbus_pid, self._dbus_address)
+        self.debug(
+            "Daemon data parsed, values:", self._dbus_pid, self._dbus_address
+        )
 
         conn = dbus.bus.BusConnection(self._dbus_address)
         self.debug("dbus.bus.BusConnection coon:", conn)
@@ -242,8 +262,11 @@ def get_all_tests(test_filter):
             testsok[t] = None
 
     base = os.path.dirname(__file__)
-    test_files = [x for x in os.listdir(base)
-                  if x.startswith('integtests_') and x.endswith('.py')]
+    test_files = [
+        x
+        for x in os.listdir(base)
+        if x.startswith('integtests_') and x.endswith('.py')
+    ]
 
     all_funcs = []
     for fname in test_files:
@@ -290,8 +313,8 @@ def execute_tests(all_tests, sd1, sd2, sd3):
     debug(prefix, 'FS_DIR_CREATE in sd2 done.')
 
     # calm down
-    yield sd1.sdt.wait_for_nirvana(.5)
-    yield sd2.sdt.wait_for_nirvana(.5)
+    yield sd1.sdt.wait_for_nirvana(0.5)
+    yield sd2.sdt.wait_for_nirvana(0.5)
     debug(prefix, 'Nirvana reached for sd1 and sd2.')
 
     len_tests = len(all_tests)
@@ -304,8 +327,11 @@ def execute_tests(all_tests, sd1, sd2, sd3):
             debug(testprefix, 'Skipping test!', skipit, previous_newline=True)
             continue
 
-        debug(testprefix, 'Starting test %d of %d' % (i + 1, len_tests),
-              previous_newline=True)
+        debug(
+            testprefix,
+            'Starting test %d of %d' % (i + 1, len_tests),
+            previous_newline=True,
+        )
 
         try:
             yield test(test_name, sd1, sd2, sd3, testprefix)
@@ -318,9 +344,9 @@ def execute_tests(all_tests, sd1, sd2, sd3):
             debug(testprefix, 'Cleaning up.')
 
             # wait for SDs to finish
-            yield sd1.sdt.wait_for_nirvana(.5)
-            yield sd2.sdt.wait_for_nirvana(.5)
-            yield sd3.sdt.wait_for_nirvana(.5)
+            yield sd1.sdt.wait_for_nirvana(0.5)
+            yield sd2.sdt.wait_for_nirvana(0.5)
+            yield sd3.sdt.wait_for_nirvana(0.5)
 
             # clean up UDFs (removing from 1 should remove it from all)
             debug(testprefix, 'Removing old folders.')
@@ -331,9 +357,9 @@ def execute_tests(all_tests, sd1, sd2, sd3):
                 yield sd1.sdt.delete_folder(folder_id=vid)
 
             # wait for SDs to finish
-            yield sd1.sdt.wait_for_nirvana(.5)
-            yield sd2.sdt.wait_for_nirvana(.5)
-            yield sd3.sdt.wait_for_nirvana(.5)
+            yield sd1.sdt.wait_for_nirvana(0.5)
+            yield sd2.sdt.wait_for_nirvana(0.5)
+            yield sd3.sdt.wait_for_nirvana(0.5)
 
             folders = yield sd1.sdt.get_folders()
             assert folders == []
@@ -364,9 +390,9 @@ def execute_tests(all_tests, sd1, sd2, sd3):
                             os.remove(fullpath)
 
             # wait for SDs to finish these last changes
-            yield sd1.sdt.wait_for_nirvana(.5)
-            yield sd2.sdt.wait_for_nirvana(.5)
-            yield sd3.sdt.wait_for_nirvana(.5)
+            yield sd1.sdt.wait_for_nirvana(0.5)
+            yield sd2.sdt.wait_for_nirvana(0.5)
+            yield sd3.sdt.wait_for_nirvana(0.5)
 
             # clean up events
             sd1.events = []
@@ -439,8 +465,13 @@ if __name__ == "__main__":
     # check we're ready to go
     if not deps_missing():
         parser = OptionParser()
-        parser.add_option("-r", "--repeat", action="store_true", dest="repeat",
-                          help="repeat the test(s) until failure")
+        parser.add_option(
+            "-r",
+            "--repeat",
+            action="store_true",
+            dest="repeat",
+            help="repeat the test(s) until failure",
+        )
         (options, args) = parser.parse_args()
         main(args, options.repeat)
         reactor.run()

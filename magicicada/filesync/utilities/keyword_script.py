@@ -58,12 +58,14 @@ if __name__ == "__main__":
     parser.add_option("--dbname", dest="dbname")
     parser.add_option("--user", dest="user")
     parser.add_option("--password", dest="password", default='')
-    parser.add_option("--limit", dest="limit", type="int",
-                      default=10000)
+    parser.add_option("--limit", dest="limit", type="int", default=10000)
     (options, args) = parser.parse_args()
 
     conn_string = "host='%s' dbname='%s' user='%s'" % (
-        options.host, options.dbname, options.user)
+        options.host,
+        options.dbname,
+        options.user,
+    )
     if options.password:
         conn_string = conn_string + " password='%s'" % options.password
 

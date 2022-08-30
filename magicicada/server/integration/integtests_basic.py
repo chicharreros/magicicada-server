@@ -38,7 +38,7 @@ def test_empty_file(test_name, sd1, sd2, sd3, prefix):
     with open(os.path.join(sd1.rootdir, 'file.txt'), 'w'):
         debug(prefix, "File created")
 
-    yield sd2.sdt.wait_for_nirvana(.5)
+    yield sd2.sdt.wait_for_nirvana(0.5)
 
     # check that the file is in sd2
     assert os.path.exists(os.path.join(sd2.rootdir, 'file.txt'))
@@ -50,7 +50,7 @@ def test_empty_file_funny_name(test_name, sd1, sd2, sd3, prefix):
     # create the file in sd1 and wait
     with open(os.path.join(sd1.rootdir, 'moño.txt'), 'w'):
         debug(prefix, "File created")
-    yield sd2.sdt.wait_for_nirvana(.5)
+    yield sd2.sdt.wait_for_nirvana(0.5)
 
     # check that the file is in sd2
     assert os.path.exists(os.path.join(sd2.rootdir, 'moño.txt'))
@@ -63,7 +63,7 @@ def test_file_with_content(test_name, sd1, sd2, sd3, prefix):
     filepath = os.path.join(sd1.rootdir, 'file.txt')
     content = create_file_and_add_content(filepath)
     debug(prefix, "File created")
-    yield sd2.sdt.wait_for_nirvana(.5)
+    yield sd2.sdt.wait_for_nirvana(0.5)
 
     # check that the file is in sd2 with correct content
     with open(os.path.join(sd2.rootdir, 'file.txt')) as f:
@@ -78,7 +78,7 @@ def test_file_with_content_changing(test_name, sd1, sd2, sd3, prefix):
     filepath = os.path.join(sd1.rootdir, 'file.txt')
     content = create_file_and_add_content(filepath)
     debug(prefix, "File created")
-    yield sd2.sdt.wait_for_nirvana(.5)
+    yield sd2.sdt.wait_for_nirvana(0.5)
 
     # check that the file is in sd2 with correct content
     with open(os.path.join(sd2.rootdir, 'file.txt')) as f:
@@ -89,8 +89,8 @@ def test_file_with_content_changing(test_name, sd1, sd2, sd3, prefix):
     newcontent = os.urandom(1000)
     with open(os.path.join(sd2.rootdir, 'file.txt'), 'w') as fh:
         fh.write(newcontent)
-    yield sd2.sdt.wait_for_nirvana(.5)
-    yield sd1.sdt.wait_for_nirvana(.5)
+    yield sd2.sdt.wait_for_nirvana(0.5)
+    yield sd1.sdt.wait_for_nirvana(0.5)
 
     # check that the file in sd1 has the correct content
     with open(os.path.join(sd1.rootdir, 'file.txt')) as f:
@@ -104,7 +104,7 @@ def test_rename_file(test_name, sd1, sd2, sd3, prefix):
     # create the file in sd1 and wait
     with open(os.path.join(sd1.rootdir, 'file.txt'), 'w'):
         debug(prefix, "File created")
-    yield sd2.sdt.wait_for_nirvana(.5)
+    yield sd2.sdt.wait_for_nirvana(0.5)
 
     # check that the file is in sd2
     assert os.path.exists(os.path.join(sd2.rootdir, 'file.txt'))
@@ -112,9 +112,10 @@ def test_rename_file(test_name, sd1, sd2, sd3, prefix):
     # rename the file, wait for both to settle
     os.rename(
         os.path.join(sd1.rootdir, 'file.txt'),
-        os.path.join(sd1.rootdir, 'filenew.txt'))
-    yield sd1.sdt.wait_for_nirvana(.5)
-    yield sd2.sdt.wait_for_nirvana(.5)
+        os.path.join(sd1.rootdir, 'filenew.txt'),
+    )
+    yield sd1.sdt.wait_for_nirvana(0.5)
+    yield sd2.sdt.wait_for_nirvana(0.5)
 
     # check the new file is there, and the old one isn't
     assert os.path.exists(os.path.join(sd2.rootdir, 'filenew.txt'))
@@ -131,12 +132,14 @@ def test_rename_file_with_content(test_name, sd1, sd2, sd3, prefix):
     """
     # create the file in sd1 and rename
     content = create_file_and_add_content(
-        os.path.join(sd1.rootdir, 'file.txt'))
+        os.path.join(sd1.rootdir, 'file.txt')
+    )
     os.rename(
         os.path.join(sd1.rootdir, 'file.txt'),
-        os.path.join(sd1.rootdir, 'filenew.txt'))
+        os.path.join(sd1.rootdir, 'filenew.txt'),
+    )
     debug(prefix, "File created and renamed")
-    yield sd2.sdt.wait_for_nirvana(.5)
+    yield sd2.sdt.wait_for_nirvana(0.5)
 
     # check that the file is in sd2 ok (and old file is not there)
     assert not os.path.exists(os.path.join(sd2.rootdir, 'file.txt'))
@@ -151,15 +154,15 @@ def test_unlink_file(test_name, sd1, sd2, sd3, prefix):
     # create the file in sd1 and wait
     with open(os.path.join(sd1.rootdir, 'file.txt'), 'w'):
         debug(prefix, "File created")
-    yield sd2.sdt.wait_for_nirvana(.5)
+    yield sd2.sdt.wait_for_nirvana(0.5)
 
     # check that the file is in sd2
     assert os.path.exists(os.path.join(sd2.rootdir, 'file.txt'))
 
     # remove the file, wait for both to settle
     os.remove(os.path.join(sd1.rootdir, 'file.txt'))
-    yield sd1.sdt.wait_for_nirvana(.5)
-    yield sd2.sdt.wait_for_nirvana(.5)
+    yield sd1.sdt.wait_for_nirvana(0.5)
+    yield sd2.sdt.wait_for_nirvana(0.5)
 
     # check
     assert not os.path.exists(os.path.join(sd2.rootdir, 'file.txt'))
@@ -174,8 +177,8 @@ def test_fast_unlink_file(test_name, sd1, sd2, sd3, prefix):
     debug(prefix, "File created and deleted")
 
     # wait and check
-    yield sd1.sdt.wait_for_nirvana(.5)
-    yield sd2.sdt.wait_for_nirvana(.5)
+    yield sd1.sdt.wait_for_nirvana(0.5)
+    yield sd2.sdt.wait_for_nirvana(0.5)
     assert not os.path.exists(os.path.join(sd1.rootdir, 'file.txt'))
     assert not os.path.exists(os.path.join(sd2.rootdir, 'file.txt'))
 
@@ -186,7 +189,7 @@ def test_create_directory(test_name, sd1, sd2, sd3, prefix):
     # create the dir in sd1 and wait
     os.mkdir(os.path.join(sd1.rootdir, 'dir'))
     debug(prefix, "Directory created")
-    yield sd2.sdt.wait_for_nirvana(.5)
+    yield sd2.sdt.wait_for_nirvana(0.5)
 
     # check that the dir is in sd2
     assert os.path.exists(os.path.join(sd2.rootdir, 'dir'))
@@ -198,7 +201,7 @@ def test_create_and_remove_directory(test_name, sd1, sd2, sd3, prefix):
     # create the dir in sd1 and wait
     os.mkdir(os.path.join(sd1.rootdir, 'dir'))
     debug(prefix, "Directory created")
-    yield sd2.sdt.wait_for_nirvana(.5)
+    yield sd2.sdt.wait_for_nirvana(0.5)
 
     # check that the dir is in sd2
     assert os.path.exists(os.path.join(sd2.rootdir, 'dir'))
@@ -207,8 +210,8 @@ def test_create_and_remove_directory(test_name, sd1, sd2, sd3, prefix):
     # remove it and wait
     os.rmdir(os.path.join(sd2.rootdir, 'dir'))
     debug(prefix, "Directory removed")
-    yield sd2.sdt.wait_for_nirvana(.5)
-    yield sd1.sdt.wait_for_nirvana(.5)
+    yield sd2.sdt.wait_for_nirvana(0.5)
+    yield sd1.sdt.wait_for_nirvana(0.5)
 
     # check it's gone also in sd1
     assert not os.path.exists(os.path.join(sd1.rootdir, 'dir'))
@@ -232,8 +235,8 @@ def test_create_tree_and_rename_parent_fast(test_name, sd1, sd2, sd3, prefix):
     debug(prefix, "Tree structure created and dir removed")
 
     # wait for both to settle, and check
-    yield sd1.sdt.wait_for_nirvana(.5)
-    yield sd2.sdt.wait_for_nirvana(.5)
+    yield sd1.sdt.wait_for_nirvana(0.5)
+    yield sd2.sdt.wait_for_nirvana(0.5)
 
     with open(os.path.join(nuevo, 'b', 'c', 'd', 'file1.txt')) as f:
         assert f.read() == c1
@@ -254,14 +257,16 @@ def test_create_both_sd_different_content(test_name, sd1, sd2, sd3, prefix):
     c1 = os.urandom(1000)
     c2 = c1[::-1]
     create_file_and_add_content(
-        os.path.join(sd1.rootdir, 'file.txt'), content=c1)
+        os.path.join(sd1.rootdir, 'file.txt'), content=c1
+    )
     create_file_and_add_content(
-        os.path.join(sd2.rootdir, 'file.txt'), content=c2)
+        os.path.join(sd2.rootdir, 'file.txt'), content=c2
+    )
     debug(prefix, "Files with different content created in both SDs")
 
     # wait for both to settle, and get the files in both
-    yield sd1.sdt.wait_for_nirvana(.5)
-    yield sd2.sdt.wait_for_nirvana(.5)
+    yield sd1.sdt.wait_for_nirvana(0.5)
+    yield sd2.sdt.wait_for_nirvana(0.5)
     files1 = walk_and_list_dir(sd1.rootdir)
     debug(prefix, "Files in SD1", files1)
     files2 = walk_and_list_dir(sd2.rootdir)
@@ -274,8 +279,9 @@ def test_create_both_sd_different_content(test_name, sd1, sd2, sd3, prefix):
     # one of them should have a conflict, and the other should not
     conflict1 = "file.txt.u1conflict" in files1
     conflict2 = "file.txt.u1conflict" in files2
-    assert conflict1 and not conflict2 or conflict2 and not conflict1, \
-        "Only one of both should have conflict!"
+    assert (
+        conflict1 and not conflict2 or conflict2 and not conflict1
+    ), "Only one of both should have conflict!"
 
 
 @defer.inlineCallbacks
@@ -291,8 +297,8 @@ def test_create_both_sd_empty(test_name, sd1, sd2, sd3, prefix):
     debug(prefix, "Empty files created in both SDs")
 
     # wait for both to settle, and get the files in both
-    yield sd1.sdt.wait_for_nirvana(.5)
-    yield sd2.sdt.wait_for_nirvana(.5)
+    yield sd1.sdt.wait_for_nirvana(0.5)
+    yield sd2.sdt.wait_for_nirvana(0.5)
     files1 = walk_and_list_dir(sd1.rootdir)
     files2 = walk_and_list_dir(sd2.rootdir)
 
@@ -313,14 +319,16 @@ def test_create_both_sd_same_content(test_name, sd1, sd2, sd3, prefix):
     # create both files with same content
     data = os.urandom(1000)
     create_file_and_add_content(
-        os.path.join(sd1.rootdir, 'file.txt'), content=data)
+        os.path.join(sd1.rootdir, 'file.txt'), content=data
+    )
     create_file_and_add_content(
-        os.path.join(sd2.rootdir, 'file.txt'), content=data)
+        os.path.join(sd2.rootdir, 'file.txt'), content=data
+    )
     debug(prefix, "Files with same content created in both SDs")
 
     # wait for both to settle, and get the files in both
-    yield sd1.sdt.wait_for_nirvana(.5)
-    yield sd2.sdt.wait_for_nirvana(.5)
+    yield sd1.sdt.wait_for_nirvana(0.5)
+    yield sd2.sdt.wait_for_nirvana(0.5)
     files1 = walk_and_list_dir(sd1.rootdir)
     files2 = walk_and_list_dir(sd2.rootdir)
 
@@ -347,8 +355,8 @@ def test_create_both_sd_same_dir_diff_file(test_name, sd1, sd2, sd3, prefix):
     debug(prefix, "Dir and files created in both SDs")
 
     # wait for both to settle, and get the files in both
-    yield sd1.sdt.wait_for_nirvana(.5)
-    yield sd2.sdt.wait_for_nirvana(.5)
+    yield sd1.sdt.wait_for_nirvana(0.5)
+    yield sd2.sdt.wait_for_nirvana(0.5)
     files1 = walk_and_list_dir(os.path.join(sd1.rootdir, 'dir'))
     files2 = walk_and_list_dir(os.path.join(sd2.rootdir, 'dir'))
 
@@ -371,14 +379,15 @@ def test_create_tree_and_rename(test_name, sd1, sd2, sd3, prefix):
     os.makedirs(os.path.join(sd1.rootdir, 'a', 'b'))
     open(os.path.join(sd1.rootdir, 'a', 'b', 'c.txt'), 'w').close()
     debug(prefix, "Dir and files created in SD1")
-    yield sd1.sdt.wait_for_nirvana(.5)
+    yield sd1.sdt.wait_for_nirvana(0.5)
 
     # rename the parent, wait for both to settle, and get the files in both
     os.rename(
-        os.path.join(sd1.rootdir, 'a'), os.path.join(sd1.rootdir, 'nuevo'))
+        os.path.join(sd1.rootdir, 'a'), os.path.join(sd1.rootdir, 'nuevo')
+    )
     debug(prefix, "Parent renamed")
-    yield sd1.sdt.wait_for_nirvana(.5)
-    yield sd2.sdt.wait_for_nirvana(.5)
+    yield sd1.sdt.wait_for_nirvana(0.5)
+    yield sd2.sdt.wait_for_nirvana(0.5)
     files1 = walk_and_list_dir(sd1.rootdir)
     files2 = walk_and_list_dir(sd2.rootdir)
 
@@ -414,14 +423,14 @@ def test_create_tree_and_remove_it(test_name, sd1, sd2, sd3, prefix):
     debug(prefix, "Tree structure created with files in it")
 
     # wait for both to settle, and remove everything
-    yield sd1.sdt.wait_for_nirvana(.5)
-    yield sd2.sdt.wait_for_nirvana(.5)
+    yield sd1.sdt.wait_for_nirvana(0.5)
+    yield sd2.sdt.wait_for_nirvana(0.5)
     shutil.rmtree(os.path.join(sd1.rootdir, 'a'))
     debug(prefix, "rmtree finished")
 
     # wait for everything to finish, get both files list and check
-    yield sd1.sdt.wait_for_nirvana(.5)
-    yield sd2.sdt.wait_for_nirvana(.5)
+    yield sd1.sdt.wait_for_nirvana(0.5)
+    yield sd2.sdt.wait_for_nirvana(0.5)
     files1 = walk_and_list_dir(sd1.rootdir)
     files2 = walk_and_list_dir(sd2.rootdir)
     assert files1 == [], "bad info in SD1: %s" % (files1,)
@@ -440,19 +449,20 @@ def test_rename_dir_create_same_name(test_name, sd1, sd2, sd3, prefix):
     os.mkdir(os.path.join(sd1.rootdir, 'direct'))
     open(os.path.join(sd1.rootdir, 'direct', 'fileA.txt'), 'w').close()
     debug(prefix, "Directory with file A created")
-    yield sd1.sdt.wait_for_nirvana(.5)
+    yield sd1.sdt.wait_for_nirvana(0.5)
     debug(prefix, "Nirvana reached")
 
     # rename the directory, create again, and a new file
     os.rename(
         os.path.join(sd1.rootdir, 'direct'),
-        os.path.join(sd1.rootdir, 'newdir'))
+        os.path.join(sd1.rootdir, 'newdir'),
+    )
     os.mkdir(os.path.join(sd1.rootdir, 'direct'))
     open(os.path.join(sd1.rootdir, 'direct', 'fileB.txt'), 'w').close()
     debug(prefix, "Directory renamed and created new one with file B")
 
-    yield sd1.sdt.wait_for_nirvana(.5)
-    yield sd2.sdt.wait_for_nirvana(.5)
+    yield sd1.sdt.wait_for_nirvana(0.5)
+    yield sd2.sdt.wait_for_nirvana(0.5)
     debug(prefix, "Nirvana reached on both")
 
     # check in sd2
@@ -471,13 +481,16 @@ def test_create_tree_internal_move(test_name, sd1, sd2, sd3, prefix):
     # create the tree and do the move
     os.makedirs(os.path.join(sd1.rootdir, 'dir1', 'dir2'))
     content = create_file_and_add_content(
-        os.path.join(sd1.rootdir, 'dir1', 'dir2', 'file.txt'))
-    os.rename(os.path.join(sd1.rootdir, 'dir1', 'dir2', 'file.txt'),
-              os.path.join(sd1.rootdir, 'dir1', 'file.txt'))
+        os.path.join(sd1.rootdir, 'dir1', 'dir2', 'file.txt')
+    )
+    os.rename(
+        os.path.join(sd1.rootdir, 'dir1', 'dir2', 'file.txt'),
+        os.path.join(sd1.rootdir, 'dir1', 'file.txt'),
+    )
     debug(prefix, "Tree created and file moved")
 
-    yield sd1.sdt.wait_for_nirvana(.5)
-    yield sd2.sdt.wait_for_nirvana(.5)
+    yield sd1.sdt.wait_for_nirvana(0.5)
+    yield sd2.sdt.wait_for_nirvana(0.5)
     debug(prefix, "Nirvana reached on both")
 
     # check files in sd2
@@ -502,8 +515,9 @@ def test_delete_tree_touched_ok(test_name, sd1, sd2, sd3, prefix):
     # create the tree and wait
     os.makedirs(os.path.join(sd1.rootdir, 'dir1', 'dir2'))
     create_file_and_add_content(
-        os.path.join(sd1.rootdir, 'dir1', 'dir2', 'file.txt'))
-    yield sd1.sdt.wait_for_nirvana(.5)
+        os.path.join(sd1.rootdir, 'dir1', 'dir2', 'file.txt')
+    )
+    yield sd1.sdt.wait_for_nirvana(0.5)
     debug(prefix, "Tree created and propagated")
 
     # remove everything on one side, and unlink on the other
@@ -512,8 +526,8 @@ def test_delete_tree_touched_ok(test_name, sd1, sd2, sd3, prefix):
     debug(prefix, "Deletes executed")
 
     # wait
-    yield sd1.sdt.wait_for_nirvana(.5)
-    yield sd2.sdt.wait_for_nirvana(.5)
+    yield sd1.sdt.wait_for_nirvana(0.5)
+    yield sd2.sdt.wait_for_nirvana(0.5)
     debug(prefix, "Nirvana reached on both")
 
     # check files
@@ -535,15 +549,16 @@ def test_delete_tree_touched_conflict(test_name, sd1, sd2, sd3, prefix):
     # create the tree and wait
     os.makedirs(os.path.join(sd1.rootdir, 'dir1', 'dir2'))
     create_file_and_add_content(
-        os.path.join(sd1.rootdir, 'dir1', 'dir2', 'file.txt'))
-    yield sd1.sdt.wait_for_nirvana(.5)
-    yield sd2.sdt.wait_for_nirvana(.5)
+        os.path.join(sd1.rootdir, 'dir1', 'dir2', 'file.txt')
+    )
+    yield sd1.sdt.wait_for_nirvana(0.5)
+    yield sd2.sdt.wait_for_nirvana(0.5)
     yield sd1.sdt.disconnect()
     debug(prefix, "Tree created and propagated; sd1 disconnected")
 
     # remove everything on one side
     shutil.rmtree(os.path.join(sd2.rootdir, 'dir1'))
-    yield sd2.sdt.wait_for_nirvana(.5)
+    yield sd2.sdt.wait_for_nirvana(0.5)
     debug(prefix, "Delete executed")
 
     # change sd1 and reconnect
@@ -551,7 +566,7 @@ def test_delete_tree_touched_conflict(test_name, sd1, sd2, sd3, prefix):
     with open(fname, 'w') as fh:
         fh.write(os.urandom(10))
     yield sd1.sdt.connect()
-    yield sd1.sdt.wait_for_nirvana(.5)
+    yield sd1.sdt.wait_for_nirvana(0.5)
     debug(prefix, "Wrote in SD1 and reconnected")
 
     # check files
@@ -559,8 +574,11 @@ def test_delete_tree_touched_conflict(test_name, sd1, sd2, sd3, prefix):
     assert files2 == [], "Bad files in SD2: %s" % (files2,)
 
     files1 = walk_and_list_dir(sd1.rootdir)
-    shouldbe = ['dir1.u1conflict', 'dir1.u1conflict/dir2.u1conflict',
-                'dir1.u1conflict/dir2.u1conflict/file.txt.u1conflict']
+    shouldbe = [
+        'dir1.u1conflict',
+        'dir1.u1conflict/dir2.u1conflict',
+        'dir1.u1conflict/dir2.u1conflict/file.txt.u1conflict',
+    ]
     assert files1 == shouldbe, "Bad files in SD1: %s" % (files1,)
 
 
@@ -576,7 +594,7 @@ def test_overwrite_file_with_content(test_name, sd1, sd2, sd3, prefix):
     create_file_and_add_content(file1)
     file2 = os.path.join(sd1.rootdir, 'file2.txt')
     content2 = create_file_and_add_content(file2)
-    yield sd1.sdt.wait_for_nirvana(.5)
+    yield sd1.sdt.wait_for_nirvana(0.5)
     debug(prefix, "Files created")
 
     # overwrite it
@@ -584,8 +602,8 @@ def test_overwrite_file_with_content(test_name, sd1, sd2, sd3, prefix):
     debug(prefix, "Overwritten")
 
     # wait propagation
-    yield sd1.sdt.wait_for_nirvana(.5)
-    yield sd2.sdt.wait_for_nirvana(.5)
+    yield sd1.sdt.wait_for_nirvana(0.5)
+    yield sd2.sdt.wait_for_nirvana(0.5)
     debug(prefix, "All changes propagated")
 
     # check that the file is in sd2 with correct content

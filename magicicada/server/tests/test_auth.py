@@ -35,7 +35,6 @@ from magicicada.server.testing.testcase import TestWithDatabase
 
 
 class AuthenticationBaseTestCase(TestWithDatabase):
-
     def do_auth(self, client, credentials, **kwargs):
         if not isinstance(credentials, dict):
             auth_d = client.dummy_authenticate(credentials, **kwargs)
@@ -144,7 +143,8 @@ class ClientDummyAuthTests(AuthenticationBaseTestCase):
         """Correct authentication must succeed."""
         handler = self.add_memento_handler(auth_logger, level=logging.DEBUG)
         yield self.callback_test(
-            self.do_auth, credentials=self.creds, add_default_callbacks=True)
+            self.do_auth, credentials=self.creds, add_default_callbacks=True
+        )
         self.assert_auth_ok_logging(handler)
 
     @defer.inlineCallbacks
@@ -152,11 +152,15 @@ class ClientDummyAuthTests(AuthenticationBaseTestCase):
         """Non existing user must fail authentication."""
         handler = self.add_memento_handler(auth_logger, level=logging.DEBUG)
         # make the user getter fail
-        self.patch(self.service.factory.content, 'get_user_by_id',
-                   lambda *a, **k: defer.fail(DoesNotExist()))
+        self.patch(
+            self.service.factory.content,
+            'get_user_by_id',
+            lambda *a, **k: defer.fail(DoesNotExist()),
+        )
 
         d = self.callback_test(
-            self.do_auth, credentials=self.creds, add_default_callbacks=True)
+            self.do_auth, credentials=self.creds, add_default_callbacks=True
+        )
         yield self.assertFailure(d, protocol_errors.AuthenticationFailedError)
 
         self.assert_auth_ok_missing_user(handler)
@@ -165,7 +169,8 @@ class ClientDummyAuthTests(AuthenticationBaseTestCase):
     def test_auth_ok_with_session_id(self):
         """Correct authentication must succeed and include the session_id."""
         auth_request = yield self.callback_test(
-            self.do_auth, credentials=self.creds, add_default_callbacks=True)
+            self.do_auth, credentials=self.creds, add_default_callbacks=True
+        )
 
         protocol = self.service.factory.protocols[0]
         self.assertEqual(auth_request.session_id, str(protocol.session_id))
@@ -178,8 +183,11 @@ class ClientDummyAuthTests(AuthenticationBaseTestCase):
         handler = self.add_memento_handler(server_logger, level=logging.DEBUG)
         metadata = {"platform": "linux2", "version": "1.0", "foo": "bar"}
         yield self.callback_test(
-            self.do_auth, credentials=self.creds, metadata=metadata,
-            add_default_callbacks=True)
+            self.do_auth,
+            credentials=self.creds,
+            metadata=metadata,
+            add_default_callbacks=True,
+        )
 
         handler.assert_info("Client metadata: %s" % metadata)
         self.assertIn(("client.platform.linux2", 1), m_called)
@@ -193,7 +201,8 @@ class ClientDummyAuthTests(AuthenticationBaseTestCase):
             d = self.do_auth(client, credentials=self.bad_creds)
             d.addCallbacks(
                 lambda _: client.test_fail(Exception("Should not succeed.")),
-                lambda _: client.test_done("ok"))
+                lambda _: client.test_done("ok"),
+            )
 
         return self.callback_test(test)
 
@@ -266,8 +275,11 @@ class ClientSimpleAuthTests(ClientDummyAuthTests):
 
     def assert_auth_ok_logging(self, handler):
         handler.assert_info(
-            "authenticated user", "OK", self.usr0.username,
-            "(id=%s)" % self.usr0.id)
+            "authenticated user",
+            "OK",
+            self.usr0.username,
+            "(id=%s)" % self.usr0.id,
+        )
         handler.assert_info("valid tokens", "(id=%s)" % self.usr0.id)
         handler.assert_not_logged("missing user")
 

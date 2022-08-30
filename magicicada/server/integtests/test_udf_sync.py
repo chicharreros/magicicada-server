@@ -31,16 +31,20 @@ from magicicada.server.testing.testcase import get_put_content_params
 
 class TestUDFSync(test_sync.TestSync):
     """Base class for UDF tests."""
+
     called = 0
 
     def handle_SYS_STATE_CHANGED(self, state):
         """We fire our callback shortly after the state arrives in IDLE."""
-        if not self.called and state.name == 'QUEUE_MANAGER' \
-                and state.queue_state.name == 'IDLE':
+        if (
+            not self.called
+            and state.name == 'QUEUE_MANAGER'
+            and state.queue_state.name == 'IDLE'
+        ):
             self.called = 1
             # this is probably a hack:
             # let the other subscribers go first
-            reactor.callLater(.1, self.deferred.callback, None)
+            reactor.callLater(0.1, self.deferred.callback, None)
 
     def handle_default(self, event_name, *args, **kwargs):
         """Stub implementation."""
@@ -56,7 +60,7 @@ class TestUDFSync(test_sync.TestSync):
         self.source_dir = self.udf_source_dir
         yield self.deferred
         # create a UDF for the tests
-        yield self.wait_for_nirvana(.2)
+        yield self.wait_for_nirvana(0.2)
         self.my_udf = yield self.create_udf('TestUDF')
         self.my_udf_id = self.my_udf.id
         self.my_udf_dir = self.my_udf.path
@@ -78,25 +82,30 @@ class TestUDFSync(test_sync.TestSync):
 
     def compare_dirs(self):
         """Run rsync to compare directories, needs some work."""
+
         def _compare():
             """spwan rsync and compare"""
             out = StringIO()
-            subprocess.call(["rsync", "-nric", self.my_udf_dir,
-                             self.source_dir], stdout=out)
+            subprocess.call(
+                ["rsync", "-nric", self.my_udf_dir, self.source_dir],
+                stdout=out,
+            )
             return not out.getvalue()
+
         return test_sync.deferToThread(_compare)
 
     def upload_server(self):
         """Upload files in source to the test udf."""
         return super(TestUDFSync, self).upload_server(
-            share=str(self.my_udf_id))
+            share=str(self.my_udf_id)
+        )
 
-    def compare_server(self, dir_name='my_udf_dir',
-                       udf_id_name='my_udf_id'):
+    def compare_server(self, dir_name='my_udf_dir', udf_id_name='my_udf_id'):
         """Compare UDF with server."""
         return super(TestUDFSync, self).compare_server(
             share=str(getattr(self, udf_id_name)),
-            target=getattr(self, dir_name))
+            target=getattr(self, dir_name),
+        )
 
 
 class TestUDFBasic(TestUDFSync, test_sync.TestBasic):
@@ -106,8 +115,10 @@ class TestUDFBasic(TestUDFSync, test_sync.TestBasic):
         """make sure compare fails if different"""
         open(self.source_dir + "/file", "w").close()
         d = self.compare_server("source_dir")
-        d.addCallbacks(lambda _: Failure(Exception("dirs matched, they dont")),
-                       lambda _: True)
+        d.addCallbacks(
+            lambda _: Failure(Exception("dirs matched, they dont")),
+            lambda _: True,
+        )
         return d
 
 
@@ -143,7 +154,8 @@ class TestUDFServerBase(TestUDFSync, test_sync.TestServerBase):
 
         # data for putcontent
         params = get_put_content_params(
-            share=volume_id, node=mkfile_req.new_id)
+            share=volume_id, node=mkfile_req.new_id
+        )
         yield self.client.put_content(**params)
 
         yield self.main.wait_for_nirvana(last_event_interval=1)
@@ -153,12 +165,15 @@ class TestUDFServerBase(TestUDFSync, test_sync.TestServerBase):
         """Create a dir in the server."""
         volume_id = getattr(self, udf_name + '_id')
         d = self.get_client()
-        d.addCallback(lambda _: self.client.make_dir(volume_id,
-                                                     parent, dirname))
-        d.addCallback(lambda _:
-                      self.main.wait_for_nirvana(last_event_interval=1))
-        d.addCallback(lambda _: self.check(udf_name + '_dir',
-                                           udf_name + '_id'))
+        d.addCallback(
+            lambda _: self.client.make_dir(volume_id, parent, dirname)
+        )
+        d.addCallback(
+            lambda _: self.main.wait_for_nirvana(last_event_interval=1)
+        )
+        d.addCallback(
+            lambda _: self.check(udf_name + '_dir', udf_name + '_id')
+        )
         return d
 
     def check(self, udf_dir, udf_id):
@@ -171,9 +186,9 @@ class TestUDFServerBase(TestUDFSync, test_sync.TestServerBase):
 class TestClientMoveMultipleUDFs(TestUDFServerBase):
     """Moves on the client (between UDFs), e.g:
 
-        1) jack has two UDFs
-        2) jack moves (on the filesystem) a file from udf1 to udf2
-        3) jack moves (on the filesystem) a dir from udf1 to udf2
+    1) jack has two UDFs
+    2) jack moves (on the filesystem) a file from udf1 to udf2
+    3) jack moves (on the filesystem) a dir from udf1 to udf2
 
     """
 
@@ -182,7 +197,7 @@ class TestClientMoveMultipleUDFs(TestUDFServerBase):
         """Create another UDF."""
         yield super(TestClientMoveMultipleUDFs, self).setUp()
         # Creates a extra UDF for the cross UDF tests
-        yield self.wait_for_nirvana(.2)
+        yield self.wait_for_nirvana(0.2)
         self.other_udf = yield self.create_udf('TestUDF2')
         self.other_udf_id = self.other_udf.id
         self.other_udf_dir = self.other_udf.path
@@ -221,7 +236,7 @@ class TestUDFServerMove(TestUDFServerBase):
         """Create another UDF."""
         yield super(TestUDFServerMove, self).setUp()
         # Creates a extra UDF for the cross UDF tests
-        yield self.wait_for_nirvana(.2)
+        yield self.wait_for_nirvana(0.2)
         self.other_udf = yield self.create_udf('TestUDF2')
         self.other_udf_id = self.other_udf.id
         self.other_udf_dir = self.other_udf.path
@@ -230,16 +245,17 @@ class TestUDFServerMove(TestUDFServerBase):
     def test_simple_move(self):
         """Server-side move of a file inside a UDF."""
         yield self.get_client()
-        req = yield self.client.make_file(self.my_udf_id,
-                                          self.my_udf.node_id, "test_file")
+        req = yield self.client.make_file(
+            self.my_udf_id, self.my_udf.node_id, "test_file"
+        )
         # data for putcontent
-        params = get_put_content_params(
-            share=self.my_udf_id, node=req.new_id)
+        params = get_put_content_params(share=self.my_udf_id, node=req.new_id)
         yield self.client.put_content(**params)
 
-        yield self.main.wait_for_nirvana(last_event_interval=.5)
-        yield self.client.move(self.my_udf_id, req.new_id,
-                               self.my_udf.node_id, "test_file_moved")
+        yield self.main.wait_for_nirvana(last_event_interval=0.5)
+        yield self.client.move(
+            self.my_udf_id, req.new_id, self.my_udf.node_id, "test_file_moved"
+        )
         yield self.check()
 
     @defer.inlineCallbacks
@@ -247,10 +263,12 @@ class TestUDFServerMove(TestUDFServerBase):
         """Test rename dir."""
         yield self.get_client()
         req = yield self.client.make_dir(
-            self.my_udf_id, self.my_udf.node_id, "test_dir")
+            self.my_udf_id, self.my_udf.node_id, "test_dir"
+        )
         yield self.main.wait_for_nirvana(last_event_interval=1)
-        yield self.client.move(self.my_udf_id, req.new_id,
-                               self.my_udf.node_id, "test_dir_moved")
+        yield self.client.move(
+            self.my_udf_id, req.new_id, self.my_udf.node_id, "test_dir_moved"
+        )
         yield self.check()
 
     def check(self):

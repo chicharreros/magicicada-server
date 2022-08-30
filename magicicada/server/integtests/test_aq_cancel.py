@@ -60,10 +60,11 @@ class AQCancelTestBase(TestBase):
         self.eq.push('SYS_USER_DISCONNECT')
         self.connlost_deferred.errback(error.ConnectionLost())
         self.eq.push('SYS_CONNECTION_LOST')
-        self.eq.push('SYS_USER_CONNECT',
-                     access_token=self.access_tokens['jack'])
+        self.eq.push(
+            'SYS_USER_CONNECT', access_token=self.access_tokens['jack']
+        )
         self.eq.push('SYS_NET_CONNECTED')
-        return self.wait_for_nirvana(.1)
+        return self.wait_for_nirvana(0.1)
 
 
 class TestCancel(AQCancelTestBase):
@@ -72,31 +73,40 @@ class TestCancel(AQCancelTestBase):
     @defer.inlineCallbacks
     def test_list_shares(self):
         """Hiccup the network in the middle of a list_shares."""
+
         def worker():
             """Async worker."""
             self.aq.list_shares()
             return self.hiccup()
+
         yield self.nuke_client_method(
-            'query', worker, lambda: self.connlost_deferred)
+            'query', worker, lambda: self.connlost_deferred
+        )
         self.assertInListenerEvents(
-            'AQ_SHARES_LIST', {'shares_list': anEmptyShareList})
+            'AQ_SHARES_LIST', {'shares_list': anEmptyShareList}
+        )
 
     @defer.inlineCallbacks
     def test_create_share(self):
         """Hiccup the network in the middle of a create_share."""
+
         def worker():
             """Async worker."""
             self.aq.create_share(self.root, 'jack', '', 'View', 'marker:x', '')
             return self.hiccup()
+
         yield self.nuke_client_method(
-            'create_share', worker, lambda: self.connlost_deferred)
+            'create_share', worker, lambda: self.connlost_deferred
+        )
         self.assertInListenerEvents(
             'AQ_CREATE_SHARE_OK',
-            {'marker': 'marker:x', 'share_id': aShareUUID})
+            {'marker': 'marker:x', 'share_id': aShareUUID},
+        )
 
     @defer.inlineCallbacks
     def test_answer_share(self):
         """Hiccup the network in the middle of an answer_share."""
+
         def worker():
             """Asynch worker."""
             share_id = self.listener.get_id_for_marker('marker:x')
@@ -107,14 +117,17 @@ class TestCancel(AQCancelTestBase):
 
         yield self.wait_for_nirvana()
         yield self.nuke_client_method(
-            'accept_share', worker, lambda: self.connlost_deferred)
+            'accept_share', worker, lambda: self.connlost_deferred
+        )
 
         self.assertInListenerEvents(
-            'AQ_ANSWER_SHARE_OK', {'answer': 'Yes', 'share_id': anUUID})
+            'AQ_ANSWER_SHARE_OK', {'answer': 'Yes', 'share_id': anUUID}
+        )
 
     @defer.inlineCallbacks
     def test_unlink(self):
         """Hiccup the network in the middle of an unlink."""
+
         def worker():
             """Asynch worker."""
             new_id = self.listener.get_id_for_marker('marker:x')
@@ -127,37 +140,51 @@ class TestCancel(AQCancelTestBase):
 
         yield self.wait_for_nirvana()
         yield self.nuke_client_method(
-            'unlink', worker, lambda: self.connlost_deferred)
+            'unlink', worker, lambda: self.connlost_deferred
+        )
 
         self.assertInListenerEvents(
             'AQ_UNLINK_OK',
-            {'share_id': '', 'node_id': anUUID, 'parent_id': self.root,
-             'was_dir': False, 'old_path': '', 'new_generation': 2})
+            {
+                'share_id': '',
+                'node_id': anUUID,
+                'parent_id': self.root,
+                'was_dir': False,
+                'old_path': '',
+                'new_generation': 2,
+            },
+        )
 
     @defer.inlineCallbacks
     def test_move(self):
         """Hiccup the network in the middle of a move."""
+
         def worker():
             """Async worker."""
             new_id = self.listener.get_id_for_marker('marker:x')
-            self.aq.move('', new_id, self.root, self.root,
-                         'chau', 'from', 'to')
+            self.aq.move(
+                '', new_id, self.root, self.root, 'chau', 'from', 'to'
+            )
             return self.hiccup()
+
         parent_path = self.main.fs.get_by_node_id('', self.root).path
         mdid = self.main.fs.create(os.path.join(parent_path, "test"), '')
         self.aq.make_file('', self.root, 'hola', 'marker:x', mdid)
 
         yield self.wait_for_nirvana()
         yield self.nuke_client_method(
-            'move', worker, lambda: self.connlost_deferred)
+            'move', worker, lambda: self.connlost_deferred
+        )
 
         self.assertInListenerEvents(
             'AQ_MOVE_OK',
-            {'share_id': '', 'node_id': anUUID, 'new_generation': 2})
+            {'share_id': '', 'node_id': anUUID, 'new_generation': 2},
+        )
 
     @defer.inlineCallbacks
     def test_make_file(self):
         """Hiccup the network in the middle of a make_file."""
+
         def worker():
             """Async worker."""
             parent_path = self.main.fs.get_by_node_id('', self.root).path
@@ -166,36 +193,56 @@ class TestCancel(AQCancelTestBase):
             return self.hiccup()
 
         yield self.nuke_client_method(
-            'make_file', worker, lambda: self.connlost_deferred)
+            'make_file', worker, lambda: self.connlost_deferred
+        )
 
         self.assertInListenerEvents(
             'AQ_FILE_NEW_OK',
-            {'new_id': anUUID, 'marker': 'marker:x', 'new_generation': 1,
-             'volume_id': request.ROOT})
+            {
+                'new_id': anUUID,
+                'marker': 'marker:x',
+                'new_generation': 1,
+                'volume_id': request.ROOT,
+            },
+        )
 
     @defer.inlineCallbacks
     def test_download(self):
         """Hiccup the network in the middle of a download."""
-        self.patch(self.main.fs, 'get_partial_for_writing',
-                   lambda s, n: NoCloseCustomIO())
+        self.patch(
+            self.main.fs,
+            'get_partial_for_writing',
+            lambda s, n: NoCloseCustomIO(),
+        )
         result = yield self._mk_file_w_content()
 
         def worker():
             """Async worker."""
             self.aq.download(
-                result['share_id'], result['node_id'], result['hash'],
-                result['mdid'])
+                result['share_id'],
+                result['node_id'],
+                result['hash'],
+                result['mdid'],
+            )
             return self.hiccup()
 
         fake_gc = FakeGetContent(
-            self.connlost_deferred, result['share_id'], self.root,
-            result['hash'])
+            self.connlost_deferred,
+            result['share_id'],
+            self.root,
+            result['hash'],
+        )
         yield self.nuke_client_method(
-            'get_content_request', worker, lambda: fake_gc)
+            'get_content_request', worker, lambda: fake_gc
+        )
         self.assertInListenerEvents(
             'AQ_DOWNLOAD_COMMIT',
-            {'share_id': '', 'node_id': result['node_id'],
-             'server_hash': result['hash']})
+            {
+                'share_id': '',
+                'node_id': result['node_id'],
+                'server_hash': result['hash'],
+            },
+        )
 
     @defer.inlineCallbacks
     def test_download_while_transferring(self):
@@ -204,6 +251,7 @@ class TestCancel(AQCancelTestBase):
 
         class MyFile(NoCloseCustomIO):
             """A NoCloseCustomIO that cancels on the first call to write"""
+
             def write(self, data):
                 """Cancel the request, and then go on and write."""
                 aq.cancel_download(request.ROOT, self.file_id)
@@ -211,14 +259,17 @@ class TestCancel(AQCancelTestBase):
 
         myfile = MyFile()
         self.patch(
-            self.main.fs, 'get_partial_for_writing', lambda s, n: myfile)
+            self.main.fs, 'get_partial_for_writing', lambda s, n: myfile
+        )
 
         result = yield self._mk_file_w_content(data_len=1024 * 256)
         myfile.file_id = file_id = result['node_id']
         yield aq.download(
-            result['share_id'], file_id, result['hash'], result['mdid'])
+            result['share_id'], file_id, result['hash'], result['mdid']
+        )
         command = aq.queue.hashed_waiting[
-            ('Download', result['share_id'], file_id)]
+            ('Download', result['share_id'], file_id)
+        ]
         yield self.wait_for_nirvana()
 
         # This is insufficient for a proper test. Both a successful download
@@ -238,18 +289,30 @@ class TestCancel(AQCancelTestBase):
         def worker():
             """Async worker."""
             self.aq.upload(
-                params['share_id'], node_id, params['previous_hash'],
-                params['hash'], params['crc32'], params['size'], mdid)
+                params['share_id'],
+                node_id,
+                params['previous_hash'],
+                params['hash'],
+                params['crc32'],
+                params['size'],
+                mdid,
+            )
             return self.hiccup()
 
         yield self.wait_for_nirvana()
         yield self.nuke_client_method(
-            'put_content_request', worker, lambda: self.connlost_deferred)
+            'put_content_request', worker, lambda: self.connlost_deferred
+        )
 
         self.assertInListenerEvents(
             'AQ_UPLOAD_FINISHED',
-            {'share_id': params['share_id'], 'hash': params['hash'],
-             'node_id': anUUID, 'new_generation': 2})
+            {
+                'share_id': params['share_id'],
+                'hash': params['hash'],
+                'node_id': anUUID,
+                'new_generation': 2,
+            },
+        )
 
 
 class TestCancelMarker(AQCancelTestBase):
@@ -264,6 +327,7 @@ class TestCancelMarker(AQCancelTestBase):
     @defer.inlineCallbacks
     def test_create_share(self):
         """Hiccup the network in the middle of a create_share."""
+
         def worker():
             """Async worker."""
             dir_path = os.path.join(self.main.root_dir, 'testdir')
@@ -277,11 +341,13 @@ class TestCancelMarker(AQCancelTestBase):
 
         self.assertInListenerEvents(
             'AQ_CREATE_SHARE_OK',
-            {'marker': 'marker:x', 'share_id': aShareUUID})
+            {'marker': 'marker:x', 'share_id': aShareUUID},
+        )
 
     @defer.inlineCallbacks
     def test_unlink(self):
         """Hiccup the network in the middle of an unlink."""
+
         def worker():
             """Async worker."""
             dir_path = os.path.join(self.main.root_dir, 'testdir')
@@ -295,12 +361,20 @@ class TestCancelMarker(AQCancelTestBase):
 
         self.assertInListenerEvents(
             'AQ_UNLINK_OK',
-            {'share_id': '', 'node_id': anUUID, 'parent_id': self.root,
-             'was_dir': False, 'old_path': 'dir', 'new_generation': 2})
+            {
+                'share_id': '',
+                'node_id': anUUID,
+                'parent_id': self.root,
+                'was_dir': False,
+                'old_path': 'dir',
+                'new_generation': 2,
+            },
+        )
 
     @defer.inlineCallbacks
     def test_move(self):
         """Hiccup the network in the middle of a move."""
+
         def worker():
             """Async worker."""
             dir_path = os.path.join(self.main.root_dir, 'testdir')
@@ -314,11 +388,13 @@ class TestCancelMarker(AQCancelTestBase):
 
         self.assertInListenerEvents(
             'AQ_MOVE_OK',
-            {'share_id': '', 'node_id': anUUID, 'new_generation': 2})
+            {'share_id': '', 'node_id': anUUID, 'new_generation': 2},
+        )
 
     @defer.inlineCallbacks
     def test_make_file(self):
         """Hiccup the network in the middle of a make_file."""
+
         def worker():
             """Async worker."""
             dir_path = os.path.join(self.main.root_dir, 'testdir')
@@ -334,5 +410,10 @@ class TestCancelMarker(AQCancelTestBase):
 
         self.assertInListenerEvents(
             'AQ_FILE_NEW_OK',
-            {'new_id': anUUID, 'marker': 'marker:x', 'new_generation': 2,
-             'volume_id': request.ROOT})
+            {
+                'new_id': anUUID,
+                'marker': 'marker:x',
+                'new_generation': 2,
+                'volume_id': request.ROOT,
+            },
+        )

@@ -33,16 +33,20 @@ from threading import Thread
 from optparse import OptionParser
 
 from twisted.internet import gireactor
+
 gireactor.install()
 
 from dbus.mainloop.glib import DBusGMainLoop
+
 DBusGMainLoop(set_as_default=True)
 
 from twisted.internet import reactor, defer, ssl
 from twisted.python.failure import Failure
 from twisted.python.util import mergeFunctionMetadata
+
 try:
     import gobject
+
     gobject.set_application_name('cmd_client')
 except ImportError:
     pass
@@ -58,9 +62,15 @@ from magicicadaprotocol.content_hash import content_hash_factory, crc32
 def show_volume(volume):
     """Show a volume."""
     if isinstance(volume, volumes.ShareVolume):
-        print("Share %r (other: %s, access: %s, id: %s)" % (
-            volume.share_name, volume.other_username,
-            volume.access_level, volume.volume_id))
+        print(
+            "Share %r (other: %s, access: %s, id: %s)"
+            % (
+                volume.share_name,
+                volume.other_username,
+                volume.access_level,
+                volume.volume_id,
+            )
+        )
     elif isinstance(volume, volumes.UDFVolume):
         print("UDF %r (id: %s)" % (volume.suggested_path, volume.volume_id))
 
@@ -128,16 +138,19 @@ def parse_args(*args, **kwargs):
     o.p("10 10")
     will print 20.
     """
+
     def inner(method):
         """the actual decorator"""
+
         def parser(self, rest):
             """the parser"""
             parts = split_args(rest)
 
             if len(parts) != len(args):
                 print(
-                    "ERROR: Wrong number of arguments. Expected %i, got %i" % (
-                        len(args), len(parts)))
+                    "ERROR: Wrong number of arguments. Expected %i, got %i"
+                    % (len(args), len(parts))
+                )
                 return
 
             result = []
@@ -146,13 +159,16 @@ def parse_args(*args, **kwargs):
                     value = constructor(part)
                 except ValueError:
                     print(
-                        "ERROR: cant convert argument %i to %s" % (
-                            i, constructor))
+                        "ERROR: cant convert argument %i to %s"
+                        % (i, constructor)
+                    )
                     return
                 result.append(value)
 
             return method(self, *result)
+
         return mergeFunctionMetadata(method, parser)
+
     return inner
 
 
@@ -167,11 +183,13 @@ def require_connection(method):
             return
         else:
             return method(self, *args)
+
     return mergeFunctionMetadata(method, decorator)
 
 
 def show_exception(function):
     """Trap exceptions and print them."""
+
     def decorator(*args, **kwargs):
         """inner"""
         # we do want to catch all
@@ -179,6 +197,7 @@ def show_exception(function):
             function(*args, **kwargs)
         except Exception:
             traceback.print_exc()
+
     return mergeFunctionMetadata(function, decorator)
 
 
@@ -266,7 +285,8 @@ class ClientCmd(cmd.Cmd):
             return self.volume_root
         else:
             return self.defer_from_thread(
-                self.factory.current_protocol.get_root)
+                self.factory.current_protocol.get_root
+            )
 
     def get_id_from_filename(self, filename):
         """Get a node id from a filename."""
@@ -320,6 +340,7 @@ class ClientCmd(cmd.Cmd):
 
     def get_hash(self, node_id):
         """Get the hash of node_id."""
+
         def _got_query(query):
             """deferred part."""
             message = query[0][1].response[0]
@@ -332,6 +353,7 @@ class ClientCmd(cmd.Cmd):
             )
             d.addCallback(_got_query)
             return d
+
         return self.defer_from_thread(_query)
 
     def get_content(self, node_id):
@@ -341,8 +363,9 @@ class ClientCmd(cmd.Cmd):
 
         def _get_content():
             """deferred part."""
-            d = self.factory.current_protocol.get_content(self.volume,
-                                                          node_id, hash)
+            d = self.factory.current_protocol.get_content(
+                self.volume, node_id, hash
+            )
             return d
 
         content = self.defer_from_thread(_get_content)
@@ -364,7 +387,8 @@ class ClientCmd(cmd.Cmd):
         def _move():
             """deferred part."""
             d = self.factory.current_protocol.move(
-                self.volume, node_id, new_parent_id, new_name)
+                self.volume, node_id, new_parent_id, new_name
+            )
             return d
 
         return self.defer_from_thread(_move)
@@ -372,19 +396,24 @@ class ClientCmd(cmd.Cmd):
     @parse_args(str, int)
     def do_connect(self, host, port):
         """Connect to host/port."""
+
         def _connect():
             """deferred part."""
             reactor.connectTCP(host, port, self.factory)
+
         self.status = "connecting"
         reactor.callFromThread(_connect)
 
     @parse_args(str, int)
     def do_connect_ssl(self, host, port):
         """Connect to host/port using ssl."""
+
         def _connect():
             """deferred part."""
-            reactor.connectSSL(host, port, self.factory,
-                               ssl.ClientContextFactory())
+            reactor.connectSSL(
+                host, port, self.factory, ssl.ClientContextFactory()
+            )
+
         self.status = "connecting"
         reactor.callFromThread(_connect)
 
@@ -400,7 +429,8 @@ class ClientCmd(cmd.Cmd):
             print("ERROR: Not connecting.")
             return
         reactor.callFromThread(
-            self.factory.current_protocol.transport.loseConnection)
+            self.factory.current_protocol.transport.loseConnection
+        )
 
     @parse_args(str)
     @require_connection
@@ -408,15 +438,15 @@ class ClientCmd(cmd.Cmd):
     def do_dummy_auth(self, token):
         """Perform dummy authentication."""
         self.defer_from_thread(
-            self.factory.current_protocol.dummy_authenticate, token)
+            self.factory.current_protocol.dummy_authenticate, token
+        )
 
     @parse_args()
     @require_connection
     @show_exception
     def do_shares(self):
         """Perform dummy authentication."""
-        r = self.defer_from_thread(
-            self.factory.current_protocol.list_shares)
+        r = self.defer_from_thread(self.factory.current_protocol.list_shares)
         for share in r.shares:
             print(share)
             if share.accepted and share.direction == 'to_me':
@@ -427,8 +457,7 @@ class ClientCmd(cmd.Cmd):
     @show_exception
     def do_set_share(self, sharename):
         """Perform dummy authentication."""
-        r = self.defer_from_thread(
-            self.factory.current_protocol.list_shares)
+        r = self.defer_from_thread(self.factory.current_protocol.list_shares)
         for share in r.shares:
             if str(share.id) == sharename:
                 self.volume_root = share.subtree
@@ -444,8 +473,7 @@ class ClientCmd(cmd.Cmd):
     @show_exception
     def do_volumes(self):
         """Perform dummy authentication."""
-        r = self.defer_from_thread(
-            self.factory.current_protocol.list_volumes)
+        r = self.defer_from_thread(self.factory.current_protocol.list_volumes)
         for volume in r.volumes:
             show_volume(volume)
             if not isinstance(volume, volumes.RootVolume):
@@ -456,8 +484,7 @@ class ClientCmd(cmd.Cmd):
     @show_exception
     def do_set_volume(self, volume_id):
         """Perform dummy authentication."""
-        r = self.defer_from_thread(
-            self.factory.current_protocol.list_volumes)
+        r = self.defer_from_thread(self.factory.current_protocol.list_volumes)
         for volume in r.volumes:
             if str(volume.volume_id) == volume_id:
                 self.volume_root = volume.node_id
@@ -496,8 +523,9 @@ class ClientCmd(cmd.Cmd):
         node_id = self.get_cwd_id()
         entries = self._list_dir(node_id)
         for entry in entries:
-            node_type = dircontent_pb2._NODETYPE. \
-                values_by_number[entry.node_type].name
+            node_type = dircontent_pb2._NODETYPE.values_by_number[
+                entry.node_type
+            ].name
             print("%s %10s %s" % (entry.node, node_type, entry.name))
 
     @parse_args(str)
@@ -507,8 +535,8 @@ class ClientCmd(cmd.Cmd):
         """Create a file named name on the current working directory."""
         node_id = self.get_cwd_id()
         self.defer_from_thread(
-            self.factory.current_protocol.make_file,
-            self.volume, node_id, name)
+            self.factory.current_protocol.make_file, self.volume, node_id, name
+        )
 
     @parse_args(str)
     @show_exception
@@ -521,8 +549,8 @@ class ClientCmd(cmd.Cmd):
         """Create a directory named name on the current working directory."""
         node_id = self.get_cwd_id()
         self.defer_from_thread(
-            self.factory.current_protocol.make_dir,
-            self.volume, node_id, name)
+            self.factory.current_protocol.make_dir, self.volume, node_id, name
+        )
 
     @parse_args(int)
     @show_exception
@@ -553,8 +581,9 @@ class ClientCmd(cmd.Cmd):
                     yield make_file(self.volume, req.new_id, name)
             tend = time.time()
             print(
-                "%d dirs and %d files created in %.2f seconds" % (
-                    intensity, intensity ** 2, tend - tini))
+                "%d dirs and %d files created in %.2f seconds"
+                % (intensity, intensity**2, tend - tini)
+            )
 
         self.defer_from_thread(go)
 
@@ -598,7 +627,10 @@ class ClientCmd(cmd.Cmd):
             parent_id = self.get_cwd_id()
             r = self.defer_from_thread(
                 self.factory.current_protocol.make_file,
-                self.volume, parent_id, remote.split("/")[-1])
+                self.volume,
+                parent_id,
+                remote.split("/")[-1],
+            )
             node_id = r.new_id
 
         old_hash = self.get_hash(node_id)
@@ -610,11 +642,12 @@ class ClientCmd(cmd.Cmd):
         deflated_size = 0
         temp_file_name = None
         with open(local) as fh:
-            with tempfile.NamedTemporaryFile(mode='w', prefix='cmd_client-',
-                                             delete=False) as dest:
+            with tempfile.NamedTemporaryFile(
+                mode='w', prefix='cmd_client-', delete=False
+            ) as dest:
                 temp_file_name = dest.name
                 while True:
-                    cont = fh.read(1024 ** 2)
+                    cont = fh.read(1024**2)
                     if not cont:
                         dest.write(zipper.flush())
                         deflated_size = dest.tell()
@@ -627,8 +660,15 @@ class ClientCmd(cmd.Cmd):
         try:
             self.defer_from_thread(
                 self.factory.current_protocol.put_content,
-                self.volume, node_id, old_hash, hash_value,
-                crc32_value, size, deflated_size, open(temp_file_name, 'r'))
+                self.volume,
+                node_id,
+                old_hash,
+                hash_value,
+                crc32_value,
+                size,
+                deflated_size,
+                open(temp_file_name, 'r'),
+            )
         finally:
             if os.path.exists(temp_file_name):
                 os.unlink(temp_file_name)
@@ -638,9 +678,11 @@ class ClientCmd(cmd.Cmd):
     @show_exception
     def do_rput(self, local, remote):
         """Put local directory and it's files into remote directory."""
+
         def get_server_path(path):
-            """ returns the server relative path """
+            """returns the server relative path"""
             return path.rpartition(os.path.dirname(local))[2].lstrip('/')
+
         cwd = self.cwd
         for dirpath, dirnames, fnames in os.walk(local):
             server_path = get_server_path(dirpath)
@@ -726,6 +768,7 @@ class ClientCmd(cmd.Cmd):
         """Exit the shell."""
         print("Goodbye", rest)
         return True
+
     do_EOF = do_quit
 
     @require_connection
@@ -733,32 +776,39 @@ class ClientCmd(cmd.Cmd):
         """Completion for set_volume."""
         if not self.volumes:
             r = self.defer_from_thread(
-                self.factory.current_protocol.list_volumes)
+                self.factory.current_protocol.list_volumes
+            )
             for volume in r.volumes:
                 if not isinstance(volume, volumes.RootVolume):
                     self.volumes.add(str(volume.volume_id))
-        return [vol_id for vol_id in sorted(self.volumes)
-                if vol_id.startswith(text)]
+        return [
+            vol_id
+            for vol_id in sorted(self.volumes)
+            if vol_id.startswith(text)
+        ]
 
     @require_connection
     def complete_set_share(self, text, line, begidx, endidx):
         """Completion for set_share."""
         if not self.shares:
             r = self.defer_from_thread(
-                self.factory.current_protocol.list_shares)
+                self.factory.current_protocol.list_shares
+            )
             for share in r.shares:
                 if share.accepted and share.direction == 'to_me':
                     self.shares.add(str(share.id))
-        return [share_id for share_id in sorted(self.shares)
-                if share_id.startswith(text)]
+        return [
+            share_id
+            for share_id in sorted(self.shares)
+            if share_id.startswith(text)
+        ]
 
     @require_connection
     def _complete_single_filename(self, text, line, begidx, endidx):
         """Completion for remote filename for single argument commands."""
         node_id = self.get_cwd_id()
         entries = self._list_dir(node_id)
-        return [entry.name for entry in entries
-                if entry.name.startswith(text)]
+        return [entry.name for entry in entries if entry.name.startswith(text)]
 
     complete_cat = complete_unlink = _complete_single_filename
 
@@ -768,9 +818,12 @@ class ClientCmd(cmd.Cmd):
         if len(line.split(' ')) < 3:
             node_id = self.get_cwd_id()
             entries = self._list_dir(node_id)
-            return [entry.name for entry in entries
-                    if entry.node_type != dircontent_pb2.DIRECTORY
-                    and entry.name.startswith(text)]
+            return [
+                entry.name
+                for entry in entries
+                if entry.node_type != dircontent_pb2.DIRECTORY
+                and entry.name.startswith(text)
+            ]
 
     def _complete_local(self, text, include_dirs=False):
         """Return the list of possible local filenames."""
@@ -779,6 +832,7 @@ class ClientCmd(cmd.Cmd):
         def filter_files(files):
             """Firlter files/dirs."""
             return [f for f in files if include_dirs or not isdir(f)]
+
         if not os.path.exists(text):
             head, tail = os.path.split(text)
             while head and tail and not os.path.exists(head):
@@ -799,36 +853,57 @@ class ClientCmd(cmd.Cmd):
         else:  # remote
             node_id = self.get_cwd_id()
             entries = self._list_dir(node_id)
-            return [entry.name for entry in entries
-                    if entry.node_type != dircontent_pb2.DIRECTORY
-                    and entry.name.startswith(text)]
+            return [
+                entry.name
+                for entry in entries
+                if entry.node_type != dircontent_pb2.DIRECTORY
+                and entry.name.startswith(text)
+            ]
 
     @require_connection
     def complete_cd(self, text, line, begidx, endidx):
         """Completion for cd command."""
         node_id = self.get_cwd_id()
         entries = self._list_dir(node_id)
-        return [entry.name for entry in entries
-                if entry.node_type == dircontent_pb2.DIRECTORY
-                and entry.name.startswith(text)]
+        return [
+            entry.name
+            for entry in entries
+            if entry.node_type == dircontent_pb2.DIRECTORY
+            and entry.name.startswith(text)
+        ]
 
 
 def main():
     """run the cmd_client parsing cmd line options"""
     usage = "usage: %prog [options] [CMD]"
     parser = OptionParser(usage=usage)
-    parser.add_option("--port", dest="port", metavar="PORT",
-                      default=443,
-                      help="The port on which to connect to the server")
-    parser.add_option("--host", dest="host", metavar="HOST",
-                      default='localhost',
-                      help="The server address")
-    parser.add_option("--username", dest="username", metavar="USERNAME",
-                      help="The username")
-    parser.add_option("--password", dest="password", metavar="PASSWORD",
-                      help="The password")
-    parser.add_option("-f", "--file", dest="filename",
-                      help="write report to FILE", metavar="FILE")
+    parser.add_option(
+        "--port",
+        dest="port",
+        metavar="PORT",
+        default=443,
+        help="The port on which to connect to the server",
+    )
+    parser.add_option(
+        "--host",
+        dest="host",
+        metavar="HOST",
+        default='localhost',
+        help="The server address",
+    )
+    parser.add_option(
+        "--username", dest="username", metavar="USERNAME", help="The username"
+    )
+    parser.add_option(
+        "--password", dest="password", metavar="PASSWORD", help="The password"
+    )
+    parser.add_option(
+        "-f",
+        "--file",
+        dest="filename",
+        help="write report to FILE",
+        metavar="FILE",
+    )
 
     (options, args) = parser.parse_args()
 
@@ -836,7 +911,7 @@ def main():
     client.onecmd('connect_ssl "%s" %s' % (options.host, options.port))
 
     while client.status != 'connected':
-        time.sleep(.5)
+        time.sleep(0.5)
 
     client.onecmd("auth")
 
@@ -844,6 +919,7 @@ def main():
         client.onecmd(" ".join(args))
     else:
         client.cmdloop()
+
 
 if __name__ == "__main__":
     main()

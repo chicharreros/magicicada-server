@@ -23,7 +23,10 @@ import uuid
 from io import BytesIO
 
 from magicicadaclient.syncdaemon.states import (
-    StateManager, QueueManager, ConnectionManager)
+    StateManager,
+    QueueManager,
+    ConnectionManager,
+)
 from magicicadaclient.syncdaemon import action_queue
 from magicicadaclient.syncdaemon.action_queue import (
     ActionQueue,
@@ -54,6 +57,7 @@ PROTOCOL = ActionQueue.protocol
 
 class TestBasic(TestWithDatabase):
     """Basic connection tests."""
+
     client = None
 
     def tearDown(self):
@@ -67,8 +71,9 @@ class TestBasic(TestWithDatabase):
         connected = self.wait_for('SYS_CONNECTION_MADE')
         self.eq.push('SYS_INIT_DONE')
         self.eq.push('SYS_LOCAL_RESCAN_DONE')
-        self.eq.push('SYS_USER_CONNECT',
-                     access_token=self.access_tokens['jack'])
+        self.eq.push(
+            'SYS_USER_CONNECT', access_token=self.access_tokens['jack']
+        )
         self.eq.push('SYS_NET_CONNECTED')
         yield connected
 
@@ -80,13 +85,15 @@ class TestBasic(TestWithDatabase):
 
         class FakeAQProtocol(PROTOCOL):
             """An ActionQueue's protocol with a bad PROTOCOL_VERSION."""
+
             PROTOCOL_VERSION = -1
 
         self.aq.protocol = FakeAQProtocol
         self.eq.push('SYS_INIT_DONE')
         self.eq.push('SYS_LOCAL_RESCAN_DONE')
-        self.eq.push('SYS_USER_CONNECT',
-                     access_token=self.access_tokens['jack'])
+        self.eq.push(
+            'SYS_USER_CONNECT', access_token=self.access_tokens['jack']
+        )
         self.eq.push('SYS_NET_CONNECTED')
 
         # will continue and finish ok only if couldn't get to the server
@@ -103,8 +110,13 @@ class TestMeta(TestBase):
         yield self._mkfile('hola')
         self.assertInListenerEvents(
             'AQ_FILE_NEW_OK',
-            {'marker': anUUID, 'new_id': anUUID, 'new_generation': 1,
-             'volume_id': ''})
+            {
+                'marker': anUUID,
+                'new_id': anUUID,
+                'new_generation': 1,
+                'volume_id': '',
+            },
+        )
 
     @defer.inlineCallbacks
     def test_make_file_double(self):
@@ -113,23 +125,39 @@ class TestMeta(TestBase):
         yield self._mkfile('hola', default_id=None)
         self.assertInListenerEvents(
             'AQ_FILE_NEW_OK',
-            {'marker': anUUID, 'new_id': anUUID, 'new_generation': 1,
-             'volume_id': ''})
+            {
+                'marker': anUUID,
+                'new_id': anUUID,
+                'new_generation': 1,
+                'volume_id': '',
+            },
+        )
 
     @defer.inlineCallbacks
     def test_make_file_kwargs(self):
         """Test we can make files using keyword arguments."""
         wait_for_queue_done = self.wait_for('SYS_QUEUE_DONE')
         parent_path = self.main.fs.get_by_node_id(request.ROOT, self.root).path
-        mdid = self.main.fs.create(os.path.join(parent_path, "test"),
-                                   request.ROOT)
-        self.aq.make_file(share_id=request.ROOT, parent_id=self.root,
-                          name='hola', marker='marker:xyzzy', mdid=mdid)
+        mdid = self.main.fs.create(
+            os.path.join(parent_path, "test"), request.ROOT
+        )
+        self.aq.make_file(
+            share_id=request.ROOT,
+            parent_id=self.root,
+            name='hola',
+            marker='marker:xyzzy',
+            mdid=mdid,
+        )
         yield wait_for_queue_done
         self.assertInListenerEvents(
             'AQ_FILE_NEW_OK',
-            {'marker': 'marker:xyzzy', 'new_id': anUUID, 'new_generation': 1,
-             'volume_id': ''})
+            {
+                'marker': 'marker:xyzzy',
+                'new_id': anUUID,
+                'new_generation': 1,
+                'volume_id': '',
+            },
+        )
 
     @defer.inlineCallbacks
     def test_make_dir(self):
@@ -137,8 +165,13 @@ class TestMeta(TestBase):
         yield self._mkdir('hola')
         self.assertInListenerEvents(
             'AQ_DIR_NEW_OK',
-            {'marker': anUUID, 'new_id': anUUID, 'new_generation': 1,
-             'volume_id': ''})
+            {
+                'marker': anUUID,
+                'new_id': anUUID,
+                'new_generation': 1,
+                'volume_id': '',
+            },
+        )
 
     @defer.inlineCallbacks
     def test_make_dir_again(self):
@@ -147,12 +180,22 @@ class TestMeta(TestBase):
         yield self._mkdir('hola', default_id=None)
         self.assertInListenerEvents(
             'AQ_DIR_NEW_OK',
-            {'marker': anUUID, 'new_id': anUUID, 'new_generation': 1,
-             'volume_id': ''})
+            {
+                'marker': anUUID,
+                'new_id': anUUID,
+                'new_generation': 1,
+                'volume_id': '',
+            },
+        )
         self.assertInListenerEvents(
             'AQ_DIR_NEW_OK',
-            {'marker': anUUID, 'new_id': anUUID, 'new_generation': 1,
-             'volume_id': ''})
+            {
+                'marker': anUUID,
+                'new_id': anUUID,
+                'new_generation': 1,
+                'volume_id': '',
+            },
+        )
 
     @defer.inlineCallbacks
     def test_move_simple(self):
@@ -160,12 +203,14 @@ class TestMeta(TestBase):
         _, dir_id = yield self._mkdir('un_dir')
         _, file_id = yield self._mkfile('hola')
         wait_for_queue_done = self.wait_for('SYS_QUEUE_DONE')
-        self.aq.move(request.ROOT, file_id, self.root, dir_id,
-                     'chau', 'f', 't')
+        self.aq.move(
+            request.ROOT, file_id, self.root, dir_id, 'chau', 'f', 't'
+        )
         yield wait_for_queue_done
         self.assertInListenerEvents(
             'AQ_MOVE_OK',
-            {'share_id': aShareUUID, 'node_id': anUUID, 'new_generation': 3})
+            {'share_id': aShareUUID, 'node_id': anUUID, 'new_generation': 3},
+        )
 
     @defer.inlineCallbacks
     def test_node_is_with_queued_move__move(self):
@@ -175,8 +220,9 @@ class TestMeta(TestBase):
 
         # do and check
         waiter = self.wait_for('SYS_QUEUE_DONE')
-        self.aq.move(request.ROOT, file_id, self.root,
-                     dir_id, 'chau', 'f', 't')
+        self.aq.move(
+            request.ROOT, file_id, self.root, dir_id, 'chau', 'f', 't'
+        )
         self.assertTrue(self.aq.node_is_with_queued_move("", file_id))
         self.assertFalse(self.aq.node_is_with_queued_move("", "other_id"))
 
@@ -207,8 +253,9 @@ class TestMeta(TestBase):
         # do and check
         waiter = self.wait_for('SYS_QUEUE_DONE')
         self.aq.list_shares()
-        self.aq.move(request.ROOT, file_id, self.root,
-                     dir_id, 'chau', 'f', 't')
+        self.aq.move(
+            request.ROOT, file_id, self.root, dir_id, 'chau', 'f', 't'
+        )
         self.assertTrue(self.aq.node_is_with_queued_move("", file_id))
         self.assertFalse(self.aq.node_is_with_queued_move("", "other_id"))
 
@@ -225,14 +272,21 @@ class TestMeta(TestBase):
         yield self._mkfile('hola')
         other_node_id = str(uuid.uuid4())
         wait_for_queue_done = self.wait_for('SYS_QUEUE_DONE')
-        self.aq.move(request.ROOT, other_node_id, self.root, self.root,
-                     'hola', 'f', 't')
+        self.aq.move(
+            request.ROOT, other_node_id, self.root, self.root, 'hola', 'f', 't'
+        )
         yield wait_for_queue_done
         self.assertInListenerEvents(
             'AQ_MOVE_ERROR',
-            {'error': 'DOES_NOT_EXIST', 'share_id': request.ROOT,
-             'node_id': other_node_id, 'old_parent_id': self.root,
-             'new_parent_id': self.root, 'new_name': 'hola'})
+            {
+                'error': 'DOES_NOT_EXIST',
+                'share_id': request.ROOT,
+                'node_id': other_node_id,
+                'old_parent_id': self.root,
+                'new_parent_id': self.root,
+                'new_name': 'hola',
+            },
+        )
 
     @defer.inlineCallbacks
     def test_unlink_ok(self):
@@ -243,8 +297,15 @@ class TestMeta(TestBase):
         yield wait_for_queue_done
         self.assertInListenerEvents(
             'AQ_UNLINK_OK',
-            {'share_id': aShareUUID, 'node_id': anUUID, 'parent_id': self.root,
-             'was_dir': False, 'old_path': '', 'new_generation': 2})
+            {
+                'share_id': aShareUUID,
+                'node_id': anUUID,
+                'parent_id': self.root,
+                'was_dir': False,
+                'old_path': '',
+                'new_generation': 2,
+            },
+        )
 
     @defer.inlineCallbacks
     @failure_expected('DOES_NOT_EXIST')
@@ -255,8 +316,13 @@ class TestMeta(TestBase):
         yield wait_for_queue_done
         self.assertInListenerEvents(
             'AQ_UNLINK_ERROR',
-            {'share_id': aShareUUID, 'node_id': anUUID,
-             'error': 'DOES_NOT_EXIST', 'parent_id': self.root})
+            {
+                'share_id': aShareUUID,
+                'node_id': anUUID,
+                'error': 'DOES_NOT_EXIST',
+                'parent_id': self.root,
+            },
+        )
 
     def test_multi_mk(self):
         """Make some files, and test that they are created in order."""
@@ -266,17 +332,22 @@ class TestMeta(TestBase):
             new_path = os.path.join(parent_path, 'hola_' + letter)
             mdid = self.main.fs.create(new_path, request.ROOT)
             marker = 'marker:' + letter
-            self.aq.make_file(request.ROOT, self.root,
-                              'hola_' + letter, marker, mdid)
+            self.aq.make_file(
+                request.ROOT, self.root, 'hola_' + letter, marker, mdid
+            )
             dl.append(self.wait_for('AQ_FILE_NEW_OK', marker=marker))
         d = defer.DeferredList(dl)
 
         def check(_):
             """Actually do the check."""
-            evs = [kw['marker'][7:] for (ev, kw) in self.listener.q
-                   if ev == 'AQ_FILE_NEW_OK']
+            evs = [
+                kw['marker'][7:]
+                for (ev, kw) in self.listener.q
+                if ev == 'AQ_FILE_NEW_OK'
+            ]
             # check that the makes arrived in order:
             self.assertEqual(''.join(evs), LETTERS)
+
         d.addCallback(check)
         return d
 
@@ -289,8 +360,9 @@ class TestNonAscii(TestBase):
         """Test that AQ correctly handles non-ascii in mkfile."""
         non_ascii = 'moño'
         yield self._mkfile(non_ascii)
-        wait_for_rescan = self.wait_for('AQ_RESCAN_FROM_SCRATCH_OK',
-                                        volume_id=request.ROOT)
+        wait_for_rescan = self.wait_for(
+            'AQ_RESCAN_FROM_SCRATCH_OK', volume_id=request.ROOT
+        )
         yield self.aq.rescan_from_scratch(request.ROOT)
         yield wait_for_rescan
         res = self.listener.get_rescan_from_scratch_for(request.ROOT)
@@ -301,8 +373,9 @@ class TestNonAscii(TestBase):
         """Test that AQ correctly handles non_ascii in mkdir."""
         non_ascii = 'camión'
         yield self._mkdir(non_ascii)
-        wait_for_rescan = self.wait_for('AQ_RESCAN_FROM_SCRATCH_OK',
-                                        volume_id=request.ROOT)
+        wait_for_rescan = self.wait_for(
+            'AQ_RESCAN_FROM_SCRATCH_OK', volume_id=request.ROOT
+        )
         yield self.aq.rescan_from_scratch(request.ROOT)
         yield wait_for_rescan
         res = self.listener.get_rescan_from_scratch_for(request.ROOT)
@@ -314,6 +387,7 @@ class TestDeferredMeta(TestBase):
 
     Sounds creepy, huh.
     """
+
     def test_make_file_in_unknown_dir(self):
         """Test we can make files in directories we don't know."""
         # create a dir
@@ -327,8 +401,9 @@ class TestDeferredMeta(TestBase):
         mdid = self.main.fs.create(file_path, request.ROOT)
         file_marker = Marker(mdid)
         file_deferred = self.wait_for('AQ_FILE_NEW_OK', marker=file_marker)
-        self.aq.make_file(request.ROOT, dir_marker,
-                          'testfile', file_marker, mdid)
+        self.aq.make_file(
+            request.ROOT, dir_marker, 'testfile', file_marker, mdid
+        )
 
         return file_deferred
 
@@ -343,8 +418,9 @@ class TestDeferredMeta(TestBase):
             new_dir_path = os.path.join(dir_path, letter)
             mdid = self.main.fs.create(new_dir_path, request.ROOT)
             new_dir_marker = Marker(mdid)
-            self.aq.make_dir(request.ROOT, parent_id,
-                             letter, new_dir_marker, mdid)
+            self.aq.make_dir(
+                request.ROOT, parent_id, letter, new_dir_marker, mdid
+            )
             dir_path = new_dir_path
             parent_id = new_dir_marker
 
@@ -360,23 +436,33 @@ class TestDeferredMeta(TestBase):
         file_path = os.path.join(self.main.root_dir, 'testfile')
         mdid = self.main.fs.create(file_path, request.ROOT)
         file_marker = Marker(mdid)
-        self.aq.make_file(request.ROOT, self.root,
-                          'testdir', file_marker, mdid)
+        self.aq.make_file(
+            request.ROOT, self.root, 'testdir', file_marker, mdid
+        )
 
         # try to create other file inside it
         inside_file_path = os.path.join(file_path, 'inside_testfile')
         mdid = self.main.fs.create(inside_file_path, request.ROOT)
         inside_file_marker = Marker(mdid)
-        inside_file_deferred = self.wait_for('AQ_FILE_NEW_ERROR',
-                                             marker=inside_file_marker)
-        self.aq.make_file(request.ROOT, file_marker, 'inside_testfile',
-                          inside_file_marker, mdid)
+        inside_file_deferred = self.wait_for(
+            'AQ_FILE_NEW_ERROR', marker=inside_file_marker
+        )
+        self.aq.make_file(
+            request.ROOT,
+            file_marker,
+            'inside_testfile',
+            inside_file_marker,
+            mdid,
+        )
         yield inside_file_deferred
 
         self.assertInListenerEvents(
             'AQ_FILE_NEW_ERROR',
-            {'marker': inside_file_marker,
-             'failure': FakeFailure('NOT_A_DIRECTORY')})
+            {
+                'marker': inside_file_marker,
+                'failure': FakeFailure('NOT_A_DIRECTORY'),
+            },
+        )
 
     @defer.inlineCallbacks
     @failure_expected('NOT_A_DIRECTORY')
@@ -395,8 +481,9 @@ class TestDeferredMeta(TestBase):
             m = Marker(mdid)
             ml.append(m)
             self.aq.make_file(request.ROOT, parent_id, letter, m, mdid)
-            dl.append(self.wait_for('AQ_FILE_NEW_OK', 'AQ_FILE_NEW_ERROR',
-                                    marker=m))
+            dl.append(
+                self.wait_for('AQ_FILE_NEW_OK', 'AQ_FILE_NEW_ERROR', marker=m)
+            )
             path = new_file_path
             parent_id = m
 
@@ -404,7 +491,8 @@ class TestDeferredMeta(TestBase):
         for m in ml[1:]:
             self.assertInListenerEvents(
                 'AQ_FILE_NEW_ERROR',
-                {'marker': m, 'failure': FakeFailure('NOT_A_DIRECTORY')})
+                {'marker': m, 'failure': FakeFailure('NOT_A_DIRECTORY')},
+            )
 
 
 class TestContent(TestBase):
@@ -418,15 +506,25 @@ class TestContent(TestBase):
 
         result = yield self._mk_file_w_content()
         yield self.aq.download(
-            result['share_id'], result['node_id'], result['hash'],
-            result['mdid'])
+            result['share_id'],
+            result['node_id'],
+            result['hash'],
+            result['mdid'],
+        )
         yield self.wait_for_nirvana()
         self.assertEqual(buf.getvalue(), result['data'])
 
         self.assertEvent(
-            ('AQ_UPLOAD_FINISHED',
-             {'share_id': result['share_id'], 'node_id': result['node_id'],
-              'hash': result['hash'], 'new_generation': 2}))
+            (
+                'AQ_UPLOAD_FINISHED',
+                {
+                    'share_id': result['share_id'],
+                    'node_id': result['node_id'],
+                    'hash': result['hash'],
+                    'new_generation': 2,
+                },
+            )
+        )
 
     @defer.inlineCallbacks
     def test_upload_several(self):
@@ -436,11 +534,15 @@ class TestContent(TestBase):
             result = yield self._mk_file_w_content(filename)
             # download it
             buf = NoCloseCustomIO()
-            self.patch(self.main.fs, 'get_partial_for_writing',
-                       lambda s, n: buf)
+            self.patch(
+                self.main.fs, 'get_partial_for_writing', lambda s, n: buf
+            )
             yield self.aq.download(
-                result['share_id'], result['node_id'], result['hash'],
-                result['mdid'])
+                result['share_id'],
+                result['node_id'],
+                result['hash'],
+                result['mdid'],
+            )
             yield self.wait_for_nirvana()
             self.assertEqual(buf.getvalue(), result['data'])
 
@@ -455,11 +557,17 @@ class TestContent(TestBase):
 
             While read is called, checks that the right info is in the command.
             """
+
             def __init__(self):
                 self.name = 'dummy-will-be-ignored'
                 self.tempfile = BytesIO()
-                commands.append([x for x in outer_self.aq.queue.waiting
-                                 if isinstance(x, Upload)][0])
+                commands.append(
+                    [
+                        x
+                        for x in outer_self.aq.queue.waiting
+                        if isinstance(x, Upload)
+                    ][0]
+                )
                 self.all_read = 0
 
             def read(self, size=None):
@@ -505,9 +613,13 @@ class TestContent(TestBase):
 
         class MyFile(object):
             """A filelike to check that the right info is in aq.downloading."""
+
             def __init__(self):
-                self.cmd = [x for x in outer_self.aq.queue.waiting
-                            if isinstance(x, Download)][0]
+                self.cmd = [
+                    x
+                    for x in outer_self.aq.queue.waiting
+                    if isinstance(x, Download)
+                ][0]
                 commands.append(self.cmd)
                 self.written = 0
 
@@ -517,14 +629,19 @@ class TestContent(TestBase):
 
             def truncate(self, *a, **kw):
                 """Stub."""
+
             flush = close = seek = truncate
 
-        self.patch(self.main.fs, 'get_partial_for_writing',
-                   lambda s, n: MyFile())
+        self.patch(
+            self.main.fs, 'get_partial_for_writing', lambda s, n: MyFile()
+        )
         wait_for_download = self.wait_for('AQ_DOWNLOAD_COMMIT')
         self.aq.download(
-            result['share_id'], result['node_id'], result['hash'],
-            result['mdid'])
+            result['share_id'],
+            result['node_id'],
+            result['hash'],
+            result['mdid'],
+        )
         yield wait_for_download
         self.assertEqual(commands[0].n_bytes_read, deflated_size)
 
@@ -554,15 +671,22 @@ class TestContent(TestBase):
         mdid, node_id = yield self._mkfile('hola')
         waiter = self.wait_for('AQ_UPLOAD_ERROR')
         yield self.aq.upload(
-            params['share_id'], node_id, params['previous_hash'],
-            params['hash'], params['crc32'], params['size'], mdid)
+            params['share_id'],
+            node_id,
+            params['previous_hash'],
+            params['hash'],
+            params['crc32'],
+            params['size'],
+            mdid,
+        )
         yield waiter
 
     def test_ordered(self):
         """Three commands that if run out of order will throw an exception."""
         parent_path = self.main.fs.get_by_node_id(request.ROOT, self.root).path
-        mdid = self.main.fs.create(os.path.join(parent_path, "test"),
-                                   request.ROOT)
+        mdid = self.main.fs.create(
+            os.path.join(parent_path, "test"), request.ROOT
+        )
         marker = Marker(mdid)
         self.aq.make_file(request.ROOT, self.root, 'hola', marker, mdid)
         self.aq.unlink(request.ROOT, self.root, marker, '', False)
@@ -584,6 +708,7 @@ class TestContent(TestBase):
 
             Disconnects the network after the second write.
             """
+
             def __init__(self):
                 self.buf = NoCloseCustomIO()
                 self.writes = 0
@@ -599,14 +724,17 @@ class TestContent(TestBase):
 
             def __getattr__(self, attr):
                 return getattr(self.buf, attr)
+
         buf = Foo()
         result = yield self._mk_file_w_content(data_len=1024 * 128)
-        self.patch(
-            self.main.fs, 'get_partial_for_writing', lambda s, n: buf)
+        self.patch(self.main.fs, 'get_partial_for_writing', lambda s, n: buf)
         yield self.aq.download(
-            result['share_id'], result['node_id'], result['hash'],
-            result['mdid'])
-        yield self.main.wait_for_nirvana(.1)
+            result['share_id'],
+            result['node_id'],
+            result['hash'],
+            result['mdid'],
+        )
+        yield self.main.wait_for_nirvana(0.1)
         self.assertEqual(buf.getvalue(), result['data'])
 
 
@@ -619,7 +747,8 @@ class TestShares(TestBase):
         self.aq.list_shares()
         yield self.wait_for('SYS_QUEUE_DONE')
         self.assertInListenerEvents(
-            'AQ_SHARES_LIST', {'shares_list': anEmptyShareList})
+            'AQ_SHARES_LIST', {'shares_list': anEmptyShareList}
+        )
 
     @defer.inlineCallbacks
     @failure_expected('aiee')
@@ -638,20 +767,23 @@ class TestShares(TestBase):
         self.aq.create_share(self.root, 'jane', '', 'View', 'marker:x', '')
         yield self.wait_for('SYS_QUEUE_DONE')
         self.assertInListenerEvents(
-            'AQ_CREATE_SHARE_OK', {'marker': 'marker:x', 'share_id': anUUID})
+            'AQ_CREATE_SHARE_OK', {'marker': 'marker:x', 'share_id': anUUID}
+        )
 
     @defer.inlineCallbacks
     @failure_expected('DOES_NOT_EXIST')
     def test_create_share_failure(self):
         """Test we can survive a failure to create shares."""
         d = self.wait_for('SYS_QUEUE_DONE')
-        self.aq.create_share(self.root, 'no such user', '', 'View',
-                             'marker:x', '')
+        self.aq.create_share(
+            self.root, 'no such user', '', 'View', 'marker:x', ''
+        )
         yield d
 
         self.assertInListenerEvents(
             'AQ_CREATE_SHARE_ERROR',
-            {'marker': 'marker:x', 'error': 'DOES_NOT_EXIST'})
+            {'marker': 'marker:x', 'error': 'DOES_NOT_EXIST'},
+        )
 
     @defer.inlineCallbacks
     def test_share_notification(self):
@@ -664,6 +796,7 @@ class TestShares(TestBase):
             self.client.factory._share_change_callback(*a)
             timeout.cancel()
             d1.callback('ok!')
+
         self.client.set_share_change_callback(on_notification)
 
         # sharing to yourself will stop working at some point, but
@@ -686,12 +819,14 @@ class TestShares(TestBase):
             self.client.factory._share_change_callback(*a)
             d1.callback('ok!')
             self.aq.answer_share(a[0].share_id, "Yes")
+
         self.client.set_share_change_callback(on_change_notification)
 
         def on_answer_notification(*a):
             """our custom share answer callback"""
             self.client.factory._share_answer_callback(*a)
             d2.callback('ok!')
+
         self.client.set_share_answer_callback(on_answer_notification)
 
         # sharing to yourself will stop working at some point, but
@@ -702,12 +837,14 @@ class TestShares(TestBase):
         yield d1
         yield d2
         self.assertInListenerEvents(
-            'SV_SHARE_ANSWERED', {'answer': 'Yes', 'share_id': anUUID})
+            'SV_SHARE_ANSWERED', {'answer': 'Yes', 'share_id': anUUID}
+        )
         yield d3
 
 
 class TestFSM(TestWithDatabase):
     """Test the AQ follows its FSM."""
+
     client = None
 
     def tearDown(self):
@@ -719,7 +856,7 @@ class TestFSM(TestWithDatabase):
         d = super(TestFSM, self).connect(do_connect)
         if d is not None:
             d.addCallback(lambda client: setattr(self, 'client', client))
-            d.addCallback(lambda _: self.wait_for_nirvana(.5))
+            d.addCallback(lambda _: self.wait_for_nirvana(0.5))
         return d
 
     @defer.inlineCallbacks
@@ -728,14 +865,14 @@ class TestFSM(TestWithDatabase):
         dd = defer.Deferred()
 
         yield self.connect()
-        yield self.wait_for_nirvana(.5)
+        yield self.wait_for_nirvana(0.5)
         yield self.aq.connector.transport.loseConnection()
         yield reactor.callLater(1, dd.callback, None)
         yield dd
         # check that the connection lost event is issued:
         self.assertInListenerEvents('SYS_CONNECTION_LOST', {})
         # test that we reconnect:
-        yield lambda _: self.wait_for_nirvana(.5)
+        yield lambda _: self.wait_for_nirvana(0.5)
 
     def test_init(self):
         """Check that, when started, state is INIT."""
@@ -748,6 +885,7 @@ class TestFSM(TestWithDatabase):
         def _assert(_):
             """do the check"""
             self.assertEqual(self.state.queues.state, QueueManager.IDLE)
+
         d.addCallback(_assert)
         return d
 
@@ -772,6 +910,7 @@ class TestFSM(TestWithDatabase):
             """do the check"""
             self.eq.push('SYS_USER_DISCONNECT')
             self.assertEqual(self.state.state, StateManager.STANDOFF)
+
         d.addCallback(_assert)
         return d
 
@@ -783,6 +922,7 @@ class TestFSM(TestWithDatabase):
             """do the check"""
             self.eq.push('SYS_NET_DISCONNECTED')
             self.assertEqual(self.state.state, StateManager.STANDOFF)
+
         d.addCallback(_assert)
         return d
 
@@ -801,6 +941,7 @@ class TestFSM(TestWithDatabase):
             """Do the check."""
             self.assertEqual(self.state.state, StateManager.QUEUE_MANAGER)
             self.assertEqual(self.state.queues.state, QueueManager.IDLE)
+
         d1 = self.wait_for_nirvana()
         d1.addCallback(_assert)
         return d1
@@ -814,13 +955,17 @@ class TestFSM(TestWithDatabase):
         d = self.connect()
         d.addCallback(lambda _: self.eq.push('SYS_USER_DISCONNECT'))
         d.addCallback(lambda _: self.main.wait_for('SYS_CONNECTION_LOST'))
-        d.addCallback(lambda _: self.eq.push(
-            'SYS_USER_CONNECT', access_token=self.access_tokens['jack']))
+        d.addCallback(
+            lambda _: self.eq.push(
+                'SYS_USER_CONNECT', access_token=self.access_tokens['jack']
+            )
+        )
 
         def _assert(_):
             """do the check"""
             self.assertEqual(self.state.state, StateManager.QUEUE_MANAGER)
             self.assertEqual(self.state.queues.state, QueueManager.IDLE)
+
         d1 = self.wait_for_nirvana()
         d1.addCallback(_assert)
         return d1
@@ -884,12 +1029,16 @@ class TestMulticon(TestWithDatabase):
             """Disconnect the client before the calling original method."""
             self.main.action_q.disconnect()
             return protocol_version(s)
+
         StorageClient.protocol_version = my_protocol_version
         self.state.connection.handshake_timeout = 10
         self.connect()
         d = self.main.wait_for('SYS_CONNECTION_LOST')
-        d.addBoth(lambda _: setattr(StorageClient, 'protocol_version',
-                                    protocol_version))
+        d.addBoth(
+            lambda _: setattr(
+                StorageClient, 'protocol_version', protocol_version
+            )
+        )
         d.addBoth(lambda _: self.main.wait_for_nirvana())
         d.addBoth(lambda _: self.eq.push('SYS_USER_DISCONNECT'))
         return d
@@ -902,12 +1051,16 @@ class TestMulticon(TestWithDatabase):
             """Disconnect the client before the calling original method."""
             self.main.action_q.disconnect()
             return authenticate(*a)
+
         StorageClient.simple_authenticate = my_authenticate
         self.state.connection.handshake_timeout = 10
         self.connect()
         d = self.main.wait_for('SYS_CONNECTION_LOST')
-        d.addBoth(lambda _: setattr(StorageClient, 'simple_authenticate',
-                                    authenticate))
+        d.addBoth(
+            lambda _: setattr(
+                StorageClient, 'simple_authenticate', authenticate
+            )
+        )
         d.addBoth(lambda _: self.main.wait_for_nirvana())
         d.addBoth(lambda _: self.eq.push('SYS_USER_DISCONNECT'))
         return d

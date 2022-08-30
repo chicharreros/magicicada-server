@@ -77,7 +77,8 @@ class TestDelivery(TwistedTestCase):
         self.node_volume_id = uuid.uuid4()
         self.content_node = mock.Mock()
         self.factory = StorageServerFactory(
-            content_class=lambda _: self.content, reactor=self.fake_reactor)
+            content_class=lambda _: self.content, reactor=self.fake_reactor
+        )
 
     @inlineCallbacks
     def test_new_volume_generation_ok(self):
@@ -113,19 +114,22 @@ class TestDelivery(TwistedTestCase):
 
         def test(resp, filter):
             """Check that the broadcast message info is ok."""
-            self.assertEqual(resp.type,
-                             protocol_pb2.Message.VOLUME_NEW_GENERATION)
+            self.assertEqual(
+                resp.type, protocol_pb2.Message.VOLUME_NEW_GENERATION
+            )
             self.assertEqual(resp.volume_new_generation.volume, 'vol_id')
             self.assertEqual(resp.volume_new_generation.generation, 66)
 
             # other session, and generations
             protocol = mock.Mock(
-                session_id=uuid.uuid4(), working_caps=['generations'])
+                session_id=uuid.uuid4(), working_caps=['generations']
+            )
             self.assertTrue(filter(protocol))
 
             # same session, and generations
             protocol = mock.Mock(
-                session_id=session_id, working_caps=['generations'])
+                session_id=session_id, working_caps=['generations']
+            )
             self.assertFalse(filter(protocol))
 
             deferred.callback(None)
@@ -152,40 +156,50 @@ class TestDelivery(TwistedTestCase):
 
         def test_from(resp, filter):
             """Check that the broadcast message info is ok."""
-            self.assertEqual(resp.type,
-                             protocol_pb2.Message.SHARE_ACCEPTED)
+            self.assertEqual(resp.type, protocol_pb2.Message.SHARE_ACCEPTED)
             self.assertEqual(resp.share_accepted.share_id, str(share_id))
-            self.assertEqual(resp.share_accepted.answer,
-                             protocol_pb2.ShareAccepted.YES)
+            self.assertEqual(
+                resp.share_accepted.answer, protocol_pb2.ShareAccepted.YES
+            )
             deferred_from.callback(None)
 
         def test_to(resp, filter):
             """Check that the broadcast message info is ok."""
-            self.assertEqual(resp.type,
-                             protocol_pb2.Message.VOLUME_CREATED)
+            self.assertEqual(resp.type, protocol_pb2.Message.VOLUME_CREATED)
             self.assertEqual(resp.volume_created.share.share_id, str(share_id))
             self.assertEqual(resp.volume_created.share.subtree, str(root_id))
-            self.assertEqual(resp.volume_created.share.direction,
-                             protocol_pb2.Shares.TO_ME)
+            self.assertEqual(
+                resp.volume_created.share.direction, protocol_pb2.Shares.TO_ME
+            )
             deferred_to.callback(None)
 
         user = mock.Mock(
-            id=from_user, username='from_username', visible_name='from user',
-            broadcast=test_from)
+            id=from_user,
+            username='from_username',
+            visible_name='from user',
+            broadcast=test_from,
+        )
         user2 = mock.Mock(
-            id=to_user, username='to_username', visible_name='to user name',
-            broadcast=test_to)
+            id=to_user,
+            username='to_username',
+            visible_name='to user name',
+            broadcast=test_to,
+        )
         users = {from_user: user, to_user: user2}
         self.content.get_user_by_id.side_effect = lambda uid: users[uid]
 
-        notif_to = ShareAccepted(share_id, "name", root_id, from_user,
-                                 to_user, Share.VIEW, True)
-        notif_from = ShareAccepted(share_id, "name", root_id, from_user,
-                                   to_user, Share.VIEW, True)
-        yield self.factory.deliver_share_accepted(notif_to,
-                                                  recipient_id=to_user)
-        yield self.factory.deliver_share_accepted(notif_from,
-                                                  recipient_id=from_user)
+        notif_to = ShareAccepted(
+            share_id, "name", root_id, from_user, to_user, Share.VIEW, True
+        )
+        notif_from = ShareAccepted(
+            share_id, "name", root_id, from_user, to_user, Share.VIEW, True
+        )
+        yield self.factory.deliver_share_accepted(
+            notif_to, recipient_id=to_user
+        )
+        yield self.factory.deliver_share_accepted(
+            notif_from, recipient_id=from_user
+        )
         yield deferred_from
         yield deferred_to
 
@@ -208,29 +222,44 @@ class TestDelivery(TwistedTestCase):
 
         def test_to(resp, filter):
             """Check that the broadcast message info is ok."""
-            self.assertEqual(resp.type,
-                             protocol_pb2.Message.VOLUME_CREATED)
+            self.assertEqual(resp.type, protocol_pb2.Message.VOLUME_CREATED)
             self.assertEqual(resp.volume_created.share.share_id, str(share_id))
             self.assertEqual(resp.volume_created.share.subtree, str(root_id))
-            self.assertEqual(resp.volume_created.share.direction,
-                             protocol_pb2.Shares.TO_ME)
+            self.assertEqual(
+                resp.volume_created.share.direction, protocol_pb2.Shares.TO_ME
+            )
             deferred_to.callback(None)
 
         user = mock.Mock(
-            id=from_user, username='from_username', visible_name='from user',
-            name='from_user')
+            id=from_user,
+            username='from_username',
+            visible_name='from user',
+            name='from_user',
+        )
         user2 = mock.Mock(
-            id=to_user, username='to_username', visible_name='to user name',
-            broadcast=test_to, name='to_user')
+            id=to_user,
+            username='to_username',
+            visible_name='to user name',
+            broadcast=test_to,
+            name='to_user',
+        )
         self.content.get_user_by_id.side_effect = [
-            None, user2, None, user2, user]
+            None,
+            user2,
+            None,
+            user2,
+            user,
+        ]
 
-        notif = ShareAccepted(share_id, "name", root_id, from_user, to_user,
-                              Share.VIEW, True)
-        notif2 = ShareAccepted(share_id, "name", root_id, from_user, to_user,
-                               Share.VIEW, True)
-        yield self.factory.deliver_share_accepted(notif,
-                                                  recipient_id=from_user)
+        notif = ShareAccepted(
+            share_id, "name", root_id, from_user, to_user, Share.VIEW, True
+        )
+        notif2 = ShareAccepted(
+            share_id, "name", root_id, from_user, to_user, Share.VIEW, True
+        )
+        yield self.factory.deliver_share_accepted(
+            notif, recipient_id=from_user
+        )
         yield self.factory.deliver_share_accepted(notif2, recipient_id=to_user)
         yield deferred_to
 
@@ -249,6 +278,7 @@ class NotificationsTestCase(TestWithDatabase):
 
     def test_new_volume_generation(self):
         """Test VolumeNewGeneration notification delivery."""
+
         @defer.inlineCallbacks
         def test(client):
             """Test."""
@@ -269,6 +299,7 @@ class NotificationsTestCase(TestWithDatabase):
                 self.assertEqual(str(volume_id), root)
                 self.assertEqual(new_generation, 15)
                 client.test_done()
+
         return self.callback_test(test)
 
     def test_notify_multi_clients(self):
@@ -348,8 +379,11 @@ class NotificationErrorsTestCase(TestWithDatabase):
         protocol.factory = self.ssfactory
         protocol.working_caps = ["volumes", "generations"]
         protocol.session_id = uuid.uuid4()
-        self.patch(self.ssfactory.content, 'get_user_by_id',
-                   lambda *a: self.induced_error)
+        self.patch(
+            self.ssfactory.content,
+            'get_user_by_id',
+            lambda *a: self.induced_error,
+        )
         self.handler = self.add_memento_handler(logger)
 
     @defer.inlineCallbacks
@@ -361,33 +395,66 @@ class NotificationErrorsTestCase(TestWithDatabase):
         actual = self.handler.records_by_level[logging.ERROR]
         self.assertEqual(len(actual), 1)
         expected = '%s in notification %r while calling deliver_%s(**%r)' % (
-            self.induced_error.value, event, event.event_type, kwargs)
+            self.induced_error.value,
+            event,
+            event.event_type,
+            kwargs,
+        )
         self.assertEqual(actual[0].getMessage(), expected)
 
     def test_share_created(self):
         """Test the share events."""
         event_args = (
-            uuid.uuid4(), "name", uuid.uuid4(), 1, 2, Share.VIEW, False)
+            uuid.uuid4(),
+            "name",
+            uuid.uuid4(),
+            1,
+            2,
+            Share.VIEW,
+            False,
+        )
         return self.check_event(ShareCreated(*event_args))
 
     def test_share_deleted(self):
         """Test the share events."""
         event_args = (
-            uuid.uuid4(), "name", uuid.uuid4(), 1, 2, Share.VIEW, False)
+            uuid.uuid4(),
+            "name",
+            uuid.uuid4(),
+            1,
+            2,
+            Share.VIEW,
+            False,
+        )
         return self.check_event(ShareDeleted(*event_args))
 
     def test_share_declined(self):
         """Test the share events."""
         event_args = (
-            uuid.uuid4(), "name", uuid.uuid4(), 1, 2, Share.VIEW, False)
+            uuid.uuid4(),
+            "name",
+            uuid.uuid4(),
+            1,
+            2,
+            Share.VIEW,
+            False,
+        )
         return self.check_event(ShareDeclined(*event_args))
 
     def test_share_accepted(self):
         """Test the share events."""
         event_args = (
-            uuid.uuid4(), "name", uuid.uuid4(), 1, 2, Share.VIEW, True)
+            uuid.uuid4(),
+            "name",
+            uuid.uuid4(),
+            1,
+            2,
+            Share.VIEW,
+            True,
+        )
         return self.check_event(
-            ShareAccepted(*event_args), recipient_id='test')
+            ShareAccepted(*event_args), recipient_id='test'
+        )
 
     def test_udf_delete(self):
         """Test UDF Delete."""
@@ -396,7 +463,8 @@ class NotificationErrorsTestCase(TestWithDatabase):
     def test_udf_create(self):
         """Test UDF Create."""
         return self.check_event(
-            UDFCreate(1, uuid.uuid4(), uuid.uuid4(), "path", uuid.uuid4()))
+            UDFCreate(1, uuid.uuid4(), uuid.uuid4(), "path", uuid.uuid4())
+        )
 
     def test_new_volume_gen(self):
         """Test the new gen for volume events."""

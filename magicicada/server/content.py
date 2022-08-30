@@ -135,11 +135,16 @@ class Node(object):
             session_ids = ','.join([str(p.session_id) for p in user.protocols])
         else:
             session_ids = 'No sessions?'
-        context = dict(user_id=user.id,
-                       username=user.username.replace('%', '%%'),
-                       session_ids=session_ids, node_id=str(self.id))
-        return ("%(session_ids)s - %(username)s (%(user_id)s) - "
-                "node_id=%(node_id)s" % context)
+        context = dict(
+            user_id=user.id,
+            username=user.username.replace('%', '%%'),
+            session_ids=session_ids,
+            node_id=str(self.id),
+        )
+        return (
+            "%(session_ids)s - %(username)s (%(user_id)s) - "
+            "node_id=%(node_id)s" % context
+        )
 
     def _handle_errors(self, failure, user):
         """Transform storage backend errors into something more appropiate."""
@@ -151,8 +156,17 @@ class Node(object):
 class DBUploadJob(object):
     """A proxy for Upload model objects."""
 
-    def __init__(self, user, volume_id, node_id, uploadjob_id, uploaded_bytes,
-                 multipart_key, chunk_count, when_last_active):
+    def __init__(
+        self,
+        user,
+        volume_id,
+        node_id,
+        uploadjob_id,
+        uploaded_bytes,
+        multipart_key,
+        chunk_count,
+        when_last_active,
+    ):
         self.__dict__ = locals()
 
         # will only update the DB with parts when accumulate over a trigger
@@ -161,27 +175,49 @@ class DBUploadJob(object):
     @classmethod
     def get(cls, user, volume_id, node_id, uploadjob_id, hash_value, crc32):
         """Get a multipart upload job."""
-        data = dict(user=user, volume_id=volume_id,
-                    node_id=node_id)
-        kwargs = dict(user_id=user.id, volume_id=volume_id, node_id=node_id,
-                      uploadjob_id=uploadjob_id,
-                      hash_value=hash_value, crc32=crc32)
+        data = dict(user=user, volume_id=volume_id, node_id=node_id)
+        kwargs = dict(
+            user_id=user.id,
+            volume_id=volume_id,
+            node_id=node_id,
+            uploadjob_id=uploadjob_id,
+            hash_value=hash_value,
+            crc32=crc32,
+        )
         d = user.rpc_dal.call('get_uploadjob', **kwargs)
         d.addCallback(lambda r: r.update(data) or r)
         d.addCallback(lambda r: cls(**r))
         return d
 
     @classmethod
-    def make(cls, user, volume_id, node_id, previous_hash,
-             hash_value, crc32, inflated_size):
+    def make(
+        cls,
+        user,
+        volume_id,
+        node_id,
+        previous_hash,
+        hash_value,
+        crc32,
+        inflated_size,
+    ):
         """Make an upload job."""
         multipart_key = uuid.uuid4()
-        data = dict(user=user, volume_id=volume_id,
-                    node_id=node_id, multipart_key=multipart_key)
-        kwargs = dict(user_id=user.id, volume_id=volume_id, node_id=node_id,
-                      previous_hash=previous_hash,
-                      hash_value=hash_value, crc32=crc32,
-                      inflated_size=inflated_size, multipart_key=multipart_key)
+        data = dict(
+            user=user,
+            volume_id=volume_id,
+            node_id=node_id,
+            multipart_key=multipart_key,
+        )
+        kwargs = dict(
+            user_id=user.id,
+            volume_id=volume_id,
+            node_id=node_id,
+            previous_hash=previous_hash,
+            hash_value=hash_value,
+            crc32=crc32,
+            inflated_size=inflated_size,
+            multipart_key=multipart_key,
+        )
         d = user.rpc_dal.call('make_uploadjob', **kwargs)
         d.addCallback(lambda r: r.update(data) or r)
         d.addCallback(lambda r: cls(**r))
@@ -192,9 +228,12 @@ class DBUploadJob(object):
         self.unsaved_count += chunk_size
         if self.unsaved_count >= settings.STORAGE_CHUNK_SIZE:
             self.unsaved_count -= settings.STORAGE_CHUNK_SIZE
-            kwargs = dict(user_id=self.user.id, volume_id=self.volume_id,
-                          uploadjob_id=self.uploadjob_id,
-                          chunk_size=chunk_size)
+            kwargs = dict(
+                user_id=self.user.id,
+                volume_id=self.volume_id,
+                uploadjob_id=self.uploadjob_id,
+                chunk_size=chunk_size,
+            )
             d = self.user.rpc_dal.call('add_part_to_uploadjob', **kwargs)
         else:
             d = defer.succeed(True)
@@ -204,25 +243,30 @@ class DBUploadJob(object):
     def delete(self):
         """Delete an upload job."""
         try:
-            yield self.user.rpc_dal.call('delete_uploadjob',
-                                         user_id=self.user.id,
-                                         volume_id=self.volume_id,
-                                         uploadjob_id=self.uploadjob_id)
+            yield self.user.rpc_dal.call(
+                'delete_uploadjob',
+                user_id=self.user.id,
+                volume_id=self.volume_id,
+                uploadjob_id=self.uploadjob_id,
+            )
         except dataerrors.DoesNotExist:
             pass
 
     @defer.inlineCallbacks
     def touch(self):
         """Touch an upload job."""
-        r = yield self.user.rpc_dal.call('touch_uploadjob',
-                                         user_id=self.user.id,
-                                         volume_id=self.volume_id,
-                                         uploadjob_id=self.uploadjob_id)
+        r = yield self.user.rpc_dal.call(
+            'touch_uploadjob',
+            user_id=self.user.id,
+            volume_id=self.volume_id,
+            uploadjob_id=self.uploadjob_id,
+        )
         self.when_last_active = r['when_last_active']
 
 
 class BogusUploadJob(object):
     """A proxy for Upload that really doesn't do anything, for small files."""
+
     def __init__(self):
         self.multipart_key = uuid.uuid4()  # unique id for the upload
         self.uploaded_bytes = 0  # always start from 0 (non resumable)
@@ -246,12 +290,25 @@ class BaseUploadJob(object):
     _magic_hash_hint_mismatch = "Magic hash does not match hint."
     _crc32_hint_mismatch = "Crc32 does not match hint."
 
-    def __init__(self, user, file_node, previous_hash, hash_hint, crc32_hint,
-                 inflated_size_hint, deflated_size_hint, session_id,
-                 blob_exists, magic_hash):
+    def __init__(
+        self,
+        user,
+        file_node,
+        previous_hash,
+        hash_hint,
+        crc32_hint,
+        inflated_size_hint,
+        deflated_size_hint,
+        session_id,
+        blob_exists,
+        magic_hash,
+    ):
         node_hash = file_node.content_hash
-        if (node_hash or previous_hash) and \
-                node_hash != previous_hash and node_hash != hash_hint:
+        if (
+            (node_hash or previous_hash)
+            and node_hash != previous_hash
+            and node_hash != hash_hint
+        ):
             raise errors.ConflictError("Previous hash does not match.")
 
         self.user = user
@@ -309,7 +366,8 @@ class BaseUploadJob(object):
         offset = self.uploadjob.uploaded_bytes
 
         self.consumer = self.user.manager.factory.diskstorage.put(
-            str(self.storage_key), offset)
+            str(self.storage_key), offset
+        )
 
         streaming = offset == 0  # hash on the fly if receive from start
         self.producer = upload.ProxyHashingProducer(self.consumer, streaming)
@@ -363,7 +421,7 @@ class BaseUploadJob(object):
         return self._stop_producer_and_factory()
 
     def _handle_connection_done(self, failure):
-        """Process error states encountered by producers and consumers """
+        """Process error states encountered by producers and consumers"""
         if failure.check(twisted.internet.error.ConnectionDone):
             # if we're on the canceling pathway, we expect this
             if self.canceling:
@@ -378,8 +436,9 @@ class BaseUploadJob(object):
             """Return a str with the context for this upload."""
             session_ids = ''
             if self.user.protocols:
-                session_ids = ','.join([str(p.session_id)
-                                        for p in self.user.protocols])
+                session_ids = ','.join(
+                    [str(p.session_id) for p in self.user.protocols]
+                )
             upload_context = dict(
                 user_id=self.user.id,
                 username=self.user.username.replace('%', '%%'),
@@ -388,13 +447,16 @@ class BaseUploadJob(object):
                 node_id=self.file_node.id,
                 bytes_sent=self.producer.deflated_size if self.producer else 0,
             )
-            context_msg = ('%(session_ids)s - %(username)s (%(user_id)s) - '
-                           'node=%(volume_id)s::%(node_id)s '
-                           'sent=%(bytes_sent)s')
+            context_msg = (
+                '%(session_ids)s - %(username)s (%(user_id)s) - '
+                'node=%(volume_id)s::%(node_id)s '
+                'sent=%(bytes_sent)s'
+            )
             return context_msg % upload_context
 
         logger.warning(
-            "%s - storage backend error: %s", context_msg(), failure)
+            "%s - storage backend error: %s", context_msg(), failure
+        )
         if failure.check(errors.UploadCorrupt):
             return failure
         raise errors.TryAgain(failure.value)
@@ -409,7 +471,8 @@ class BaseUploadJob(object):
                 yield self.uploadjob.delete()
             except Exception as exc:
                 logger.exception(
-                    "%s while deleting uploadjob:", exc.__class__.__name__)
+                    "%s while deleting uploadjob:", exc.__class__.__name__
+                )
         defer.returnValue(new_gen)
 
     @defer.inlineCallbacks
@@ -452,14 +515,19 @@ class BaseUploadJob(object):
     @defer.inlineCallbacks
     def _commit_content(self, storage_key, magic_hash):
         """Commit the content in the DAL."""
-        kwargs = dict(user_id=self.user.id, node_id=self.file_node.id,
-                      volume_id=self.file_node.volume_id,
-                      original_hash=self.original_file_hash,
-                      hash_hint=self.hash_hint, crc32_hint=self.crc32_hint,
-                      inflated_size_hint=self.inflated_size_hint,
-                      deflated_size_hint=self.deflated_size_hint,
-                      storage_key=storage_key, magic_hash=magic_hash,
-                      session_id=self.session_id)
+        kwargs = dict(
+            user_id=self.user.id,
+            node_id=self.file_node.id,
+            volume_id=self.file_node.volume_id,
+            original_hash=self.original_file_hash,
+            hash_hint=self.hash_hint,
+            crc32_hint=self.crc32_hint,
+            inflated_size_hint=self.inflated_size_hint,
+            deflated_size_hint=self.deflated_size_hint,
+            storage_key=storage_key,
+            magic_hash=magic_hash,
+            session_id=self.session_id,
+        )
         try:
             r = yield self.user.rpc_dal.call('make_content', **kwargs)
         except dataerrors.ContentMissing:
@@ -472,13 +540,32 @@ class BaseUploadJob(object):
 class UploadJob(BaseUploadJob):
     """A simple upload job."""
 
-    def __init__(self, user, file_node, previous_hash, hash_hint, crc32_hint,
-                 inflated_size_hint, deflated_size_hint,
-                 session_id, blob_exists, magic_hash, upload):
-        super(UploadJob, self).__init__(user, file_node, previous_hash,
-                                        hash_hint, crc32_hint,
-                                        inflated_size_hint, deflated_size_hint,
-                                        session_id, blob_exists, magic_hash)
+    def __init__(
+        self,
+        user,
+        file_node,
+        previous_hash,
+        hash_hint,
+        crc32_hint,
+        inflated_size_hint,
+        deflated_size_hint,
+        session_id,
+        blob_exists,
+        magic_hash,
+        upload,
+    ):
+        super(UploadJob, self).__init__(
+            user,
+            file_node,
+            previous_hash,
+            hash_hint,
+            crc32_hint,
+            inflated_size_hint,
+            deflated_size_hint,
+            session_id,
+            blob_exists,
+            magic_hash,
+        )
         self.uploadjob = upload
 
     @property
@@ -499,15 +586,32 @@ class MagicUploadJob(BaseUploadJob):
     real action here is the commit.
     """
 
-    def __init__(self, user, file_node, previous_hash, hash_hint, crc32_hint,
-                 inflated_size_hint, deflated_size_hint,
-                 storage_key, magic_hash, session_id, blob_exists):
-        super(MagicUploadJob, self).__init__(user, file_node, previous_hash,
-                                             hash_hint, crc32_hint,
-                                             inflated_size_hint,
-                                             deflated_size_hint,
-                                             session_id, blob_exists,
-                                             magic_hash)
+    def __init__(
+        self,
+        user,
+        file_node,
+        previous_hash,
+        hash_hint,
+        crc32_hint,
+        inflated_size_hint,
+        deflated_size_hint,
+        storage_key,
+        magic_hash,
+        session_id,
+        blob_exists,
+    ):
+        super(MagicUploadJob, self).__init__(
+            user,
+            file_node,
+            previous_hash,
+            hash_hint,
+            crc32_hint,
+            inflated_size_hint,
+            deflated_size_hint,
+            session_id,
+            blob_exists,
+            magic_hash,
+        )
         self.storage_key = storage_key
         # all already done!
         self.deferred.callback(None)
@@ -537,8 +641,9 @@ class MagicUploadJob(BaseUploadJob):
 class User(object):
     """A proxy for User objects."""
 
-    def __init__(self, manager, user_id,
-                 root_volume_id, username, visible_name):
+    def __init__(
+        self, manager, user_id, root_volume_id, username, visible_name
+    ):
         self.manager = manager
         self.id = user_id
         self.root_volume_id = root_volume_id
@@ -587,7 +692,8 @@ class User(object):
         if share_id:
             try:
                 share = yield self.rpc_dal.call(
-                    'get_share', user_id=self.id, share_id=share_id)
+                    'get_share', user_id=self.id, share_id=share_id
+                )
                 owner_id = share['shared_by_id']
             except dataerrors.DoesNotExist:
                 # There is currently a bug in the client which
@@ -616,8 +722,9 @@ class User(object):
             we are looking for
         @param content_hash: The current content hash of the node.
         """
-        node = yield self.rpc_dal.call('get_node', user_id=self.id,
-                                       volume_id=volume_id, node_id=node_id)
+        node = yield self.rpc_dal.call(
+            'get_node', user_id=self.id, volume_id=volume_id, node_id=node_id
+        )
         if content_hash and content_hash != node['content_hash']:
             msg = "Node is not available due to hash mismatch."
             raise errors.NotAvailable(msg)
@@ -629,8 +736,9 @@ class User(object):
         defer.returnValue(Node(self.manager, node))
 
     @defer.inlineCallbacks
-    def move(self, volume_id, node_id, new_parent_id,
-             new_name, session_id=None):
+    def move(
+        self, volume_id, node_id, new_parent_id, new_name, session_id=None
+    ):
         """Move a node.
 
         Returns a list of modified nodes.
@@ -640,9 +748,14 @@ class User(object):
         @param new_parent_id: the node id of the new parent.
         @param new_name: the new name for node_id.
         """
-        args = dict(user_id=self.id, volume_id=volume_id, node_id=node_id,
-                    new_name=new_name, new_parent_id=new_parent_id,
-                    session_id=session_id)
+        args = dict(
+            user_id=self.id,
+            volume_id=volume_id,
+            node_id=node_id,
+            new_name=new_name,
+            new_parent_id=new_parent_id,
+            session_id=session_id,
+        )
         r = yield self.rpc_dal.call('move', **args)
         defer.returnValue((r['generation'], r['mimetype']))
 
@@ -654,22 +767,31 @@ class User(object):
         @param parent: the parent content.Node.
         @param name: the name for the directory.
         """
-        args = dict(user_id=self.id, volume_id=volume_id, parent_id=parent_id,
-                    name=name, session_id=session_id)
+        args = dict(
+            user_id=self.id,
+            volume_id=volume_id,
+            parent_id=parent_id,
+            name=name,
+            session_id=session_id,
+        )
         r = yield self.rpc_dal.call('make_dir', **args)
         defer.returnValue((r['node_id'], r['generation'], r['mimetype']))
 
     @defer.inlineCallbacks
-    def make_file(self, volume_id, parent_id, name,
-                  session_id=None):
+    def make_file(self, volume_id, parent_id, name, session_id=None):
         """Create a file.
 
         @param: volume_id: None for the root volume, or uuid of udf or share id
         @param parent: the parent content.Node.
         @param name: the name for the file.
         """
-        args = dict(user_id=self.id, volume_id=volume_id, parent_id=parent_id,
-                    name=name, session_id=session_id)
+        args = dict(
+            user_id=self.id,
+            volume_id=volume_id,
+            parent_id=parent_id,
+            name=name,
+            session_id=session_id,
+        )
         r = yield self.rpc_dal.call('make_file', **args)
         defer.returnValue((r['node_id'], r['generation'], r['mimetype']))
 
@@ -682,8 +804,9 @@ class User(object):
         @param session_id: id of the session where the event was generated
         """
         fullpath = pypath.join(path, name)
-        r = yield self.rpc_dal.call('create_udf', user_id=self.id,
-                                    path=fullpath, session_id=session_id)
+        r = yield self.rpc_dal.call(
+            'create_udf', user_id=self.id, path=fullpath, session_id=session_id
+        )
         defer.returnValue((r['udf_id'], r['udf_root_id'], r['udf_path']))
 
     @defer.inlineCallbacks
@@ -693,8 +816,12 @@ class User(object):
         @param volume_id: the id of the share or udf.
         @param session_id: id of the session where the event was generated.
         """
-        yield self.rpc_dal.call('delete_volume', user_id=self.id,
-                                volume_id=volume_id, session_id=session_id)
+        yield self.rpc_dal.call(
+            'delete_volume',
+            user_id=self.id,
+            volume_id=volume_id,
+            session_id=session_id,
+        )
 
     @defer.inlineCallbacks
     def list_volumes(self):
@@ -717,8 +844,9 @@ class User(object):
         This only returns the "from me" shares, and the "to me" shares that I
         still didn't accept.
         """
-        r = yield self.rpc_dal.call('list_shares', user_id=self.id,
-                                    accepted=False)
+        r = yield self.rpc_dal.call(
+            'list_shares', user_id=self.id, accepted=False
+        )
         defer.returnValue((r['shared_by'], r['shared_to']))
 
     @defer.inlineCallbacks
@@ -731,10 +859,14 @@ class User(object):
         @param access_level: the permissions on the share.
         """
         readonly = access_level == Share.VIEW
-        r = yield self.rpc_dal.call('create_share', user_id=self.id,
-                                    node_id=node_id, share_name=name,
-                                    to_username=shared_to_username,
-                                    readonly=readonly)
+        r = yield self.rpc_dal.call(
+            'create_share',
+            user_id=self.id,
+            node_id=node_id,
+            share_name=name,
+            to_username=shared_to_username,
+            readonly=readonly,
+        )
         defer.returnValue(r['share_id'])
 
     @defer.inlineCallbacks
@@ -743,8 +875,9 @@ class User(object):
 
         @param share_id: the share id.
         """
-        yield self.rpc_dal.call('delete_share',
-                                user_id=self.id, share_id=share_id)
+        yield self.rpc_dal.call(
+            'delete_share', user_id=self.id, share_id=share_id
+        )
 
     @defer.inlineCallbacks
     def share_accepted(self, share_id, answer):
@@ -768,11 +901,16 @@ class User(object):
         @param volume_id: the id of the volume of the node.
         @param node_id: the id of the node.
         """
-        r = yield self.rpc_dal.call('unlink_node', user_id=self.id,
-                                    volume_id=volume_id, node_id=node_id,
-                                    session_id=session_id)
-        defer.returnValue((r['generation'], r['kind'],
-                           r['name'], r['mimetype']))
+        r = yield self.rpc_dal.call(
+            'unlink_node',
+            user_id=self.id,
+            volume_id=volume_id,
+            node_id=node_id,
+            session_id=session_id,
+        )
+        defer.returnValue(
+            (r['generation'], r['kind'], r['name'], r['mimetype'])
+        )
 
     @defer.inlineCallbacks
     def list_public_files(self):
@@ -782,23 +920,39 @@ class User(object):
         defer.returnValue(nodes)
 
     @defer.inlineCallbacks
-    def change_public_access(self, volume_id, node_id,
-                             is_public, session_id=None):
+    def change_public_access(
+        self, volume_id, node_id, is_public, session_id=None
+    ):
         """Change public access of a node.
 
         @param volume_id: the id of the volume of the node.
         @param node_id: the id of the node.
         @param is_public: if the node should be public or not.
         """
-        r = yield self.rpc_dal.call('change_public_access', user_id=self.id,
-                                    volume_id=volume_id, node_id=node_id,
-                                    is_public=is_public, session_id=session_id)
+        r = yield self.rpc_dal.call(
+            'change_public_access',
+            user_id=self.id,
+            volume_id=volume_id,
+            node_id=node_id,
+            is_public=is_public,
+            session_id=session_id,
+        )
         defer.returnValue(r['public_url'])
 
     @defer.inlineCallbacks
-    def get_upload_job(self, vol_id, node_id, previous_hash, hash_value, crc32,
-                       inflated_size, deflated_size, session_id=None,
-                       magic_hash=None, upload_id=None):
+    def get_upload_job(
+        self,
+        vol_id,
+        node_id,
+        previous_hash,
+        hash_value,
+        crc32,
+        inflated_size,
+        deflated_size,
+        session_id=None,
+        magic_hash=None,
+        upload_id=None,
+    ):
         """Create an upload reservation for a node.
 
         @param vol_id: the volume id this node belongs to.
@@ -813,28 +967,60 @@ class User(object):
             previous_hash = None
 
         # reuse the content if we can
-        r = yield self.rpc_dal.call('get_reusable_content', user_id=self.id,
-                                    hash_value=hash_value,
-                                    magic_hash=magic_hash)
+        r = yield self.rpc_dal.call(
+            'get_reusable_content',
+            user_id=self.id,
+            hash_value=hash_value,
+            magic_hash=magic_hash,
+        )
         blob_exists, storage_key = r['blob_exists'], r['storage_key']
 
         if storage_key is not None:
             upload_job = yield self._get_magic_upload_job(
-                vol_id, node_id, previous_hash, hash_value,
-                crc32, inflated_size, deflated_size,
-                storage_key, magic_hash, session_id,
-                blob_exists)
+                vol_id,
+                node_id,
+                previous_hash,
+                hash_value,
+                crc32,
+                inflated_size,
+                deflated_size,
+                storage_key,
+                magic_hash,
+                session_id,
+                blob_exists,
+            )
             defer.returnValue(upload_job)
 
         upload_job = yield self._get_upload_job(
-            vol_id, node_id, previous_hash, hash_value, crc32, inflated_size,
-            deflated_size, session_id, blob_exists, magic_hash, upload_id)
+            vol_id,
+            node_id,
+            previous_hash,
+            hash_value,
+            crc32,
+            inflated_size,
+            deflated_size,
+            session_id,
+            blob_exists,
+            magic_hash,
+            upload_id,
+        )
         defer.returnValue(upload_job)
 
     @defer.inlineCallbacks
-    def _get_upload_job(self, vol_id, node_id, previous_hash, hash_value,
-                        crc32, inflated_size, deflated_size,
-                        session_id, blob_exists, magic_hash, upload_id):
+    def _get_upload_job(
+        self,
+        vol_id,
+        node_id,
+        previous_hash,
+        hash_value,
+        crc32,
+        inflated_size,
+        deflated_size,
+        session_id,
+        blob_exists,
+        magic_hash,
+        upload_id,
+    ):
         """Create an upload reservation for a node.
 
         @param vol_id: the volume id this node belongs to.
@@ -845,8 +1031,9 @@ class User(object):
         @param size: the uncompressed size of the new content.
         @param deflated_size: the compressed size of the new content.
         """
-        node = yield self.rpc_dal.call('get_node', user_id=self.id,
-                                       volume_id=vol_id, node_id=node_id)
+        node = yield self.rpc_dal.call(
+            'get_node', user_id=self.id, volume_id=vol_id, node_id=node_id
+        )
         if not node["is_file"]:
             raise dataerrors.NoPermission("Can only put content on files.")
         file_node = Node(self.manager, node)
@@ -861,8 +1048,9 @@ class User(object):
                 upload = None
             else:
                 try:
-                    upload = yield DBUploadJob.get(self, vol_id, node_id,
-                                                   uploadid, hash_value, crc32)
+                    upload = yield DBUploadJob.get(
+                        self, vol_id, node_id, uploadid, hash_value, crc32
+                    )
                 except dataerrors.DoesNotExist:
                     # there is no uploadjob with the specified id
                     upload = None
@@ -874,25 +1062,52 @@ class User(object):
                 upload = BogusUploadJob()
             else:
                 try:
-                    upload = yield DBUploadJob.make(self, vol_id, node_id,
-                                                    previous_hash, hash_value,
-                                                    crc32, inflated_size)
+                    upload = yield DBUploadJob.make(
+                        self,
+                        vol_id,
+                        node_id,
+                        previous_hash,
+                        hash_value,
+                        crc32,
+                        inflated_size,
+                    )
                 except dataerrors.HashMismatch:
                     raise errors.ConflictError("Previous hash does not match.")
         else:
             # update the when_last_active value.
             yield upload.touch()
 
-        uj = UploadJob(self, file_node, previous_hash, hash_value,
-                       crc32, inflated_size, deflated_size,
-                       session_id, blob_exists, magic_hash, upload)
+        uj = UploadJob(
+            self,
+            file_node,
+            previous_hash,
+            hash_value,
+            crc32,
+            inflated_size,
+            deflated_size,
+            session_id,
+            blob_exists,
+            magic_hash,
+            upload,
+        )
 
         defer.returnValue(uj)
 
     @defer.inlineCallbacks
-    def _get_magic_upload_job(self, vol_id, node_id, previous_hash, hash_value,
-                              crc32, inflated_size, deflated_size, storage_key,
-                              magic_hash, session_id, blob_exists):
+    def _get_magic_upload_job(
+        self,
+        vol_id,
+        node_id,
+        previous_hash,
+        hash_value,
+        crc32,
+        inflated_size,
+        deflated_size,
+        storage_key,
+        magic_hash,
+        session_id,
+        blob_exists,
+    ):
         """Create a magic upload reservation for a node.
 
         @param vol_id: the volume id this node belongs to.
@@ -905,33 +1120,53 @@ class User(object):
         @param storage_key: the content's storage key
         @param magic_hash: the magic_hash from client
         """
-        node = yield self.rpc_dal.call('get_node', user_id=self.id,
-                                       volume_id=vol_id, node_id=node_id)
+        node = yield self.rpc_dal.call(
+            'get_node', user_id=self.id, volume_id=vol_id, node_id=node_id
+        )
         if not node["is_file"]:
             raise dataerrors.NoPermission("Can only put content on files.")
         file_node = Node(self.manager, node)
-        uj = MagicUploadJob(self, file_node, previous_hash, hash_value,
-                            crc32, inflated_size, deflated_size,
-                            storage_key, magic_hash, session_id, blob_exists)
+        uj = MagicUploadJob(
+            self,
+            file_node,
+            previous_hash,
+            hash_value,
+            crc32,
+            inflated_size,
+            deflated_size,
+            storage_key,
+            magic_hash,
+            session_id,
+            blob_exists,
+        )
         defer.returnValue(uj)
 
     @defer.inlineCallbacks
     def get_delta(self, volume_id, from_generation, limit=None):
         """Get the delta form generation for volume_id."""
-        r = yield self.rpc_dal.call('get_delta', user_id=self.id,
-                                    volume_id=volume_id, limit=limit,
-                                    from_generation=from_generation)
+        r = yield self.rpc_dal.call(
+            'get_delta',
+            user_id=self.id,
+            volume_id=volume_id,
+            limit=limit,
+            from_generation=from_generation,
+        )
         nodes = [Node(self.manager, n) for n in r['nodes']]
         defer.returnValue((nodes, r['vol_generation'], r['free_bytes']))
 
     @defer.inlineCallbacks
-    def get_from_scratch(self, volume_id, start_from_path=None, limit=None,
-                         max_generation=None):
+    def get_from_scratch(
+        self, volume_id, start_from_path=None, limit=None, max_generation=None
+    ):
         """Get the list of live nodes in volume_id."""
-        r = yield self.rpc_dal.call('get_from_scratch', user_id=self.id,
-                                    volume_id=volume_id,
-                                    start_from_path=start_from_path,
-                                    limit=limit, max_generation=max_generation)
+        r = yield self.rpc_dal.call(
+            'get_from_scratch',
+            user_id=self.id,
+            volume_id=volume_id,
+            start_from_path=start_from_path,
+            limit=limit,
+            max_generation=max_generation,
+        )
         nodes = [Node(self.manager, n) for n in r['nodes']]
         defer.returnValue((nodes, r['vol_generation'], r['free_bytes']))
 
@@ -942,8 +1177,9 @@ class User(object):
         @param node_id: an uuid object or string representing the id of the
             we are looking for
         """
-        r = yield self.rpc_dal.call('get_volume_id', user_id=self.id,
-                                    node_id=node_id)
+        r = yield self.rpc_dal.call(
+            'get_volume_id', user_id=self.id, node_id=node_id
+        )
         defer.returnValue(r['volume_id'])
 
 
@@ -964,11 +1200,17 @@ class ContentManager(object):
         user = self.users.get(user_id, None)
         if user is None and required:
             r = yield self.rpc_dal.call(
-                'get_user_data', user_id=user_id, session_id=session_id)
+                'get_user_data', user_id=user_id, session_id=session_id
+            )
             # Another task may have already updated the cache, so check again
             user = self.users.get(user_id, None)
             if user is None:
-                user = User(self, user_id, r['root_volume_id'],
-                            r['username'], r['visible_name'])
+                user = User(
+                    self,
+                    user_id,
+                    r['root_volume_id'],
+                    r['username'],
+                    r['visible_name'],
+                )
                 self.users[user_id] = user
         defer.returnValue(user)

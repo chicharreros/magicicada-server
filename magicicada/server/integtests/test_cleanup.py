@@ -57,8 +57,13 @@ class TestCleanup(TestBase):
         yield d
         self.assertInListenerEvents(
             'AQ_FILE_NEW_OK',
-            {'marker': 'marker:foo', 'new_id': anUUID, 'new_generation': 1,
-             'volume_id': request.ROOT})
+            {
+                'marker': 'marker:foo',
+                'new_id': anUUID,
+                'new_generation': 1,
+                'volume_id': request.ROOT,
+            },
+        )
 
     @defer.inlineCallbacks
     @failure_ignore('ALREADY_EXISTS')
@@ -85,12 +90,23 @@ class TestCleanup(TestBase):
         yield self.wait_for_nirvana()
 
         events = []
-        events.append(('AQ_FILE_NEW_ERROR', {'marker': 'marker:foo',
-                                             'error': 'ALREADY_EXISTS'}))
-        events.append(('AQ_FILE_NEW_OK', {'marker': 'marker:foo',
-                                          'new_id': anUUID,
-                                          'new_generation': 1,
-                                          'volume_id': request.ROOT}))
+        events.append(
+            (
+                'AQ_FILE_NEW_ERROR',
+                {'marker': 'marker:foo', 'error': 'ALREADY_EXISTS'},
+            )
+        )
+        events.append(
+            (
+                'AQ_FILE_NEW_OK',
+                {
+                    'marker': 'marker:foo',
+                    'new_id': anUUID,
+                    'new_generation': 1,
+                    'volume_id': request.ROOT,
+                },
+            )
+        )
         self.assertAnyInListenerEvents(events)
 
     @defer.inlineCallbacks
@@ -112,12 +128,23 @@ class TestCleanup(TestBase):
         yield self.wait_for_nirvana()
 
         events = []
-        events.append(('AQ_DIR_NEW_ERROR',
-                       {'marker': 'marker:foo', 'error': 'ALREADY_EXISTS'}))
-        events.append(('AQ_DIR_NEW_OK', {'marker': 'marker:foo',
-                                         'new_id': anUUID,
-                                         'new_generation': 1,
-                                         'volume_id': request.ROOT}))
+        events.append(
+            (
+                'AQ_DIR_NEW_ERROR',
+                {'marker': 'marker:foo', 'error': 'ALREADY_EXISTS'},
+            )
+        )
+        events.append(
+            (
+                'AQ_DIR_NEW_OK',
+                {
+                    'marker': 'marker:foo',
+                    'new_id': anUUID,
+                    'new_generation': 1,
+                    'volume_id': request.ROOT,
+                },
+            )
+        )
         self.assertAnyInListenerEvents(events)
 
     @defer.inlineCallbacks
@@ -140,16 +167,32 @@ class TestCleanup(TestBase):
         yield d1
         yield self.wait_for_nirvana()
         events = [
-            ('AQ_MOVE_ERROR',
-             {'new_name': 'bar', 'share_id': '', 'old_parent_id': self.root,
-              'new_parent_id': self.root, 'node_id': new_id,
-              'error': 'ALREADY_EXISTS'}),
-            ('AQ_MOVE_ERROR',
-             {'new_name': 'bar', 'share_id': '', 'old_parent_id': self.root,
-              'new_parent_id': self.root, 'node_id': new_id,
-              'error': 'DOES_NOT_EXIST'}),
-            ('AQ_MOVE_OK',
-             {'share_id': '', 'node_id': new_id, 'new_generation': 2}),
+            (
+                'AQ_MOVE_ERROR',
+                {
+                    'new_name': 'bar',
+                    'share_id': '',
+                    'old_parent_id': self.root,
+                    'new_parent_id': self.root,
+                    'node_id': new_id,
+                    'error': 'ALREADY_EXISTS',
+                },
+            ),
+            (
+                'AQ_MOVE_ERROR',
+                {
+                    'new_name': 'bar',
+                    'share_id': '',
+                    'old_parent_id': self.root,
+                    'new_parent_id': self.root,
+                    'node_id': new_id,
+                    'error': 'DOES_NOT_EXIST',
+                },
+            ),
+            (
+                'AQ_MOVE_OK',
+                {'share_id': '', 'node_id': new_id, 'new_generation': 2},
+            ),
         ]
         self.assertAnyInListenerEvents(events)
 
@@ -174,13 +217,27 @@ class TestCleanup(TestBase):
         yield d1
         yield self.wait_for_nirvana()
 
-        self.assertAnyInListenerEvents([
-            ('AQ_UNLINK_OK',
-             {'share_id': '', 'parent_id': self.root, 'node_id': new_id}),
-            ('AQ_UNLINK_ERROR',
-             {'share_id': '', 'parent_id': self.root, 'node_id': new_id,
-              'error': 'DOES_NOT_EXIST'}),
-        ])
+        self.assertAnyInListenerEvents(
+            [
+                (
+                    'AQ_UNLINK_OK',
+                    {
+                        'share_id': '',
+                        'parent_id': self.root,
+                        'node_id': new_id,
+                    },
+                ),
+                (
+                    'AQ_UNLINK_ERROR',
+                    {
+                        'share_id': '',
+                        'parent_id': self.root,
+                        'node_id': new_id,
+                        'error': 'DOES_NOT_EXIST',
+                    },
+                ),
+            ]
+        )
 
     @defer.inlineCallbacks
     def test_list_shares(self):
@@ -195,7 +252,8 @@ class TestCleanup(TestBase):
         yield self.wait_for_nirvana()
 
         self.assertInListenerEvents(
-            'AQ_SHARES_LIST', {'shares_list': anEmptyShareList})
+            'AQ_SHARES_LIST', {'shares_list': anEmptyShareList}
+        )
 
     @defer.inlineCallbacks
     @failure_ignore('ALREADY_EXISTS')
@@ -210,12 +268,18 @@ class TestCleanup(TestBase):
         yield d
         yield self.wait_for_nirvana()
 
-        self.assertAnyInListenerEvents([
-            ('AQ_CREATE_SHARE_ERROR',
-                {'marker': 'marker:x', 'error': 'ALREADY_EXISTS'}),
-            ('AQ_CREATE_SHARE_OK',
-                {'marker': 'marker:x', 'share_id': anUUID}),
-        ])
+        self.assertAnyInListenerEvents(
+            [
+                (
+                    'AQ_CREATE_SHARE_ERROR',
+                    {'marker': 'marker:x', 'error': 'ALREADY_EXISTS'},
+                ),
+                (
+                    'AQ_CREATE_SHARE_OK',
+                    {'marker': 'marker:x', 'share_id': anUUID},
+                ),
+            ]
+        )
 
     @defer.inlineCallbacks
     def test_download(self):
@@ -226,17 +290,26 @@ class TestCleanup(TestBase):
 
         waiter = self.wait_for('SYS_QUEUE_DONE')
         self.aq.download(
-            result['share_id'], result['node_id'], result['hash'],
-            result['mdid'])
+            result['share_id'],
+            result['node_id'],
+            result['hash'],
+            result['mdid'],
+        )
         self.eq.push('SYS_NET_DISCONNECTED')
         self.eq.push('SYS_CONNECTION_LOST')
         self.eq.push('SYS_NET_CONNECTED')
         yield waiter
         yield self.wait_for_nirvana(1)
         self.assertEvent(
-            ('AQ_DOWNLOAD_COMMIT',
-             {'share_id': result['share_id'], 'node_id': result['node_id'],
-              'server_hash': result['hash']}))
+            (
+                'AQ_DOWNLOAD_COMMIT',
+                {
+                    'share_id': result['share_id'],
+                    'node_id': result['node_id'],
+                    'server_hash': result['hash'],
+                },
+            )
+        )
 
     @defer.inlineCallbacks
     def test_upload(self):
@@ -248,8 +321,14 @@ class TestCleanup(TestBase):
         # Start the upload, jigger the network
         waiter = self.wait_for('SYS_QUEUE_DONE')
         self.aq.upload(
-            params['share_id'], node_id, params['previous_hash'],
-            params['hash'], params['crc32'], params['size'], mdid)
+            params['share_id'],
+            node_id,
+            params['previous_hash'],
+            params['hash'],
+            params['crc32'],
+            params['size'],
+            mdid,
+        )
         self.eq.push('SYS_NET_DISCONNECTED')
         self.eq.push('SYS_CONNECTION_LOST')
         reactor.callLater(0.2, self.eq.push, 'SYS_NET_CONNECTED')
@@ -257,6 +336,13 @@ class TestCleanup(TestBase):
         yield waiter
         yield self.wait_for_nirvana(1)
         self.assertEvent(
-            ('AQ_UPLOAD_FINISHED',
-             {'share_id': params['share_id'], 'node_id': anUUID,
-              'new_generation': 2, 'hash': params['hash']}))
+            (
+                'AQ_UPLOAD_FINISHED',
+                {
+                    'share_id': params['share_id'],
+                    'node_id': anUUID,
+                    'new_generation': 2,
+                    'hash': params['hash'],
+                },
+            )
+        )

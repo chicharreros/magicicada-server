@@ -47,21 +47,29 @@ def required_caps(*args, **kwargs):
         """the wrapped function/method"""
 
         if validate and supported_caps_set.difference(server.SUPPORTED_CAPS):
+
             def fail_func(self, *args, **kwargs):
                 """a wrapper that always fail"""
-                self.fail("The specified supported capabilities don't match "
-                          "the server.SUPPORTED_CAPS")
+                self.fail(
+                    "The specified supported capabilities don't match "
+                    "the server.SUPPORTED_CAPS"
+                )
+
             functools.update_wrapper(fail_func, func)
             return fail_func
         else:
             # to support older client without explicit required capabilities
-            client_required_caps = getattr(syncdaemon, 'REQUIRED_CAPS',
-                                           frozenset())
+            client_required_caps = getattr(
+                syncdaemon, 'REQUIRED_CAPS', frozenset()
+            )
             if client_required_caps not in supported_caps_set:
                 if kwargs.get('message') is not None:
                     func.skip = kwargs.get('message')
                 else:
-                    func.skip = "client don't have the required capabilities" \
+                    func.skip = (
+                        "client don't have the required capabilities"
                         ": %r" % supported_caps_set
+                    )
             return func
+
     return wrapper

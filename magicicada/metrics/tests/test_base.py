@@ -33,7 +33,8 @@ class FileBasedMeterTestCase(BaseTestCase):
 
         # configure the memento handler to do the testings
         self.handler = self.add_memento_handler(
-            metrics.logger, level=logging.INFO)
+            metrics.logger, level=logging.INFO
+        )
 
     def test_gauge(self):
         self.meter.gauge("name", "value")

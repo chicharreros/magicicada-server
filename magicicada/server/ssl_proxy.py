@@ -61,8 +61,12 @@ class ProxyClient(portforward.ProxyClient):
         self.source = get_transport_info(self.peer.transport.getPeer())
         self.local = get_transport_info(self.transport.getHost())
         self.dest = get_transport_info(self.transport.getPeer())
-        logger.debug("Backend connection made: %s -> %s -> %s",
-                     self.source, self.local, self.dest)
+        logger.debug(
+            "Backend connection made: %s -> %s -> %s",
+            self.source,
+            self.local,
+            self.dest,
+        )
 
         if twisted.version.major < 11:
             # see http://twistedmatrix.com/trac/ticket/3350
@@ -77,12 +81,20 @@ class ProxyClient(portforward.ProxyClient):
     def connectionLost(self, reason=None):
         if reason and reason.check(error.ConnectionDone):
             self.peer.metrics.meter("backend_connection_done", 1)
-            logger.debug("Backend connection done: %s -> %s -> %s",
-                         self.source, self.local, self.dest)
+            logger.debug(
+                "Backend connection done: %s -> %s -> %s",
+                self.source,
+                self.local,
+                self.dest,
+            )
         else:
             self.peer.metrics.meter("backend_connection_lost", 1)
-            logger.debug("Backend connection lost: %s -> %s -> %s",
-                         self.source, self.local, self.dest)
+            logger.debug(
+                "Backend connection lost: %s -> %s -> %s",
+                self.source,
+                self.local,
+                self.dest,
+            )
         portforward.ProxyClient.connectionLost(self, reason=reason)
 
 
@@ -96,7 +108,8 @@ class ProxyClientFactory(portforward.ProxyClientFactory):
         self.server.metrics.meter("backend_connection_failed", 1)
         logger.warning('Backend connection failed: %s - %s', connector, reason)
         portforward.ProxyClientFactory.clientConnectionFailed(
-            self, connector, reason)
+            self, connector, reason
+        )
 
 
 class ProxyServer(portforward.ProxyServer):
@@ -107,14 +120,18 @@ class ProxyServer(portforward.ProxyServer):
 
     def connectionMade(self):
         self.metrics.meter("frontend_connection_made", 1)
-        logger.debug('Frontend connection made: %s',
-                     get_transport_info(self.transport.getPeer()))
+        logger.debug(
+            'Frontend connection made: %s',
+            get_transport_info(self.transport.getPeer()),
+        )
         portforward.ProxyServer.connectionMade(self)
 
     def connectionLost(self, reason=None):
         self.metrics.meter("frontend_connection_lost", 1)
-        logger.debug('Frontend connection lost: %s',
-                     get_transport_info(self.transport.getPeer()))
+        logger.debug(
+            'Frontend connection lost: %s',
+            get_transport_info(self.transport.getPeer()),
+        )
         portforward.ProxyServer.connectionLost(self, reason=reason)
 
 
@@ -126,8 +143,9 @@ class SSLProxyFactory(portforward.ProxyFactory):
 
     protocol = ProxyServer
 
-    def __init__(self, listen_port, remote_host, remote_port,
-                 server_name='ssl-proxy'):
+    def __init__(
+        self, listen_port, remote_host, remote_port, server_name='ssl-proxy'
+    ):
         super(SSLProxyFactory, self).__init__(remote_host, remote_port)
         self.listen_port = listen_port
         self.server_name = server_name
@@ -135,8 +153,9 @@ class SSLProxyFactory(portforward.ProxyFactory):
 
     def startFactory(self):
         """Start any other stuff we need."""
-        logger.info("listening on %d -> %s:%d",
-                    self.listen_port, self.host, self.port)
+        logger.info(
+            "listening on %d -> %s:%d", self.listen_port, self.host, self.port
+        )
         self.metrics = metrics.get_meter("ssl-proxy")
         self.metrics.meter("server_start", 1)
 
@@ -216,9 +235,18 @@ class ProxyContextFactory:
 class ProxyService(MultiService):
     """A class wrapping the whole things a s single twisted service."""
 
-    def __init__(self, ssl_cert, ssl_key, ssl_cert_chain, ssl_port,
-                 dest_host, dest_port, server_name, status_port):
-        """ Create a rageServerService.
+    def __init__(
+        self,
+        ssl_cert,
+        ssl_key,
+        ssl_cert_chain,
+        ssl_port,
+        dest_host,
+        dest_port,
+        server_name,
+        status_port,
+    ):
+        """Create a rageServerService.
 
         @param ssl_cert: the certificate text.
         @param ssl_key: the key text.
@@ -232,12 +260,15 @@ class ProxyService(MultiService):
         if server_name is None:
             server_name = "anonymous_instance"
         self.server_name = server_name
-        self.factory = SSLProxyFactory(ssl_port, dest_host, dest_port,
-                                       self.server_name)
-        ssl_context_factory = ProxyContextFactory(ssl_cert, ssl_key,
-                                                  ssl_cert_chain)
-        self.ssl_service = SSLServer(ssl_port, self.factory,
-                                     ssl_context_factory)
+        self.factory = SSLProxyFactory(
+            ssl_port, dest_host, dest_port, self.server_name
+        )
+        ssl_context_factory = ProxyContextFactory(
+            ssl_cert, ssl_key, ssl_cert_chain
+        )
+        self.ssl_service = SSLServer(
+            ssl_port, self.factory, ssl_context_factory
+        )
         self.ssl_service.setName("SSL")
         self.ssl_service.setServiceParent(self)
         # setup the status service
@@ -264,7 +295,8 @@ class ProxyService(MultiService):
         heartbeat_interval = float(settings.HEARTBEAT_INTERVAL)
         if heartbeat_interval > 0:
             self.heartbeat_writer = stdio.StandardIO(
-                supervisor_utils.HeartbeatWriter(heartbeat_interval, logger))
+                supervisor_utils.HeartbeatWriter(heartbeat_interval, logger)
+            )
 
     @defer.inlineCallbacks
     def stopService(self):
@@ -285,18 +317,23 @@ def create_service():
 
     ssl_cert = crypto.load_certificate(crypto.FILETYPE_PEM, server_crt)
     if server_crt_chain:
-        ssl_cert_chain = crypto.load_certificate(crypto.FILETYPE_PEM,
-                                                 server_crt_chain)
+        ssl_cert_chain = crypto.load_certificate(
+            crypto.FILETYPE_PEM, server_crt_chain
+        )
     else:
         ssl_cert_chain = None
     ssl_key = crypto.load_privatekey(crypto.FILETYPE_PEM, server_key)
 
-    ssl_proxy = ProxyService(ssl_cert, ssl_key, ssl_cert_chain,
-                             settings.SSL_PORT,
-                             '127.0.0.1',
-                             settings.TCP_PORT,
-                             settings.SSL_SERVER_NAME,
-                             settings.SSL_STATUS_PORT)
+    ssl_proxy = ProxyService(
+        ssl_cert,
+        ssl_key,
+        ssl_cert_chain,
+        settings.SSL_PORT,
+        '127.0.0.1',
+        settings.TCP_PORT,
+        settings.SSL_SERVER_NAME,
+        settings.SSL_STATUS_PORT,
+    )
     return ssl_proxy
 
 
@@ -319,8 +356,10 @@ class _Status(resource.Resource):
 
         def on_error(failure):
             """Error callback"""
-            logger.error("Error while checking remote host: %s",
-                         failure.getBriefTraceback())
+            logger.error(
+                "Error while checking remote host: %s",
+                failure.getBriefTraceback(),
+            )
             request.setResponseCode(503)
             request.write((failure.getErrorMessage() + "\n").encode('utf-8'))
             request.finish()

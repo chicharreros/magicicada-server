@@ -68,7 +68,7 @@ from magicicada.filesync.signals import (
 
 
 DEFAULT_QUOTA_GIGAS = 20
-DEFAULT_QUOTA_BYTES = DEFAULT_QUOTA_GIGAS * (1024 ** 4)
+DEFAULT_QUOTA_BYTES = DEFAULT_QUOTA_GIGAS * (1024**4)
 
 # lifecycle constants
 LIFECYCLE_STATUS_CHOICES = (
@@ -106,8 +106,10 @@ class StorageUser(AbstractUser):
     @property
     def root_node(self):
         return StorageObject.objects.select_related('volume').get(
-            name=ROOT_NAME, volume__owner__id=self.id,
-            volume__path=settings.ROOT_USERVOLUME_PATH)
+            name=ROOT_NAME,
+            volume__owner__id=self.id,
+            volume__path=settings.ROOT_USERVOLUME_PATH,
+        )
 
     @property
     def free_bytes(self):
@@ -136,12 +138,20 @@ class StorageUser(AbstractUser):
             return
 
         new_value = self.used_storage_bytes + difference
-        if (difference > 0 and new_value > self.max_storage_bytes and
-                enforce_quota):
+        if (
+            difference > 0
+            and new_value > self.max_storage_bytes
+            and enforce_quota
+        ):
             raise QuotaExceeded(
-                'User %s exceeds quota by %s bytes (used: %s, max: %s)' %
-                (self.id, new_value - self.max_storage_bytes,
-                 self.used_storage_bytes, self.max_storage_bytes))
+                'User %s exceeds quota by %s bytes (used: %s, max: %s)'
+                % (
+                    self.id,
+                    new_value - self.max_storage_bytes,
+                    self.used_storage_bytes,
+                    self.max_storage_bytes,
+                )
+            )
 
         if new_value < 0:
             # XXX: log warning!
@@ -172,10 +182,15 @@ class StorageUser(AbstractUser):
         path = ""
         # find deleted order by path to make sure directories are created in
         # the correct order
-        deleted = StorageObject.objects.filter(
-            volume__id=root.volume.id, status=STATUS_DEAD,
-            kind=StorageObject.FILE,
-        ).select_related('content_blob').order_by('-when_last_modified')
+        deleted = (
+            StorageObject.objects.filter(
+                volume__id=root.volume.id,
+                status=STATUS_DEAD,
+                kind=StorageObject.FILE,
+            )
+            .select_related('content_blob')
+            .order_by('-when_last_modified')
+        )
 
         if deleted.exists():
             parent = restore_parent.build_tree_from_path(path)
@@ -213,7 +228,8 @@ class ContentBlob(models.Model):
     # Whether this content entry is live, or else a candidate for
     # garbage collection.
     status = models.CharField(
-        max_length=128, choices=LIFECYCLE_STATUS_CHOICES, default=STATUS_LIVE)
+        max_length=128, choices=LIFECYCLE_STATUS_CHOICES, default=STATUS_LIVE
+    )
 
     # The magic hash of the content
     _magic_hash = models.BinaryField(null=True)
@@ -231,7 +247,9 @@ class ContentBlob(models.Model):
     def magic_hash(self):
         return (
             bytes(self._magic_hash).decode('utf-8')
-            if self._magic_hash else None)
+            if self._magic_hash
+            else None
+        )
 
     @magic_hash.setter
     def magic_hash(self, value):
@@ -262,7 +280,8 @@ class BaseStorageObject(models.Model):
     # The directory node containing the object, or NULL if the object is
     # a volume root (only directories should be volume roots).
     parent = models.ForeignKey(
-        'self', related_name='children', null=True, on_delete=models.CASCADE)
+        'self', related_name='children', null=True, on_delete=models.CASCADE
+    )
 
     # The UserVolume containing this object, NULL for the Root volume.
     volume = models.ForeignKey('UserVolume', on_delete=models.CASCADE)
@@ -273,11 +292,11 @@ class BaseStorageObject(models.Model):
 
     # The content of the object, represented with a blob.
     content_blob = models.ForeignKey(
-        ContentBlob, null=True, on_delete=models.CASCADE)
+        ContentBlob, null=True, on_delete=models.CASCADE
+    )
 
     # The kind of the object: directory, file, or symbolic link.
-    kind = models.CharField(
-        max_length=128, choices=OBJECT_KIND_CHOICES)
+    kind = models.CharField(max_length=128, choices=OBJECT_KIND_CHOICES)
 
     # Timestamp at which the object was first created.
     when_created = models.DateTimeField(default=now)
@@ -287,7 +306,8 @@ class BaseStorageObject(models.Model):
 
     # Whether this object is alive or dead.
     status = models.CharField(
-        max_length=128, choices=LIFECYCLE_STATUS_CHOICES, default=STATUS_LIVE)
+        max_length=128, choices=LIFECYCLE_STATUS_CHOICES, default=STATUS_LIVE
+    )
 
     # The path of the object from its root.
     path = models.TextField()
@@ -317,12 +337,20 @@ class BaseStorageObject(models.Model):
     def __repr__(self):
         """Representation with info."""
         return "<%s id: %s volume: %s full_path: %r>" % (
-            self.__class__.__name__, self.id, self.volume.id, self.full_path)
+            self.__class__.__name__,
+            self.id,
+            self.volume.id,
+            self.full_path,
+        )
 
     def __unicode__(self):
         """Unicode representation with info."""
         return "%s id: %s volume: %s full_path: %r" % (
-            self.__class__.__name__, self.id, self.volume.id, self.full_path)
+            self.__class__.__name__,
+            self.id,
+            self.volume.id,
+            self.full_path,
+        )
 
     def save(self, *args, **kwargs):
         update_fields = kwargs.pop('update_fields', None)
@@ -333,14 +361,17 @@ class BaseStorageObject(models.Model):
                 update_fields.append('when_last_modified')
 
         super(BaseStorageObject, self).save(
-            *args, update_fields=update_fields, **kwargs)
+            *args, update_fields=update_fields, **kwargs
+        )
 
     def lock_tree_for_update(self):
         """Lock the storageobject record for update."""
         return StorageObject.objects.select_for_update(nowait=True).filter(
-            models.Q(parent__id=self.id) |
-            models.Q(path__startswith=self.absolute_path),
-            status=STATUS_LIVE, volume__id=self.volume.id)
+            models.Q(parent__id=self.id)
+            | models.Q(path__startswith=self.absolute_path),
+            status=STATUS_LIVE,
+            volume__id=self.volume.id,
+        )
 
     @property
     def full_path(self):
@@ -391,8 +422,9 @@ class BaseStorageObject(models.Model):
         if kind not in valid:
             # isn't one of File, Directory or None
             raise ValueError(
-                'Invalid kind value, must be %s (got %r instead)' %
-                (', '.join((repr(i) for i in valid)), kind))
+                'Invalid kind value, must be %s (got %r instead)'
+                % (', '.join((repr(i) for i in valid)), kind)
+            )
 
         # Notice that in order to get indirect children we need to filter
         # by path. Also, we need to add a trailing slash to the path so
@@ -404,9 +436,10 @@ class BaseStorageObject(models.Model):
         # we need the extra clause (parent.id == self.id) to get them *and*
         # we need to filter out self.
         result = StorageObject.objects.exclude(id=self.id).filter(
-            models.Q(parent__id=self.id) |
-            models.Q(path__startswith=self.absolute_path),
-            volume__id=self.volume.id)
+            models.Q(parent__id=self.id)
+            | models.Q(path__startswith=self.absolute_path),
+            volume__id=self.volume.id,
+        )
         if live_only:
             result = result.filter(status=STATUS_LIVE)
         if kind:
@@ -426,7 +459,8 @@ class BaseStorageObject(models.Model):
         self.update_generation(save=False)
         self.save(update_fields=['public_uuid', 'generation'])
         public_access_changed.send(
-            sender=self.__class__, instance=self, public=False)
+            sender=self.__class__, instance=self, public=False
+        )
 
     def make_public(self):
         """Make this node public."""
@@ -436,7 +470,8 @@ class BaseStorageObject(models.Model):
         self.update_generation(save=False)
         self.save(update_fields=['public_uuid', 'generation'])
         public_access_changed.send(
-            sender=self.__class__, instance=self, public=True)
+            sender=self.__class__, instance=self, public=True
+        )
 
     @property
     def base62_public_id(self):
@@ -472,8 +507,12 @@ class BaseStorageObject(models.Model):
         self.update_generation(save=False)
         new_size = new_content.size - curr_size
         content_changed.send(
-            sender=self.__class__, instance=self, content_added=True,
-            new_size=new_size, enforce_quota=enforce_quota)
+            sender=self.__class__,
+            instance=self,
+            content_added=True,
+            new_size=new_size,
+            enforce_quota=enforce_quota,
+        )
         self.save(update_fields=['content_blob', 'generation'])
 
     content = property(get_content, set_content)
@@ -488,7 +527,8 @@ class BaseStorageObject(models.Model):
         """Get the child named name."""
         try:
             child = StorageObject.objects.select_related('content_blob').get(
-                parent=self, name=name, status=STATUS_LIVE)
+                parent=self, name=name, status=STATUS_LIVE
+            )
         except DataError as e:
             raise InvalidFilename('Name is not valid: %r (%r)' % (name, e))
         except StorageObject.DoesNotExist:
@@ -503,7 +543,8 @@ class BaseStorageObject(models.Model):
             # so we can leave None through as well.
             raise TypeError(
                 'StorageObject.move: new_parent must be a StorageObject or '
-                'None, got: %r' % new_parent)
+                'None, got: %r' % new_parent
+            )
 
         if not new_name:
             raise InvalidFilename("Invalid name.")
@@ -517,7 +558,8 @@ class BaseStorageObject(models.Model):
 
         if new_parent.is_file:
             raise NotADirectory(
-                "New parent (%r) isn't a directory" % new_parent)
+                "New parent (%r) isn't a directory" % new_parent
+            )
 
         if new_parent.volume != self.volume:
             raise NoPermission("Can't move a node between volumes.")
@@ -539,17 +581,22 @@ class BaseStorageObject(models.Model):
             # need to update all the paths that are under the current directory
             # this will be the new path to all children
             new_path = posixpath.join(
-                new_parent_path, new_parent_name, new_name)
+                new_parent_path, new_parent_name, new_name
+            )
             new_path = new_path.replace('\\', '\\\\')
             # this will be the size of the path parts to replace
             replace_size = len(self.full_path) + 1
             # update the path of all descendants
             descendants = list(
                 self.descendants.select_related(
-                    'volume', 'volume__owner', 'content_blob'))
+                    'volume', 'volume__owner', 'content_blob'
+                )
+            )
             self.descendants.update(
-                path=Concat(models.Value(new_path),
-                            Substr('path', replace_size)))
+                path=Concat(
+                    models.Value(new_path), Substr('path', replace_size)
+                )
+            )
 
         # update this node
         self.update_generation(save=False)
@@ -567,8 +614,12 @@ class BaseStorageObject(models.Model):
         new_parent.save(update_fields=['when_last_modified'])
 
         node_moved.send(
-            sender=self.__class__, instance=self, old_name=old_name,
-            old_parent=old_parent, descendants=descendants)
+            sender=self.__class__,
+            instance=self,
+            old_name=old_name,
+            old_parent=old_parent,
+            descendants=descendants,
+        )
 
     def get_unique_childname(self, name):
         """Find a unique child name in this directory."""
@@ -602,7 +653,8 @@ class BaseStorageObject(models.Model):
             head = path_parts[0]
             try:
                 d = StorageObject.objects.get(
-                    parent=start, status=STATUS_LIVE, name=head)
+                    parent=start, status=STATUS_LIVE, name=head
+                )
             except StorageObject.DoesNotExist:
                 d = start.make_subdirectory(head)
             else:
@@ -612,6 +664,7 @@ class BaseStorageObject(models.Model):
                     name = start.get_unique_childname(d.name)
                     d = start.make_subdirectory(name)
             return getleaf(d, rest)
+
         return getleaf(self, [x for x in path.split("/") if x])
 
     def undelete(self, new_parent=None):
@@ -629,9 +682,12 @@ class BaseStorageObject(models.Model):
         self.name = parent.get_unique_childname(self.name)
         if self.is_file:
             content_changed.send(
-                sender=self.__class__, instance=self, content_added=False,
+                sender=self.__class__,
+                instance=self,
+                content_added=False,
                 new_size=getattr(self.content_blob, 'size', 0),
-                enforce_quota=False)
+                enforce_quota=False,
+            )
 
         self.parent = parent
         self.volume = parent.volume
@@ -647,8 +703,11 @@ class BaseStorageObject(models.Model):
             try:
                 # if we have a suitable parent, update the parent
                 self.parent = StorageObject.objects.get(
-                    volume__id=self.volume.id, path=path, name=name,
-                    status=STATUS_LIVE)
+                    volume__id=self.volume.id,
+                    path=path,
+                    name=name,
+                    status=STATUS_LIVE,
+                )
             except StorageObject.DoesNotExist:
                 # if we can't find a suitable parent, we need to restore the
                 # old one.
@@ -661,8 +720,16 @@ class BaseStorageObject(models.Model):
             self.parent.when_last_modified = now()
             self.parent.save(update_fields=['when_last_modified'])
 
-        self.save(update_fields=[
-            'name', 'parent', 'volume', 'path', 'status', 'generation'])
+        self.save(
+            update_fields=[
+                'name',
+                'parent',
+                'volume',
+                'path',
+                'status',
+                'generation',
+            ]
+        )
 
     def unlink(self):
         """Mark the node as Dead."""
@@ -681,9 +748,12 @@ class BaseStorageObject(models.Model):
 
         if self.is_file:
             content_changed.send(
-                sender=self.__class__, instance=self, content_added=False,
+                sender=self.__class__,
+                instance=self,
+                content_added=False,
                 new_size=0 - getattr(self.content_blob, 'size', 0),
-                enforce_quota=False)
+                enforce_quota=False,
+            )
         if self.parent != ROOT_PARENT:
             self.parent.when_last_modified = now()
             self.parent.save(update_fields=['when_last_modified'])
@@ -711,15 +781,22 @@ class BaseStorageObject(models.Model):
         if self.live_children.exists():
             size_to_remove = self.tree_size
             content_changed.send(
-                sender=self.__class__, instance=self, content_added=False,
-                new_size=0 - size_to_remove, enforce_quota=False)
+                sender=self.__class__,
+                instance=self,
+                content_added=False,
+                new_size=0 - size_to_remove,
+                enforce_quota=False,
+            )
             descendants = list(  # make a copy before killing
-                self.descendants.select_related('volume', 'volume__owner'))
+                self.descendants.select_related('volume', 'volume__owner')
+            )
             self.descendants.update(
-                status=STATUS_DEAD, when_last_modified=right_now)
+                status=STATUS_DEAD, when_last_modified=right_now
+            )
 
         pre_unlink_tree.send(
-            sender=self.__class__, instance=self, descendants=descendants)
+            sender=self.__class__, instance=self, descendants=descendants
+        )
 
         self.status = STATUS_DEAD
         self.save(update_fields=['status', 'generation'])
@@ -728,7 +805,8 @@ class BaseStorageObject(models.Model):
             self.parent.save()
 
         post_unlink_tree.send(
-            sender=self.__class__, instance=self, descendants=descendants)
+            sender=self.__class__, instance=self, descendants=descendants
+        )
 
     @property
     def tree_size(self):
@@ -749,7 +827,8 @@ class BaseStorageObject(models.Model):
         if not self.is_dir:
             raise NotADirectory("%s is not a directory." % self)
         node = StorageObject.objects.create_directory(
-            volume=self.volume, name=name, parent=self)
+            volume=self.volume, name=name, parent=self
+        )
         self.when_last_modified = now()
         self.save(update_fields=['when_last_modified'])
         return node
@@ -767,7 +846,8 @@ class BaseStorageObject(models.Model):
             raise NotADirectory("%s is not a directory." % self.id)
 
         node = StorageObject.objects.create_file(
-            volume=self.volume, name=name, parent=self, mimetype=mimetype)
+            volume=self.volume, name=name, parent=self, mimetype=mimetype
+        )
         if content_blob is not None:
             node.set_content(content_blob)
         self.when_last_modified = now()
@@ -806,8 +886,11 @@ class BaseStorageObject(models.Model):
         # """ % str(self.parent.id)
         all_parents_but_me = self.parent_paths[:-1]
         parents = StorageObject.objects.filter(
-            status=STATUS_LIVE, path__in=all_parents_but_me,
-            kind=StorageObject.DIRECTORY, volume=self.volume)
+            status=STATUS_LIVE,
+            path__in=all_parents_but_me,
+            kind=StorageObject.DIRECTORY,
+            volume=self.volume,
+        )
         parents = dict(parents.values_list('id', 'parent__id'))
         # Filter out siblings, which are included in the query above
         result = []
@@ -828,7 +911,9 @@ class StorageObject(BaseStorageObject):
     def public_url(self):
         """Return the public URL of the file."""
         return '%s/%s/' % (
-            settings.PUBLIC_URL_PREFIX.rstrip('/'), self.base62_public_id)
+            settings.PUBLIC_URL_PREFIX.rstrip('/'),
+            self.base62_public_id,
+        )
 
     @property
     def nodekey(self):
@@ -853,8 +938,11 @@ class MoveFromShare(BaseStorageObject):
     share_id = models.UUIDField()
     node_id = models.UUIDField()
     old_parent = models.ForeignKey(
-        StorageObject, related_name='old_children', null=True,
-        on_delete=models.CASCADE)
+        StorageObject,
+        related_name='old_children',
+        null=True,
+        on_delete=models.CASCADE,
+    )
     objects = MoveFromShareManager()
 
     class Meta:
@@ -890,13 +978,18 @@ class Share(models.Model):
 
     # user who shares
     shared_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, related_name='sharedby_folders',
-        on_delete=models.CASCADE)
+        settings.AUTH_USER_MODEL,
+        related_name='sharedby_folders',
+        on_delete=models.CASCADE,
+    )
 
     # user to whom the subtree is shared
     shared_to = models.ForeignKey(
-        settings.AUTH_USER_MODEL, related_name='sharedto_folders', null=True,
-        on_delete=models.CASCADE)
+        settings.AUTH_USER_MODEL,
+        related_name='sharedto_folders',
+        null=True,
+        on_delete=models.CASCADE,
+    )
     email = models.TextField(blank=True)
 
     # name of the sharing. The pair (shared_to, name) is unique.
@@ -916,7 +1009,8 @@ class Share(models.Model):
 
     # whether this object is alive or dead
     status = models.CharField(
-        max_length=128, choices=LIFECYCLE_STATUS_CHOICES, default=STATUS_LIVE)
+        max_length=128, choices=LIFECYCLE_STATUS_CHOICES, default=STATUS_LIVE
+    )
 
     objects = ShareManager()
 
@@ -968,8 +1062,11 @@ class Share(models.Model):
         # Check and make sure this folder isn't shared to them already
         try:
             matching_share = Share.objects.get(
-                shared_by=self.shared_by, shared_to=user, status=STATUS_LIVE,
-                subtree=self.subtree)
+                shared_by=self.shared_by,
+                shared_to=user,
+                status=STATUS_LIVE,
+                subtree=self.subtree,
+            )
         except self.__class__.DoesNotExist:
             pass
         else:
@@ -1018,7 +1115,8 @@ class UploadJob(models.Model):
 
     # Whether this is a live upload or a done-with one
     status = models.CharField(
-        max_length=128, choices=LIFECYCLE_STATUS_CHOICES, default=STATUS_LIVE)
+        max_length=128, choices=LIFECYCLE_STATUS_CHOICES, default=STATUS_LIVE
+    )
 
     # the key name for this multipart upload
     multipart_key = models.UUIDField(null=True)
@@ -1037,8 +1135,9 @@ class UploadJob(models.Model):
         self.uploaded_bytes += size
         self.chunk_count += 1
         self.when_last_active = now()
-        self.save(update_fields=[
-            'uploaded_bytes', 'chunk_count', 'when_last_active'])
+        self.save(
+            update_fields=['uploaded_bytes', 'chunk_count', 'when_last_active']
+        )
 
 
 class UserVolume(models.Model):
@@ -1048,7 +1147,8 @@ class UserVolume(models.Model):
 
     # The object's owner, for access control and accounting purposes.
     owner = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE
+    )
 
     # suggested path (it's not enforced to the client)
     path = models.TextField(validators=[validate_volume_path])
@@ -1058,7 +1158,8 @@ class UserVolume(models.Model):
 
     # whether this object is alive or dead
     status = models.CharField(
-        max_length=128, choices=LIFECYCLE_STATUS_CHOICES, default=STATUS_LIVE)
+        max_length=128, choices=LIFECYCLE_STATUS_CHOICES, default=STATUS_LIVE
+    )
 
     # the generation of this volume
     generation = models.BigIntegerField(default=0)
@@ -1085,8 +1186,12 @@ class UserVolume(models.Model):
         pre_kill.send(sender=self.__class__, instance=self)
         size_to_remove = self.volume_size()
         content_changed.send(
-            sender=self.__class__, instance=self, content_added=False,
-            new_size=0 - size_to_remove, enforce_quota=False)
+            sender=self.__class__,
+            instance=self,
+            content_added=False,
+            new_size=0 - size_to_remove,
+            enforce_quota=False,
+        )
         self.increment_generation(save=False)
         self.status = STATUS_DEAD
         self.save(update_fields=['generation', 'status'])
@@ -1129,19 +1234,21 @@ class Download(models.Model):
     volume = models.ForeignKey(UserVolume, on_delete=models.CASCADE)
     # The node of the download after it has completed.
     node = models.ForeignKey(
-        StorageObject, null=True, on_delete=models.CASCADE)
+        StorageObject, null=True, on_delete=models.CASCADE
+    )
     file_path = models.TextField()
     download_url = models.TextField()
     download_key = models.TextField(null=True)
     status = models.CharField(
-        max_length=128, choices=DOWNLOAD_STATUS_CHOICES, default=STATUS_QUEUED)
+        max_length=128, choices=DOWNLOAD_STATUS_CHOICES, default=STATUS_QUEUED
+    )
     status_change_date = models.DateTimeField(default=now)
     error_message = models.TextField()
 
     objects = DownloadManager()
 
     class Meta:
-        unique_together = (('volume', 'file_path', 'download_url'))
+        unique_together = ('volume', 'file_path', 'download_url')
 
 
 class ResumableUpload(models.Model):
@@ -1151,7 +1258,8 @@ class ResumableUpload(models.Model):
 
     # the owner of this upload
     owner = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE
+    )
 
     # the volume path of the file when this upload completes
     volume_path = models.TextField()
@@ -1167,7 +1275,8 @@ class ResumableUpload(models.Model):
 
     # Whether this is a live upload or a done-with one
     status = models.CharField(
-        max_length=128, choices=LIFECYCLE_STATUS_CHOICES, default=STATUS_LIVE)
+        max_length=128, choices=LIFECYCLE_STATUS_CHOICES, default=STATUS_LIVE
+    )
 
     # the key for this upload
     storage_key = models.UUIDField()
@@ -1193,7 +1302,9 @@ class ResumableUpload(models.Model):
     def hash_context(self):
         return (
             bytes(self._hash_context).decode('utf-8')
-            if self._hash_context else None)
+            if self._hash_context
+            else None
+        )
 
     @hash_context.setter
     def hash_context(self, value):
@@ -1203,7 +1314,9 @@ class ResumableUpload(models.Model):
     def magic_hash_context(self):
         return (
             bytes(self._magic_hash_context).decode('utf-8')
-            if self._magic_hash_context else None)
+            if self._magic_hash_context
+            else None
+        )
 
     @magic_hash_context.setter
     def magic_hash_context(self, value):
@@ -1222,7 +1335,8 @@ class ResumableUpload(models.Model):
 
 @receiver(pre_save, sender=Download)
 def download_pre_save_handler(
-        sender, instance, raw, using, update_fields=None, **kwargs):
+    sender, instance, raw, using, update_fields=None, **kwargs
+):
     try:
         previous_status = Download.objects.get(id=instance.id).status
     except Download.DoesNotExist:
@@ -1234,8 +1348,10 @@ def download_pre_save_handler(
 
 @receiver(content_changed, sender=StorageObject)
 def storage_object_content_changed(
-        sender, instance, content_added, new_size, enforce_quota, **kwargs):
+    sender, instance, content_added, new_size, enforce_quota, **kwargs
+):
     with transaction.atomic():
         owner = StorageUser.objects.select_for_update(nowait=True).get(
-            id=instance.volume.owner.id)
+            id=instance.volume.owner.id
+        )
         owner.update_used_bytes(new_size, enforce_quota=enforce_quota)

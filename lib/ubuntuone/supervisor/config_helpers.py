@@ -32,13 +32,15 @@ GROUP_TEMPLATE = """
 programs=%(programs)s
 """
 
-HEARTBEAT_LISTENER_TEMPLATE = '\n'.join((
-    "[eventlistener:heartbeat]",
-    "command=python %(basepath)s/lib/ubuntuone/supervisor/heartbeat_listener.py --interval=%(interval)s --timeout=%(timeout)s --log_level=%(log_level)s --log_file=%(log_folder)s/heartbeat_listener.log --groups=%(groups)s %(processes)s",  # NOQA
-    'environment=PYTHONPATH="%(pythonpath)s",DJANGO_SETTINGS_MODULE="magicicada.settings"',  # NOQA
-    "events=PROCESS_COMMUNICATION,TICK_5",
-    "buffer_size=%(buffer_size)s",
-))
+HEARTBEAT_LISTENER_TEMPLATE = '\n'.join(
+    (
+        "[eventlistener:heartbeat]",
+        "command=python %(basepath)s/lib/ubuntuone/supervisor/heartbeat_listener.py --interval=%(interval)s --timeout=%(timeout)s --log_level=%(log_level)s --log_file=%(log_folder)s/heartbeat_listener.log --groups=%(groups)s %(processes)s",  # NOQA
+        'environment=PYTHONPATH="%(pythonpath)s",DJANGO_SETTINGS_MODULE="magicicada.settings"',  # NOQA
+        "events=PROCESS_COMMUNICATION,TICK_5",
+        "buffer_size=%(buffer_size)s",
+    )
+)
 
 
 CONFIG_TEMPLATE = """; supervisor config file
@@ -103,16 +105,19 @@ def get_config(environ, config_spec, base_dir):
     if "env_vars" in config:
         env_vars = config["env_vars"][environ]
         config["environment_vars"] = ',' + ','.join(
-            ['%s="%s"' % (k, v) for k, v in env_vars.items()])
+            ['%s="%s"' % (k, v) for k, v in env_vars.items()]
+        )
     else:
         config["environment_vars"] = ''
 
     for k, v in config.items():
         # only apply the env to string values
         if isinstance(v, str) and '%' in v:
-            config[k] = v % {"env": environ,
-                             "host_env": config["host_env"],
-                             "base_dir": base_dir}
+            config[k] = v % {
+                "env": environ,
+                "host_env": config["host_env"],
+                "base_dir": base_dir,
+            }
         else:
             config[k] = v
 
@@ -130,9 +135,15 @@ def get_sort_key(value):
         return name
 
 
-def generate_server_config(server_name, env_service_map, config_spec,
-                           templates, service_group, with_heartbeat,
-                           with_header):
+def generate_server_config(
+    server_name,
+    env_service_map,
+    config_spec,
+    templates,
+    service_group,
+    with_heartbeat,
+    with_header,
+):
     """Generate the config for a specific server/machine."""
     # Generally we have only one env per machine, except when production and
     # edge are colocated. In which case we default everything that doesn't have
@@ -152,8 +163,8 @@ def generate_server_config(server_name, env_service_map, config_spec,
         service_spec = get_config(env, config_spec, base_dir)
         service_spec["nick_extra"] = "edge" if env == "edge" else ""
         service_output, workers, groups = generate_service_config(
-            service_map, service_spec, service_group,
-            server_config, templates)
+            service_map, service_spec, service_group, server_config, templates
+        )
         processes = sorted(workers.keys())
         output.extend(service_output)
 
@@ -169,20 +180,25 @@ def generate_server_config(server_name, env_service_map, config_spec,
                 to_watch = [proc for proc in processes if proc_re in proc]
                 procs_to_watch.extend(to_watch)
         if procs_to_watch:
-            heartbeat_listener_spec['processes'] = '--processes=' + \
-                ','.join(procs_to_watch)
+            heartbeat_listener_spec['processes'] = '--processes=' + ','.join(
+                procs_to_watch
+            )
         output.append(HEARTBEAT_LISTENER_TEMPLATE % heartbeat_listener_spec)
 
     for group, progs in sorted(groups.items(), key=get_sort_key):
-        group_spec = {"group_name": group,
-                      "programs": ",".join(progs)}
+        group_spec = {"group_name": group, "programs": ",".join(progs)}
         output.append(GROUP_TEMPLATE % group_spec)
 
     return ''.join(output)
 
 
-def generate_service_config(service_map, config_spec, service_group=None,
-                            server_config=None, templates=None):
+def generate_service_config(
+    service_map,
+    config_spec,
+    service_group=None,
+    server_config=None,
+    templates=None,
+):
     """Generate a config and a mapping of worker name to worker config."""
     if config_spec.get("nick_extra") is None:
         config_spec["nick_extra"] = ""
@@ -215,7 +231,7 @@ def generate_service_config(service_map, config_spec, service_group=None,
         for key, value in list(service_config_spec.items()):
             if key.startswith(nick + "."):
                 del service_config_spec[key]
-                key_name = key[len(nick) + 1:]
+                key_name = key[len(nick) + 1 :]
                 service_config_spec[key_name] = value
 
         if partition_id is not None:
@@ -233,12 +249,17 @@ def generate_service_config(service_map, config_spec, service_group=None,
 
             # build the environment vars, if any
             env_vars = {"PGAPPNAME": "%(program_name)s"}
-            env_vars.update(service_config_spec.get(
-                "env_vars", {}).get(environ, {}))
-            env_vars.update(service_config_spec.get(
-                "%s.env_vars" % service_name, {}).get(environ, {}))
+            env_vars.update(
+                service_config_spec.get("env_vars", {}).get(environ, {})
+            )
+            env_vars.update(
+                service_config_spec.get("%s.env_vars" % service_name, {}).get(
+                    environ, {}
+                )
+            )
             instance_config["environment_vars"] = ',' + ','.join(
-                ['%s="%s"' % (k, v) for k, v in env_vars.items()])
+                ['%s="%s"' % (k, v) for k, v in env_vars.items()]
+            )
 
             instance_name = instance_name_template % instance_config
             instance_config["instance_name"] = instance_name
@@ -252,28 +273,44 @@ def generate_service_config(service_map, config_spec, service_group=None,
                 group_services = groups.setdefault(group_name, [])
                 group_services.append(instance_name)
 
-    for instance_name, instance_output in sorted(output_by_name.items(),
-                                                 key=get_sort_key):
+    for instance_name, instance_output in sorted(
+        output_by_name.items(), key=get_sort_key
+    ):
         output.append(instance_output)
 
     return output, workers, groups
 
 
-def main(instance_map, templates, service_group=None,
-         with_heartbeat=False, config_spec=None):
+def main(
+    instance_map,
+    templates,
+    service_group=None,
+    with_heartbeat=False,
+    config_spec=None,
+):
     """Entry point"""
     from optparse import OptionParser
 
     parser = OptionParser()
-    parser.add_option("-n", "--dry-run", dest="dry_run", action="store_true",
-                      help="Show the generated config via stdout.")
+    parser.add_option(
+        "-n",
+        "--dry-run",
+        dest="dry_run",
+        action="store_true",
+        help="Show the generated config via stdout.",
+    )
     options, args = parser.parse_args()
 
     for server_name, env_service_map in instance_map.items():
-        config_content = generate_server_config(server_name, env_service_map,
-                                                config_spec, templates,
-                                                service_group, with_heartbeat,
-                                                with_header=True)
+        config_content = generate_server_config(
+            server_name,
+            env_service_map,
+            config_spec,
+            templates,
+            service_group,
+            with_heartbeat,
+            with_header=True,
+        )
         if options.dry_run:
             print(config_content)
         else:

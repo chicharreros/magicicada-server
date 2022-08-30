@@ -58,7 +58,7 @@ class DummyAuthProvider(AuthenticationProvider):
     # request_token: user_id
     _allowed = {
         "open sesame": 0,
-        "friend": 1,          # say 'friend', and enter
+        "friend": 1,  # say 'friend', and enter
         "usr3": 3,
     }
 
@@ -74,8 +74,9 @@ class DummyAuthProvider(AuthenticationProvider):
         user_id = self._allowed[request_token]
         get_user_by_id = self.factory.content.get_user_by_id
         try:
-            user = yield get_user_by_id(user_id, session_id=session_id,
-                                        required=True)
+            user = yield get_user_by_id(
+                user_id, session_id=session_id, required=True
+            )
         except DoesNotExist:
             logger.debug("AUTH: missing user (id=%s)", user_id)
             return
@@ -93,7 +94,8 @@ class SimpleAuthProvider(AuthenticationProvider):
         """See `AuthenticationProvider`"""
         try:
             resp = yield self.factory.rpc_dal.call(
-                'get_userid_from_token', auth_parameters=auth_parameters)
+                'get_userid_from_token', auth_parameters=auth_parameters
+            )
         except backend.FailedAuthentication as exc:
             logger.info("Failed auth: %s", exc)
             return
@@ -104,13 +106,15 @@ class SimpleAuthProvider(AuthenticationProvider):
         session_id = protocol.session_id if protocol else None
         get_user_by_id = self.factory.content.get_user_by_id
         try:
-            user = yield get_user_by_id(user_id, session_id=session_id,
-                                        required=True)
+            user = yield get_user_by_id(
+                user_id, session_id=session_id, required=True
+            )
         except DoesNotExist:
             # if there is no user, they haven't subscribed
             logger.warning("AUTH: missing user (id=%s)", user_id)
             return
-        logger.info("AUTH: authenticated user %s (id=%s) OK",
-                    user.username, user.id)
+        logger.info(
+            "AUTH: authenticated user %s (id=%s) OK", user.username, user.id
+        )
         user.register_protocol(protocol)
         defer.returnValue(user)

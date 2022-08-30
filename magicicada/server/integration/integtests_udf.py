@@ -53,10 +53,10 @@ def create_udf(udf_name, sd, prefix, basedir=None):
 
     debug(prefix, 'Attempting to create folder for path %r' % folderdir)
     folder = yield sd.sdt.create_folder(path=folderdir)
-    folder, = folder
+    (folder,) = folder
     debug(prefix, 'folder created with id %s' % (folder['volume_id'],))
 
-    yield sd.sdt.wait_for_nirvana(.5)
+    yield sd.sdt.wait_for_nirvana(0.5)
     defer.returnValue(folder)
 
 
@@ -68,7 +68,7 @@ def test_create_folder(udf_name, sd1, sd2, sd3, prefix):
 
     yield create_udf(udf_name, sd1, prefix)
     yield wait_for_udf_created
-    yield sd2.sdt.wait_for_nirvana(.5)
+    yield sd2.sdt.wait_for_nirvana(0.5)
 
     folderdir1 = os.path.join(sd1.homedir, udf_name)
     folderdir2 = os.path.join(sd2.homedir, udf_name)
@@ -90,7 +90,7 @@ def test_get_folders(udf_name, sd1, sd2, sd3, prefix):
     """Test 2: Assert folder list is correct."""
     udf_values = yield create_udf(udf_name, sd1, prefix)
 
-    yield sd2.sdt.wait_for_nirvana(.5)
+    yield sd2.sdt.wait_for_nirvana(0.5)
 
     folders = yield sd2.sdt.get_folders()
     debug(prefix, 'get_folders completed!', folders)
@@ -98,15 +98,17 @@ def test_get_folders(udf_name, sd1, sd2, sd3, prefix):
     assert len(folders) == 1, 'only 1 folder'
 
     folder = folders[0]
-    assert folder['path'] == os.path.join(sd2.homedir, udf_name), \
-        'path correct'
+    assert folder['path'] == os.path.join(
+        sd2.homedir, udf_name
+    ), 'path correct'
     assert folder['subscribed'], 'udf must be subscribed'
-    assert folder['suggested_path'] == os.path.join('~', udf_name), \
-        'suggested_path must be correct'
-    assert folder['node_id'] == udf_values['node_id'], \
-        'node_id mut be correct'
-    assert folder['volume_id'] == udf_values['volume_id'], \
-        'volume id must be correct'
+    assert folder['suggested_path'] == os.path.join(
+        '~', udf_name
+    ), 'suggested_path must be correct'
+    assert folder['node_id'] == udf_values['node_id'], 'node_id mut be correct'
+    assert (
+        folder['volume_id'] == udf_values['volume_id']
+    ), 'volume id must be correct'
 
 
 @defer.inlineCallbacks
@@ -115,7 +117,7 @@ def test_unsubscribe_no_side_effects(udf_name, sd1, sd2, sd3, prefix):
     folder = yield create_udf(udf_name, sd1, prefix)
     assert folder['subscribed'], 'sd1 subscribed'
 
-    yield sd2.sdt.wait_for_nirvana(.5)
+    yield sd2.sdt.wait_for_nirvana(0.5)
 
     # is UDF created already?
     folders = yield sd1.sdt.get_folders()
@@ -123,7 +125,7 @@ def test_unsubscribe_no_side_effects(udf_name, sd1, sd2, sd3, prefix):
 
     fid = folder['volume_id']
     folder = yield sd1.sdt.unsubscribe_folder(fid)
-    folder, = folder
+    (folder,) = folder
     debug(prefix, 'unsubscribe_folder completed!', folder)
     assert not folder['subscribed'], 'sd1 no longer subscribed'
 
@@ -177,13 +179,13 @@ def test_merge_directories_no_overlap(udf_name, sd1, sd2, sd3, prefix):
 
     # create the folder on sd1 and wait sd2 to finish working
     yield sd1.sdt.create_folder(path=folderdir1)
-    yield sd1.sdt.wait_for_nirvana(.5)
+    yield sd1.sdt.wait_for_nirvana(0.5)
 
     folders = yield sd1.sdt.get_folders()
     debug(prefix, 'get_folders completed!', folders)
     assert len(folders) == 1  # UDF was reported as expected
 
-    yield sd2.sdt.wait_for_nirvana(.5)
+    yield sd2.sdt.wait_for_nirvana(0.5)
 
     actual = walk_and_list_dir(folderdir2)
     debug(prefix, 'Found in SD2', actual)
@@ -260,15 +262,19 @@ def test_merge_directories_with_overlap(udf_name, sd1, sd2, sd3, prefix):
     os.makedirs(dirpath)
 
     # wait for all changes to settle down
-    yield sd2.sdt.wait_for_nirvana(.5)
-    yield sd1.sdt.wait_for_nirvana(.5)
+    yield sd2.sdt.wait_for_nirvana(0.5)
+    yield sd1.sdt.wait_for_nirvana(0.5)
 
     # prepare the info to compare
-    expected_no_conflict = ['a', 'b', 'c',
-                            os.path.join('a', 'bar.txt'),
-                            os.path.join('a', 'beer.txt'),
-                            os.path.join('a', 'noconflict.txt'),
-                            os.path.join('a', 'conflict.txt')]
+    expected_no_conflict = [
+        'a',
+        'b',
+        'c',
+        os.path.join('a', 'bar.txt'),
+        os.path.join('a', 'beer.txt'),
+        os.path.join('a', 'noconflict.txt'),
+        os.path.join('a', 'conflict.txt'),
+    ]
     expected_no_conflict.sort()
     debug(prefix, 'expected without conflict', expected_no_conflict)
 
@@ -279,8 +285,8 @@ def test_merge_directories_with_overlap(udf_name, sd1, sd2, sd3, prefix):
 
     # create the UDF and wait everything to stop
     yield sd1.sdt.create_folder(path=folderdir1)
-    yield sd2.sdt.wait_for_nirvana(.5)
-    yield sd1.sdt.wait_for_nirvana(.5)
+    yield sd2.sdt.wait_for_nirvana(0.5)
+    yield sd1.sdt.wait_for_nirvana(0.5)
 
     actual1 = walk_and_list_dir(folderdir1)
     debug(prefix, 'actual content from SD1', actual1)
@@ -290,15 +296,19 @@ def test_merge_directories_with_overlap(udf_name, sd1, sd2, sd3, prefix):
     # we don't know which client will enter in conflict, so we
     # tested both ways.
     if actual1 != expected_no_conflict:
-        assert actual1 == expected_with_conflict, \
-            'directory merge must be correct for SD1'
-        assert actual2 == expected_no_conflict, \
-            'directory merge must be correct for SD2'
+        assert (
+            actual1 == expected_with_conflict
+        ), 'directory merge must be correct for SD1'
+        assert (
+            actual2 == expected_no_conflict
+        ), 'directory merge must be correct for SD2'
     else:
-        assert actual1 == expected_no_conflict, \
-            'directory merge must be correct for SD1'
-        assert actual2 == expected_with_conflict, \
-            'directory merge must be correct for SD2'
+        assert (
+            actual1 == expected_no_conflict
+        ), 'directory merge must be correct for SD1'
+        assert (
+            actual2 == expected_with_conflict
+        ), 'directory merge must be correct for SD2'
 
 
 test_merge_directories_with_overlap.skip = """
@@ -318,7 +328,7 @@ def test_renaming_ancestor(udf_name, sd1, sd2, sd3, prefix):
     folder = yield sd1.sdt.create_folder(path=folder3)
     debug(prefix, 'create_folder completed!', folder)
 
-    yield sd2.sdt.wait_for_nirvana(.5)
+    yield sd2.sdt.wait_for_nirvana(0.5)
 
     # FIXME: this signal is sometimes lost.
     events = [event['event_name'] for event in sd2.events]
@@ -339,8 +349,9 @@ def test_renaming_ancestor(udf_name, sd1, sd2, sd3, prefix):
     assert not udfs[0]['subscribed'], "The UDF of SD1 is subscribed!"
 
     folders = yield sd2.sdt.get_folders()
-    folder_in_sd2 = os.path.join(sd2.homedir, udf_name,
-                                 "udf_parent_dir", "udf_dir")
+    folder_in_sd2 = os.path.join(
+        sd2.homedir, udf_name, "udf_parent_dir", "udf_dir"
+    )
     udfs = [f for f in folders if f['path'] == folder_in_sd2]
     assert len(udfs) == 1, "SD1 has udfs != 1 (%d)" % len(udfs)
     assert udfs[0]['subscribed'], "The UDF of SD1 is not subscribed!"
@@ -386,8 +397,9 @@ def test_renaming_the_udf_itself(udf_name, sd1, sd2, sd3, prefix):
     assert not udfs[0]['subscribed'], "The UDF of SD1 is subscribed!"
 
     folders = yield sd2.sdt.get_folders()
-    folder_in_sd2 = os.path.join(sd2.homedir, udf_name,
-                                 "udf_parent_dir", "udf_dir")
+    folder_in_sd2 = os.path.join(
+        sd2.homedir, udf_name, "udf_parent_dir", "udf_dir"
+    )
     udfs = [f for f in folders if f['path'] == folder_in_sd2]
     assert len(udfs) == 1, "SD1 has udfs != 1 (%d)" % len(udfs)
     assert udfs[0]['subscribed'], "The UDF of SD1 is not subscribed!"
@@ -397,7 +409,7 @@ def test_renaming_the_udf_itself(udf_name, sd1, sd2, sd3, prefix):
 def test_remove_udf(udf_name, sd1, sd2, sd3, prefix):
     """Test 8: Remove an UDF, assert correct deletion on both clients."""
     yield create_udf(udf_name, sd1, prefix)
-    yield sd2.sdt.wait_for_nirvana(.5)
+    yield sd2.sdt.wait_for_nirvana(0.5)
 
     assert os.path.exists(os.path.join(sd2.homedir, udf_name))
     actual1 = walk_and_list_dir(os.path.join(sd1.homedir, udf_name))
@@ -408,8 +420,8 @@ def test_remove_udf(udf_name, sd1, sd2, sd3, prefix):
     debug(prefix, "Removing the UDF:", udf_name)
     shutil.rmtree(os.path.join(sd1.homedir, udf_name))
 
-    yield sd1.sdt.wait_for_nirvana(.5)
-    yield sd2.sdt.wait_for_nirvana(.5)
+    yield sd1.sdt.wait_for_nirvana(0.5)
+    yield sd2.sdt.wait_for_nirvana(0.5)
 
     events = [event['event_name'] for event in sd2.events]
     assert 'VM_VOLUME_DELETED' in events, 'VM_UDF_DELETED in sd2.events'
@@ -512,23 +524,27 @@ def test_sharing(udf_name, sd1, sd2, sd3, prefix):
     # check the shares of sd1
     shared = yield sd1.sdt.list_shared()
     share = [x for x in shared if x['name'] == share_name_1][0]
-    assert share['access_level'] == Share.VIEW, (
-        "share 1 in sd1 should be View!")
+    assert (
+        share['access_level'] == Share.VIEW
+    ), "share 1 in sd1 should be View!"
     assert share['accepted'], "share 1 in sd1 should be accepted"
     share = [x for x in shared if x['name'] == share_name_2][0]
-    assert share['access_level'] == Share.MODIFY, (
-        "share 2 in sd1 should be Modif!")
+    assert (
+        share['access_level'] == Share.MODIFY
+    ), "share 2 in sd1 should be Modif!"
     assert not share['accepted'], "share 2 in sd1 should NOT be accepted"
 
     # check the shared of sd3
     shares = yield sd3.sdt.get_shares()
     share = [x for x in shares if x['name'] == share_name_1][0]
-    assert share['access_level'] == Share.VIEW, (
-        "share 1 in sd2 should be View!")
+    assert (
+        share['access_level'] == Share.VIEW
+    ), "share 1 in sd2 should be View!"
     assert share['accepted'], "share 1 in sd2 should be accepted"
     share = [x for x in shares if x['name'] == share_name_2][0]
-    assert share['access_level'] == Share.MODIFY, (
-        "share 2 in sd2 should be Modif!")
+    assert (
+        share['access_level'] == Share.MODIFY
+    ), "share 2 in sd2 should be Modif!"
     assert not share['accepted'], "share 2 in sd2 should NOT be accepted"
 
 
@@ -542,7 +558,7 @@ def test_disconnect_modify_connect(udf_name, sd1, sd2, sd3, prefix):
     third_dir = os.path.join(folder_path, 'third_dir')
     os.mkdir(third_dir)
 
-    yield sd1.sdt.wait_for_nirvana(.5)
+    yield sd1.sdt.wait_for_nirvana(0.5)
 
     debug(prefix, 'Disconnecting SD1.')
     yield sd1.sdt.disconnect()  # disconnect SD1
@@ -554,37 +570,46 @@ def test_disconnect_modify_connect(udf_name, sd1, sd2, sd3, prefix):
     create_file_and_add_content(os.path.join(xyz_dir, 'new.txt'))
 
     # move a file within the UDF
-    os.rename(os.path.join(folder_path, 'a_dir', 'a_file.txt'),
-              os.path.join(xyz_dir, 'renamed_file.txt'))
+    os.rename(
+        os.path.join(folder_path, 'a_dir', 'a_file.txt'),
+        os.path.join(xyz_dir, 'renamed_file.txt'),
+    )
 
     # move a folder outside the UDF to the root dir
-    os.rename(os.path.join(folder_path, 'other_dir'),
-              os.path.join(sd1.rootdir, udf_name + 'renamed_other_dir'))
+    os.rename(
+        os.path.join(folder_path, 'other_dir'),
+        os.path.join(sd1.rootdir, udf_name + 'renamed_other_dir'),
+    )
 
     # move a folder outside the UDF to the home dir
     renamed_third_dir = os.path.join(sd1.homedir, 'renamed_third_dir')
-    os.rename(os.path.join(folder_path, 'third_dir'),
-              renamed_third_dir)
+    os.rename(os.path.join(folder_path, 'third_dir'), renamed_third_dir)
 
     expected = set(walk_and_list_dir(sd1.homedir))
     debug(prefix, "Expected to have", expected)
 
     debug(prefix, 'Re connecting SD1.')
     yield sd1.sdt.connect()  # re-connect SD1
-    yield sd1.sdt.wait_for_nirvana(.5)
+    yield sd1.sdt.wait_for_nirvana(0.5)
 
     debug(prefix, 'Waiting for nirvana for SD2.')
-    yield sd2.sdt.wait_for_nirvana(.5)  # wait for SD2 to get all the changes
+    yield sd2.sdt.wait_for_nirvana(0.5)  # wait for SD2 to get all the changes
 
     actual = set(walk_and_list_dir(sd2.homedir))
     debug(prefix, "Currently found", actual)
 
-    debug(prefix, 'expected sym diff actual',
-          expected.symmetric_difference(actual))
-    assert expected.difference(actual) == set(['renamed_third_dir']), \
-        'SD1 home must have the same as SD2 except for renamed_third_dir.'
-    assert actual.difference(expected) == set([]), \
-        'SD2 home must have nothing extra than the SD1\'s.'
+    debug(
+        prefix,
+        'expected sym diff actual',
+        expected.symmetric_difference(actual),
+    )
+    assert expected.difference(actual) == set(
+        ['renamed_third_dir']
+    ), 'SD1 home must have the same as SD2 except for renamed_third_dir.'
+    assert actual.difference(expected) == set(
+        []
+    ), 'SD2 home must have nothing extra than the SD1\'s.'
+
 
 #    Disabled the following lines, because they try to create a folder while
 #    being disconnected, and right now the SDT interface waits for the
@@ -622,7 +647,7 @@ def test_unsuscribe_delete_subscribe(udf_name, sd1, sd2, sd3, prefix):
     udf_path = folder["path"]
     debug(prefix, 'create_folder completed!', folder)
     assert folder['subscribed'], 'sd1 must be subscribed'
-    yield sd1.sdt.wait_for_nirvana(.5)
+    yield sd1.sdt.wait_for_nirvana(0.5)
 
     # un-subscribe and check
     yield sd1.sdt.unsubscribe_folder(folder_id)
@@ -634,21 +659,23 @@ def test_unsuscribe_delete_subscribe(udf_name, sd1, sd2, sd3, prefix):
     # remove everything
     shutil.rmtree(udf_path)
     debug(prefix, 'everything removed from disk')
-    yield sd1.sdt.wait_for_nirvana(.5)
+    yield sd1.sdt.wait_for_nirvana(0.5)
 
     # subscribe and wait
     yield sd1.sdt.subscribe_folder(folder_id)
     folders = yield sd1.sdt.get_folders()
     assert len(folders) == 1, "SD1 has udfs != 1 (%d)" % len(folders)
     assert folders[0]['subscribed'], 'sd1 must be subscribed'
-    yield sd1.sdt.wait_for_nirvana(.5)
+    yield sd1.sdt.wait_for_nirvana(0.5)
     debug(prefix, 'subscribed!')
 
     # check stuff in disk for sd1
     in_disk = walk_and_list_dir(udf_path)
     expected = ['a_dir', os.path.join('a_dir', 'a_file.txt')]
-    assert in_disk == expected, \
-        "Wrong stuff in disk: %s (expected: %s)" % (in_disk, expected)
+    assert in_disk == expected, "Wrong stuff in disk: %s (expected: %s)" % (
+        in_disk,
+        expected,
+    )
 
 
 @defer.inlineCallbacks
@@ -685,7 +712,7 @@ def test_renaming_ancestor_of_two(udf_name, sd1, sd2, sd3, prefix):
     yield sd1.sdt.create_folder(path=udfdir4)
     debug(prefix, 'create_folders completed!')
 
-    yield sd1.sdt.wait_for_nirvana(.5)
+    yield sd1.sdt.wait_for_nirvana(0.5)
 
     # FIXME: this signal is sometimes lost.
     events = [event['event_name'] for event in sd2.events]
@@ -735,7 +762,7 @@ def test_no_events_from_ancestors_if_unsubsc(udf_name, sd1, sd2, sd3, prefix):
     yield sd1.sdt.create_folder(path=udf_dir1)
     yield sd1.sdt.create_folder(path=udf_dir2)
     debug(prefix, 'create_folders completed!')
-    yield sd1.sdt.wait_for_nirvana(.5)
+    yield sd1.sdt.wait_for_nirvana(0.5)
 
     # rename udf2 and wait for nirvana
     debug(prefix, 'rename!')
@@ -771,20 +798,22 @@ def test_sharing_udfitself(udf_name, sd1, sd2, sd3, prefix):
 
     debug(prefix, "Accepting share and wait acceptance to propagate")
     yield sd3.sdt.accept_share(share_id)
-    yield sd1.sdt.wait_for_nirvana(.5)
+    yield sd1.sdt.wait_for_nirvana(0.5)
 
     # check the shares of sd1
     shared = yield sd1.sdt.list_shared()
     share = [x for x in shared if x['name'] == share_name][0]
-    assert share['access_level'] == Share.MODIFY, (
-        "share in sd1 should be Modify!")
+    assert (
+        share['access_level'] == Share.MODIFY
+    ), "share in sd1 should be Modify!"
     assert share['accepted'], "share in sd1 should be accepted"
 
     # check the shared of sd3
     shares = yield sd3.sdt.get_shares()
     share = [x for x in shares if x['name'] == share_name][0]
-    assert share['access_level'] == Share.MODIFY, (
-        "share in sd2 should be Modify!")
+    assert (
+        share['access_level'] == Share.MODIFY
+    ), "share in sd2 should be Modify!"
     assert share['accepted'], "share in sd2 should be accepted"
 
 
@@ -807,14 +836,14 @@ def test_unsusc_lotofchanges_subsc(udf_name, sd1, sd2, sd3, prefix):
     #  -     file_2
     #  - dir_b
     #  - dir_c
-    folder, = yield sd1.sdt.create_folder(path=udf_dir)
+    (folder,) = yield sd1.sdt.create_folder(path=udf_dir)
     folder_id = folder["volume_id"]
     for d in (dir_a, dir_b, dir_c):
         os.mkdir(d)
     for f in (file_1, file_2):
         open(f, "w").close()
     debug(prefix, 'initial UDF completed!')
-    yield sd1.sdt.wait_for_nirvana(.5)
+    yield sd1.sdt.wait_for_nirvana(0.5)
 
     # unsubscribe
     yield sd1.sdt.unsubscribe_folder(folder_id)
@@ -832,8 +861,8 @@ def test_unsusc_lotofchanges_subsc(udf_name, sd1, sd2, sd3, prefix):
     yield sd1.sdt.subscribe_folder(folder_id)
     debug(prefix, 'subscribed!')
 
-    yield sd1.sdt.wait_for_nirvana(.5)
-    yield sd2.sdt.wait_for_nirvana(.5)
+    yield sd1.sdt.wait_for_nirvana(0.5)
+    yield sd2.sdt.wait_for_nirvana(0.5)
     debug(prefix, 'changes propagated')
 
     # what the merge should do:
@@ -849,5 +878,7 @@ def test_unsusc_lotofchanges_subsc(udf_name, sd1, sd2, sd3, prefix):
         debug(prefix, 'check SD', sd)
         udf_dir = os.path.join(sd.homedir, udf_name)
         in_disk = walk_and_list_dir(udf_dir)
-        assert in_disk == expected, "sd %s has bad stuff in "\
-                                    "disk: %s" % (which, in_disk)
+        assert in_disk == expected, "sd %s has bad stuff in " "disk: %s" % (
+            which,
+            in_disk,
+        )

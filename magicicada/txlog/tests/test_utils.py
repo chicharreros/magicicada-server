@@ -33,19 +33,22 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
     def _create_db_worker_last_row_entry(self, worker_name, txlog):
         """Create a new entry on the txlog_db_worker_last_row table."""
         return DBWorkerLastRow.objects.create(
-            worker_id=worker_name, txlog=txlog)
+            worker_id=worker_name, txlog=txlog
+        )
 
     def _find_last_row_worker_names(self):
         """Find all worker names from the db_worker_last_row table."""
         return DBWorkerLastRow.objects.all().values_list(
-            'worker_id', flat=True)
+            'worker_id', flat=True
+        )
 
     def test_get_last_row_with_no_data(self):
         """Test the get_last_row function when no data is present."""
         worker_count = DBWorkerLastRow.objects.all().count()
         assert worker_count == 0, worker_count
         self.assertEqual(
-            utils.NEW_WORKER_LAST_ROW, utils.get_last_row('some worker'))
+            utils.NEW_WORKER_LAST_ROW, utils.get_last_row('some worker')
+        )
 
     def test_get_last_row_with_other_data_returns_the_oldest_one(self):
         """get_last_row returns the row for the oldest txlog ID in the
@@ -55,14 +58,18 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         txlog3 = self.factory.make_transaction_log()
 
         self._create_db_worker_last_row_entry(
-            self.factory.get_unique_string(), txlog3)
+            self.factory.get_unique_string(), txlog3
+        )
         self._create_db_worker_last_row_entry(
-            self.factory.get_unique_string(), txlog1)
+            self.factory.get_unique_string(), txlog1
+        )
         self._create_db_worker_last_row_entry(
-            self.factory.get_unique_string(), txlog2)
+            self.factory.get_unique_string(), txlog2
+        )
 
         self.assertEqual(
-            (txlog1.id, txlog1.timestamp), utils.get_last_row('some worker'))
+            (txlog1.id, txlog1.timestamp), utils.get_last_row('some worker')
+        )
 
     def test_get_last_row_with_same_data_returns_the_exact_one(self):
         """Test that get_last_row returns the row for the exact txlog ID in the
@@ -74,12 +81,15 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         worker_name = self.factory.get_unique_string()
         self._create_db_worker_last_row_entry(worker_name, txlog3)
         self._create_db_worker_last_row_entry(
-            self.factory.get_unique_string(), txlog1)
+            self.factory.get_unique_string(), txlog1
+        )
         self._create_db_worker_last_row_entry(
-            self.factory.get_unique_string(), txlog2)
+            self.factory.get_unique_string(), txlog2
+        )
 
         self.assertEqual(
-            (txlog3.id, txlog3.timestamp), utils.get_last_row(worker_name))
+            (txlog3.id, txlog3.timestamp), utils.get_last_row(worker_name)
+        )
 
     def test_update_last_row_with_no_data(self):
         """Test the update_last_row function when no data is present."""
@@ -88,8 +98,10 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         utils.update_last_row(worker_name=worker_name, txlog=txlog)
 
         result = DBWorkerLastRow.objects.get(worker_id=worker_name)
-        self.assertEqual((txlog.id, txlog.timestamp),
-                         (result.txlog.id, result.txlog.timestamp))
+        self.assertEqual(
+            (txlog.id, txlog.timestamp),
+            (result.txlog.id, result.txlog.timestamp),
+        )
 
     def test_update_last_row_with_data(self):
         """Test the update_last_row function when data for this worker is
@@ -102,8 +114,10 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         utils.update_last_row(worker_name=worker_name, txlog=txlog2)
 
         result = DBWorkerLastRow.objects.get(worker_id=worker_name)
-        self.assertEqual((txlog2.id, txlog2.timestamp),
-                         (result.txlog.id, result.txlog.timestamp))
+        self.assertEqual(
+            (txlog2.id, txlog2.timestamp),
+            (result.txlog.id, result.txlog.timestamp),
+        )
 
     def test_get_txn_recs_no_previous_no_txns(self):
         """Test getting a batch of transactions when we have not previously
@@ -118,8 +132,10 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         is smaller than the number requested.
         """
         owner = self.make_user_without_txlog()
-        txlogs = [self.factory.make_transaction_log(owner=owner),
-                  self.factory.make_transaction_log(owner=owner)]
+        txlogs = [
+            self.factory.make_transaction_log(owner=owner),
+            self.factory.make_transaction_log(owner=owner),
+        ]
         txlist = utils.get_txn_recs(num_recs=5, last_id=0)
         self.assertEqual([t.as_dict() for t in txlogs], txlist)
 
@@ -129,8 +145,10 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         is exactly the number requested.
         """
         owner = self.make_user_without_txlog()
-        txlogs = [self.factory.make_transaction_log(owner=owner),
-                  self.factory.make_transaction_log(owner=owner)]
+        txlogs = [
+            self.factory.make_transaction_log(owner=owner),
+            self.factory.make_transaction_log(owner=owner),
+        ]
         txlist = utils.get_txn_recs(num_recs=2, last_id=0)
         self.assertEqual([t.as_dict() for t in txlogs], txlist)
 
@@ -140,11 +158,13 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         is larger than the number requested.
         """
         owner = self.make_user_without_txlog()
-        txlogs = [self.factory.make_transaction_log(owner=owner),
-                  self.factory.make_transaction_log(owner=owner),
-                  self.factory.make_transaction_log(owner=owner),
-                  self.factory.make_transaction_log(owner=owner),
-                  self.factory.make_transaction_log(owner=owner)]
+        txlogs = [
+            self.factory.make_transaction_log(owner=owner),
+            self.factory.make_transaction_log(owner=owner),
+            self.factory.make_transaction_log(owner=owner),
+            self.factory.make_transaction_log(owner=owner),
+            self.factory.make_transaction_log(owner=owner),
+        ]
         txlist = utils.get_txn_recs(num_recs=1, last_id=0)
         expected = [txlogs[0].as_dict()]
         self.assertEqual(expected, txlist)
@@ -167,10 +187,12 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         """
         owner = self.make_user_without_txlog()
         t1 = self.factory.make_transaction_log(owner=owner)
-        txlogs = [self.factory.make_transaction_log(owner=owner),
-                  self.factory.make_transaction_log(owner=owner),
-                  self.factory.make_transaction_log(owner=owner),
-                  self.factory.make_transaction_log(owner=owner)]
+        txlogs = [
+            self.factory.make_transaction_log(owner=owner),
+            self.factory.make_transaction_log(owner=owner),
+            self.factory.make_transaction_log(owner=owner),
+            self.factory.make_transaction_log(owner=owner),
+        ]
         txlist = utils.get_txn_recs(num_recs=5, last_id=t1.id)
         self.assertEqual([t.as_dict() for t in txlogs], txlist)
 
@@ -180,8 +202,10 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         transaction_log table that we requested.
         """
         owner = self.make_user_without_txlog()
-        txlogs = [self.factory.make_transaction_log(owner=owner),
-                  self.factory.make_transaction_log(owner=owner)]
+        txlogs = [
+            self.factory.make_transaction_log(owner=owner),
+            self.factory.make_transaction_log(owner=owner),
+        ]
         txlist = utils.get_txn_recs(num_recs=1, last_id=txlogs[0].id)
         expected = [txlogs[1].as_dict()]
         self.assertEqual(expected, txlist)
@@ -192,11 +216,13 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         transaction_log table than we requested.
         """
         owner = self.make_user_without_txlog()
-        txlogs = [self.factory.make_transaction_log(owner=owner),
-                  self.factory.make_transaction_log(owner=owner),
-                  self.factory.make_transaction_log(owner=owner),
-                  self.factory.make_transaction_log(owner=owner),
-                  self.factory.make_transaction_log(owner=owner)]
+        txlogs = [
+            self.factory.make_transaction_log(owner=owner),
+            self.factory.make_transaction_log(owner=owner),
+            self.factory.make_transaction_log(owner=owner),
+            self.factory.make_transaction_log(owner=owner),
+            self.factory.make_transaction_log(owner=owner),
+        ]
         txlist = utils.get_txn_recs(num_recs=1, last_id=txlogs[1].id)
         expected = [txlogs[2].as_dict()]
         self.assertEqual(expected, txlist)
@@ -204,9 +230,11 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
     def test_get_txn_recs_respects_order(self):
         """Test that transaction log entries are returned in order."""
         owner = self.make_user_without_txlog()
-        txlogs = [self.factory.make_transaction_log(owner=owner),
-                  self.factory.make_transaction_log(owner=owner),
-                  self.factory.make_transaction_log(owner=owner)]
+        txlogs = [
+            self.factory.make_transaction_log(owner=owner),
+            self.factory.make_transaction_log(owner=owner),
+            self.factory.make_transaction_log(owner=owner),
+        ]
         txlist = utils.get_txn_recs(num_recs=3, last_id=0)
         self.assertEqual([t.as_dict() for t in txlogs], txlist)
 
@@ -217,15 +245,18 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
 
         """
         owner = self.make_user_without_txlog()
-        txlogs = [self.factory.make_transaction_log(owner=owner),
-                  self.factory.make_transaction_log(owner=owner)]
+        txlogs = [
+            self.factory.make_transaction_log(owner=owner),
+            self.factory.make_transaction_log(owner=owner),
+        ]
         worker_id = self.factory.get_unique_string()
         txlist = utils.get_txn_recs(num_recs=3, worker_id=worker_id)
 
         self.assertEqual([t.as_dict() for t in txlogs], txlist)
         unseen = self.factory.make_transaction_log(owner=owner)
         txlist = utils.get_txn_recs(
-            num_recs=3, last_id=txlogs[1].id, worker_id=worker_id)
+            num_recs=3, last_id=txlogs[1].id, worker_id=worker_id
+        )
         self.assertEqual([unseen.as_dict()], txlist)
 
     def test_get_txn_recs_retry_list_no_new_or_retry(self):
@@ -243,7 +274,8 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         txlist = utils.get_txn_recs(num_recs=3, worker_id=worker_id)
         self.assertEqual([t1.as_dict(), t3.as_dict()], txlist)
         txlist = utils.get_txn_recs(
-            num_recs=3, last_id=t3.id, worker_id=worker_id)
+            num_recs=3, last_id=t3.id, worker_id=worker_id
+        )
         self.assertEqual([], txlist)
 
     def test_get_txn_recs_for_partition(self):
@@ -264,14 +296,18 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         t3 = self.factory.make_transaction_log(owner=owner)
         # Share txlogs, but with a different owner, are also returned.
         t4 = self.factory.make_transaction_log(
-            owner=other, op_type=TransactionLog.OP_SHARE_ACCEPTED)
+            owner=other, op_type=TransactionLog.OP_SHARE_ACCEPTED
+        )
         t5 = self.factory.make_transaction_log(
-            owner=other, op_type=TransactionLog.OP_SHARE_DELETED)
+            owner=other, op_type=TransactionLog.OP_SHARE_DELETED
+        )
 
         txlogs = [t1, t3, t4, t5]
         txlist = utils.get_txn_recs(
-            num_recs=5, last_id=0,
-            num_partitions=num_partitions, partition_id=partition_id
+            num_recs=5,
+            last_id=0,
+            num_partitions=num_partitions,
+            partition_id=partition_id,
         )
         self.assertEqual([t.as_dict() for t in txlogs], txlist)
 
@@ -288,10 +324,12 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         expected = [
             self.factory.make_transaction_log(owner=owner),
             self.factory.make_transaction_log(
-                owner=owner, timestamp=old_datetime),
+                owner=owner, timestamp=old_datetime
+            ),
             self.factory.make_transaction_log(owner=owner),
             self.factory.make_transaction_log(
-                owner=owner, timestamp=old_datetime),
+                owner=owner, timestamp=old_datetime
+            ),
         ]
 
         removed = utils.delete_old_txlogs(timestamp_limit=limit_datetime)
@@ -313,10 +351,12 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         txlogs = [
             self.factory.make_transaction_log(owner=owner),
             self.factory.make_transaction_log(
-                owner=owner, timestamp=old_datetime),
+                owner=owner, timestamp=old_datetime
+            ),
             self.factory.make_transaction_log(owner=owner),
             self.factory.make_transaction_log(
-                owner=owner, timestamp=old_datetime),
+                owner=owner, timestamp=old_datetime
+            ),
         ]
         expected = [txlogs[0], txlogs[2]]
 
@@ -342,17 +382,25 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         txlogs = [
             self.factory.make_transaction_log(owner=owner),
             self.factory.make_transaction_log(
-                owner=owner, timestamp=old_datetime),
+                owner=owner, timestamp=old_datetime
+            ),
             self.factory.make_transaction_log(owner=owner),
             self.factory.make_transaction_log(
-                owner=owner, timestamp=old_datetime),
+                owner=owner, timestamp=old_datetime
+            ),
             self.factory.make_transaction_log(
-                owner=owner, timestamp=old_datetime),
+                owner=owner, timestamp=old_datetime
+            ),
         ]
-        expected = [txlogs[0], txlogs[2], txlogs[4], ]
+        expected = [
+            txlogs[0],
+            txlogs[2],
+            txlogs[4],
+        ]
 
-        removed = utils.delete_old_txlogs(timestamp_limit=timestamp_limit,
-                                          quantity_limit=quantity_limit)
+        removed = utils.delete_old_txlogs(
+            timestamp_limit=timestamp_limit, quantity_limit=quantity_limit
+        )
 
         txlist = utils.get_txn_recs(num_recs=len(txlogs), last_id=0)
         self.assertEqual(len(txlist), 3)
@@ -372,15 +420,18 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         txlogs = [
             self.factory.make_transaction_log(owner=owner),
             self.factory.make_transaction_log(
-                owner=owner, timestamp=timestamp_limit),
+                owner=owner, timestamp=timestamp_limit
+            ),
             self.factory.make_transaction_log(owner=owner),
             self.factory.make_transaction_log(
-                owner=owner, timestamp=timestamp_limit),
+                owner=owner, timestamp=timestamp_limit
+            ),
             self.factory.make_transaction_log(owner=owner),
         ]
 
-        removed = utils.delete_txlogs_slice(date=right_now.date(),
-                                            quantity_limit=quantity_limit)
+        removed = utils.delete_txlogs_slice(
+            date=right_now.date(), quantity_limit=quantity_limit
+        )
         self.assertEqual(removed, quantity_limit)
 
         txlist = utils.get_txn_recs(num_recs=len(txlogs), last_id=0)
@@ -400,7 +451,8 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         ts = now()
         txlogs = [
             self.factory.make_transaction_log(timestamp=ts + timedelta(i, 0))
-            for i in range(5)]
+            for i in range(5)
+        ]
         tstamp = txlogs[2].timestamp
         txid, newtstamp = utils.get_row_by_time(tstamp)
         self.assertEqual(txid, txlogs[2].id)
@@ -411,7 +463,8 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         ts = now()
         txlogs = [
             self.factory.make_transaction_log(timestamp=ts + timedelta(i, 0))
-            for i in range(5)]
+            for i in range(5)
+        ]
         # put the timestamp of [3] into [1], the function should return the
         # id of [1]
         tstamp = txlogs[1].timestamp = txlogs[3].timestamp
@@ -426,7 +479,8 @@ class TransactionLogUtilsTestCase(BaseTransactionLogTestCase):
         ts = now()
         txlogs = [
             self.factory.make_transaction_log(timestamp=ts + timedelta(i, 0))
-            for i in range(5)]
+            for i in range(5)
+        ]
 
         # get a timestamp in the middle of [2] and [3], the function should
         # return the id of [3]

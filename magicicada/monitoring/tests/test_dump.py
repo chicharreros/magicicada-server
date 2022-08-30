@@ -42,7 +42,7 @@ class TestDump(TestCase):
     def test_meliae_dump(self):
         """Check that the dump works."""
         collect = mock.Mock()
-        self.patch(gc, 'collect',  collect)
+        self.patch(gc, 'collect', collect)
         dump_all_objects = mock.Mock()
         self.patch(scanner, 'dump_all_objects', dump_all_objects)
 
@@ -72,7 +72,7 @@ class TestDump(TestCase):
     def test_gc_dumps_garbage_ok(self):
         """Check that the garbage dump works."""
         get_count = mock.Mock(return_value=0)
-        self.patch(gc, 'get_count',  get_count)
+        self.patch(gc, 'get_count', get_count)
         garbage = iter(['foo', 666])
         self.patch(gc, 'garbage', garbage)
 
@@ -87,8 +87,10 @@ class TestDump(TestCase):
 
     def test_gc_dump_error_garbage(self):
         """Support something that breaks in repr."""
+
         class Strange(object):
             """Weird object that breaks on repr."""
+
             def __repr__(self):
                 raise ValueError('foo')
 

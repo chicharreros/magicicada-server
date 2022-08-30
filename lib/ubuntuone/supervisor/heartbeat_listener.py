@@ -36,8 +36,9 @@ from supervisor import childutils, states
 from supervisor.events import EventTypes, getEventNameByType
 
 
-PROCESS_COMMUNICATION_STDOUT = \
-    getEventNameByType(EventTypes.PROCESS_COMMUNICATION_STDOUT)
+PROCESS_COMMUNICATION_STDOUT = getEventNameByType(
+    EventTypes.PROCESS_COMMUNICATION_STDOUT
+)
 TICK_5 = getEventNameByType(EventTypes.TICK_5)
 
 
@@ -48,9 +49,19 @@ class HeartbeatListener(object):
     item in order to dispatch to the event handler.
     """
 
-    def __init__(self, timeout, interval, groups, processes, rpc, logger=None,
-                 timer=time.time, stdin=sys.stdin, stdout=sys.stdout,
-                 stderr=sys.stderr):
+    def __init__(
+        self,
+        timeout,
+        interval,
+        groups,
+        processes,
+        rpc,
+        logger=None,
+        timer=time.time,
+        stdin=sys.stdin,
+        stdout=sys.stdout,
+        stderr=sys.stderr,
+    ):
         # there is no __init__ to call in basic.LineReceiver
         self.logger = logger or logging.getLogger('heartbeat')
         self.timeout = timeout
@@ -65,8 +76,11 @@ class HeartbeatListener(object):
         self.timer = timer
         self.running = False
         self.tick_count = 0
-        self.logger.info("Initialized with: timeout=%s, interval=%s",
-                         self.timeout, self.interval)
+        self.logger.info(
+            "Initialized with: timeout=%s, interval=%s",
+            self.timeout,
+            self.interval,
+        )
 
     def stop(self):
         """Set the running flag to False."""
@@ -84,8 +98,9 @@ class HeartbeatListener(object):
         """Handle an event."""
         headers, payload = childutils.listener.wait(self.stdin, self.stdout)
         try:
-            self.logger.debug("Event '%s' received: %r",
-                              headers['eventname'], payload)
+            self.logger.debug(
+                "Event '%s' received: %r", headers['eventname'], payload
+            )
             if headers['eventname'] == PROCESS_COMMUNICATION_STDOUT:
                 payload_raw_headers, payload_data = payload.split("\n", 1)
                 payload_headers = childutils.get_headers(payload_raw_headers)
@@ -94,14 +109,19 @@ class HeartbeatListener(object):
                     data = json.loads(payload_data)
                     event_type = data.pop('type')
                     method = getattr(self, 'handle_%s' % event_type, None)
-                    method(payload_headers['processname'],
-                           payload_headers['groupname'],
-                           payload_headers['pid'], data)
+                    method(
+                        payload_headers['processname'],
+                        payload_headers['groupname'],
+                        payload_headers['pid'],
+                        data,
+                    )
                 except Exception:
                     # failed to parse the payload or to dispatch the event
                     self.logger.exception(
                         "Unable to handle event type '%s' - %r",
-                        event_type, payload)
+                        event_type,
+                        payload,
+                    )
             # handle the tick events to fire a check on the processes.
             elif headers['eventname'] == TICK_5:
                 self.tick_count += 1
@@ -112,10 +132,14 @@ class HeartbeatListener(object):
                     except Exception as e:
                         print(e)
                         self.logger.exception(
-                            "Oops, failed to check the processes.")
+                            "Oops, failed to check the processes."
+                        )
             else:
-                self.logger.warning("Received unsupported event: %s - %r",
-                                    headers['eventname'], payload)
+                self.logger.warning(
+                    "Received unsupported event: %s - %r",
+                    headers['eventname'],
+                    payload,
+                )
 
         finally:
             childutils.listener.ok(self.stdout)
@@ -123,9 +147,11 @@ class HeartbeatListener(object):
     def handle_heartbeat(self, process_name, group_name, pid, payload):
         """handle a heartbeat event."""
         heartbeat = payload['time']
-        self.data[process_name] = {'pid': pid,
-                                   'time': heartbeat,
-                                   'received': time.time()}
+        self.data[process_name] = {
+            'pid': pid,
+            'time': heartbeat,
+            'received': time.time(),
+        }
 
     def check_processes(self):
         """Check heartbeat of configured processes.
@@ -142,13 +168,15 @@ class HeartbeatListener(object):
             pname = '%s:%s' % (group, name)
             if not pid or info['state'] != states.ProcessStates.RUNNING:
                 # nothing to check, as there is no pid yet for this process
-                self.logger.info("Ignoring %s (%s) as isn't running.",
-                                 pname, pid)
+                self.logger.info(
+                    "Ignoring %s (%s) as isn't running.", pname, pid
+                )
                 continue
             in_processes_list = name in self.processes
             if group not in self.groups and not in_processes_list:
-                self.logger.info("Ignoring %s (%s) as isn't tracked.",
-                                 pname, pid)
+                self.logger.info(
+                    "Ignoring %s (%s) as isn't tracked.", pname, pid
+                )
                 continue
             self.logger.info("Checking %s (%s)", pname, pid)
             # define the restart target (group or specific process)
@@ -160,29 +188,39 @@ class HeartbeatListener(object):
                     self.restart(target, heartbeat_info['time'])
             else:
                 # the process is tracked, but we don't have any info about it
-                self.logger.warning("Restarting process %s (%s), as we never"
-                                    " received a hearbeat event from it",
-                                    pname, pid)
+                self.logger.warning(
+                    "Restarting process %s (%s), as we never"
+                    " received a hearbeat event from it",
+                    pname,
+                    pid,
+                )
                 self.restart(target, "never")
 
     def restart(self, name, when_client_heartbeat):
         """Restart process 'name'."""
-        self.logger.info('Restarting %s (last hearbeat: %s)',
-                         name, when_client_heartbeat)
+        self.logger.info(
+            'Restarting %s (last hearbeat: %s)', name, when_client_heartbeat
+        )
         try:
             self.rpc.supervisor.stopProcess(name)
             self.logger.debug("Process %s stopped.", name)
         except Fault as what:
             self.logger.error(
                 'Failed to stop process %s (last heartbeat: %s), exiting: %s',
-                name, when_client_heartbeat, what)
+                name,
+                when_client_heartbeat,
+                what,
+            )
             raise
         try:
             self.rpc.supervisor.startProcess(name)
             self.logger.debug("Process %s started.", name)
         except Fault as what:
-            self.logger.error('Failed to start process %s after stopping it, '
-                              'exiting: %s', name, what)
+            self.logger.error(
+                'Failed to start process %s after stopping it, ' 'exiting: %s',
+                name,
+                what,
+            )
             raise
 
 
@@ -221,6 +259,7 @@ log_format.help = The logging format
 if __name__ == '__main__':
     from configglue.inischema.glue import configglue
     from io import StringIO
+
     config_file = StringIO()
     config_file.write(default_config)
     config_file.seek(0)
@@ -229,13 +268,19 @@ if __name__ == '__main__':
         config_file,
         args=sys.argv[1:],
         usage="%prog [options]",
-        extra_parsers=[("comma_separated_list", comma_separated_list_parser)])
+        extra_parsers=[("comma_separated_list", comma_separated_list_parser)],
+    )
 
     if not options.groups or not options.interval or not options.timeout:
         parser.print_help()
         sys.exit(2)
 
     rpc = childutils.getRPCInterface(os.environ)
-    hbl = HeartbeatListener(options.timeout, options.interval, options.groups,
-                            options.processes, rpc)
+    hbl = HeartbeatListener(
+        options.timeout,
+        options.interval,
+        options.groups,
+        options.processes,
+        rpc,
+    )
     hbl.runforever()

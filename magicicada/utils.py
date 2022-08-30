@@ -22,10 +22,22 @@ from magicicada.filesync import services
 
 
 def create_test_user(
-        username='fred', email='fred@bedrock.com', first_name='Fredrick',
-        last_name='Flintsone', password=None, max_storage_bytes=2 ** 20):
+    username='fred',
+    email='fred@bedrock.com',
+    first_name='Fredrick',
+    last_name='Flintsone',
+    password=None,
+    max_storage_bytes=2**20,
+):
     """Create a user used for testing."""
     return services.make_storage_user(
-        username, max_storage_bytes=max_storage_bytes, password=password,
-        email=email, first_name=first_name, last_name=last_name,
-        is_staff=False, is_active=True, is_superuser=False)
+        username,
+        max_storage_bytes=max_storage_bytes,
+        password=password,
+        email=email,
+        first_name=first_name,
+        last_name=last_name,
+        is_staff=False,
+        is_active=True,
+        is_superuser=False,
+    )

@@ -43,14 +43,16 @@ class TestServerScan(TestServerBase):
     @defer.inlineCallbacks
     def do_create_lots_of_files(self, suffix=''):
         """A helper that creates N files."""
-        mk = yield self.client.make_file(request.ROOT, self.root_id,
-                                         "test_first" + suffix)
+        mk = yield self.client.make_file(
+            request.ROOT, self.root_id, "test_first" + suffix
+        )
         # data for putcontent
         params = get_put_content_params(share=request.ROOT, node=mk.new_id)
         yield self.client.put_content(**params)
 
         for i in range(self.N):
-            mk = yield self.client.make_file(request.ROOT, self.root_id,
-                                             "test_%03x%s" % (i, suffix))
+            mk = yield self.client.make_file(
+                request.ROOT, self.root_id, "test_%03x%s" % (i, suffix)
+            )
             params = get_put_content_params(share=request.ROOT, node=mk.new_id)
             yield self.client.put_content(**params)

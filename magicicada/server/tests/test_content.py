@@ -104,7 +104,8 @@ class TestGetContent(TestWithDatabase):
         params = get_put_content_params(data, node=mkfile_req.new_id)
         yield client.put_content(**params)
         result = yield client.get_content(
-            params['share'], params['node'], EMPTY_HASH)
+            params['share'], params['node'], EMPTY_HASH
+        )
         self.assertEqual(zlib.decompress(result.data), data)
 
     @defer.inlineCallbacks
@@ -120,7 +121,8 @@ class TestGetContent(TestWithDatabase):
         yield client.put_content(**params)
 
         req = yield client.get_content(
-            params['share'], params['node'], params['new_hash'])
+            params['share'], params['node'], params['new_hash']
+        )
         if check_file_content:
             self.assertEqual(zlib.decompress(req.data), data)
 
@@ -140,8 +142,10 @@ class TestGetContent(TestWithDatabase):
             request = server.GetContentResponse(s, message)
             self.request = request
             request.start()
-        self.patch(server.StorageServer, 'handle_GET_CONTENT',
-                   handle_get_content)
+
+        self.patch(
+            server.StorageServer, 'handle_GET_CONTENT', handle_get_content
+        )
 
         # monkeypatching to simulate that we're not working on that request
         # at the moment the CANCEL arrives
@@ -193,11 +197,16 @@ class TestGetContent(TestWithDatabase):
         yield client.put_content(**params)
 
         gc_request = client.get_content_request(
-            params['share'], params['node'], params['new_hash'],
-            offset=0, callback=cancel)
+            params['share'],
+            params['node'],
+            params['new_hash'],
+            offset=0,
+            callback=cancel,
+        )
         yield d
         yield self.assertFailure(
-            gc_request.deferred, protoerrors.RequestCancelledError)
+            gc_request.deferred, protoerrors.RequestCancelledError
+        )
 
     @defer.inlineCallbacks
     def test_getcontent_cancel_inside_download(self):
@@ -215,8 +224,10 @@ class TestGetContent(TestWithDatabase):
             request = server.GetContentResponse(s, message)
             self.request = request
             request.start()
-        self.patch(server.StorageServer, 'handle_GET_CONTENT',
-                   handle_get_content)
+
+        self.patch(
+            server.StorageServer, 'handle_GET_CONTENT', handle_get_content
+        )
 
         # monkeypatching to assure that the producer was cancelled
         orig_method = server.GetContentResponse.unregisterProducer
@@ -254,10 +265,12 @@ class TestGetContent(TestWithDatabase):
         yield client.put_content(**params)
 
         gc_request = client.get_content_request(
-            params['share'], params['node'], params['new_hash'], 0, cancel)
+            params['share'], params['node'], params['new_hash'], 0, cancel
+        )
         yield d
         yield self.assertFailure(
-            gc_request.deferred, protoerrors.RequestCancelledError)
+            gc_request.deferred, protoerrors.RequestCancelledError
+        )
 
     @defer.inlineCallbacks
     def test_getcontent_cancel_after_download(self):
@@ -285,7 +298,8 @@ class TestGetContent(TestWithDatabase):
         yield client.put_content(**params)
 
         gc_request = client.get_content_request(
-                params['share'], params['node'], params['new_hash'], 0, cancel)
+            params['share'], params['node'], params['new_hash'], 0, cancel
+        )
         yield d
         yield gc_request.cancel()
         yield gc_request.deferred
@@ -305,7 +319,8 @@ class TestGetContent(TestWithDatabase):
         storage_server = self.service.factory.buildProtocol('addr')
         producer = mock.Mock(deferred=defer.Deferred(), name='producer')
         node = mock.Mock(
-            deflated_size=0, size=0, content_hash='hash', crc32=0, name='node')
+            deflated_size=0, size=0, content_hash='hash', crc32=0, name='node'
+        )
         node.get_content.return_value = defer.succeed(producer)
 
         user = mock.Mock(username='', name='user')
@@ -328,9 +343,11 @@ class TestGetContent(TestWithDatabase):
 
         self.assertNotEqual(assigned[0], None)
         user.get_node.assert_called_once_with(
-            share_id, message.get_content.node, message.get_content.hash)
+            share_id, message.get_content.node, message.get_content.hash
+        )
         node.get_content.assert_called_once_with(
-            user=user, previous_hash=message.get_content.hash,
+            user=user,
+            previous_hash=message.get_content.hash,
             start=message.get_content.offset,
         )
         producer.startProducing.assert_called_once_with(mock.ANY)
@@ -355,7 +372,7 @@ class TestPutContent(TestWithDatabase):
             if request.cancelled and request.finished:
                 d.callback(True)
             else:
-                reactor.callLater(.1, test_done, request)
+                reactor.callLater(0.1, test_done, request)
             return d
 
         client = yield self.get_client_helper(auth_token="open sesame")
@@ -366,7 +383,8 @@ class TestPutContent(TestWithDatabase):
         pc_request = client.put_content_request(**params)
         pc_request.cancel()
         yield self.assertFailure(
-            pc_request.deferred, protoerrors.RequestCancelledError)
+            pc_request.deferred, protoerrors.RequestCancelledError
+        )
 
         yield test_done(pc_request)
 
@@ -390,7 +408,8 @@ class TestPutContent(TestWithDatabase):
         size = int(settings.STORAGE_CHUNK_SIZE * 1.5)
         data = os.urandom(size)
         StorageUser.objects.filter(id=self.usr0.id).update(
-            max_storage_bytes=size * 2)
+            max_storage_bytes=size * 2
+        )
 
         client = yield self.get_client_helper(auth_token="open sesame")
         root_id = yield client.get_root()
@@ -412,7 +431,8 @@ class TestPutContent(TestWithDatabase):
         pc_request = client.put_content_request(**params)
         pc_request.fd.read = partial(cancel_and_read, pc_request)
         yield self.assertFailure(
-            pc_request.deferred, protoerrors.RequestCancelledError)
+            pc_request.deferred, protoerrors.RequestCancelledError
+        )
 
     @defer.inlineCallbacks
     def test_putcontent(self, num_files=1, size=300000):
@@ -526,22 +546,26 @@ class TestPutContent(TestWithDatabase):
     def test_putcontent_bad_prev_hash(self):
         """Test wrong prev hash hint."""
         return self._put_content_bad_params(
-            previous_hash="sha1:wrong", error_class=protoerrors.ConflictError)
+            previous_hash="sha1:wrong", error_class=protoerrors.ConflictError
+        )
 
     def test_putcontent_bad_hash(self):
         """Test wrong hash hint."""
         return self._put_content_bad_params(
-            new_hash="sha1:notthehash", error_class=protoerrors.ProtocolError)
+            new_hash="sha1:notthehash", error_class=protoerrors.ProtocolError
+        )
 
     def test_putcontent_bad_c3c32(self):
         """Test wrong crc32 hint."""
         return self._put_content_bad_params(
-            crc32=100, error_class=protoerrors.UploadCorruptError)
+            crc32=100, error_class=protoerrors.UploadCorruptError
+        )
 
     def test_putcontent_bad_size(self):
         """Test wrong size hint."""
         return self._put_content_bad_params(
-            size=20, error_class=protoerrors.UploadCorruptError)
+            size=20, error_class=protoerrors.UploadCorruptError
+        )
 
     @defer.inlineCallbacks
     def test_putcontent_notify(self):
@@ -562,8 +586,15 @@ class TestPutContent(TestWithDatabase):
 
         client = yield self.get_client_helper(auth_token="open sesame")
         kwargs = get_put_content_params(
-            share=request.ROOT, node=uuid.uuid4(), previous_hash='',
-            new_hash='', crc32=0, size=0, deflated_size=0, fd='')
+            share=request.ROOT,
+            node=uuid.uuid4(),
+            previous_hash='',
+            new_hash='',
+            crc32=0,
+            size=0,
+            deflated_size=0,
+            fd='',
+        )
         d = client.put_content(**kwargs)
         yield self.assertFails(d, 'DOES_NOT_EXIST')
 
@@ -571,7 +602,8 @@ class TestPutContent(TestWithDatabase):
         """Make sure we dont raise exceptions on deleted files."""
         so_file = self.usr0.root.make_file("foobar")
         upload_job = so_file.make_uploadjob(
-            so_file.content_hash, "sha1:100", 0, 100)
+            so_file.content_hash, "sha1:100", 0, 100
+        )
         # kill file
         so_file.delete()
         upload_job.delete()
@@ -593,14 +625,15 @@ class TestPutContent(TestWithDatabase):
             hash_value = get_hash(b'randomdata')
             filenode = self.usr0.get_node(params['node'])
             filenode.make_content(
-                filenode.content_hash, hash_value, 32, 1000, 1000,
-                uuid.uuid4())
+                filenode.content_hash, hash_value, 32, 1000, 1000, uuid.uuid4()
+            )
             return real_fd_read(amount)
 
         params['fd'].read = make_conflict_and_read
         pc_request = client.put_content_request(**params)
         yield self.assertFailure(
-            pc_request.deferred, protoerrors.ConflictError)
+            pc_request.deferred, protoerrors.ConflictError
+        )
 
     @defer.inlineCallbacks
     def test_putcontent_update_used_bytes(self):
@@ -625,7 +658,8 @@ class TestPutContent(TestWithDatabase):
         """Test the QuotaExceeded handling."""
         StorageUser.objects.filter(id=self.usr0.id).update(max_storage_bytes=1)
         e = yield self.assertFailure(
-            self.test_putcontent(), protoerrors.QuotaExceededError)
+            self.test_putcontent(), protoerrors.QuotaExceededError
+        )
         self.assertEqual(e.free_bytes, 1)
         self.assertEqual(e.share_id, request.ROOT)
 
@@ -642,8 +676,9 @@ class TestPutContent(TestWithDatabase):
         # put content and check
         params = get_put_content_params(data, node=mkfile_req.new_id)
         putc_req = yield client.put_content(**params)
-        self.assertEqual(putc_req.new_generation,
-                         mkfile_req.new_generation + 1)
+        self.assertEqual(
+            putc_req.new_generation, mkfile_req.new_generation + 1
+        )
 
     @defer.inlineCallbacks
     def test_putcontent_corrupt(self):
@@ -662,9 +697,11 @@ class TestPutContent(TestWithDatabase):
 
         # put content and check
         params = get_put_content_params(
-            data, node=mkfile_req.new_id, size=size)
+            data, node=mkfile_req.new_id, size=size
+        )
         yield self.assertFailure(
-            client.put_content(**params), protoerrors.UploadCorruptError)
+            client.put_content(**params), protoerrors.UploadCorruptError
+        )
         self.handler.assert_debug('UploadCorrupt', str(size))
 
     @defer.inlineCallbacks
@@ -672,8 +709,11 @@ class TestPutContent(TestWithDatabase):
         """PutContent should assign resources before release."""
         storage_server = self.service.factory.buildProtocol('addr')
         upload_job = mock.Mock(
-            deferred=defer.succeed(None), offset=0, upload_id="hola",
-            storage_key="storage_key")
+            deferred=defer.succeed(None),
+            offset=0,
+            upload_id="hola",
+            storage_key="storage_key",
+        )
         upload_job.connect.return_value = defer.succeed(None)
 
         user = mock.Mock(username='')
@@ -684,8 +724,7 @@ class TestPutContent(TestWithDatabase):
         message = mock.Mock()
         message.put_content.share = str(share_id)
 
-        self.patch(server.PutContentResponse, 'sendMessage',
-                   lambda *r: None)
+        self.patch(server.PutContentResponse, 'sendMessage', lambda *r: None)
         pc = server.PutContentResponse(storage_server, message)
         pc.id = 123
 
@@ -698,13 +737,17 @@ class TestPutContent(TestWithDatabase):
 
         self.assertEqual(assigned[0], upload_job)
         user.get_upload_job.assert_called_once_with(
-            share_id, message.put_content.node,
-            message.put_content.previous_hash, message.put_content.hash,
-            message.put_content.crc32, message.put_content.size,
+            share_id,
+            message.put_content.node,
+            message.put_content.previous_hash,
+            message.put_content.hash,
+            message.put_content.crc32,
+            message.put_content.size,
             message.put_content.deflated_size,
             session_id=mock.ANY,
             magic_hash=message.put_content.magic_hash,
-            upload_id=message.put_content.upload_id)
+            upload_id=message.put_content.upload_id,
+        )
         upload_job.connect.assert_called_once_with()
 
     @defer.inlineCallbacks
@@ -717,20 +760,25 @@ class TestPutContent(TestWithDatabase):
         client = yield self.get_client_helper(auth_token="open sesame")
         root_id = yield client.get_root()
         mkfile_req = yield client.make_file(
-            request.ROOT, root_id, 'a_file.txt')
+            request.ROOT, root_id, 'a_file.txt'
+        )
 
         params = get_put_content_params(
-            data, node=mkfile_req.new_id, deflated_data=deflated_data)
+            data, node=mkfile_req.new_id, deflated_data=deflated_data
+        )
         d = client.put_content(**params)
         yield self.assertFails(d, 'UPLOAD_CORRUPT')
 
     def _get_users(self, max_storage_bytes):
         """Get both storage and content users."""
-        s_user = self.make_user(
-            max_storage_bytes=max_storage_bytes)
+        s_user = self.make_user(max_storage_bytes=max_storage_bytes)
         c_user = User(
-            self.service.factory.content, s_user.id, s_user.root_volume_id,
-            s_user.username, s_user.visible_name)
+            self.service.factory.content,
+            s_user.id,
+            s_user.root_volume_id,
+            s_user.username,
+            s_user.visible_name,
+        )
         return s_user, c_user
 
     @defer.inlineCallbacks
@@ -741,7 +789,7 @@ class TestPutContent(TestWithDatabase):
         error, instead of wait until the full upload is done.
         """
         chunk_size = settings.STORAGE_CHUNK_SIZE
-        user, content_user = self._get_users(chunk_size ** 2)
+        user, content_user = self._get_users(chunk_size**2)
         # create the file
         a_file = user.root.make_file("A new file")
         # build the upload data
@@ -770,12 +818,17 @@ class TestPutContent(TestWithDatabase):
         message.type = protocol_pb2.Message.PUT_CONTENT
 
         begin_d = defer.Deferred()
-        self.patch(server.PutContentResponse, 'sendMessage',
-                   lambda *r: begin_d.callback(None))
+        self.patch(
+            server.PutContentResponse,
+            'sendMessage',
+            lambda *r: begin_d.callback(None),
+        )
         error_d = defer.Deferred()
         self.patch(
-            server.PutContentResponse, 'sendError',
-            lambda _, error, comment: error_d.callback((error, comment)))
+            server.PutContentResponse,
+            'sendError',
+            lambda _, error, comment: error_d.callback((error, comment)),
+        )
         pc = server.PutContentResponse(storage_server, message)
         pc.id = 123
 
@@ -783,6 +836,7 @@ class TestPutContent(TestWithDatabase):
         def crash(*_):
             """Make it crash."""
             raise ValueError("test problem")
+
         self.patch(diskstorage.FileWriterConsumer, 'write', crash)
 
         # start uploading
@@ -812,7 +866,8 @@ class TestPutContent(TestWithDatabase):
         # first file, it should ask for all the content not magic here
         mkfile_req = yield client.make_file(request.ROOT, root_id, 'hola')
         params = get_put_content_params(
-            data, node=mkfile_req.new_id, magic_hash=None)
+            data, node=mkfile_req.new_id, magic_hash=None
+        )
         yield client.put_content(**params)
 
         # startup another client for a different user
@@ -821,17 +876,22 @@ class TestPutContent(TestWithDatabase):
         mkfile_req = yield client.make_file(request.ROOT, root_id, 'chau')
 
         params = get_put_content_params(
-            data, node=mkfile_req.new_id, magic_hash=None)
+            data, node=mkfile_req.new_id, magic_hash=None
+        )
         yield client.put_content(**params)
 
         # the BEGIN_CONTENT should be from 0
-        message = [m for m in client.messages
-                   if m.type == protocol_pb2.Message.BEGIN_CONTENT][0]
+        message = [
+            m
+            for m in client.messages
+            if m.type == protocol_pb2.Message.BEGIN_CONTENT
+        ][0]
         self.assertEqual(message.begin_content.offset, 0)
 
         # check all went ok by getting the content
         get_req = yield client.get_content(
-            params['share'], params['node'], params['new_hash'])
+            params['share'], params['node'], params['new_hash']
+        )
         self.assertEqual(zlib.decompress(get_req.data), data)
 
     @defer.inlineCallbacks
@@ -846,7 +906,8 @@ class TestPutContent(TestWithDatabase):
         # first file, it should ask for all the content not magic here
         mkfile_req = yield client.make_file(request.ROOT, root_id, 'hola')
         params = get_put_content_params(
-            data, node=mkfile_req.new_id, magic_hash=None)
+            data, node=mkfile_req.new_id, magic_hash=None
+        )
         yield client.put_content(**params)
 
         # hook to test stats
@@ -861,24 +922,30 @@ class TestPutContent(TestWithDatabase):
 
         mkfile_req = yield client.make_file(request.ROOT, root_id, 'chau')
         params = get_put_content_params(
-            data, node=mkfile_req.new_id, magic_hash=mhash_value)
+            data, node=mkfile_req.new_id, magic_hash=mhash_value
+        )
         resp = yield client.put_content(**params)
 
         # the response should have the new_generation
         self.assertEqual(mkfile_req.new_generation + 1, resp.new_generation)
 
         # the BEGIN_CONTENT should be from the end
-        message = [m for m in client.messages
-                   if m.type == protocol_pb2.Message.BEGIN_CONTENT][0]
+        message = [
+            m
+            for m in client.messages
+            if m.type == protocol_pb2.Message.BEGIN_CONTENT
+        ][0]
         self.assertEqual(message.begin_content.offset, params['deflated_size'])
 
         # check all went ok by getting the content
         get_req = yield client.get_content(
-            params['share'], mkfile_req.new_id, params['new_hash'])
+            params['share'], mkfile_req.new_id, params['new_hash']
+        )
         self.assertEqual(zlib.decompress(get_req.data), data)
         # check reused content stat
         self.assertIn(
-            ('MagicUploadJob.upload', params['deflated_size']), gauge)
+            ('MagicUploadJob.upload', params['deflated_size']), gauge
+        )
         self.assertIn(('MagicUploadJob.upload.begin', 1), meter)
 
     @defer.inlineCallbacks
@@ -892,12 +959,16 @@ class TestPutContent(TestWithDatabase):
         # first file, it should ask for all the content not magic here
         mkfile_req = yield client.make_file(request.ROOT, root_id, 'hola')
         params = get_put_content_params(
-            data, node=mkfile_req.new_id, magic_hash=None)
+            data, node=mkfile_req.new_id, magic_hash=None
+        )
         yield client.put_content(**params)
 
         # the BEGIN_CONTENT should be from 0
-        message = [m for m in client.messages
-                   if m.type == protocol_pb2.Message.BEGIN_CONTENT][0]
+        message = [
+            m
+            for m in client.messages
+            if m.type == protocol_pb2.Message.BEGIN_CONTENT
+        ][0]
         self.assertEqual(message.begin_content.offset, 0)
 
         # hook to test stats
@@ -910,24 +981,30 @@ class TestPutContent(TestWithDatabase):
         # other file but same content, still no magic
         mkfile_req = yield client.make_file(request.ROOT, root_id, 'chau')
         params = get_put_content_params(
-            data, node=mkfile_req.new_id, magic_hash=None)
+            data, node=mkfile_req.new_id, magic_hash=None
+        )
         resp = yield client.put_content(**params)
 
         # response has the new generation in it
         self.assertEqual(resp.new_generation, mkfile_req.new_generation + 1)
 
         # the BEGIN_CONTENT should be from the end
-        message = [m for m in client.messages
-                   if m.type == protocol_pb2.Message.BEGIN_CONTENT][0]
+        message = [
+            m
+            for m in client.messages
+            if m.type == protocol_pb2.Message.BEGIN_CONTENT
+        ][0]
         self.assertEqual(message.begin_content.offset, params['deflated_size'])
 
         # check all went ok by getting the content
         get_req = yield client.get_content(
-            params['share'], params['node'], params['new_hash'])
+            params['share'], params['node'], params['new_hash']
+        )
         self.assertEqual(zlib.decompress(get_req.data), data)
         # check reused content stat
         self.assertIn(
-            ('MagicUploadJob.upload', params['deflated_size']), gauge)
+            ('MagicUploadJob.upload', params['deflated_size']), gauge
+        )
         self.assertIn(('MagicUploadJob.upload.begin', 1), meter)
 
     @defer.inlineCallbacks
@@ -942,12 +1019,16 @@ class TestPutContent(TestWithDatabase):
         # first file, it should ask for all the content not magic here
         mkfile_req = yield client.make_file(request.ROOT, root_id, 'hola')
         params = get_put_content_params(
-            data, node=mkfile_req.new_id, magic_hash=mhash_value)
+            data, node=mkfile_req.new_id, magic_hash=mhash_value
+        )
         yield client.put_content(**params)
 
         # the BEGIN_CONTENT should be from 0
-        message = [m for m in client.messages
-                   if m.type == protocol_pb2.Message.BEGIN_CONTENT][0]
+        message = [
+            m
+            for m in client.messages
+            if m.type == protocol_pb2.Message.BEGIN_CONTENT
+        ][0]
         self.assertEqual(message.begin_content.offset, 0)
 
         meter = []
@@ -959,24 +1040,30 @@ class TestPutContent(TestWithDatabase):
         # another file but same content, still no upload
         mkfile_req = yield client.make_file(request.ROOT, root_id, 'chau')
         params = get_put_content_params(
-            data, node=mkfile_req.new_id, magic_hash=mhash_value)
+            data, node=mkfile_req.new_id, magic_hash=mhash_value
+        )
         resp = yield client.put_content(**params)
 
         # response has the new generation in it
         self.assertEqual(resp.new_generation, mkfile_req.new_generation + 1)
 
         # the BEGIN_CONTENT should be from the end
-        message = [m for m in client.messages
-                   if m.type == protocol_pb2.Message.BEGIN_CONTENT][0]
+        message = [
+            m
+            for m in client.messages
+            if m.type == protocol_pb2.Message.BEGIN_CONTENT
+        ][0]
         self.assertEqual(message.begin_content.offset, params['deflated_size'])
 
         # check all went ok by getting the content
         get_req = yield client.get_content(
-            params['share'], params['node'], params['new_hash'])
+            params['share'], params['node'], params['new_hash']
+        )
         self.assertEqual(zlib.decompress(get_req.data), data)
         # check reused content stat
         self.assertIn(
-            ('MagicUploadJob.upload', params['deflated_size']), gauge)
+            ('MagicUploadJob.upload', params['deflated_size']), gauge
+        )
         self.assertIn(('MagicUploadJob.upload.begin', 1), meter)
 
     @defer.inlineCallbacks
@@ -1001,16 +1088,23 @@ class TestPutContent(TestWithDatabase):
         data = b"*" * 100
         params = get_put_content_params(data)
         # create the content blob without a magic hash in a different user.
-        self.make_user('my_user', max_storage_bytes=2 ** 20)
+        self.make_user('my_user', max_storage_bytes=2**20)
         self.usr3.make_filepath_with_content(
-            settings.ROOT_USERVOLUME_PATH + "/file.txt", params['new_hash'],
-            params['crc32'], params['size'], params['deflated_size'],
-            uuid.uuid4())
+            settings.ROOT_USERVOLUME_PATH + "/file.txt",
+            params['new_hash'],
+            params['crc32'],
+            params['size'],
+            params['deflated_size'],
+            uuid.uuid4(),
+        )
 
         # overwrite UploadJob method to detect if it
         # uploaded stuff (it shouldn't)
-        self.patch(BaseUploadJob, '_start_receiving',
-                   lambda s: defer.fail(Exception("This shouldn't be called")))
+        self.patch(
+            BaseUploadJob,
+            '_start_receiving',
+            lambda s: defer.fail(Exception("This shouldn't be called")),
+        )
 
         client = yield self.get_client_helper(auth_token="open sesame")
         root_id = yield client.get_root()
@@ -1096,7 +1190,9 @@ class TestMultipartPutContent(TestWithDatabase):
 
             self.assertRaises(
                 errors.DoesNotExist,
-                self.usr0.volume().get_content, params['new_hash'])
+                self.usr0.volume().get_content,
+                params['new_hash'],
+            )
             # check upload stat and log, with the offset sent
             self.assertIn(('UploadJob.upload', 0), gauge)
             self.assertIn(('UploadJob.upload.begin', 1), meter)
@@ -1108,7 +1204,8 @@ class TestMultipartPutContent(TestWithDatabase):
         self.patch(settings, 'STORAGE_CHUNK_SIZE', 1024 * 64)
         size = 2 * 1024 * 512
         StorageUser.objects.filter(id=self.usr0.id).update(
-            max_storage_bytes=size * 2)
+            max_storage_bytes=size * 2
+        )
         data = self.get_data(size)
 
         # setup
@@ -1145,7 +1242,8 @@ class TestMultipartPutContent(TestWithDatabase):
         mkfile_req = yield client.make_file(request.ROOT, root_id, 'hola_12')
         upload_info = []
         params = get_put_content_params(
-            data, node=mkfile_req.new_id,
+            data,
+            node=mkfile_req.new_id,
             upload_id_cb=lambda *a: upload_info.append(a),
         )
         yield self.assertFailure(client.put_content(**params), EOFError)
@@ -1173,8 +1271,8 @@ class TestMultipartPutContent(TestWithDatabase):
 
         self.patch(sp_client.PutContent, 'processMessage', new_processMessage)
         params = get_put_content_params(
-            data, node_id=mkfile_req.new_id,
-            upload_id=str(upload_info[0][0]))
+            data, node_id=mkfile_req.new_id, upload_id=str(upload_info[0][0])
+        )
         req = sp_client.PutContent(client, **params)
         req.start()
         yield req.deferred
@@ -1195,7 +1293,8 @@ class TestMultipartPutContent(TestWithDatabase):
         # resumes from the first chunk
         self.assertTrue(('UploadJob.upload', offset_sent) in gauge)
         self.handler.assert_debug(
-            "UploadJob begin content from offset %d" % offset_sent)
+            "UploadJob begin content from offset %d" % offset_sent
+        )
 
     @defer.inlineCallbacks
     def test_resume_putcontent_invalid_upload_id(self):
@@ -1206,7 +1305,8 @@ class TestMultipartPutContent(TestWithDatabase):
         self.patch(settings, 'STORAGE_CHUNK_SIZE', 1024 * 32)
         size = 2 * 1024 * 128
         StorageUser.objects.filter(id=self.usr0.id).update(
-            max_storage_bytes=size * 2)
+            max_storage_bytes=size * 2
+        )
         data = self.get_data(size)
         # hook to test stats
         meter = []
@@ -1219,8 +1319,11 @@ class TestMultipartPutContent(TestWithDatabase):
         mkfile_req = yield client.make_file(request.ROOT, root_id, 'hola')
         upload_info = []
         params = get_put_content_params(
-            data, node=mkfile_req.new_id, upload_id="invalid id",
-            upload_id_cb=lambda *a: upload_info.append(a))
+            data,
+            node=mkfile_req.new_id,
+            upload_id="invalid id",
+            upload_id_cb=lambda *a: upload_info.append(a),
+        )
         yield client.put_content(**params)
 
         self.assertIn(('UploadJob.upload', 0), gauge)
@@ -1252,7 +1355,8 @@ class TestMultipartPutContent(TestWithDatabase):
         self.patch(settings, 'STORAGE_CHUNK_SIZE', 1024 * 64)
         size = 2 * 1024 * 512
         StorageUser.objects.filter(id=self.usr0.id).update(
-            max_storage_bytes=size * 2 + 10)
+            max_storage_bytes=size * 2 + 10
+        )
         data = self.get_data(size)
         size = len(data) + 10
 
@@ -1262,11 +1366,13 @@ class TestMultipartPutContent(TestWithDatabase):
         mkfile_req = yield client.make_file(request.ROOT, root_id, "hola")
 
         params = get_put_content_params(
-            data, node=mkfile_req.new_id, size=size)
+            data, node=mkfile_req.new_id, size=size
+        )
         # put content and check
         putc_req = client.put_content_request(**params)
         yield self.assertFailure(
-            putc_req.deferred, protoerrors.UploadCorruptError)
+            putc_req.deferred, protoerrors.UploadCorruptError
+        )
 
         self.handler.assert_debug('UploadCorrupt', str(size))
         # check that the uploadjob was deleted.
@@ -1274,7 +1380,10 @@ class TestMultipartPutContent(TestWithDatabase):
         self.assertRaises(
             errors.DoesNotExist,
             node.get_multipart_uploadjob,
-            putc_req.upload_id, params['new_hash'], params['crc32'])
+            putc_req.upload_id,
+            params['new_hash'],
+            params['crc32'],
+        )
 
     @defer.inlineCallbacks
     def test_putcontent_blob_exists(self):
@@ -1282,11 +1391,15 @@ class TestMultipartPutContent(TestWithDatabase):
         data = self.get_data(1024 * 20)
         params = get_put_content_params(data)
         # create the content blob without a magic hash in a different user.
-        self.make_user('my_user', max_storage_bytes=2 ** 20)
+        self.make_user('my_user', max_storage_bytes=2**20)
         self.usr3.make_filepath_with_content(
             settings.ROOT_USERVOLUME_PATH + "/file.txt",
-            params['new_hash'], params['crc32'], params['size'],
-            params['deflated_size'], uuid.uuid4())
+            params['new_hash'],
+            params['crc32'],
+            params['size'],
+            params['deflated_size'],
+            uuid.uuid4(),
+        )
 
         client = yield self.get_client_helper(auth_token="open sesame")
         root_id = yield client.get_root()
@@ -1334,10 +1447,14 @@ class TestPutContentInternalError(TestWithDatabase):
         error, instead of wait until the full upload is done.
         """
         chunk_size = settings.STORAGE_CHUNK_SIZE
-        user = self.make_user(max_storage_bytes=chunk_size ** 2)
+        user = self.make_user(max_storage_bytes=chunk_size**2)
         content_user = User(
-            self.service.factory.content, user.id, user.root_volume_id,
-            user.username, user.visible_name)
+            self.service.factory.content,
+            user.id,
+            user.root_volume_id,
+            user.username,
+            user.visible_name,
+        )
         # create the file
         a_file = user.root.make_file("A new file")
         # build the upload data
@@ -1365,12 +1482,17 @@ class TestPutContentInternalError(TestWithDatabase):
         message.type = protocol_pb2.Message.PUT_CONTENT
 
         begin_d = defer.Deferred()
-        self.patch(server.PutContentResponse, 'sendMessage',
-                   lambda *r: begin_d.callback(None))
+        self.patch(
+            server.PutContentResponse,
+            'sendMessage',
+            lambda *r: begin_d.callback(None),
+        )
         error_d = defer.Deferred()
         self.patch(
-            server.PutContentResponse, 'sendError',
-            lambda _, error, comment: error_d.callback((error, comment)))
+            server.PutContentResponse,
+            'sendError',
+            lambda _, error, comment: error_d.callback((error, comment)),
+        )
         pc = server.PutContentResponse(storage_server, message)
         pc.id = 123
 
@@ -1378,6 +1500,7 @@ class TestPutContentInternalError(TestWithDatabase):
         def crash(*_):
             """Make it crash."""
             raise ValueError("Fail!")
+
         self.patch(BaseUploadJob, 'add_data', crash)
 
         # start uploading
@@ -1429,7 +1552,8 @@ class TestChunkedContent(TestWithDatabase):
         """Checks a chunked putcontent."""
         size = int(settings.STORAGE_CHUNK_SIZE * 1.5)
         StorageUser.objects.filter(id=self.usr0.id).update(
-            max_storage_bytes=size * 2)
+            max_storage_bytes=size * 2
+        )
         data = os.urandom(size)
 
         def _put_fail():
@@ -1440,6 +1564,7 @@ class TestChunkedContent(TestWithDatabase):
                 def crash(*_):
                     """Make it crash."""
                     raise ValueError("test problem")
+
                 self.patch(diskstorage.FileWriterConsumer, 'write', crash)
 
         def _get_fail():
@@ -1454,8 +1579,10 @@ class TestChunkedContent(TestWithDatabase):
                     deferred = orig_func(*a)
                     deferred.errback(ValueError())
                     return deferred
+
                 self.patch(
-                    diskstorage.FileReaderProducer, 'startProducing', mitm)
+                    diskstorage.FileReaderProducer, 'startProducing', mitm
+                )
 
         client = yield self.get_client_helper(auth_token="open sesame")
         root_id = yield client.get_root()
@@ -1468,7 +1595,8 @@ class TestChunkedContent(TestWithDatabase):
         yield client.put_content(**params)
 
         content = yield client.get_content(
-            params['share'], params['node'], params['new_hash'])
+            params['share'], params['node'], params['new_hash']
+        )
         if not put_fail and not get_fail:
             self.assertEqual(zlib.decompress(content.data), data)
 
@@ -1487,7 +1615,8 @@ class TestChunkedContent(TestWithDatabase):
         """Check that parts are added to upload job only after a limit."""
         size = int(settings.STORAGE_CHUNK_SIZE * 2.5)
         StorageUser.objects.filter(id=self.usr0.id).update(
-            max_storage_bytes=size * 2)
+            max_storage_bytes=size * 2
+        )
         data = os.urandom(size)
 
         recorded_calls = []
@@ -1519,18 +1648,23 @@ class UserTest(TestWithDatabase):
         yield super(UserTest, self).setUp()
 
         # user and root to use in the tests
-        u = self.suser = self.make_user(max_storage_bytes=64 ** 2)
+        u = self.suser = self.make_user(max_storage_bytes=64**2)
         self.user = User(
-            self.service.factory.content, u.id, u.root_volume_id, u.username,
-            u.visible_name)
+            self.service.factory.content,
+            u.id,
+            u.root_volume_id,
+            u.username,
+            u.visible_name,
+        )
 
     @defer.inlineCallbacks
     def test_make_file_node_with_gen(self):
         """Test that make_file returns a node with generation in it."""
         root_id, root_gen = yield self.user.get_root()
         volume_id = yield self.user.get_volume_id(root_id)
-        _, generation, _ = yield self.user.make_file(volume_id, root_id,
-                                                     "name", True)
+        _, generation, _ = yield self.user.make_file(
+            volume_id, root_id, "name", True
+        )
         self.assertEqual(generation, root_gen + 1)
 
     @defer.inlineCallbacks
@@ -1538,8 +1672,9 @@ class UserTest(TestWithDatabase):
         """Test that make_dir returns a node with generation in it."""
         root_id, root_gen = yield self.user.get_root()
         volume_id = yield self.user.get_volume_id(root_id)
-        _, generation, _ = yield self.user.make_dir(volume_id, root_id,
-                                                    "name", True)
+        _, generation, _ = yield self.user.make_dir(
+            volume_id, root_id, "name", True
+        )
         self.assertEqual(generation, root_gen + 1)
 
     @defer.inlineCallbacks
@@ -1547,10 +1682,12 @@ class UserTest(TestWithDatabase):
         """Test that unlink returns a node with generation in it."""
         root_id, root_gen = yield self.user.get_root()
         volume_id = yield self.user.get_volume_id(root_id)
-        node_id, generation, _ = yield self.user.make_dir(volume_id, root_id,
-                                                          "name", True)
+        node_id, generation, _ = yield self.user.make_dir(
+            volume_id, root_id, "name", True
+        )
         new_gen, kind, name, _ = yield self.user.unlink_node(
-            volume_id, node_id)
+            volume_id, node_id
+        )
         self.assertEqual(new_gen, generation + 1)
         self.assertEqual(kind, StorageObject.DIRECTORY)
         self.assertEqual(name, "name")
@@ -1561,10 +1698,12 @@ class UserTest(TestWithDatabase):
         root_id, _ = yield self.user.get_root()
         volume_id = yield self.user.get_volume_id(root_id)
         yield self.user.make_dir(volume_id, root_id, "name", True)
-        node_id, generation, _ = yield self.user.make_dir(volume_id, root_id,
-                                                          "name", True)
-        new_generation, _ = yield self.user.move(volume_id, node_id,
-                                                 root_id, "new_name")
+        node_id, generation, _ = yield self.user.make_dir(
+            volume_id, root_id, "name", True
+        )
+        new_generation, _ = yield self.user.move(
+            volume_id, node_id, root_id, "new_name"
+        )
         self.assertEqual(new_generation, generation + 1)
 
     @defer.inlineCallbacks
@@ -1572,19 +1711,22 @@ class UserTest(TestWithDatabase):
         """Test for _get_upload_job."""
         root_id, _ = yield self.user.get_root()
         volume_id = yield self.user.get_volume_id(root_id)
-        node_id, _, _ = yield self.user.make_file(volume_id, root_id,
-                                                  "name", True)
+        node_id, _, _ = yield self.user.make_file(
+            volume_id, root_id, "name", True
+        )
         size = 1024
         # this will create a new uploadjob
         upload_job = yield self.user.get_upload_job(
-            None, node_id, '', 'foo', 10, size / 2, size / 4, True)
+            None, node_id, '', 'foo', 10, size / 2, size / 4, True
+        )
         self.assertIsInstance(upload_job, UploadJob)
 
     @defer.inlineCallbacks
     def test_get_free_bytes_root(self):
         """Get the user free bytes, normal case."""
         StorageUser.objects.filter(id=self.suser.id).update(
-            max_storage_bytes=1000)
+            max_storage_bytes=1000
+        )
         fb = yield self.user.get_free_bytes()
         self.assertEqual(fb, 1000)
 
@@ -1594,7 +1736,8 @@ class UserTest(TestWithDatabase):
         other_user = self.make_user(username='user2')
         share = self.suser.root.share(other_user.id, "sharename")
         StorageUser.objects.filter(id=self.suser.id).update(
-            max_storage_bytes=1000)
+            max_storage_bytes=1000
+        )
         fb = yield self.user.get_free_bytes(share.id)
         self.assertEqual(fb, 1000)
 
@@ -1621,9 +1764,11 @@ class UserTest(TestWithDatabase):
         root_id, root_gen = yield self.user.get_root()
         volume_id = yield self.user.get_volume_id(root_id)
         node_id, generation, _ = yield self.user.make_file(
-            volume_id, root_id, "name")
+            volume_id, root_id, "name"
+        )
         public_url = yield self.user.change_public_access(
-            volume_id, node_id, True)
+            volume_id, node_id, True
+        )
         self.assertTrue(public_url.startswith(settings.PUBLIC_URL_PREFIX))
 
     @defer.inlineCallbacks
@@ -1634,16 +1779,19 @@ class UserTest(TestWithDatabase):
 
         # create three files, make two public
         node_id_1, _, _ = yield self.user.make_file(
-            volume_id, root_id, "name1")
+            volume_id, root_id, "name1"
+        )
         yield self.user.make_file(volume_id, root_id, "name2")
         node_id_3, _, _ = yield self.user.make_file(
-            volume_id, root_id, "name3")
+            volume_id, root_id, "name3"
+        )
         yield self.user.change_public_access(volume_id, node_id_1, True)
         yield self.user.change_public_access(volume_id, node_id_3, True)
 
         public_files = yield self.user.list_public_files()
-        self.assertEqual(set(node.id for node in public_files),
-                         {node_id_1, node_id_3})
+        self.assertEqual(
+            set(node.id for node in public_files), {node_id_1, node_id_3}
+        )
 
 
 class TestUploadJob(TestWithDatabase):
@@ -1656,11 +1804,14 @@ class TestUploadJob(TestWithDatabase):
         self.chunk_size = settings.STORAGE_CHUNK_SIZE
         self.half_size = self.chunk_size // 2
         self.double_size = self.chunk_size * 2
-        self.user = self.make_user(max_storage_bytes=self.chunk_size ** 2)
+        self.user = self.make_user(max_storage_bytes=self.chunk_size**2)
         self.content_user = User(
-            self.service.factory.content, self.user.id,
-            self.user.root_volume_id, self.user.username,
-            self.user.visible_name)
+            self.service.factory.content,
+            self.user.id,
+            self.user.root_volume_id,
+            self.user.username,
+            self.user.visible_name,
+        )
 
         def slowScheduler(x):
             """A slower scheduler for our cooperator."""
@@ -1686,8 +1837,9 @@ class TestUploadJob(TestWithDatabase):
         yield upload_job.add_data(deflated_data)
         yield upload_job.commit()
         node_id = upload_job.file_node.id
-        node = yield self.content_user.get_node(self.user.root_volume_id,
-                                                node_id, None)
+        node = yield self.content_user.get_node(
+            self.user.root_volume_id, node_id, None
+        )
         self.assertEqual(node.content_hash, hash_value)
 
     @defer.inlineCallbacks
@@ -1702,15 +1854,17 @@ class TestUploadJob(TestWithDatabase):
             """Iterate over chunks."""
             for part in range(0, len(deflated_data), chunk_size):
                 yield upload_job.add_data(
-                    deflated_data[part:part + chunk_size])
+                    deflated_data[part : part + chunk_size]
+                )
 
         yield self._cooperator.coiterate(data_iter())
         yield upload_job.commit()
 
         # verify node content
         node_id = upload_job.file_node.id
-        node = yield self.content_user.get_node(self.user.root_volume_id,
-                                                node_id, None)
+        node = yield self.content_user.get_node(
+            self.user.root_volume_id, node_id, None
+        )
         self.assertEqual(node.content_hash, hash_value)
 
     @defer.inlineCallbacks
@@ -1724,7 +1878,8 @@ class TestUploadJob(TestWithDatabase):
         upload_job.original_file_hash = "sha1:fakehash"
 
         e = yield self.assertFailure(
-            upload_job.commit(), server.errors.ConflictError)
+            upload_job.commit(), server.errors.ConflictError
+        )
         self.assertEqual(str(e), 'The File changed while uploading.')
 
     @defer.inlineCallbacks
@@ -1833,8 +1988,9 @@ class TestUploadJob(TestWithDatabase):
         """Test the upload_id generation."""
         size = self.half_size
         deflated_data, _, upload_job = yield self.make_upload(size)
-        self.assertEqual(upload_job.upload_id,
-                         upload_job.uploadjob.multipart_key)
+        self.assertEqual(
+            upload_job.upload_id, upload_job.uploadjob.multipart_key
+        )
 
     @defer.inlineCallbacks
     def test_stop_sets_canceling(self):
@@ -1877,11 +2033,15 @@ class TestUploadJob(TestWithDatabase):
         yield upload_job.connect()
         yield upload_job.add_data(deflated_data)
         # make commit fail
-        self.patch(upload_job, "_commit",
-                   lambda: defer.fail(ValueError("boom")))
+        self.patch(
+            upload_job, "_commit", lambda: defer.fail(ValueError("boom"))
+        )
         # also delete
-        self.patch(upload_job.uploadjob, "delete",
-                   lambda: defer.fail(ValueError("delete boom")))
+        self.patch(
+            upload_job.uploadjob,
+            "delete",
+            lambda: defer.fail(ValueError("delete boom")),
+        )
         handler = self.add_memento_handler(logger, level=logging.WARNING)
         failure = yield self.assertFailure(upload_job.commit(), ValueError)
         self.assertEqual(str(failure), "delete boom")
@@ -1898,8 +2058,13 @@ class TestUploadJob(TestWithDatabase):
         node = upload_job.file_node
         # check that the upload is no more
         d = DBUploadJob.get(
-            self.content_user, node.volume_id, node.id, upload_job.upload_id,
-            upload_job.hash_hint, upload_job.crc32_hint)
+            self.content_user,
+            node.volume_id,
+            node.id,
+            upload_job.upload_id,
+            upload_job.hash_hint,
+            upload_job.crc32_hint,
+        )
         yield self.assertFailure(d, errors.DoesNotExist)
 
     @defer.inlineCallbacks
@@ -1955,11 +2120,14 @@ class TestNode(TestWithDatabase):
         self.chunk_size = settings.STORAGE_CHUNK_SIZE
         self.half_size = self.chunk_size / 2
         self.double_size = self.chunk_size * 2
-        self.user = self.make_user(max_storage_bytes=self.chunk_size ** 2)
+        self.user = self.make_user(max_storage_bytes=self.chunk_size**2)
         self.suser = User(
-            self.service.factory.content, self.user.id,
-            self.user.root_volume_id, self.user.username,
-            self.user.visible_name)
+            self.service.factory.content,
+            self.user.id,
+            self.user.root_volume_id,
+            self.user.username,
+            self.user.visible_name,
+        )
 
         # add a memento handler, to check we log ok
         self.handler = self.add_memento_handler(server.logger)
@@ -1974,7 +2142,8 @@ class TestNode(TestWithDatabase):
         """
         size = self.chunk_size / 2
         deflated_data, hash_value, upload_job = yield self.make_upload_job(
-            size, user, content_user)
+            size, user, content_user
+        )
         yield upload_job.connect()
         yield upload_job.add_data(deflated_data)
         yield upload_job.commit()
@@ -2013,10 +2182,12 @@ class TestNode(TestWithDatabase):
             deferred = orig_func(*a)
             deferred.errback(ValueError("crash"))
             return deferred
+
         self.patch(diskstorage.FileReaderProducer, 'startProducing', mitm)
 
-        producer = yield node.get_content(previous_hash=node.content_hash,
-                                          user=user)
+        producer = yield node.get_content(
+            previous_hash=node.content_hash, user=user
+        )
         consumer = BufferedConsumer(producer)
         # resume producing
         producer.startProducing(consumer)
@@ -2030,10 +2201,14 @@ class TestGenerations(TestWithDatabase):
     def setUp(self):
         """Setup the test."""
         yield super(TestGenerations, self).setUp()
-        self.suser = u = self.make_user(max_storage_bytes=64 ** 2)
+        self.suser = u = self.make_user(max_storage_bytes=64**2)
         self.user = User(
-            self.service.factory.content, u.id, u.root_volume_id, u.username,
-            u.visible_name)
+            self.service.factory.content,
+            u.id,
+            u.root_volume_id,
+            u.username,
+            u.visible_name,
+        )
 
     @defer.inlineCallbacks
     def test_get_delta_empty(self):
@@ -2059,8 +2234,9 @@ class TestGenerations(TestWithDatabase):
         nodes = [root.make_file("name%s" % i) for i in range(5)]
         nodes += [root.make_subdirectory("dir%s" % i) for i in range(5)]
         from_generation = nodes[5].generation
-        delta, end_gen, free_bytes = yield self.user.get_delta(None,
-                                                               from_generation)
+        delta, end_gen, free_bytes = yield self.user.get_delta(
+            None, from_generation
+        )
         self.assertEqual(len(delta), len(nodes[6:]))
         self.assertEqual(end_gen, nodes[-1].generation)
         self.assertEqual(free_bytes, self.suser.free_bytes)
@@ -2073,8 +2249,9 @@ class TestGenerations(TestWithDatabase):
         nodes = [root.make_file("name%s" % i) for i in range(5)]
         nodes += [root.make_subdirectory("dir%s" % i) for i in range(5)]
         from_generation = nodes[-1].generation
-        delta, end_gen, free_bytes = yield self.user.get_delta(None,
-                                                               from_generation)
+        delta, end_gen, free_bytes = yield self.user.get_delta(
+            None, from_generation
+        )
         self.assertEqual(len(delta), 0)
         self.assertEqual(end_gen, nodes[-1].generation)
         self.assertEqual(free_bytes, self.suser.free_bytes)
@@ -2087,8 +2264,9 @@ class TestGenerations(TestWithDatabase):
         nodes = [root.make_file("name%s" % i) for i in range(10)]
         nodes += [root.make_subdirectory("dir%s" % i) for i in range(10)]
         limit = 5
-        delta, vol_gen, free_bytes = yield self.user.get_delta(None, 10,
-                                                               limit=limit)
+        delta, vol_gen, free_bytes = yield self.user.get_delta(
+            None, 10, limit=limit
+        )
         self.assertEqual(len(delta), limit)
         self.assertEqual(vol_gen, 20)
 
@@ -2115,7 +2293,7 @@ class TestContentManagerTests(TestWithDatabase):
     def setUp(self):
         """Setup the test."""
         yield super(TestContentManagerTests, self).setUp()
-        self.suser = self.make_user(max_storage_bytes=64 ** 2)
+        self.suser = self.make_user(max_storage_bytes=64**2)
         self.cm = ContentManager(self.service.factory)
         self.cm.rpc_dal = self.service.rpc_dal
 
@@ -2179,7 +2357,8 @@ class TestContent(TestWithDatabase):
         yield client.put_content(**params)
 
         req = yield client.get_content(
-            params['share'], params['node'], params['new_hash'])
+            params['share'], params['node'], params['new_hash']
+        )
         self.assertEqual(zlib.decompress(req.data), data)
 
     @defer.inlineCallbacks
@@ -2222,25 +2401,40 @@ class DBUploadJobTestCase(TestCase):
 
     def setUp(self):
         """Set up."""
-        d = dict(uploadjob_id='uploadjob_id', uploaded_bytes='uploaded_bytes',
-                 multipart_key='multipart_key', chunk_count='chunk_count',
-                 when_last_active='when_last_active')
+        d = dict(
+            uploadjob_id='uploadjob_id',
+            uploaded_bytes='uploaded_bytes',
+            multipart_key='multipart_key',
+            chunk_count='chunk_count',
+            when_last_active='when_last_active',
+        )
         self.user = self.FakeUser(to_return=d)
         return super(DBUploadJobTestCase, self).setUp()
 
     @defer.inlineCallbacks
     def test_get(self):
         """Test the getter."""
-        args = (self.user, 'volume_id', 'node_id', 'uploadjob_id',
-                'hash_value', 'crc32')
+        args = (
+            self.user,
+            'volume_id',
+            'node_id',
+            'uploadjob_id',
+            'hash_value',
+            'crc32',
+        )
         dbuj = yield DBUploadJob.get(*args)
 
         # check it called rpc dal correctly
         method, attribs = self.user.recorded
         self.assertEqual(method, 'get_uploadjob')
-        should = dict(user_id='fake_user_id', volume_id='volume_id',
-                      node_id='node_id', uploadjob_id='uploadjob_id',
-                      hash_value='hash_value', crc32='crc32')
+        should = dict(
+            user_id='fake_user_id',
+            volume_id='volume_id',
+            node_id='node_id',
+            uploadjob_id='uploadjob_id',
+            hash_value='hash_value',
+            crc32='crc32',
+        )
         self.assertEqual(attribs, should)
 
         # check it built the instance correctly
@@ -2257,19 +2451,31 @@ class DBUploadJobTestCase(TestCase):
     @defer.inlineCallbacks
     def test_make(self):
         """Test the builder."""
-        args = (self.user, 'volume_id', 'node_id', 'previous_hash',
-                'hash_value', 'crc32', 'inflated_size')
+        args = (
+            self.user,
+            'volume_id',
+            'node_id',
+            'previous_hash',
+            'hash_value',
+            'crc32',
+            'inflated_size',
+        )
         self.patch(uuid, 'uuid4', lambda: "test unique id")
         dbuj = yield DBUploadJob.make(*args)
 
         # check it called rpc dal correctly
         method, attribs = self.user.recorded
         self.assertEqual(method, 'make_uploadjob')
-        should = dict(user_id='fake_user_id', volume_id='volume_id',
-                      node_id='node_id', previous_hash='previous_hash',
-                      hash_value='hash_value', crc32='crc32',
-                      inflated_size='inflated_size',
-                      multipart_key='test unique id')
+        should = dict(
+            user_id='fake_user_id',
+            volume_id='volume_id',
+            node_id='node_id',
+            previous_hash='previous_hash',
+            hash_value='hash_value',
+            crc32='crc32',
+            inflated_size='inflated_size',
+            multipart_key='test unique id',
+        )
         self.assertEqual(attribs, should)
 
         # check it built the instance correctly
@@ -2285,8 +2491,15 @@ class DBUploadJobTestCase(TestCase):
 
     def _make_uj(self):
         """Helper to create the upload job."""
-        args = (self.user, 'volume_id', 'node_id', 'previous_hash',
-                'hash_value', 'crc32', 'inflated_size')
+        args = (
+            self.user,
+            'volume_id',
+            'node_id',
+            'previous_hash',
+            'hash_value',
+            'crc32',
+            'inflated_size',
+        )
         return DBUploadJob.make(*args)
 
     @defer.inlineCallbacks
@@ -2299,8 +2512,12 @@ class DBUploadJobTestCase(TestCase):
         # check it called rpc dal correctly
         method, attribs = self.user.recorded
         self.assertEqual(method, 'add_part_to_uploadjob')
-        should = dict(user_id='fake_user_id', uploadjob_id='uploadjob_id',
-                      chunk_size=chunk_size, volume_id='volume_id')
+        should = dict(
+            user_id='fake_user_id',
+            uploadjob_id='uploadjob_id',
+            chunk_size=chunk_size,
+            volume_id='volume_id',
+        )
         self.assertEqual(attribs, should)
 
     @defer.inlineCallbacks
@@ -2312,8 +2529,11 @@ class DBUploadJobTestCase(TestCase):
         # check it called rpc dal correctly
         method, attribs = self.user.recorded
         self.assertEqual(method, 'delete_uploadjob')
-        should = dict(user_id='fake_user_id', uploadjob_id='uploadjob_id',
-                      volume_id='volume_id')
+        should = dict(
+            user_id='fake_user_id',
+            uploadjob_id='uploadjob_id',
+            volume_id='volume_id',
+        )
         self.assertEqual(attribs, should)
 
     @defer.inlineCallbacks
@@ -2326,8 +2546,11 @@ class DBUploadJobTestCase(TestCase):
         # check it called rpc dal correctly
         method, attribs = self.user.recorded
         self.assertEqual(method, 'touch_uploadjob')
-        should = dict(user_id='fake_user_id', uploadjob_id='uploadjob_id',
-                      volume_id='volume_id')
+        should = dict(
+            user_id='fake_user_id',
+            uploadjob_id='uploadjob_id',
+            volume_id='volume_id',
+        )
         self.assertEqual(attribs, should)
 
         # check updated attrib

@@ -28,8 +28,9 @@ def should_sync(filename):
     @param filename: a str filename
 
     """
-    return (filename != METADATA_DIR_NAME and
-            not SPECIAL_FILE_RE.match(filename))
+    return filename != METADATA_DIR_NAME and not SPECIAL_FILE_RE.match(
+        filename
+    )
 
 
 def safe_mkdir(path):

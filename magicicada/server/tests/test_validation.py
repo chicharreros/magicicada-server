@@ -29,10 +29,15 @@ def is_protocol_error(failure):
     """
     Returns whether the failure is a PROTOCOL_ERROR
     """
-    return (failure.check(request.StorageProtocolProtocolError) or
-            failure.getErrorMessage() == 'PROTOCOL_ERROR' or
-            re.search(r'^\s*type: PROTOCOL_ERROR\s*$',
-                      failure.getErrorMessage(), re.MULTILINE))
+    return (
+        failure.check(request.StorageProtocolProtocolError)
+        or failure.getErrorMessage() == 'PROTOCOL_ERROR'
+        or re.search(
+            r'^\s*type: PROTOCOL_ERROR\s*$',
+            failure.getErrorMessage(),
+            re.MULTILINE,
+        )
+    )
 
 
 def fail_check(client):
@@ -40,6 +45,7 @@ def fail_check(client):
     Returns a closure to be used as an errback that checks that the
     failure is a PROTOCOL_ERROR, and passes the test if so.
     """
+
     def fail_check_cb(f):
         """
         Check the failure is a PROTOCOL_ERROR
@@ -48,6 +54,7 @@ def fail_check(client):
             return client.test_done('ok')
         else:
             return f
+
     return fail_check_cb
 
 
@@ -58,6 +65,7 @@ class TestValidation(TestWithDatabase):
         """
         Test validation for invalid MAKE_DIR works
         """
+
         def _worker(client):
             """
             async test
@@ -66,15 +74,18 @@ class TestValidation(TestWithDatabase):
             d.addCallbacks(lambda r: client.get_root(), client.test_fail)
             d.addCallbacks(
                 lambda r: client.make_dir('invalid share', r, "hola"),
-                client.test_fail)
+                client.test_fail,
+            )
             d.addCallbacks(client.test_fail, fail_check(client))
             return d
+
         return self.callback_test(_worker)
 
     def test_make_invalid_parent(self):
         """
         Test validation for invalid MAKE_DIR works
         """
+
         def _worker(client):
             """
             async test
@@ -83,15 +94,18 @@ class TestValidation(TestWithDatabase):
             d.addCallbacks(lambda r: client.get_root(), client.test_fail)
             d.addCallbacks(
                 lambda r: client.make_dir('', 'invalid parent', "hola"),
-                client.test_fail)
+                client.test_fail,
+            )
             d.addCallbacks(client.test_fail, fail_check(client))
             return d
+
         return self.callback_test(_worker)
 
     def test_move_invalid_new_parent_node(self):
         """
         Test we fail moves to invalid nodes
         """
+
         def _worker(client):
             """
             async test
@@ -99,28 +113,34 @@ class TestValidation(TestWithDatabase):
             d = client.dummy_authenticate("open sesame")
             d.addCallbacks(lambda r: client.get_root(), client.test_fail)
             d.addCallbacks(
-                lambda r: client.make_file('', r, "hola"),
-                client.test_fail)
-            d.addCallbacks(lambda mk: client.move('', mk.new_id,
-                                                  'invalid new parent node',
-                                                  'chau'),
-                           client.test_fail)
+                lambda r: client.make_file('', r, "hola"), client.test_fail
+            )
+            d.addCallbacks(
+                lambda mk: client.move(
+                    '', mk.new_id, 'invalid new parent node', 'chau'
+                ),
+                client.test_fail,
+            )
             d.addCallbacks(client.test_fail, fail_check(client))
             return d
+
         return self.callback_test(_worker)
 
     def test_accept_share_invalid_share_id(self):
         """
         Test we fail accept_shares with invalid share_ids
         """
+
         def _worker(client):
             """
             async test
             """
             d = client.dummy_authenticate("open sesame")
-            d.addCallbacks(lambda r: client.accept_share('invalid share id',
-                                                         'Yes'),
-                           client.test_fail)
+            d.addCallbacks(
+                lambda r: client.accept_share('invalid share id', 'Yes'),
+                client.test_fail,
+            )
             d.addCallbacks(client.test_fail, fail_check(client))
             return d
+
         return self.callback_test(_worker)

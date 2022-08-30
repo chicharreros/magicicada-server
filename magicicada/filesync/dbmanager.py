@@ -39,7 +39,6 @@ def on_rollback(func):
 
 
 class Atomic(transaction.Atomic):
-
     def run_and_clear_rollback_hooks(self):
         global _run_on_rollback
         try:
@@ -81,8 +80,9 @@ class RetryLimitReached(Exception):
         self.extra_info = extra_info
 
 
-def retryable_transaction(max_time=4.0, max_retries=3, variance=0.5,
-                          exceptions=(InternalError,)):
+def retryable_transaction(
+    max_time=4.0, max_retries=3, variance=0.5, exceptions=(InternalError,)
+):
     """Make sure that transactions are retried after conflicts.
 
     This function builds a decorator to be used.
@@ -99,8 +99,9 @@ def retryable_transaction(max_time=4.0, max_retries=3, variance=0.5,
         def delay_time(step):
             """generates a delay for each step"""
             # delay_time(0) == 0
-            return (((math.exp(step) - 1) / scale) /
-                    (1 + random.random() * _variance))
+            return ((math.exp(step) - 1) / scale) / (
+                1 + random.random() * _variance
+            )
 
         total_time = sum(delay_time(i) for i in range(max_retries))
         _variance = variance
@@ -120,19 +121,25 @@ def retryable_transaction(max_time=4.0, max_retries=3, variance=0.5,
                         if isinstance(e, InternalError):
                             logger.exception(
                                 "Got an InternalError, retrying. (count: %s, "
-                                "max_retries: %s)", count, max_retries)
+                                "max_retries: %s)",
+                                count,
+                                max_retries,
+                            )
                         count += 1
                         if count >= max_retries:
                             # include the original error name in the new
                             # exception
-                            msg = ("Maximum retries (%i) reached. "
-                                   "Please try again. (Original error: %s: %s)"
-                                   % (count, e.__class__.__name__, e))
+                            msg = (
+                                "Maximum retries (%i) reached. "
+                                "Please try again. (Original error: %s: %s)"
+                                % (count, e.__class__.__name__, e)
+                            )
                             # and add the detailed error as extra_info
                             extra = "%s: %s" % (e.__class__.__name__, str(e))
 
-                            class RetryLimitExceeded(RetryLimitReached,
-                                                     info[0]):
+                            class RetryLimitExceeded(
+                                RetryLimitReached, info[0]
+                            ):
                                 """A dynamic exception type which preserves
                                 the original type as well."""
 
@@ -145,7 +152,9 @@ def retryable_transaction(max_time=4.0, max_retries=3, variance=0.5,
                 else:
                     break
             return value
+
         return decorated
+
     return inner
 
 

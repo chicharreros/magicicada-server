@@ -42,8 +42,9 @@ def wait_for(func, sleep=0.1, retries=10):
     count = 0
     while not func():
         if count == retries:
-            raise RuntimeError("%s still returned False after %d runs"
-                               % (func, retries))
+            raise RuntimeError(
+                "%s still returned False after %d runs" % (func, retries)
+            )
         time.sleep(sleep)
         count += 1
 
@@ -132,7 +133,8 @@ class HeartbeatWriterTest(BaseTestCase):
         self.handler = self.add_memento_handler(self.logger)
         self.clock = task.Clock()
         self.hw = HeartbeatWriter(
-            self.interval, self.logger, reactor=self.clock)
+            self.interval, self.logger, reactor=self.clock
+        )
 
     def test_send_no_transport(self):
         """Log a warning when there is no transport."""
@@ -180,7 +182,8 @@ class HeartbeatWriterTest(BaseTestCase):
         self.patch(self.hw.loop, 'stop', lambda: called.append(True))
         self.hw.connectionLost(protocol.connectionDone)
         self.handler.assert_info(
-            "HeartbeatWriter connectionLost: %s" % protocol.connectionDone)
+            "HeartbeatWriter connectionLost: %s" % protocol.connectionDone
+        )
         self.assertTrue(called)
         self.assertEqual(self.hw.loop, None)
         self.assertEqual(self.hw.reactor, None)

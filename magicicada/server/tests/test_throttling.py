@@ -53,6 +53,7 @@ class ThrottlingTestClient(client.ThrottlingStorageClient, ClientTestHelper):
 
 class ThrottlingTestFactory(client.ThrottlingStorageClientFactory):
     """ThrottlingStorageClientFactory for the tests"""
+
     protocol = ThrottlingTestClient
 
 
@@ -75,7 +76,8 @@ class TestThrottling(TestWithDatabase):
 
         # get the content
         content = yield client.get_content(
-            params['share'], params['node'], params['new_hash'])
+            params['share'], params['node'], params['new_hash']
+        )
         if check_file_content:
             self.assertEqual(zlib.decompress(content.data), data)
 
@@ -98,12 +100,12 @@ class TestThrottling(TestWithDatabase):
             # set the read limit, and get content
             client.factory.factory.readLimit = 1000
             yield client.get_content(
-                params['share'], params['node'], params['new_hash'])
+                params['share'], params['node'], params['new_hash']
+            )
 
         # This test is buggy since the timeout occurs way before the read
         # operation, so it's not asserting what's described
-        d = self.callback_test(auth, add_default_callbacks=True,
-                               timeout=0.1)
+        d = self.callback_test(auth, add_default_callbacks=True, timeout=0.1)
         err = yield self.assertFailure(d, Exception)
         self.assertEqual(str(err), "timeout")
 
@@ -119,12 +121,14 @@ class TestThrottling(TestWithDatabase):
 
         for i in range(num_files):
             mkfile_req = yield client.make_file(
-                request.ROOT, root_id, 'hola_%d' % i)
+                request.ROOT, root_id, 'hola_%d' % i
+            )
             data = os.urandom(300 + i)
             params = get_put_content_params(data, node=mkfile_req.new_id)
             yield client.put_content(**params)
             content_blob = yield threads.deferToThread(
-                check_file, params['new_hash'])
+                check_file, params['new_hash']
+            )
             self.assertIsNotNone(content_blob)
 
     @defer.inlineCallbacks
@@ -134,11 +138,11 @@ class TestThrottling(TestWithDatabase):
 
         @defer.inlineCallbacks
         def auth(client):
-
             @transaction.atomic
             def check_file(hash_value):
                 return services.get_object_or_none(
-                    ContentBlob, hash=hash_value)
+                    ContentBlob, hash=hash_value
+                )
 
             yield client.dummy_authenticate("open sesame")
             root_id = yield client.get_root()
@@ -153,10 +157,10 @@ class TestThrottling(TestWithDatabase):
             yield client.put_content(**params)
 
             content_blob = yield threads.deferToThread(
-                check_file, params['new_hash'])
+                check_file, params['new_hash']
+            )
             self.assertIsNotNone(content_blob)
 
-        d = self.callback_test(auth, add_default_callbacks=True,
-                               timeout=0.1)
+        d = self.callback_test(auth, add_default_callbacks=True, timeout=0.1)
         err = yield self.assertFailure(d, Exception)
         self.assertEqual(str(err), "timeout")

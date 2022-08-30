@@ -80,8 +80,12 @@ def _build_namespace(namespace):
     service_name = os.environ.get("FSYNC_SERVICE_NAME", settings.SERVICE_NAME)
     instance_id = os.environ.get("FSYNC_INSTANCE_ID", settings.INSTANCE_ID)
     return "%s.%s.%s.%03d.%s" % (
-        settings.ENVIRONMENT_NAME, settings.SERVICE_GROUP,
-        service_name, int(instance_id), namespace)
+        settings.ENVIRONMENT_NAME,
+        settings.SERVICE_GROUP,
+        service_name,
+        int(instance_id),
+        namespace,
+    )
 
 
 # cache to store the FileBasedMeters for the same namespace

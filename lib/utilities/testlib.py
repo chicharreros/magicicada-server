@@ -30,7 +30,10 @@ from twisted.internet import defer
 from twisted.internet.base import DelayedCall
 from twisted.python import failure
 from twisted.trial.reporter import (
-    TreeReporter, TestResultDecorator, SubunitReporter)
+    TreeReporter,
+    TestResultDecorator,
+    SubunitReporter,
+)
 from twisted.trial.runner import TrialRunner
 
 
@@ -76,7 +79,8 @@ class LogsOnFailureDecorator(TestResultDecorator):
         self._logs_positions = {}
         cwd = os.getcwd()
         self._abspath_logs = [
-            os.path.join(cwd, ll) for ll in self._logs_to_show]
+            os.path.join(cwd, ll) for ll in self._logs_to_show
+        ]
         TestResultDecorator.__init__(self, *a, **k)
 
     def startTest(self, test):
@@ -134,7 +138,8 @@ class RegexTestLoader(TestLoader):
 def load_unittest(relpath, loader=None):
     """Load unit tests from a Python module with the given relative path."""
     assert relpath.endswith(".py"), (
-        "%s does not appear to be a Python module" % relpath)
+        "%s does not appear to be a Python module" % relpath
+    )
     modpath = relpath.replace(os.path.sep, ".")[:-3]
     module = __import__(modpath, None, None, [""])
 
@@ -151,7 +156,6 @@ def load_unittest(relpath, loader=None):
 
 
 class MagicicadaRunner(DiscoverRunner):
-
     def __init__(self, factory, filter_test, verbosity=1, debug=False):
         self.factory = factory
         self.loader = RegexTestLoader(filter_test)
@@ -180,10 +184,10 @@ class MagicicadaRunner(DiscoverRunner):
 
             for filename in filenames:
                 filepath = os.path.join(root, filename)
-                relpath = filepath[len(testdir) + 1:]
+                relpath = filepath[len(testdir) + 1 :]
 
                 if testpaths:
-                    top_relpath = os.path.abspath(filepath)[len(topdir) + 1:]
+                    top_relpath = os.path.abspath(filepath)[len(topdir) + 1 :]
                     # Skip any tests not in testpaths.
                     for testpath in testpaths:
                         if top_relpath.startswith(testpath):
@@ -205,13 +209,16 @@ class MagicicadaRunner(DiscoverRunner):
 
     def run_suite(self, suite=None, **kwargs):
         non_server_result = super(MagicicadaRunner, self).run_suite(
-            self.non_server_suite, **kwargs)
+            self.non_server_suite, **kwargs
+        )
         if not non_server_result.wasSuccessful():
             return non_server_result
 
         server_result = TrialRunner(
-            reporterFactory=self.factory, realTimeErrors=True,
-            workingDirectory=WORKING_DIR).run(self.server_suite)
+            reporterFactory=self.factory,
+            realTimeErrors=True,
+            workingDirectory=WORKING_DIR,
+        ).run(self.server_suite)
         return server_result
 
     def suite_result(self, suite, result, **kwargs):
@@ -222,6 +229,7 @@ def test_with_trial(options, topdir, testdirs, testpaths):
     """The main testing entry point."""
     # hook twisted.python.log with standard logging
     from twisted.python import log
+
     observer = log.PythonLoggingObserver('twisted')
     observer.start()
 
@@ -266,8 +274,8 @@ def test_with_trial(options, topdir, testdirs, testpaths):
     django.setup()
 
     runner = MagicicadaRunner(
-        factory, filter_test, verbosity=options.verbosity,
-        debug=options.debug)
+        factory, filter_test, verbosity=options.verbosity, debug=options.debug
+    )
     result = runner.run_tests(test_labels=(topdir, testdirs, testpaths))
     failed = not result.wasSuccessful()
     return failed

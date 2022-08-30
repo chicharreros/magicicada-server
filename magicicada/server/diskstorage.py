@@ -64,8 +64,10 @@ class FileReaderProducer(object):
             if self.pausing_deferred is None:
                 reactor.callLater(0, self._readloop, flag, consumer)
             else:
+
                 def f(_):
                     return reactor.callLater(0, self._readloop, flag, consumer)
+
                 self.pausing_deferred.addCallback(f)
         else:
             self._fh.close()
@@ -131,6 +133,7 @@ class DiskStorage(object):
 
     Read and write those nodes acting like Twisted producers/consumers.
     """
+
     def __init__(self, basedir):
         super(DiskStorage, self).__init__()
         self.basedir = basedir
