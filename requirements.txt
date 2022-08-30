@@ -1,6 +1,6 @@
 configglue
 Cython
-Django<3
+Django<4
 magicicadaprotocol==3.0.3
 pyOpenSSL
 protobuf<4

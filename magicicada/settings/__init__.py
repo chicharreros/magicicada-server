@@ -161,6 +161,8 @@ STATIC_URL = '/static/'
 
 AUTH_USER_MODEL = 'filesync.StorageUser'
 
+DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
+
 # define the TRACE level
 TRACE = 5
 logging.addLevelName(TRACE, 'TRACE')

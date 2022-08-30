@@ -57,14 +57,16 @@ class Atomic(transaction.Atomic):
         return result
 
 
-def atomic(using=None, savepoint=True):
+# XXX: 2022-08-30 (nessita) This is copied verbatim from the Django sourcecode.
+# I'm guessing the reason is to use our custom `Atomic` class.
+def atomic(using=None, savepoint=True, durable=False):
     # Bare decorator: @atomic -- although the first argument is called
     # `using`, it's actually the function being decorated.
     if callable(using):
-        return Atomic(transaction.DEFAULT_DB_ALIAS, savepoint)(using)
+        return Atomic(transaction.DEFAULT_DB_ALIAS, savepoint, durable)(using)
     # Decorator: @atomic(...) or context manager: with atomic(...): ...
     else:
-        return Atomic(using, savepoint)
+        return Atomic(using, savepoint, durable)
 
 
 fsync_commit = atomic
