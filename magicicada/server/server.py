@@ -1489,7 +1489,7 @@ class BytesMessageProducer(object):
     def write(self, content):
         """Part of IConsumer."""
         p = 0
-        part = content[p : p + self.payload_size]
+        part = content[p : p + self.payload_size]  # noqa: E203
         while part:
             if self.request.cancelled:
                 # stop generating messages
@@ -1500,7 +1500,7 @@ class BytesMessageProducer(object):
             self.request.transferred += len(part)
             self.request.sendMessage(response)
             p += self.payload_size
-            part = content[p : p + self.payload_size]
+            part = content[p : p + self.payload_size]  # noqa: E203
         self.request.last_good_state_ts = time.time()
 
 

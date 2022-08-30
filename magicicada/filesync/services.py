@@ -507,7 +507,8 @@ class StorageNode(VolumeObjectBase):
                 o.full_path = '/'
             else:
                 # mask the root path
-                o.path = node.path[len(gateway.root_path_mask) : :]
+                mask_len = len(gateway.root_path_mask)
+                o.path = node.path[mask_len::]
                 o.path = o.path if o.path else '/'
                 o.full_path = pypath.join(o.path, o.name)
         o.volume_id = node.volume.id
@@ -2555,9 +2556,10 @@ class ReadOnlyVolumeGateway(GatewayBase):
             kind=StorageObject.FILE,
             volume__owner__id=self.owner.id,
         )
+        end = start + limit
         nodes = self._is_on_volume(nodes).order_by(
             '-when_last_modified', 'path', 'name'
-        )[start : start + limit]
+        )[start:end]
         return [
             StorageNode.factory(
                 self, n, owner=self.owner, permissions=self._get_node_perms(n)

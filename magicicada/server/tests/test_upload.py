@@ -73,9 +73,11 @@ class ProxyHashingProducerTest(UploadTestCase):
         consumer = ds.put("somenode")
         producer = upload.ProxyHashingProducer(consumer, True)
 
-        chunk_sz = 10
-        for part in range(0, len(message), chunk_sz):
-            yield producer.dataReceived(message[part : part + chunk_sz])
+        chunk_size = 10
+        for part in range(0, len(message), chunk_size):
+            yield producer.dataReceived(
+                message[part : part + chunk_size]  # noqa: E203
+            )
         producer.stopProducing()
         yield producer.flush_decompressor()
         consumer.commit()
@@ -106,9 +108,11 @@ class ProxyHashingProducerTest(UploadTestCase):
         producer = upload.ProxyHashingProducer(consumer, False)
 
         # add chunks, but see that nothing is really being calculated
-        chunk_sz = 10
-        for part in range(0, len(message), chunk_sz):
-            yield producer.dataReceived(message[part : part + chunk_sz])
+        chunk_size = 10
+        for part in range(0, len(message), chunk_size):
+            yield producer.dataReceived(
+                message[part : part + chunk_size]  # noqa: E203
+            )
             self.assertEqual(producer.deflated_size, 0)
             self.assertEqual(producer.inflated_size, 0)
             self.assertEqual(producer.crc32, 0)

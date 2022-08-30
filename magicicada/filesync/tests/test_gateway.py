@@ -160,7 +160,7 @@ class GatewayBaseTestCase(BaseTestCase):
         biglist = [i for i in range(1000)]
         # test with various max sizes
         for i in range(3, 210):
-            sublists = utils.split_in_list(biglist, max=i)
+            sublists = utils.split_in_list(biglist, max_size=i)
             items = 0
             for s in sublists:
                 items += len(s)

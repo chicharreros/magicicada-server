@@ -1854,7 +1854,7 @@ class TestUploadJob(TestWithDatabase):
             """Iterate over chunks."""
             for part in range(0, len(deflated_data), chunk_size):
                 yield upload_job.add_data(
-                    deflated_data[part : part + chunk_size]
+                    deflated_data[part : part + chunk_size]  # noqa: E203
                 )
 
         yield self._cooperator.coiterate(data_iter())
