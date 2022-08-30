@@ -126,12 +126,14 @@ class TransactionLog(models.Model):
                 cls.record_public_access_change(directory)
                 rows += 1
 
-        nodes = StorageObject.objects.exclude(
-            kind=StorageObject.DIRECTORY
-        ).filter(
-            status=STATUS_LIVE,
-            volume__status=STATUS_LIVE,
-            volume__owner__id=user.id,
+        nodes = (
+            StorageObject.objects.exclude(kind=StorageObject.DIRECTORY)
+            .filter(
+                status=STATUS_LIVE,
+                volume__status=STATUS_LIVE,
+                volume__owner__id=user.id,
+            )
+            .select_related('content_blob')
         )
         for node in nodes:
             cls.record_put_content(node)

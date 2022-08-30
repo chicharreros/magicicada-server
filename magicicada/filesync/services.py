@@ -2182,7 +2182,7 @@ class ReadOnlyVolumeGateway(GatewayBase):
 
     @property
     def volume_id(self):
-        """The id of theUserVolume for this node."""
+        """The id of the UserVolume for this node."""
         if self._volume_id is None:
             if self.udf:
                 self._volume_id = self.udf.id
@@ -3073,7 +3073,7 @@ class ReadWriteVolumeGateway(ReadOnlyVolumeGateway):
         """Create an upload job for a FileNode."""
         if self.read_only:
             raise errors.NoPermission(self.readonly_error)
-        node = self._get_node_simple(node_id)
+        node = self._get_node_simple(node_id, with_content=True)
         if node is None:
             raise errors.DoesNotExist(self.node_dne_error)
         if node.kind == StorageObject.DIRECTORY:
