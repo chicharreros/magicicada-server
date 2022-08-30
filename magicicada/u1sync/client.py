@@ -15,8 +15,6 @@
 
 """Pretty API for protocol client."""
 
-from __future__ import with_statement
-
 import logging
 import os
 import sys
@@ -24,9 +22,8 @@ import shutil
 import time
 import uuid
 import zlib
-
-from cStringIO import StringIO
-from Queue import Queue
+from io import BytesIO
+from queue import Queue
 from threading import Lock
 
 from magicicadaprotocol import request, volumes
@@ -95,7 +92,7 @@ class Waiter(object):
         (result, exc_info) = self.queue.get()
         if exc_info:
             try:
-                raise exc_info[0], exc_info[1], exc_info[2]
+                raise exc_info[0](exc_info[1]).with_traceback(exc_info[2])
             finally:
                 exc_info = None
         else:
@@ -287,7 +284,7 @@ class Client(object):
         result, exc_info, failure = self._wait(waiter)
         if exc_info:
             try:
-                raise exc_info[0], exc_info[1], exc_info[2]
+                raise exc_info[0](exc_info[1]).with_traceback(exc_info[2])
             finally:
                 exc_info = None
         elif failure:
@@ -541,7 +538,7 @@ class Client(object):
     @log_timing
     def download_string(self, share_uuid, node_uuid, content_hash):
         """Reads a file from the server into a string."""
-        output = StringIO()
+        output = BytesIO()
         self._download_inner(share_uuid=share_uuid, node_uuid=node_uuid,
                              content_hash=content_hash, output=output)
         return output.getValue()
@@ -550,7 +547,7 @@ class Client(object):
     def download_file(self, share_uuid, node_uuid, content_hash, filename):
         """Downloads a file from the server."""
         partial_filename = "%s.u1partial" % filename
-        output = open(partial_filename, "w")
+        output = open(partial_filename, "wb")
 
         @log_timing
         def rename_file():
@@ -632,7 +629,7 @@ class Client(object):
         """Uploads a string to the server as file content."""
         crc = crc32(content, 0)
         compressed_content = zlib.compress(content, 9)
-        compressed = StringIO(compressed_content)
+        compressed = BytesIO(compressed_content)
         self.defer_from_thread(self.factory.current_protocol.put_content,
                                share_str(share_uuid), str(node_uuid),
                                old_content_hash, content_hash,
@@ -670,9 +667,9 @@ class Client(object):
                 self.compressed_size += len(compressed_bytes)
                 self.stream.write(compressed_bytes)
 
-        with open(unique_filename, "w+") as compressed:
+        with open(unique_filename, "wb+") as compressed:
             os.remove(unique_filename)
-            with open(filename, "r") as original:
+            with open(filename, "rb") as original:
                 staging = StagingFile(compressed)
                 shutil.copyfileobj(original, staging)
             staging.finish()

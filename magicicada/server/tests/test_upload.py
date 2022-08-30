@@ -137,7 +137,7 @@ class ProxyHashingProducerTest(UploadTestCase):
         # check that we have all the chunks
         self.assertEqual(10 + len(data) % 10, len(called))
         # check that the inflated data is equal to the raw data.
-        self.assertEqual(raw_data, ''.join(called))
+        self.assertEqual(raw_data, b''.join(called))
 
     def test_add_deflated_data_odd(self):
         """Test that add_deflated_data decompress in chunks."""
@@ -148,14 +148,14 @@ class ProxyHashingProducerTest(UploadTestCase):
         # patch add_inflated_data to check the chunks
         self.patch(producer, 'add_inflated_data', called.append)
         producer.add_deflated_data(data)
-        self.assertEqual(raw_data, ''.join(called))
+        self.assertEqual(raw_data, b''.join(called))
         # check that we have all the chunks
         if len(data) % 10:
             self.assertEqual(11, len(called))
         else:
             self.assertEqual(10, len(called))
         # check that the inflated data is equal to the raw data.
-        self.assertEqual(raw_data, ''.join(called))
+        self.assertEqual(raw_data, b''.join(called))
 
     def test_add_deflated_data_zero(self):
         """Test that add_deflated_data decompress in chunks."""

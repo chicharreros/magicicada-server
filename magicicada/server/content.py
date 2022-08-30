@@ -121,7 +121,7 @@ class Node(object):
         storage_key = self.storage_key
         if storage_key == ZERO_LENGTH_CONTENT_KEY:
             # we send the compressed empty string
-            return FalseProducer(zlib.compress(""))
+            return FalseProducer(zlib.compress(b""))
 
         # TODO: we should get bytes from a 'start' point, there are not
         # test cases for this, did this work at all or client always sent 0?

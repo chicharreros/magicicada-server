@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 # Copyright 2008-2015 Canonical
 # Copyright 2015-2018 Chicharreros (https://launchpad.net/~chicharreros)
 #
@@ -22,12 +20,11 @@
 
 import collections
 import logging
-import os
 import time
 import uuid
 import weakref
+from unittest import mock
 
-import mock
 from django.utils.timezone import now
 from magicicadaprotocol import protocol_pb2, request
 from twisted.python.failure import Failure
@@ -90,14 +87,14 @@ class FakeNode(object):
     generation = 0
     is_live = False
     is_file = False
-    name = u"name"
+    name = "name"
     parent_id = None
     content_hash = None
     crc32 = 12123
     size = 45325
     last_modified = 2334524
     is_public = False
-    path = u"path"
+    path = "path"
     volume_id = 'volumeid'
     public_url = 'public_url'
 
@@ -135,8 +132,6 @@ class FakedStats(object):
 class FakedFactory(object):
     """A faked factory."""
 
-    auth_provider = None
-
     def __init__(self):
         self.stats = FakedStats()
         self.metrics = metrics.get_meter('metrics')
@@ -144,6 +139,8 @@ class FakedFactory(object):
         self.sli_metrics = metrics.get_meter('sli_metrics')
         self.servername = "fakeservername"
         self.trace_users = []
+        self.auth_provider = mock.Mock(name='factory-auth-provider')
+        self.auth_provider.authenticate.return_value = FakeUser()
 
 
 class FakedPeer(object):
@@ -201,11 +198,7 @@ class BaseStorageServerTestCase(BaseTestCase, TwistedTestCase):
         """Ckeck that error sent had `msg' as comment."""
         self.assertIsNotNone(comment)
         self.assertTrue(len(comment) > 0)
-        if isinstance(msg, str):
-            msg = msg.decode('utf-8')
-        else:
-            msg = unicode(msg)
-        self.assertIn(msg, comment)
+        self.assertIn(str(msg), comment)
 
     def fail_please(self, failure):
         """Return a function that raises 'failure'."""
@@ -812,8 +805,8 @@ class SimpleRequestResponseTestCase(StorageServerRequestResponseTestCase):
             self.assert_comment_present(msg)
 
         # any error not in protocol_errors
-        msg = u"ñoño message with non ascii chars"
-        failure = Failure(Exception(msg.encode('utf8')))
+        msg = "ñoño message with non ascii chars"
+        failure = Failure(Exception(msg))
         self.response._send_protocol_error(failure=failure)
         self.assert_comment_present(msg)
 
@@ -1097,9 +1090,9 @@ class ListSharesTestCase(SimpleRequestResponseTestCase):
         """Set length attribute while processing."""
         # fake share
         share = dict(id=None, from_me=None, to_me=None, root_id=None,
-                     name=u'name', shared_by_username=u'sby', accepted=False,
-                     shared_to_username=u'sto', shared_by_visible_name=u'vby',
-                     shared_to_visible_name=u'vto', access=Share.VIEW)
+                     name='name', shared_by_username='sby', accepted=False,
+                     shared_to_username='sto', shared_by_visible_name='vby',
+                     shared_to_visible_name='vto', access=Share.VIEW)
         # fake user
         user = mock.Mock(root_volume_id='')
         shared_by = [share] * 3
@@ -1171,9 +1164,9 @@ class ListVolumesTestCase(SimpleRequestResponseTestCase):
     def test_process_set_length(self):
         """Set length attribute while processing."""
         # fake share
-        share = dict(id=None, root_id=None, name=u'name', path=u"somepath",
-                     shared_by_username=u'sby', accepted=False,
-                     shared_by_visible_name=u'vby', access=Share.VIEW,
+        share = dict(id=None, root_id=None, name='name', path="somepath",
+                     shared_by_username='sby', accepted=False,
+                     shared_by_visible_name='vby', access=Share.VIEW,
                      generation=9, free_bytes=123)
         # fake user
         user = mock.Mock()
@@ -1253,7 +1246,7 @@ class GetContentResponseTestCase(SimpleRequestResponseTestCase):
             def startProducing(self, consumer):
                 """Wait a little."""
                 time.sleep(.1)
-                consumer.write("abc")
+                consumer.write(b"abc")
 
         fake_producer = FakeProducer()
         self.response.send(fake_producer)
@@ -1395,7 +1388,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase):
         """Fake an UploadJob."""
 
         def __init__(self):
-            self.bytes = ''
+            self.bytes = b''
             self.inflated_size_hint = 1000
             self.ops = defer.succeed(None)
             self.deferred = defer.Deferred()
@@ -1615,12 +1608,12 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase):
         time.sleep(.1)
 
         bytes_msg = self.make_protocol_message('BYTES')
-        bytes_msg.bytes.bytes = "123"
+        bytes_msg.bytes.bytes = b"123"
 
         self.response.processMessage(bytes_msg)
 
         self.assertTrue(self.response.last_good_state_ts > after)
-        self.assertEqual("123", upload_job.bytes)
+        self.assertEqual(b"123", upload_job.bytes)
         self.assertEqual(
             self.response.state, PutContentResponse.states.uploading)
 
@@ -1630,7 +1623,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase):
         self.response._log_start.assert_called_once_with()
         transport.getPeer.assert_called()
         expected_calls = [  # XXX: missing 'registerProducer'
-            'connect', {'add_data': '123'}]
+            'connect', {'add_data': b'123'}]
         self.assertEqual(upload_job.called, expected_calls)
 
     def test__cancel_uploadjob_cancelled(self):
@@ -2089,7 +2082,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase):
         """Got some bytes while uploading."""
         self.response.state = PutContentResponse.states.uploading
         message = self.make_protocol_message(msg_type='BYTES')
-        message.bytes.bytes = "foobar"
+        message.bytes.bytes = b"foobar"
         self.response.upload_job = self.FakeUploadJob()
         prv_transferred = self.response.transferred
 
@@ -2097,7 +2090,7 @@ class PutContentResponseTestCase(SimpleRequestResponseTestCase):
         self.assertEqual(self.response.transferred, prv_transferred + 6)
         self.assertEqual(self.response.state,
                          PutContentResponse.states.uploading)
-        self.assertEqual(self.response.upload_job.bytes, "foobar")
+        self.assertEqual(self.response.upload_job.bytes, b"foobar")
 
     def test_processwhileuploading_strange(self):
         """Got other message while uploading."""
@@ -2366,9 +2359,8 @@ class AuthenticateResponseTestCase(SimpleRequestResponseTestCase):
         """Check that the user is set after auth."""
         user = FakeUser()
         # set up a fake auth
-        auth_provider = mock.Mock()
+        auth_provider = self.response.protocol.factory.auth_provider
         auth_provider.authenticate.return_value = user
-        self.response.protocol.factory.auth_provider = auth_provider
         called = []
         self.response.protocol.set_user = lambda *a, **kw: called.append(a)
 
@@ -2381,9 +2373,8 @@ class AuthenticateResponseTestCase(SimpleRequestResponseTestCase):
         """Test client metadata handling in AuthenticateResponse."""
         user = FakeUser()
         # set up a fake auth
-        auth_provider = mock.Mock()
+        auth_provider = self.response.protocol.factory.auth_provider
         auth_provider.authenticate.return_value = user
-        self.response.protocol.factory.auth_provider = auth_provider
         metrics_called = []
         self.patch(self.response.protocol.factory.metrics, 'meter',
                    lambda *a: metrics_called.append(a))
@@ -2435,7 +2426,7 @@ class GetDeltaResponseTestCase(SimpleRequestResponseTestCase):
         self.assertTrue(isinstance(d, defer.Deferred))
         # check if _send_delta_info returns a generator
         gen = self.response._send_delta_info([], '')
-        self.assertTrue(hasattr(gen, 'next'))
+        self.assertIsInstance(gen, collections.Generator)
         # check if send_delta_info use the cooperator
         called = []
         real_cooperate = task.cooperate
@@ -2448,7 +2439,7 @@ class GetDeltaResponseTestCase(SimpleRequestResponseTestCase):
         self.patch(task, 'cooperate', cooperate)
         self.response.send_delta_info([], '')
         self.assertEqual(len(called), 1)
-        self.assertTrue(hasattr(called[0], 'next'))
+        self.assertIsInstance(called[0], collections.Generator)
 
     def test_reset_send_delta_info_counter(self):
         """Test that the count is reset on each iteration."""
@@ -2461,7 +2452,7 @@ class GetDeltaResponseTestCase(SimpleRequestResponseTestCase):
             node.id = str(uuid.uuid4())
             node.parent_id = str(uuid.uuid4())
             node.generation = 100
-            node.name = u"node_%s" % i
+            node.name = "node_%s" % i
             node.is_live = True
             node.is_file = True
             node.is_public = True
@@ -2471,7 +2462,7 @@ class GetDeltaResponseTestCase(SimpleRequestResponseTestCase):
             node.last_modified = int(time.mktime(right_now.timetuple()))
             nodes.append(node)
         gen = self.response._send_delta_info(nodes, 'share_id')
-        gen.next()
+        next(gen)
         self.assertEqual(gen.gi_frame.f_locals['count'], 0)
 
     @defer.inlineCallbacks
@@ -2508,7 +2499,7 @@ class RescanFromScratchResponseTestCase(SimpleRequestResponseTestCase):
         self.assertTrue(isinstance(d, defer.Deferred))
         # check if _send_delta_info returns a generator
         gen = self.response._send_delta_info([], '')
-        self.assertTrue(hasattr(gen, 'next'))
+        self.assertIsInstance(gen, collections.Generator)
         # check if send_delta_info use the cooperator
         called = []
         real_cooperate = task.cooperate
@@ -2521,7 +2512,7 @@ class RescanFromScratchResponseTestCase(SimpleRequestResponseTestCase):
         self.patch(task, 'cooperate', cooperate)
         self.response.send_delta_info([], '')
         self.assertEqual(len(called), 1)
-        self.assertTrue(hasattr(called[0], 'next'))
+        self.assertIsInstance(called[0], collections.Generator)
 
     @defer.inlineCallbacks
     def test_chunked_get_from_scratch(self):
@@ -2534,9 +2525,9 @@ class RescanFromScratchResponseTestCase(SimpleRequestResponseTestCase):
             node = FakeNode()
             node.id = str(uuid.uuid4())
             node.parent_id = str(uuid.uuid4())
-            node.path = u"/"
+            node.path = "/"
             node.generation = i
-            node.name = u"node_%s" % i
+            node.name = "node_%s" % i
             node.is_live = True
             node.is_file = True
             node.is_public = True
@@ -2655,14 +2646,8 @@ class NodeInfoLogsTestCase(BaseStorageServerTestCase):
             ('DELETE_SHARE', DeleteShare),
         ]
         for name, klass in data:
-            impl = os.environ.get('PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION')
-            if impl == 'cpp':
-                # the cpp implementation always return unicode.
-                self.check("share: u'foo'", name, klass,
-                           name.lower(), share_id='foo')
-            else:
-                self.check("share: 'foo'", name, klass,
-                           name.lower(), share_id='foo')
+            self.check(
+                "share: 'foo'", name, klass, name.lower(), share_id='foo')
 
     def test_with_volumes(self):
         """Test messages that work on volumes."""
@@ -2769,7 +2754,7 @@ class BytesMessageProducerTestCase(BaseStorageServerTestCase):
     def test_transferred_counting(self):
         """Keep count of transferred data."""
         assert self.bmp.request.transferred == 0
-        self.bmp.write("foobar")
+        self.bmp.write(b"foobar")
         self.assertEqual(self.bmp.request.transferred, 6)
 
 

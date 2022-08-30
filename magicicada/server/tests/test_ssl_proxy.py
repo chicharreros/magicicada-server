@@ -20,10 +20,9 @@
 
 import logging
 import re
-from StringIO import StringIO
-from unittest import SkipTest
+from io import StringIO
+from unittest import SkipTest, mock
 
-import mock
 from magicicadaprotocol.client import StorageClientFactory, StorageClient
 from twisted.internet import defer, reactor, error as txerror, ssl
 from twisted.python import failure

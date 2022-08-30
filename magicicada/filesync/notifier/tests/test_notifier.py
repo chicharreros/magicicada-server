@@ -18,8 +18,6 @@
 
 """Test storage notifier."""
 
-from __future__ import unicode_literals
-
 import unittest
 import uuid
 

@@ -15,13 +15,10 @@
 
 """Routines for loading/storing u1sync mirror metadata."""
 
-from __future__ import with_statement
-
 import os
+import pickle
 import uuid
-
 from contextlib import contextmanager
-import cPickle as pickle
 from errno import ENOENT
 
 from magicicadaprotocol.dircontent_pb2 import DIRECTORY
@@ -89,16 +86,18 @@ def write(metadata_dir, info):
 
 def write_pickle_file(filename, value):
     """Writes a pickled python object to a file."""
-    with atomic_update_file(filename) as stream:
+    with atomic_update_file(filename, 'wb') as stream:
         pickle.dump(value, stream, 2)
 
 
 def write_string_file(filename, value):
-    """Writes a string to a file with an added line feed, or
-    deletes the file if value is None.
+    """Write content to a file with an added line feed.
+
+    If value is None, delete the file.
+
     """
     if value is not None:
-        with atomic_update_file(filename) as stream:
+        with atomic_update_file(filename, 'w') as stream:
             stream.write(value)
             stream.write('\n')
     else:
@@ -134,21 +133,17 @@ def read_string_file(filename, default_value=None):
 
 def read_uuid_file(filename, default_value=None):
     """Reads a UUID from a file."""
-    try:
-        with open(filename, "r") as stream:
-            return uuid.UUID(stream.read()[:-1])
-    except IOError as e:
-        if e.errno != ENOENT:
-            raise
-        return default_value
+    content = read_string_file(filename, default_value)
+    if content is not default_value:
+        return uuid.UUID(content)
 
 
 @contextmanager
-def atomic_update_file(filename):
+def atomic_update_file(filename, mode):
     """Returns a context manager for atomically updating a file."""
     temp_filename = "%s.%s" % (filename, uuid.uuid4())
     try:
-        with open(temp_filename, "w") as stream:
+        with open(temp_filename, mode) as stream:
             yield stream
         os.rename(temp_filename, filename)
     finally:

@@ -21,10 +21,10 @@
 import json
 import logging
 import time
-from StringIO import StringIO
-from xmlrpclib import Fault
+from io import StringIO
+from unittest import mock
+from xmlrpc.client import Fault
 
-import mock
 from supervisor import states, childutils
 
 from magicicada.testing.testcase import BaseTestCase
@@ -206,7 +206,7 @@ class HeartbeatListenerTestCase(BaseTestCase):
             called.append((process_name, group_name, pid, payload))
 
         self.listener.handle_heartbeat = handle_heartbeat
-        payload_dict = {u"time": time.time(), "type": "heartbeat"}
+        payload_dict = {"time": time.time(), "type": "heartbeat"}
         raw_data = ("processname:ticker groupname:ticker pid:42\n" +
                     json.dumps(payload_dict))
         raw_header = ("ver:3.0 server:supervisor serial:1 pool:listener "
@@ -228,7 +228,7 @@ class HeartbeatListenerTestCase(BaseTestCase):
 
     def test_invalid_event_type(self):
         """Test with an invalid type."""
-        payload_dict = {u"time": time.time(), "type": "ping"}
+        payload_dict = {"time": time.time(), "type": "ping"}
         raw_data = 'processname:ticker groupname:ticker pid:42\n' + \
             json.dumps(payload_dict)
         raw_header = ("ver:3.0 server:supervisor serial:1 pool:listener "
@@ -243,7 +243,7 @@ class HeartbeatListenerTestCase(BaseTestCase):
 
     def test_invalid_payload(self):
         """Test with an invalid payload."""
-        payload_dict = {u"time": time.time(), "type": "ping"}
+        payload_dict = {"time": time.time(), "type": "ping"}
         raw_data = 'processname:ticker groupname:ticker pid:42\n' + \
             json.dumps(payload_dict) + "<!foo>"
         raw_header = ("ver:3.0 server:supervisor serial:1 pool:listener "
@@ -258,7 +258,7 @@ class HeartbeatListenerTestCase(BaseTestCase):
 
     def test_unhandled_event(self):
         """A unhandled event type."""
-        payload_dict = {u"time": time.time(), "type": "ping"}
+        payload_dict = {"time": time.time(), "type": "ping"}
         raw_data = 'processname:ticker groupname:ticker pid:42\n' + \
             json.dumps(payload_dict)
         raw_header = "ver:3.0 server:supervisor serial:1 pool:heartbeat " + \

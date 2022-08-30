@@ -15,8 +15,6 @@
 
 """A prototype directory sync client."""
 
-from __future__ import with_statement
-
 import logging
 import os
 import signal
@@ -25,7 +23,7 @@ import uuid
 
 from errno import EEXIST
 from optparse import OptionParser, SUPPRESS_HELP
-from Queue import Queue
+from queue import Queue
 
 import gobject
 
@@ -196,8 +194,6 @@ def do_list_shares(client):
             status = " [not accepted]"
         else:
             status = ""
-        name = name.encode("utf-8")
-        user = user.encode("utf-8")
         logger.debug("%s  %s (from %s) [%s]%s", id, name, user, access, status)
 
 
@@ -219,7 +215,7 @@ def do_diff(client, share_spec, directory, subtree_path, ignore_symlinks=True):
         """Compare nodes and show differences."""
         (local_node, remote_node) = nodes
         (parent_display_path, parent_differs) = partial_parent
-        display_path = os.path.join(parent_display_path, name.encode("UTF-8"))
+        display_path = os.path.join(parent_display_path, name)
         differs = True
         if local_node is None:
             logger.debug("%s missing from client", display_path)
@@ -252,7 +248,7 @@ def do_diff(client, share_spec, directory, subtree_path, ignore_symlinks=True):
 
     differs = generic_merge(trees=[local_tree, remote_tree],
                             pre_merge=pre_merge, post_merge=post_merge,
-                            partial_parent=("", False), name=u"")
+                            partial_parent=("", False), name="")
     if differs:
         raise TreesDiffer()
 
@@ -395,7 +391,7 @@ def do_main(argv):
     reactor.run(installSignalHandlers=False)
     exc_info = queue.get(True, 0.1)
     if exc_info:
-        raise exc_info[0], exc_info[1], exc_info[2]
+        raise exc_info[0](exc_info[1]).with_traceback(exc_info[2])
 
 
 def main(*argv):

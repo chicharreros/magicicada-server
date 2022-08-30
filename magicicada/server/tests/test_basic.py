@@ -24,9 +24,9 @@ import os
 import shutil
 import struct
 import sys
-from StringIO import StringIO
+from io import StringIO
+from unittest import mock
 
-import mock
 from django.conf import settings
 from magicicadaprotocol import request
 from twisted.internet import reactor, defer
@@ -100,7 +100,7 @@ class TestBasic(TestWithDatabase):
             root_id = yield client.get_root()
             # lock the user:
             StorageUser.objects.filter(id=self.usr0.id).update(locked=True)
-            client.make_dir(request.ROOT, root_id, u"open sesame")
+            client.make_dir(request.ROOT, root_id, "open sesame")
             yield d
             # check we logged a warning about this.
             handler.assert_warning("Shutting down protocol: user locked")
@@ -171,7 +171,7 @@ class TestBasic(TestWithDatabase):
         def size_too_big(client):
             def done(result):
                 client.test_done("ok")
-            data = "*" * (2 ** 16 + 1)
+            data = b"*" * (2 ** 16 + 1)
             sz = struct.pack(request.SIZE_FMT, len(data))
             client.transport.write(sz + data)
             client.connectionLostHandler = done
@@ -372,7 +372,7 @@ class ServerStatusTest(TestWithDatabase):
     def status_resource(self):
         # get the site instance from the service
         site = self.service.status_service.args[1]
-        return site.resource.children['status']
+        return site.resource.children[b'status']
 
     @defer.inlineCallbacks
     def test_status_OK(self):

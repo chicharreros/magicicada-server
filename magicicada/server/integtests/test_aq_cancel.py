@@ -122,7 +122,7 @@ class TestCancel(AQCancelTestBase):
             return self.hiccup()
 
         parent_path = self.main.fs.get_by_node_id('', self.root).path
-        mdid = self.main.fs.create(os.path.join(parent_path, u"test"), '')
+        mdid = self.main.fs.create(os.path.join(parent_path, "test"), '')
         self.aq.make_file('', self.root, 'hola', 'marker:x', mdid)
 
         yield self.wait_for_nirvana()
@@ -144,7 +144,7 @@ class TestCancel(AQCancelTestBase):
                          'chau', 'from', 'to')
             return self.hiccup()
         parent_path = self.main.fs.get_by_node_id('', self.root).path
-        mdid = self.main.fs.create(os.path.join(parent_path, u"test"), '')
+        mdid = self.main.fs.create(os.path.join(parent_path, "test"), '')
         self.aq.make_file('', self.root, 'hola', 'marker:x', mdid)
 
         yield self.wait_for_nirvana()
@@ -161,7 +161,7 @@ class TestCancel(AQCancelTestBase):
         def worker():
             """Async worker."""
             parent_path = self.main.fs.get_by_node_id('', self.root).path
-            mdid = self.main.fs.create(os.path.join(parent_path, u"test"), '')
+            mdid = self.main.fs.create(os.path.join(parent_path, "test"), '')
             self.aq.make_file('', self.root, 'hola', 'marker:x', mdid)
             return self.hiccup()
 

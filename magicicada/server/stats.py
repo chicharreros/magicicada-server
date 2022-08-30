@@ -48,7 +48,7 @@ class MeliaeResource(resource.Resource):
 
     def render_GET(self, request):
         """Handle GET."""
-        return dump.meliae_dump()
+        return dump.meliae_dump().encode('utf-8')
 
 
 class GCResource(resource.Resource):
@@ -56,7 +56,7 @@ class GCResource(resource.Resource):
 
     def render_GET(self, request):
         """Handle GET."""
-        return dump.gc_dump()
+        return dump.gc_dump().encode('utf-8')
 
 
 class StatsWorker(object):
@@ -127,18 +127,21 @@ class _Status(resource.Resource):
         """Handle GET."""
         d = self._check()
 
+        def write_response(msg, status_code=200):
+            request.setResponseCode(status_code)
+            request.write(msg.encode('utf-8'))
+            request.finish()
+
         def on_success(result):
             """Success callback"""
-            request.write(result)
-            request.finish()
+            write_response(result)
 
         def on_error(failure):
             """Error callback"""
             logger.error(
                 "Error while getting status. %s", failure.getTraceback())
-            request.setResponseCode(500)
-            request.write(failure.getErrorMessage() + "\n")
-            request.finish()
+            write_response(failure.getErrorMessage() + "\n", status_code=500)
+
         d.addCallbacks(on_success, on_error)
         return server.NOT_DONE_YET
 
@@ -157,9 +160,9 @@ def create_status_service(storage, parent_service, port,
                           user_id=0, ssl_context_factory=None):
     """Create the status service."""
     root = resource.Resource()
-    root.putChild('status', _Status(storage, user_id))
-    root.putChild('+meliae', MeliaeResource())
-    root.putChild('+gc-stats', GCResource())
+    root.putChild(b'status', _Status(storage, user_id))
+    root.putChild(b'+meliae', MeliaeResource())
+    root.putChild(b'+gc-stats', GCResource())
     site = server.Site(root)
     if ssl_context_factory is None:
         service = TCPServer(port, site)

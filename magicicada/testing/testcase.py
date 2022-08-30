@@ -18,8 +18,6 @@
 
 """TestCases for testing."""
 
-from __future__ import unicode_literals
-
 import logging
 
 from collections import defaultdict
@@ -54,12 +52,12 @@ class MementoHandler(logging.Handler):
 
     def dump_records(self):
         """Dumps the contents of the MementoHandler."""
-        print "MementoHandler records:"
+        print("MementoHandler records:")
         for rec in self.records:
-            print "\t", rec.exc_info
-            print "\t", logging.getLevelName(rec.levelno)
-            print "\t\t", rec.message
-            print "\t\t", rec.exc_text
+            print("\t", rec.exc_info)
+            print("\t", logging.getLevelName(rec.levelno))
+            print("\t\t", rec.message)
+            print("\t\t", rec.exc_text)
 
     def message_in_record(self, message, record, exc_info=None):
         result = message in record.getMessage()
@@ -132,6 +130,8 @@ class BaseTestCase(TransactionTestCase):
     request_factory = RequestFactory()
     factory = Factory()
     maxDiff = None
+
+    assertItemsEqual = TransactionTestCase.assertCountEqual
 
     def patch(self, obj, attr_name, new_val):
         """Patch!"""

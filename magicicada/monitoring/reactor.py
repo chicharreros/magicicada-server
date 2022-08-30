@@ -18,11 +18,9 @@
 
 """A thread that measures responsiveness of the twisted reactor."""
 
-from __future__ import unicode_literals
-
 import logging
 import os
-import Queue as queue
+import queue
 import sys
 import time
 import threading
@@ -56,6 +54,8 @@ class ReactorInspector(threading.Thread):
         if not self.running:
             self.running = True
             super(ReactorInspector, self).start()
+        logger.info(
+            "ReactorInspector: started, reactor thread pid: %s", os.getpid())
 
     def stop(self):
         """Stop the thread."""

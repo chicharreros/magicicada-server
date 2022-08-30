@@ -30,7 +30,7 @@ import logging
 import os
 import sys
 import time
-from xmlrpclib import Fault
+from xmlrpc.client import Fault
 
 from supervisor import childutils, states
 from supervisor.events import EventTypes, getEventNameByType
@@ -220,7 +220,7 @@ log_format.help = The logging format
 # main entry point, parse args and start the service.
 if __name__ == '__main__':
     from configglue.inischema.glue import configglue
-    from StringIO import StringIO
+    from io import StringIO
     config_file = StringIO()
     config_file.write(default_config)
     config_file.seek(0)

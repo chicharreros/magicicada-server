@@ -18,8 +18,6 @@
 
 """Utilities for endpoints which are per-development-tree"""
 
-from __future__ import unicode_literals
-
 import os
 import errno
 import socket

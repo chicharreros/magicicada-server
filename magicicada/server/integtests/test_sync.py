@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 # Copyright 2008-2015 Canonical
 # Copyright 2015-2018 Chicharreros (https://launchpad.net/~chicharreros)
 #
@@ -28,6 +26,7 @@ import shutil
 import subprocess
 import threading
 import uuid
+from unittest import SkipTest
 
 from twisted.internet import reactor, defer
 
@@ -254,7 +253,7 @@ class TestBrokenNode(TestSync):
         #   - increase the generation
         user = self.storage_users['jack']
         root = user.root_node
-        afile = root.get_child_by_name(u"test_file")
+        afile = root.get_child_by_name("test_file")
         # create a "invalid" content blob
         content = self.factory.make_content_blob(
             hash="", magic_hash="", storage_key=uuid.uuid4(), crc32=1, size=1,
@@ -275,7 +274,7 @@ class TestBrokenNode(TestSync):
         with open(file_path) as f:
             self.assertEqual(f.read(), "foo")
         # re-get the file and check the server content is fixed
-        afile = root.get_child_by_name(u"test_file")
+        afile = root.get_child_by_name("test_file")
         self.assertTrue(afile.content.hash)
         self.assertTrue(afile.content.magic_hash)
 
@@ -317,7 +316,7 @@ class TestBasic(TestSync):
 
     def test_sync_a_strangely_named_file(self):
         """Sync one file with non-ascii name."""
-        open(self.source_dir + u"/propósito".encode("utf8"), "w").close()
+        open(self.source_dir + "/propósito", "w").close()
         return self.sync_and_check()
 
     @defer.inlineCallbacks
@@ -703,6 +702,8 @@ class TestServerBase(TestSync):
     @defer.inlineCallbacks
     def put_content(self, share_id, node_id, content, client_name='client'):
         """Upload content to the server."""
+        if isinstance(content, str):
+            content = content.encode('utf-8')
         client = getattr(self, client_name)
         req = yield client.get_delta(share_id, from_scratch=True)
         dt = [dt for dt in req.response
@@ -850,7 +851,7 @@ class TestServerCornerCases(TestServerBase):
         # create file "foo" with some content
         data = os.urandom(100)
         foo_path = os.path.join(self.root_dir, "foo")
-        fh = open(foo_path, "w")
+        fh = open(foo_path, "wb")
         fh.write(data)
         fh.close()
         yield self.main.wait_for_nirvana(.5)
@@ -1095,7 +1096,7 @@ class TestClientMove(TestSync):
         def change_file(event, *args, **kwargs):
             """Changes the file permissions when HQ_HASH_NEW is received."""
             if event == "HQ_HASH_NEW":
-                os.chmod(filepath, 0666)
+                os.chmod(filepath, 0o666)
                 methinterf.restore()
             return True  # for the original function to be called
 
@@ -1175,6 +1176,9 @@ class TestTimings(TestServerBase):
         the hash generation is threaded, so it's too difficult to assure that
         the timing will be correct for the test case we created here
         """
+        raise SkipTest(
+            'Transient failures in CI, see issue '
+            'https://github.com/chicharreros/magicicada-server/issues/38')
         dfnew = self.wait_for("SV_FILE_NEW")
         yield self.get_client()
         req = yield self.client.make_file(request.ROOT, self.root_id,
@@ -1242,12 +1246,12 @@ class TestConflict(TestServerBase):
         yield self.put_content(request.ROOT, req.new_id, data_one)
         yield d
 
-        f = open(self.root_dir + "/test_file", "w")
+        f = open(self.root_dir + "/test_file", "wb")
         f.write(data_one)
         f.close()
 
         yield self.main.wait_for_nirvana(0.5)
-        data_one_local = open(self.root_dir + '/test_file').read()
+        data_one_local = open(self.root_dir + '/test_file', 'rb').read()
         self.assertEqual(data_one_local, data_one)
 
     @defer.inlineCallbacks
@@ -1292,23 +1296,23 @@ class TestConflict(TestServerBase):
         Here convergence is also checked.
         """
         data_one = os.urandom(1000000)
-        data_conflict = "hello"
+        data_conflict = b"hello"
 
         yield self.get_client()
         req = yield self.client.make_file(
             request.ROOT, self.root_id, "test_file")
         yield self.put_content(request.ROOT, req.new_id, data_one)
 
-        f = open(self.root_dir + "/test_file", "w")
+        f = open(self.root_dir + "/test_file", "wb")
         f.write(data_conflict)
         f.close()
 
         yield self.main.wait_for_nirvana(last_event_interval=0.5)
 
-        data_one_local = open(self.root_dir + '/test_file').read()
+        data_one_local = open(self.root_dir + '/test_file', 'rb').read()
         try:
             data_conflict_local = open(
-                self.root_dir + '/test_file.u1conflict').read()
+                self.root_dir + '/test_file.u1conflict', 'rb').read()
         except IOError:
             self.assertEqual(data_one_local, data_conflict)
         else:
@@ -1382,7 +1386,7 @@ class TestConflict(TestServerBase):
         nuker.nuke()
 
         # create the file and wait to everything propagate
-        with open(self.root_dir + "/test_file", "w") as fh:
+        with open(self.root_dir + "/test_file", "wb") as fh:
             fh.write(os.urandom(100))
         yield self.wait_for("HQ_HASH_NEW")
 
@@ -1489,9 +1493,9 @@ class TestConflict(TestServerBase):
 class TestConflictOnServerSideDelete(TestServerBase):
     """Test corner cases on server side tree delete."""
 
-    dir_name = u'foo'
-    dir_name_conflict = dir_name + u'.u1conflict'
-    file_name = u'bar.txt'
+    dir_name = 'foo'
+    dir_name_conflict = dir_name + '.u1conflict'
+    file_name = 'bar.txt'
 
     def create_and_check(self, _=None):
         """Create initial directory hierarchy."""
@@ -1835,7 +1839,7 @@ class TestPartialRecover(TestServerBase):
         yield self.main.lr.scan_dir("mdid", self.root_dir)
         yield self.main.wait_for_nirvana(0)
 
-        content = open(self.root_dir + '/test_file').read()
+        content = open(self.root_dir + '/test_file', 'rb').read()
         self.assertEqual(content, data_one)
 
 
@@ -1892,7 +1896,7 @@ class TestMoveWhileInProgress(TestServerBase):
         wait_for_hash = self.wait_for("HQ_HASH_NEW", path=filepath)
 
         # do the local change
-        f = open(filepath, "w")
+        f = open(filepath, "wb")
         f.write(data_conflict)
         f.close()
         yield wait_for_hash

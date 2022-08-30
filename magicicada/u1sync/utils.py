@@ -25,7 +25,7 @@ from magicicada.u1sync.constants import METADATA_DIR_NAME, SPECIAL_FILE_RE
 def should_sync(filename):
     """Returns True if the filename should be synced.
 
-    @param filename: a unicode filename
+    @param filename: a str filename
 
     """
     return (filename != METADATA_DIR_NAME and

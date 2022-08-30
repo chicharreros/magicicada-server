@@ -18,8 +18,6 @@
 
 """Some utility functions used by the DAL."""
 
-from __future__ import unicode_literals
-
 import base64
 import re
 import unicodedata
@@ -40,9 +38,7 @@ def split_in_list(inlist, max=MAX_IS_IN_SIZE):
 
 
 def encode_hash(hash_value):
-    if hash_value is not None and isinstance(hash_value, unicode):
-        hash_value = hash_value.encode('utf-8')
-    return hash_value
+    return hash_value.encode('utf-8') if hash_value is not None else None
 
 
 def encode_uuid(uuid_value):
@@ -50,25 +46,29 @@ def encode_uuid(uuid_value):
     if uuid_value:
         if isinstance(uuid_value, uuid.UUID):
             uuid_value = uuid_value.bytes
-        return base64.urlsafe_b64encode(uuid_value).strip('=')
+        elif isinstance(uuid_value, str):
+            uuid_value = uuid_value.encode('utf-8')
+        result = base64.urlsafe_b64encode(uuid_value).strip(b'=')
+        return result.decode('utf8')
 
 
 def decode_uuid(encoded, label=''):
     """Return a uuid from the encoded value.
 
     If the value isn't UUID, just return the decoded value
+
     """
     encoded += '=' * (-len(encoded) % 4)
 
-    if isinstance(encoded, unicode):
-        try:
-            encoded = encoded.encode('ascii')
-        except UnicodeEncodeError:
-            raise NodeKeyParseError('nodekey should be an ASCII string')
+    assert isinstance(encoded, str)
+    try:
+        encoded = encoded.encode('ascii')
+    except UnicodeEncodeError:
+        raise NodeKeyParseError('nodekey should be an ASCII string')
 
     try:
         value_bytes = base64.urlsafe_b64decode(encoded)
-    except TypeError:
+    except ValueError:
         raise NodeKeyParseError(
             'Could not decode %r portion of node key' % label)
     try:
@@ -91,7 +91,7 @@ def make_nodekey(share_id, node_id):
     if share_id:
         strkey = '%s:%s' % (encode_uuid(share_id), encode_uuid(node_id))
     else:
-        strkey = str(encode_uuid(node_id))
+        strkey = encode_uuid(node_id)
     return strkey
 
 
@@ -147,11 +147,7 @@ def encode_base62(value, padded_to=0):
 
 def decode_base62(string, allow_padding=False):
     """Decode a base-62 string to a positive integer."""
-    if isinstance(string, unicode):
-        try:
-            string = string.encode('ASCII')
-        except UnicodeEncodeError:
-            raise Base62Error('base62 strings should be plain ASCII')
+    assert isinstance(string, str)
     if not allow_padding and string.startswith(_base62_digits[0]):
         raise Base62Error('base62 strings may not begin with zero')
     if len(string) == 0:
@@ -162,7 +158,7 @@ def decode_base62(string, allow_padding=False):
         if digit < 0:
             raise Base62Error('Unknown base62 digit')
         value = value * 62 + digit
-    if not 0 <= value < 1 << 128L:
+    if not 0 <= value < 1 << 128:
         raise Base62Error('Value is out of range for uuid.')
     return value
 
@@ -185,7 +181,7 @@ def get_keywords_from_path(volume_path):
     # we do not index the root volume path
     clean_path = volume_path.replace(settings.ROOT_USERVOLUME_PATH, '')
     clean_path = unicodedata.normalize('NFKD', clean_path)
-    clean_path = clean_path.encode('ASCII', 'ignore').lower()
+    clean_path = clean_path.encode('ASCII', 'ignore').lower().decode('utf-8')
     keywords = re.findall(r'\w+', clean_path)
     # convert to set for unique values
     return set(keywords)

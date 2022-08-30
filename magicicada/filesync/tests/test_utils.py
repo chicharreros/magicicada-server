@@ -18,8 +18,6 @@
 
 """Tests for filesync utils."""
 
-from __future__ import unicode_literals
-
 import unittest
 import uuid
 
@@ -56,7 +54,7 @@ class NodeKeyTests(unittest.TestCase):
     def test_make_parse_nodekey(self):
         """Test make and parse_nodekey."""
         key = make_nodekey(VOLUME_UUID, NODE_UUID)
-        self.assertEqual(key, b'%s:%s' % (VOLUME_KEY, NODE_KEY))
+        self.assertEqual(key, '%s:%s' % (VOLUME_KEY, NODE_KEY))
         volume_id, node_id = parse_nodekey(key)
         self.assertEqual(volume_id, VOLUME_UUID)
         self.assertEqual(node_id, NODE_UUID)
@@ -69,12 +67,6 @@ class NodeKeyTests(unittest.TestCase):
 
     def test_parse_nodekey_with_volume_id(self):
         """parse_nodekey() handles an encoded volume ID and node ID."""
-        volume_id, node_id = parse_nodekey('%s:%s' % (VOLUME_KEY, NODE_KEY))
-        self.assertEqual(volume_id, VOLUME_UUID)
-        self.assertEqual(node_id, NODE_UUID)
-
-    def test_parse_nodekey_unicode(self):
-        """parse_nodekey() accepts unicode strings."""
         volume_id, node_id = parse_nodekey('%s:%s' % (VOLUME_KEY, NODE_KEY))
         self.assertEqual(volume_id, VOLUME_UUID)
         self.assertEqual(node_id, NODE_UUID)
@@ -188,30 +180,30 @@ class FakeNode(object):
 class KeywordsTests(unittest.TestCase):
     """Test keyword function."""
 
+    def do_test(self, path, expected):
+        kw = get_keywords_from_path(path)
+        self.assertEqual(sorted(kw), sorted(expected))
+
     def test_basic_path(self):
-        kw = get_keywords_from_path(
+        path = (
             settings.ROOT_USERVOLUME_PATH +
             '/is/the path/path! for/my%$files/here.txt')
         # result should not include base directory and should be sorted
-        self.assertEqual(
-            list(sorted(kw)),
-            sorted(['files', 'for', 'is', 'here', 'path', 'the', 'txt', 'my']))
+        expected = ['files', 'for', 'is', 'here', 'path', 'the', 'txt', 'my']
+        self.do_test(path, expected)
 
     def test_documents_path(self):
-        kw = get_keywords_from_path(
-            '~/Documents/is/the path/path! for/my%$files/here.txt')
+        path = '~/Documents/is/the path/path! for/my%$files/here.txt'
         # result should include documents and should be sorted
-        self.assertEqual(
-            sorted(kw),
-            sorted(['documents', 'files', 'for', 'is', 'here', 'path', 'the',
-                    'txt', 'my']))
+        expected = [
+            'documents', 'files', 'for', 'is', 'here', 'path', 'the', 'txt',
+            'my']
+        self.do_test(path, expected)
 
     def test_normalized_path(self):
-        kw = get_keywords_from_path(
-            '~/Do\u0304cuments/is/the path/path!'
-            ' fo\u0304r/my%$files/hero\u0304.txt')
-        # unicode character should be normalized
-        self.assertEqual(
-            sorted(kw),
-            sorted(['documents', 'files', 'for', 'is', 'hero', 'path', 'the',
-                    'txt', 'my']))
+        path = '~/Da\u0304ta/is/the foo/path! fo\u0304r/my%$bar/hero\u0304.txt'
+        # non-ascii character should be normalized
+        expected = [
+            'data', 'foo', 'bar', 'for', 'is', 'hero', 'path', 'the', 'txt',
+            'my']
+        self.do_test(path, expected)

@@ -18,8 +18,6 @@
 
 """Manage database connections and stores to the storage database."""
 
-from __future__ import unicode_literals
-
 import logging
 import math
 import random

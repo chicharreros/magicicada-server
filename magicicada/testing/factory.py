@@ -17,8 +17,6 @@
 
 """Factory of objects."""
 
-from __future__ import unicode_literals
-
 import hashlib
 import random
 import string
@@ -44,7 +42,7 @@ from magicicada.filesync.models import (
 from magicicada.txlog.models import TransactionLog
 
 
-BASE_CHARS = string.letters + string.digits
+BASE_CHARS = string.ascii_letters + string.digits
 User = get_user_model()
 
 
@@ -54,7 +52,7 @@ class Factory(object):
 
     def get_unique_integer(self):
         """Return an integer unique to this factory."""
-        return self.counter.next()
+        return next(self.counter)
 
     def get_unique_string(self, extra_length=6, prefix='string-'):
         return prefix + ''.join(
@@ -64,7 +62,9 @@ class Factory(object):
         """Return a hashkey."""
         if key is None:
             key = str(uuid.uuid4())
-        return b'sha1:' + hashlib.sha1(key).hexdigest()
+        if isinstance(key, str):
+            key = key.encode('utf-8')
+        return 'sha1:' + hashlib.sha1(key).hexdigest()
 
     def make_user(
             self, username=None, visible_name=None, max_storage_bytes=2 ** 20,
@@ -86,17 +86,20 @@ class Factory(object):
 
     def make_content_blob(
             self, hash=None, crc32=1023, size=1024, deflated_size=10000,
-            storage_key=None, magic_hash=b'magic!', content=None,
+            storage_key=None, magic_hash='magic!', content=None,
             status=STATUS_LIVE):
         """Create content for a file node."""
         if content is None:
             content = 'Hola Mundo' + self.get_unique_string()
-        if isinstance(content, unicode):
+        if isinstance(content, str):
             content = content.encode('utf-8')
         if hash is None:
             hash = self.get_fake_hash(content)
         if storage_key is None:
             storage_key = uuid.uuid4()
+        assert content is None or isinstance(content, bytes)
+        assert isinstance(hash, str)
+        assert isinstance(magic_hash, str)
         return ContentBlob.objects.create(
             hash=hash, magic_hash=magic_hash, crc32=crc32, size=size,
             deflated_size=deflated_size, status=status, content=content,

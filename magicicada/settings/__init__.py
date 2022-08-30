@@ -27,9 +27,6 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/1.8/ref/settings/
 """
 
-from __future__ import unicode_literals, print_function
-
-# Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 import logging
 import os
 import sys
@@ -48,6 +45,7 @@ def get_file_content(folder, filename):
     return content
 
 
+# Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -56,7 +54,7 @@ BASE_DIR = os.path.dirname(
 # See https://docs.djangoproject.com/en/1.8/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = '%kj2ks+76)v=*@@wbz&b&fe8k$aax41q+6dy((q684uh#ttwa%'
+SECRET_KEY = 'keep the secret key used in production secret!'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
@@ -66,7 +64,7 @@ ALLOWED_HOSTS = []
 
 # Application definition
 
-INSTALLED_APPS = (
+INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -76,9 +74,10 @@ INSTALLED_APPS = (
     'django.contrib.sites',
     'magicicada.filesync',
     'magicicada.txlog',
-)
+]
 
-MIDDLEWARE_CLASSES = (
+MIDDLEWARE = [
+    'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -86,8 +85,7 @@ MIDDLEWARE_CLASSES = (
     'django.contrib.auth.middleware.SessionAuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'django.middleware.security.SecurityMiddleware',
-)
+]
 
 ROOT_URLCONF = 'magicicada.urls'
 
@@ -125,6 +123,22 @@ DATABASES = {
         },
     },
 }
+
+
+# Password validation
+# https://docs.djangoproject.com/en/2.2/ref/settings/#auth-password-validators
+
+PASSWORD_VALIDATORS = [
+    'UserAttributeSimilarityValidator',
+    'MinimumLengthValidator',
+    'CommonPasswordValidator',
+    'NumericPasswordValidator',
+]
+AUTH_PASSWORD_VALIDATORS = [
+    {'NAME': f'django.contrib.auth.password_validation.{validator}'}
+    for validator in PASSWORD_VALIDATORS
+]
+
 
 # Internationalization
 # https://docs.djangoproject.com/en/1.8/topics/i18n/

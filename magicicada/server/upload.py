@@ -26,8 +26,7 @@ The NullConsumer is just a consumer that discards whatever it gets.
 """
 
 import zlib
-
-from cStringIO import StringIO
+from io import BytesIO
 
 from magicicadaprotocol.content_hash import (
     content_hash_factory,
@@ -85,7 +84,7 @@ class ProxyHashingProducer(object):
             return
         self.deflated_size += len(data)
         chunk_size = len(data) // self.chunks
-        buf = StringIO(data)
+        buf = BytesIO(data)
         for i in range(self.chunks):  # split the data in 10 chunks
             self.add_inflated_data(self.decompress(buf.read(chunk_size)))
         if buf.tell() < len(data):

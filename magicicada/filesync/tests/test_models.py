@@ -20,8 +20,6 @@
 
 """Test for the storage model."""
 
-from __future__ import unicode_literals
-
 import threading
 import unittest
 import uuid
@@ -1286,7 +1284,7 @@ class StorageObjectTestCase(BaseTestCase):
         user.recalculate_used_bytes()
         self.assertEqual(user.used_storage_bytes, expected_used)
 
-        for c in root.children.all():
+        for c in root.children.select_related('content_blob').all():
             c.unlink()
         self.assertEqual(user.used_bytes, expected_used * 2 / 3)
 

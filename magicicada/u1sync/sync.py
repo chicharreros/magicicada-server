@@ -22,8 +22,6 @@ the server to correspond to the merged result.
 
 """
 
-from __future__ import with_statement, unicode_literals
-
 import os
 import logging
 
@@ -35,7 +33,7 @@ from magicicada.u1sync.genericmerge import MergeNode, generic_merge
 from magicicada.u1sync.utils import safe_mkdir
 
 
-EMPTY_HASH = b""
+EMPTY_HASH = ""
 UPLOAD_SYMBOL = "▲"
 DOWNLOAD_SYMBOL = "▼"
 CONFLICT_SYMBOL = "!"
@@ -51,7 +49,7 @@ def get_conflict_path(path, conflict_info):
 
 
 def name_from_path(path):
-    """Return unicode name from last path component."""
+    """Return the name from last path component."""
     return os.path.split(path)[1]
 
 
@@ -80,9 +78,8 @@ def sync_tree(merged_tree, original_tree, sync_mode, path):
         (parent_path, parent_display_path, parent_uuid,
          parent_synced) = partial_parent
 
-        utf8_name = name  # .encode("utf-8")
-        path = os.path.join(parent_path, utf8_name)
-        display_path = os.path.join(parent_display_path, utf8_name)
+        path = os.path.join(parent_path, name)
+        display_path = os.path.join(parent_display_path, name)
         node_uuid = None
 
         synced = False
@@ -163,9 +160,8 @@ def sync_tree(merged_tree, original_tree, sync_mode, path):
 
         if model_node is not None:
             if model_node.node_type == DIRECTORY:
-                child_iter = child_results.items()
                 merged_children = dict(
-                    (name, child) for (name, child) in child_iter
+                    (name, child) for (name, child) in child_results.items()
                     if child is not None)
             else:
                 # if there are children here it's because they failed to delete

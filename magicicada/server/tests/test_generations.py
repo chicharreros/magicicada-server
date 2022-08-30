@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 # Copyright 2008-2015 Canonical
 # Copyright 2015-2018 Chicharreros (https://launchpad.net/~chicharreros)
 #
@@ -85,8 +83,8 @@ class TestGetDelta(GenerationsTestCase):
             yield client.dummy_authenticate("open sesame")
             # create some nodes to get a delta
             root = self.usr0.root
-            nodes = [root.make_file(u"name%s" % i) for i in range(5)]
-            nodes += [root.make_subdirectory(u"dir%s" % i) for i in range(5)]
+            nodes = [root.make_file("name%s" % i) for i in range(5)]
+            nodes += [root.make_subdirectory("dir%s" % i) for i in range(5)]
             req = yield client.get_delta(request.ROOT, 0)
             self.assertEqual(len(req.response), len(nodes))
             self.assertTrue(req.full)
@@ -103,8 +101,8 @@ class TestGetDelta(GenerationsTestCase):
             yield client.dummy_authenticate("open sesame")
             # create some nodes to get a delta
             root = self.usr0.root
-            nodes = [root.make_file(u"name%s" % i) for i in range(5)]
-            nodes += [root.make_subdirectory(u"dir%s" % i) for i in range(5)]
+            nodes = [root.make_file("name%s" % i) for i in range(5)]
+            nodes += [root.make_subdirectory("dir%s" % i) for i in range(5)]
             from_generation = nodes[5].generation
             req = yield client.get_delta(request.ROOT, from_generation)
             self.assertEqual(len(req.response), len(nodes[6:]))
@@ -121,7 +119,7 @@ class TestGetDelta(GenerationsTestCase):
         def auth(client):
             yield client.dummy_authenticate("open sesame")
             # create some nodes to get a delta
-            nodes = [self.usr0.root.make_file(u"name%s" % i) for i in range(5)]
+            nodes = [self.usr0.root.make_file("name%s" % i) for i in range(5)]
             from_generation = nodes[-1].generation
             req = yield client.get_delta(request.ROOT, from_generation)
             self.assertEqual(len(req.response), 0)
@@ -141,7 +139,7 @@ class TestGetDelta(GenerationsTestCase):
             limit = 10
             self.patch(server.settings, 'DELTA_MAX_SIZE', limit)
             for i in range(20):
-                self.usr0.root.make_file(u"name%s" % i)
+                self.usr0.root.make_file("name%s" % i)
             req = yield client.get_delta(request.ROOT, 5)
             self.assertEqual(len(req.response), limit)
             self.assertFalse(req.full)
@@ -163,8 +161,8 @@ class TestGetDelta(GenerationsTestCase):
         def auth(client):
             yield client.dummy_authenticate("open sesame")
             # create some nodes to get a delta
-            nodes = [self.usr0.root.make_file(u"name_1")]
-            nodes += [self.usr0.root.make_subdirectory(u"dir_1")]
+            nodes = [self.usr0.root.make_file("name_1")]
+            nodes += [self.usr0.root.make_subdirectory("dir_1")]
             req = yield client.get_delta(request.ROOT, 0)
             self.assertEqual(len(req.response), 2)
             self.assertTrue(req.full)
@@ -184,7 +182,7 @@ class TestGetDelta(GenerationsTestCase):
             # create some nodes to get a delta
             self.patch(server.settings, 'MAX_DELTA_INFO', 5)
             for i in range(20):
-                self.usr0.root.make_file(u"name%s" % i)
+                self.usr0.root.make_file("name%s" % i)
             req = yield client.get_delta(request.ROOT, 5)
             self.assertEqual(len(req.response), 15)
             self.assertTrue(req.full)
@@ -221,11 +219,11 @@ class TestRescanFromScratch(GenerationsTestCase):
             yield client.dummy_authenticate("open sesame")
             # create some nodes to get a delta
             root = self.usr0.root
-            nodes = [root.make_file(u"name%s" % i) for i in range(5)]
-            nodes += [root.make_subdirectory(u"dir%s" % i) for i in range(5)]
-            for f in [root.make_file(u"name%s" % i) for i in range(5, 10)]:
+            nodes = [root.make_file("name%s" % i) for i in range(5)]
+            nodes += [root.make_subdirectory("dir%s" % i) for i in range(5)]
+            for f in [root.make_file("name%s" % i) for i in range(5, 10)]:
                 f.delete()
-            dirs = [root.make_subdirectory(u"dir%s" % i) for i in range(5, 10)]
+            dirs = [root.make_subdirectory("dir%s" % i) for i in range(5, 10)]
             for d in dirs:
                 d.delete()
             from operator import attrgetter
@@ -250,7 +248,7 @@ class TestRescanFromScratch(GenerationsTestCase):
             # create some nodes to get a delta
             self.patch(server.settings, 'MAX_DELTA_INFO', 5)
             for i in range(20):
-                self.usr0.root.make_file(u"name%s" % i)
+                self.usr0.root.make_file("name%s" % i)
             req = yield client.get_delta(request.ROOT, 5)
             self.assertEqual(len(req.response), 15)
             self.assertTrue(req.full)

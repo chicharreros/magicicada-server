@@ -1,11 +1,11 @@
 SHELL_ENV = DJANGO_SETTINGS_MODULE=$(DJANGO_SETTINGS_MODULE) PYTHONPATH=$(PYTHONPATH)
-PGNAME = $(shell $(SHELL_ENV) $(PYTHON) -c "from django.conf import settings; print settings.DATABASES['default']['NAME']" 2> /dev/null)
-PGHOST = $(shell $(SHELL_ENV) $(PYTHON) -c "from django.conf import settings; print settings.DATABASES['default']['HOST']" 2> /dev/null)
-PGUSER = $(shell $(SHELL_ENV) $(PYTHON) -c "from django.conf import settings; print settings.DATABASES['default']['USER']" 2> /dev/null)
+PGNAME = $(shell $(SHELL_ENV) $(PYTHON) -c "from django.conf import settings; print(settings.DATABASES['default']['NAME'])" 2> /dev/null)
+PGHOST = $(shell $(SHELL_ENV) $(PYTHON) -c "from django.conf import settings; print(settings.DATABASES['default']['HOST'])" 2> /dev/null)
+PGUSER = $(shell $(SHELL_ENV) $(PYTHON) -c "from django.conf import settings; print(settings.DATABASES['default']['USER'])" 2> /dev/null)
 DATA_DIR = $(PGHOST)/data
 LOG_FILE = $(PGHOST)/postgresql.log
 CONF_FILE = $(PGHOST)/postgresql.conf
-PGBIN = /usr/lib/postgresql/10/bin
+PGBIN = /usr/lib/postgresql/12/bin
 PGCTL = $(PGBIN)/pg_ctl
 PGINIT = $(PGBIN)/initdb
 

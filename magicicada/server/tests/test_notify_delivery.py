@@ -20,8 +20,8 @@
 
 import logging
 import uuid
+from unittest import mock
 
-import mock
 from magicicadaprotocol import protocol_pb2, request
 from twisted.internet.defer import inlineCallbacks, succeed
 from twisted.internet import defer, reactor
@@ -180,7 +180,7 @@ class TestDelivery(TwistedTestCase):
 
         notif_to = ShareAccepted(share_id, "name", root_id, from_user,
                                  to_user, Share.VIEW, True)
-        notif_from = ShareAccepted(share_id, u"name", root_id, from_user,
+        notif_from = ShareAccepted(share_id, "name", root_id, from_user,
                                    to_user, Share.VIEW, True)
         yield self.factory.deliver_share_accepted(notif_to,
                                                   recipient_id=to_user)
@@ -227,7 +227,7 @@ class TestDelivery(TwistedTestCase):
 
         notif = ShareAccepted(share_id, "name", root_id, from_user, to_user,
                               Share.VIEW, True)
-        notif2 = ShareAccepted(share_id, u"name", root_id, from_user, to_user,
+        notif2 = ShareAccepted(share_id, "name", root_id, from_user, to_user,
                                Share.VIEW, True)
         yield self.factory.deliver_share_accepted(notif,
                                                   recipient_id=from_user)
@@ -367,27 +367,27 @@ class NotificationErrorsTestCase(TestWithDatabase):
     def test_share_created(self):
         """Test the share events."""
         event_args = (
-            uuid.uuid4(), u"name", uuid.uuid4(), 1, 2, Share.VIEW, False)
+            uuid.uuid4(), "name", uuid.uuid4(), 1, 2, Share.VIEW, False)
         return self.check_event(ShareCreated(*event_args))
 
     def test_share_deleted(self):
         """Test the share events."""
         event_args = (
-            uuid.uuid4(), u"name", uuid.uuid4(), 1, 2, Share.VIEW, False)
+            uuid.uuid4(), "name", uuid.uuid4(), 1, 2, Share.VIEW, False)
         return self.check_event(ShareDeleted(*event_args))
 
     def test_share_declined(self):
         """Test the share events."""
         event_args = (
-            uuid.uuid4(), u"name", uuid.uuid4(), 1, 2, Share.VIEW, False)
+            uuid.uuid4(), "name", uuid.uuid4(), 1, 2, Share.VIEW, False)
         return self.check_event(ShareDeclined(*event_args))
 
     def test_share_accepted(self):
         """Test the share events."""
         event_args = (
-            uuid.uuid4(), u"name", uuid.uuid4(), 1, 2, Share.VIEW, True)
+            uuid.uuid4(), "name", uuid.uuid4(), 1, 2, Share.VIEW, True)
         return self.check_event(
-            ShareAccepted(*event_args), recipient_id=u'test')
+            ShareAccepted(*event_args), recipient_id='test')
 
     def test_udf_delete(self):
         """Test UDF Delete."""
@@ -396,7 +396,7 @@ class NotificationErrorsTestCase(TestWithDatabase):
     def test_udf_create(self):
         """Test UDF Create."""
         return self.check_event(
-            UDFCreate(1, uuid.uuid4(), uuid.uuid4(), u"path", uuid.uuid4()))
+            UDFCreate(1, uuid.uuid4(), uuid.uuid4(), "path", uuid.uuid4()))
 
     def test_new_volume_gen(self):
         """Test the new gen for volume events."""

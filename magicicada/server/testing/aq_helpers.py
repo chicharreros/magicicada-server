@@ -23,7 +23,7 @@ import shutil
 import time
 import uuid
 from functools import partial, total_ordering
-from StringIO import StringIO
+from io import BytesIO
 
 import dbus
 import dbus.service
@@ -76,8 +76,15 @@ def show_time():
     return "%s,%s" % (p1, p2)
 
 
-class NoCloseCustomIO(StringIO):
-    """a stringio subclass that doesnt destroy content on close."""
+class NoCloseCustomIO(BytesIO):
+    """A BytesIO subclass that doesnt destroy content on close."""
+
+    # Needed for action_queue's file management
+    # if getattr(self.fileobj, 'fileno', None) is not None:
+    #     # it's a real file, with a fileno! Let's sync its data out to disk
+    #     os.fsync(self.fileobj.fileno())
+    fileno = None
+
     def close(self):
         """do nothing"""
         pass
@@ -375,9 +382,9 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
             self.rmtree(self.tmpdir)
 
         _user_data = [
-            (u'jack', u'jackpass'),
-            (u'jane', u'janepass'),
-            (u'john', u'johnpass'),
+            ('jack', 'jackpass'),
+            ('jane', 'janepass'),
+            ('john', 'johnpass'),
         ]
         self.access_tokens = {}
         self.storage_users = {}
@@ -506,7 +513,7 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
         if 'error' in kwargs:
             self.failed = kwargs['error']
         elif 'failure' in kwargs:
-            self.failed = kwargs['failure'].value.message
+            self.failed = str(kwargs['failure'].value)
 
     def wait_for_nirvana(self, last_event_interval=.5):
         """Get a deferred that will fire when there are no more

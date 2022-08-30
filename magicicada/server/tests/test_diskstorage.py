@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 # Copyright 2015-2018 Chicharreros (https://launchpad.net/~chicharreros)
 #
 # This program is free software: you can redistribute it and/or modify
@@ -21,7 +19,7 @@
 
 import os
 import shutil
-import StringIO
+import io
 
 from twisted.internet import defer
 from twisted.trial.unittest import TestCase as TwistedTestCase
@@ -60,14 +58,14 @@ class BaseTestCase(TwistedTestCase):
         node_id = "dinw78cdync8"
         path = DiskStorage(self.tmpdir)._get_treepath(node_id)
         os.makedirs(path)
-        data = 'test content'
+        data = b'test content'
         with open(os.path.join(path, node_id), 'wb') as fh:
             fh.write(data)
 
         # get it
         ds = DiskStorage(self.tmpdir)
         producer = ds.get(node_id)
-        consumer = StringIO.StringIO()
+        consumer = io.BytesIO()
         yield producer.startProducing(consumer)
         self.assertEqual(consumer.getvalue(), data)
 
@@ -79,7 +77,7 @@ class BaseTestCase(TwistedTestCase):
         # write it
         node_id = "dinw78cdync8"
         ds = DiskStorage(self.tmpdir)
-        data = 'test content to write'
+        data = b'test content to write'
         consumer = ds.put(node_id)
         consumer.write(data)
         consumer.unregisterProducer()
@@ -157,7 +155,7 @@ class BaseTestCase(TwistedTestCase):
         # write it
         node_id = "dinw78cdync8"
         ds = DiskStorage(self.tmpdir)
-        data = 'test content to write'
+        data = b'test content to write'
         consumer = ds.put(node_id)
         consumer.write(data)
         path = ds._get_treepath(node_id)

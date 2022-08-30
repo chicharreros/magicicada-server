@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 # Copyright 2008-2015 Canonical
 # Copyright 2015-2018 Chicharreros (https://launchpad.net/~chicharreros)
 #
@@ -20,9 +18,9 @@
 
 """Test the action queue."""
 
-import StringIO
 import os
 import uuid
+from io import BytesIO
 
 from magicicadaclient.syncdaemon.states import (
     StateManager, QueueManager, ConnectionManager)
@@ -123,7 +121,7 @@ class TestMeta(TestBase):
         """Test we can make files using keyword arguments."""
         wait_for_queue_done = self.wait_for('SYS_QUEUE_DONE')
         parent_path = self.main.fs.get_by_node_id(request.ROOT, self.root).path
-        mdid = self.main.fs.create(os.path.join(parent_path, u"test"),
+        mdid = self.main.fs.create(os.path.join(parent_path, "test"),
                                    request.ROOT)
         self.aq.make_file(share_id=request.ROOT, parent_id=self.root,
                           name='hola', marker='marker:xyzzy', mdid=mdid)
@@ -265,11 +263,11 @@ class TestMeta(TestBase):
         dl = []
         parent_path = self.main.fs.get_by_node_id(request.ROOT, self.root).path
         for letter in LETTERS:
-            new_path = os.path.join(parent_path, u'hola_' + letter)
+            new_path = os.path.join(parent_path, 'hola_' + letter)
             mdid = self.main.fs.create(new_path, request.ROOT)
             marker = 'marker:' + letter
             self.aq.make_file(request.ROOT, self.root,
-                              u'hola_' + letter, marker, mdid)
+                              'hola_' + letter, marker, mdid)
             dl.append(self.wait_for('AQ_FILE_NEW_OK', marker=marker))
         d = defer.DeferredList(dl)
 
@@ -288,25 +286,27 @@ class TestNonAscii(TestBase):
 
     @defer.inlineCallbacks
     def test_mkfile_ok(self):
-        """Test that AQ correctly handles UTF-8 in mkfile."""
-        yield self._mkfile('mo\xc3\xb1o')
+        """Test that AQ correctly handles non-ascii in mkfile."""
+        non_ascii = 'moño'
+        yield self._mkfile(non_ascii)
         wait_for_rescan = self.wait_for('AQ_RESCAN_FROM_SCRATCH_OK',
                                         volume_id=request.ROOT)
         yield self.aq.rescan_from_scratch(request.ROOT)
         yield wait_for_rescan
         res = self.listener.get_rescan_from_scratch_for(request.ROOT)
-        self.assertIn(u"moño", [dt.name for dt in res['delta_content']])
+        self.assertIn(non_ascii, [dt.name for dt in res['delta_content']])
 
     @defer.inlineCallbacks
     def test_mkdir_ok(self):
-        """Test that AQ correctly handles UTF-8 in mkdir."""
-        yield self._mkdir('cami\xc3\xb3n')
+        """Test that AQ correctly handles non_ascii in mkdir."""
+        non_ascii = 'camión'
+        yield self._mkdir(non_ascii)
         wait_for_rescan = self.wait_for('AQ_RESCAN_FROM_SCRATCH_OK',
                                         volume_id=request.ROOT)
         yield self.aq.rescan_from_scratch(request.ROOT)
         yield wait_for_rescan
         res = self.listener.get_rescan_from_scratch_for(request.ROOT)
-        self.assertIn(u"camión", [dt.name for dt in res['delta_content']])
+        self.assertIn(non_ascii, [dt.name for dt in res['delta_content']])
 
 
 class TestDeferredMeta(TestBase):
@@ -457,7 +457,7 @@ class TestContent(TestBase):
             """
             def __init__(self):
                 self.name = 'dummy-will-be-ignored'
-                self.tempfile = StringIO.StringIO()
+                self.tempfile = BytesIO()
                 commands.append([x for x in outer_self.aq.queue.waiting
                                  if isinstance(x, Upload)][0])
                 self.all_read = 0
@@ -561,7 +561,7 @@ class TestContent(TestBase):
     def test_ordered(self):
         """Three commands that if run out of order will throw an exception."""
         parent_path = self.main.fs.get_by_node_id(request.ROOT, self.root).path
-        mdid = self.main.fs.create(os.path.join(parent_path, u"test"),
+        mdid = self.main.fs.create(os.path.join(parent_path, "test"),
                                    request.ROOT)
         marker = Marker(mdid)
         self.aq.make_file(request.ROOT, self.root, 'hola', marker, mdid)

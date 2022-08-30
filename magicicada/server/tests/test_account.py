@@ -32,9 +32,9 @@ class QuotaTest(TestWithDatabase):
     def test_quota(self):
         """Test quota info."""
         usr2 = services.make_storage_user(
-            u"otheruser", visible_name=u"Other User",
+            "otheruser", visible_name="Other User",
             max_storage_bytes=self.usr0.max_storage_bytes * 10)
-        share = usr2.root.share(self.usr0.id, u"a share", readonly=True)
+        share = usr2.root.share(self.usr0.id, "a share", readonly=True)
 
         @defer.inlineCallbacks
         def do_test(client):

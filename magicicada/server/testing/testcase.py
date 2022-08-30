@@ -27,7 +27,6 @@ import time
 import zlib
 from functools import wraps
 from io import BytesIO
-from StringIO import StringIO
 
 from magicicadaprotocol import client as protocol_client, request, protocol_pb2
 from magicicadaprotocol.client import StorageClientFactory, StorageClient
@@ -78,8 +77,13 @@ def get_put_content_params(
     """Return the test data for put_content."""
     if data is None:
         data = os.urandom(1000)  # not terribly compressible
+    assert isinstance(data, bytes), 'data should be bytes, got %s' % type(data)
+
     if deflated_data is None:
         deflated_data = zlib.compress(data)
+    assert isinstance(deflated_data, bytes), (
+        'deflated_data should be bytes, got %s' % type(deflated_data))
+
     params = overrides.copy()
     params.setdefault('share', share)
     params.setdefault('previous_hash', NO_CONTENT_HASH)
@@ -162,7 +166,7 @@ class BaseProtocolTestCase(TwistedTestCase):
         @return: a tuple (deflated_data, hash_value, upload_job)
 
         """
-        data = os.urandom(size)
+        data = os.urandom(int(size))
         deflated_data = zlib.compress(data)
         hash_value = get_hash(data)
         magic_hash_value = get_magic_hash(data)
@@ -172,7 +176,7 @@ class BaseProtocolTestCase(TwistedTestCase):
         r = yield self.service.factory.content.rpc_dal.call(
             'make_file_with_content',
             user_id=content_user.id, volume_id=user.root_volume_id,
-            parent_id=root, name=u"A new file", node_hash=EMPTY_HASH,
+            parent_id=root, name="A new file", node_hash=EMPTY_HASH,
             crc32=0, size=0, deflated_size=0, storage_key=None)
         node_id = r['node_id']
         node = yield content_user.get_node(user.root_volume_id, node_id, None)
@@ -438,10 +442,10 @@ class TestWithDatabase(BaseTestCase, BaseProtocolTestCase):
         yield super(TestWithDatabase, self).setUp()
 
         users = (
-            (u'usr0', 'open sesame'),
-            (u'usr1', 'friend'),
-            (u'usr2', 'pass2'),
-            (u'usr3', 'usr3'),
+            ('usr0', 'open sesame'),
+            ('usr1', 'friend'),
+            ('usr2', 'pass2'),
+            ('usr3', 'usr3'),
         )
         for username, password in users:
             user = self.make_user(username=username, password=password)
@@ -520,7 +524,7 @@ class BufferedConsumer(object):
         """Create a BufferedConsumer."""
         self.producer = bytes_producer
         self.producer.consumer = self
-        self.buffer = StringIO()
+        self.buffer = BytesIO()
 
     def resumeProducing(self):
         """IPushProducer interface."""

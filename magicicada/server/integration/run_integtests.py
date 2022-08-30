@@ -296,7 +296,7 @@ def execute_tests(all_tests, sd1, sd2, sd3):
 
     len_tests = len(all_tests)
     for i, test in enumerate(all_tests):
-        test_name = test.func_name
+        test_name = test.__name__
         testprefix = ' '.join(("===", test_name, "==="))
 
         skipit = getattr(test, 'skip', None)

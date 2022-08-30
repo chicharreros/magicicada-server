@@ -18,8 +18,6 @@
 
 """Test the resthelper."""
 
-from __future__ import unicode_literals
-
 import logging
 import operator
 import os
@@ -596,7 +594,7 @@ class RestHelperTestCase(BaseTestCase):
         info = self.helper.put_node(
             self.user, new_file_path,
             {'kind': 'file', 'hash': cb.hash, 'magic_hash': 'magic'})
-        node = self.user.get_node_by_path(new_file_path)
+        node = self.user.get_node_by_path(new_file_path, with_content=True)
         self.assertEqual(node.kind, StorageObject.FILE)
         self.assertEqual(node.full_path, '/a/b/c/file.txt')
         self.assertEqual(info, self.mapper.node_repr(node))
