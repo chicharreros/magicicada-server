@@ -1633,7 +1633,8 @@ class TestSQLStatementCount(StorageDALTestCase):
     def test_delete_directory_with_files(self):
         """Delete a directory with files inside it."""
         directory = self.create_directory_with_files(amount=5)
-        with self.assertNumQueries(26):  # XXX 17
+        # XXX was 17 with Storm, 26 with Django <2
+        with self.assertNumQueries(27):
             directory.delete(cascade=True)
 
     def test_delete_directory_stable_queries(self):

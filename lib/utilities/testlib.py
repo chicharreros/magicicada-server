@@ -156,12 +156,68 @@ def load_unittest(relpath, loader=None):
 
 
 class MagicicadaRunner(DiscoverRunner):
-    def __init__(self, factory, filter_test, verbosity=1, debug=False):
+    """A custom subclass of DiscoverRunner.
+
+    class DiscoverRunner(
+        pattern='test*.py', top_level=None, verbosity=1, interactive=True,
+        failfast=False, keepdb=False, reverse=False, debug_mode=False,
+        debug_sql=False, **kwargs)
+
+    DiscoverRunner will search for tests in any file matching pattern.
+
+    top_level can be used to specify the directory containing your top-level
+    Python modules. Usually Django can figure this out automatically, so it’s
+    not necessary to specify this option. If specified, it should generally be
+    the directory containing your manage.py file.
+
+    verbosity determines the amount of notification and debug information that
+    will be printed to the console; 0 is no output, 1 is normal output, and 2 is
+    verbose output.
+
+    If interactive is True, the test suite has permission to ask the user for
+    instructions when the test suite is executed. An example of this behavior
+    would be asking for permission to delete an existing test database. If
+    interactive is False, the test suite must be able to run without any manual
+    intervention.
+
+    If failfast is True, the test suite will stop running after the first test
+    failure is detected.
+
+    If keepdb is True, the test suite will use the existing database, or create
+    one if necessary. If False, a new database will be created, prompting the
+    user to remove the existing one, if present.
+
+    If reverse is True, test cases will be executed in the opposite order. This
+    could be useful to debug tests that aren’t properly isolated and have side
+    effects. Grouping by test class is preserved when using this option.
+
+    debug_mode specifies what the DEBUG setting should be set to prior to
+    running tests.
+
+    If debug_sql is True, failing test cases will output SQL queries logged to
+    the django.db.backends logger as well as the traceback. If verbosity is 2,
+    then queries in all tests are output.
+
+    Django may, from time to time, extend the capabilities of the test runner
+    by adding new arguments. The **kwargs declaration allows for this
+    expansion. If you subclass DiscoverRunner or write your own test runner,
+    ensure it accepts **kwargs.
+
+    Your test runner may also define additional command-line options. Create or
+    override an add_arguments(cls, parser) class method and add custom
+    arguments by calling parser.add_argument() inside the method, so that the
+    test command will be able to use those arguments.
+
+    """
+
+    def __init__(
+        self, factory, filter_test, verbosity=1, debug=False, **kwargs
+    ):
         self.factory = factory
         self.loader = RegexTestLoader(filter_test)
         self.server_suite = TestSuite()
         self.non_server_suite = TestSuite()
-        super(MagicicadaRunner, self).__init__(verbosity=verbosity)
+        super(MagicicadaRunner, self).__init__(verbosity=verbosity, **kwargs)
         if debug:
             set_twisted_debug()
 
@@ -206,6 +262,7 @@ class MagicicadaRunner(DiscoverRunner):
         topdir, testdirs, testpaths = test_labels
         for testdir in testdirs:
             self.add_tests_for_dir(testdir, testpaths, topdir)
+        return self.non_server_suite
 
     def run_suite(self, suite=None, **kwargs):
         non_server_result = super(MagicicadaRunner, self).run_suite(
