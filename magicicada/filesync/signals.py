@@ -17,27 +17,29 @@
 
 import django.dispatch
 
+# Django 3.1 release notes
+# Miscellaneous (https://docs.djangoproject.com/en/4.0/releases/3.1/#id2)
+# The purely documentational providing_args argument for Signal is deprecated.
+# If you rely on this argument as documentation, you can move the text to a
+# code comment or docstring.
 
-content_changed = django.dispatch.Signal(
-    providing_args=['instance', 'content_added', 'new_size', 'enforce_quota']
-)
+# providing_args=['instance', 'content_added', 'new_size', 'enforce_quota']
+content_changed = django.dispatch.Signal()
 
-node_moved = django.dispatch.Signal(
-    providing_args=['instance', 'old_name', 'old_parent', 'descendants']
-)
+# providing_args=['instance', 'old_name', 'old_parent', 'descendants']
+node_moved = django.dispatch.Signal()
 
-pre_kill = django.dispatch.Signal(providing_args=['instance'])
+# providing_args=['instance']
+pre_kill = django.dispatch.Signal()
 
-post_kill = django.dispatch.Signal(providing_args=['instance'])
+# providing_args=['instance']
+post_kill = django.dispatch.Signal()
 
-pre_unlink_tree = django.dispatch.Signal(
-    providing_args=['instance', 'descendants']
-)
+# providing_args=['instance', 'descendants']
+pre_unlink_tree = django.dispatch.Signal()
 
-post_unlink_tree = django.dispatch.Signal(
-    providing_args=['instance', 'descendants']
-)
+# providing_args=['instance', 'descendants']
+post_unlink_tree = django.dispatch.Signal()
 
-public_access_changed = django.dispatch.Signal(
-    providing_args=['instance', 'public']
-)
+# providing_args=['instance', 'public']
+public_access_changed = django.dispatch.Signal()
