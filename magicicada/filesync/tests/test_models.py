@@ -403,7 +403,7 @@ class StorageObjectTestCase(BaseTestCase):
     def test_create_a_node_in_a_root(self):
         """Create a regular node inside a standard root."""
         volume = self.factory.make_user_volume(generation=12)
-        # change the generaiton of the volume
+        # change the generation of the volume
         obj = volume.root_node.make_file('file.ext')
 
         # check node properties
@@ -1898,7 +1898,7 @@ class ShareTestCase(BaseTestCase):
             access=Share.MODIFY,
         )
 
-    def test_create_same_share_after_delete(self):
+    def test_create_share_same_name_after_delete(self):
         """(re)creates a share after deleting it"""
         self.root.make_subdirectory('newdir')
 
