@@ -283,7 +283,9 @@ class BaseStorageObject(models.Model):
         'self', related_name='children', null=True, on_delete=models.CASCADE
     )
 
-    # The UserVolume containing this object, NULL for the Root volume.
+    # The UserVolume containing this object. Former versions of this project
+    # would store NULL for the Root volume, but since this fork migrated from
+    # the Storm ORM to Django ORM, the root volume is also a UserVolume.
     volume = models.ForeignKey('UserVolume', on_delete=models.CASCADE)
 
     # The object's name within its containing directory.
@@ -331,7 +333,6 @@ class BaseStorageObject(models.Model):
             ('volume', 'generation'),
             # CREATE UNIQUE INDEX object_parent_name_uk
             #     ON object(parent_id, name) WHERE (status = 'Live');
-            # ('parent', 'name') when status == 'Live',
         )
 
     def __repr__(self):
@@ -903,7 +904,11 @@ class BaseStorageObject(models.Model):
 
 
 class StorageObject(BaseStorageObject):
-    """A node for a directory or file."""
+    """A node for a directory or file.
+
+    See BaseStorageObject for details about this model.
+
+    """
 
     objects = StorageObjectManager()
 
@@ -1020,10 +1025,6 @@ class Share(models.Model):
     #     CREATE UNIQUE INDEX share_shared_to_shared_by_subtree
     #         ON Share(shared_to, shared_by, subtree)
     #         WHERE status='Live' AND shared_to IS NOT NULL
-    #     unique_together = (
-    #         ('shared_to', 'shared_by', 'subtree'),
-    #         ('shared_to', 'name'),
-    #     )
 
     def save(self, *args, **kwargs):
         update_fields = kwargs.pop('update_fields', None)
@@ -1169,7 +1170,6 @@ class UserVolume(models.Model):
     # class Meta:
     #     CREATE UNIQUE INDEX udf_owner_path_uk
     #         ON userdefinedfolder(owner_id, path) WHERE (status = 'Live');
-    #     unique_together = (('owner', 'path'),)
 
     @property
     def is_root(self):
