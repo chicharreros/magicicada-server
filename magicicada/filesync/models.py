@@ -25,6 +25,7 @@ import uuid
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.db import DataError, models, transaction
+from django.db.models import Q, UniqueConstraint
 from django.db.models.functions import Concat, Substr
 from django.db.models.signals import pre_save
 from django.dispatch import receiver
@@ -329,10 +330,15 @@ class BaseStorageObject(models.Model):
 
     class Meta:
         abstract = True
-        unique_together = (
-            ('volume', 'generation'),
+        unique_together = (('volume', 'generation'),)
+        constraints = (
             # CREATE UNIQUE INDEX object_parent_name_uk
             #     ON object(parent_id, name) WHERE (status = 'Live');
+            UniqueConstraint(
+                fields=('parent', 'name'),
+                name='filesync_storageobject_parent_name_uniq',
+                condition=Q(status=STATUS_LIVE),
+            ),
         )
 
     def __repr__(self):
@@ -952,6 +958,14 @@ class MoveFromShare(BaseStorageObject):
 
     class Meta:
         unique_together = (('node_id', 'share_id'),)
+        # CREATE INDEX move_from_share_delta_idx
+        # ON filesync_movefromshare (share_id, volume_id, generation, path);
+        indexes = (
+            models.Index(
+                fields=('share_id', 'volume_id', 'generation', 'path'),
+                name='move_from_share_delta_idx',
+            ),
+        )
 
 
 class ShareVolumeDelta(BaseStorageObject):
@@ -1019,12 +1033,24 @@ class Share(models.Model):
 
     objects = ShareManager()
 
-    # class Meta:
-    #     CREATE UNIQUE INDEX share_shared_to_key
-    #         ON Share(shared_to, name) WHERE status='Live'
-    #     CREATE UNIQUE INDEX share_shared_to_shared_by_subtree
-    #         ON Share(shared_to, shared_by, subtree)
-    #         WHERE status='Live' AND shared_to IS NOT NULL
+    class Meta:
+        constraints = (
+            # CREATE UNIQUE INDEX share_shared_to_key
+            #     ON Share(shared_to, name) WHERE status='Live'
+            UniqueConstraint(
+                fields=('shared_to', 'name'),
+                name='filesync_share_shared_to_name_uniq',
+                condition=Q(status=STATUS_LIVE),
+            ),
+            # CREATE UNIQUE INDEX share_shared_to_shared_by_subtree
+            #     ON Share(shared_to, shared_by, subtree)
+            #     WHERE status='Live' AND shared_to IS NOT NULL
+            UniqueConstraint(
+                fields=('shared_to', 'shared_by', 'subtree'),
+                name='filesync_share_shared_to_shared_by_subtree_uniq',
+                condition=Q(status=STATUS_LIVE, shared_to__isnull=False),
+            ),
+        )
 
     def save(self, *args, **kwargs):
         update_fields = kwargs.pop('update_fields', None)
@@ -1167,9 +1193,16 @@ class UserVolume(models.Model):
 
     objects = UserVolumeManager()
 
-    # class Meta:
-    #     CREATE UNIQUE INDEX udf_owner_path_uk
-    #         ON userdefinedfolder(owner_id, path) WHERE (status = 'Live');
+    class Meta:
+        constraints = (
+            # CREATE UNIQUE INDEX udf_owner_path_uk
+            #     ON userdefinedfolder(owner_id, path) WHERE (status = 'Live');
+            UniqueConstraint(
+                fields=('owner', 'path'),
+                name='filesync_uservolume_owner_path_uniq',
+                condition=Q(status=STATUS_LIVE),
+            ),
+        )
 
     @property
     def is_root(self):
