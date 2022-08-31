@@ -85,6 +85,23 @@ if __name__ == "__main__":
                       help="Show logs on stdout if error or failure")
     parser.add_option("-v", "--verbosity", dest="verbosity",
                       type='int', default=1, help="Verbosity, default is 1")
+    parser.add_option(
+        "-k", "--keepdb", action="store_true",
+        help=(
+            "If set, the test suite will use the existing database, or create "
+            "one if necessary. If False, a new database will be created, "
+            "prompting the user to remove the existing one, if present."))
+    parser.add_option(
+        "-p", "--parallel", type=int, default=1,
+        help=(
+            "Specifies the number of processes. If parallel is greater than "
+            "1, the test suite will run in parallel processes. If there are "
+            "fewer test cases than configured processes, Django will reduce "
+            "the number of processes accordingly. Each process gets its own "
+            "database. This option requires the third-party tblib package to "
+            "display tracebacks correctly.")
+    )
+
 
     (options, args) = parser.parse_args()
 

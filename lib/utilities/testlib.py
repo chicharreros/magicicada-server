@@ -161,7 +161,10 @@ class MagicicadaRunner(DiscoverRunner):
     class DiscoverRunner(
         pattern='test*.py', top_level=None, verbosity=1, interactive=True,
         failfast=False, keepdb=False, reverse=False, debug_mode=False,
-        debug_sql=False, **kwargs)
+        debug_sql=False, parallel=0, tags=None, exclude_tags=None,
+        test_name_patterns=None, pdb=False, buffer=False,
+        enable_faulthandler=True, timing=True, shuffle=False, logger=None,
+        **kwargs)
 
     DiscoverRunner will search for tests in any file matching pattern.
 
@@ -171,8 +174,8 @@ class MagicicadaRunner(DiscoverRunner):
     the directory containing your manage.py file.
 
     verbosity determines the amount of notification and debug information that
-    will be printed to the console; 0 is no output, 1 is normal output, and 2 is
-    verbose output.
+    will be printed to the console; 0 is no output, 1 is normal output, and 2
+    is verbose output.
 
     If interactive is True, the test suite has permission to ask the user for
     instructions when the test suite is executed. An example of this behavior
@@ -189,14 +192,52 @@ class MagicicadaRunner(DiscoverRunner):
 
     If reverse is True, test cases will be executed in the opposite order. This
     could be useful to debug tests that aren’t properly isolated and have side
-    effects. Grouping by test class is preserved when using this option.
+    effects. Grouping by test class is preserved when using this option. This
+    option can be used in conjunction with --shuffle to reverse the order for a
+    particular random seed.
 
     debug_mode specifies what the DEBUG setting should be set to prior to
     running tests.
 
+    parallel specifies the number of processes. If parallel is greater than 1,
+    the test suite will run in parallel processes. If there are fewer test
+    cases than configured processes, Django will reduce the number of processes
+    accordingly. Each process gets its own database. This option requires the
+    third-party tblib package to display tracebacks correctly.
+
+    tags can be used to specify a set of tags for filtering tests. May be
+    combined with exclude_tags.
+
+    exclude_tags can be used to specify a set of tags for excluding tests. May
+    be combined with tags.
+
     If debug_sql is True, failing test cases will output SQL queries logged to
     the django.db.backends logger as well as the traceback. If verbosity is 2,
     then queries in all tests are output.
+
+    test_name_patterns can be used to specify a set of patterns for filtering
+    test methods and classes by their names.
+
+    If pdb is True, a debugger (pdb or ipdb) will be spawned at each test error
+    or failure.
+
+    If buffer is True, outputs from passing tests will be discarded.
+
+    If enable_faulthandler is True, faulthandler will be enabled.
+
+    If timing is True, test timings, including database setup and total run
+    time, will be shown.
+
+    If shuffle is an integer, test cases will be shuffled in a random order
+    prior to execution, using the integer as a random seed. If shuffle is None,
+    the seed will be generated randomly. In both cases, the seed will be logged
+    and set to self.shuffle_seed prior to running tests. This option can be
+    used to help detect tests that aren’t properly isolated. Grouping by test
+    class is preserved when using this option.
+
+    logger can be used to pass a Python Logger object. If provided, the logger
+    will be used to log messages instead of printing to the console. The logger
+    object will respect its logging level rather than the verbosity.
 
     Django may, from time to time, extend the capabilities of the test runner
     by adding new arguments. The **kwargs declaration allows for this
@@ -211,8 +252,53 @@ class MagicicadaRunner(DiscoverRunner):
     """
 
     def __init__(
-        self, factory, filter_test, verbosity=1, debug=False, **kwargs
+        self,
+        one=False,
+        logs_on_failure=False,
+        test=None,
+        ignore=None,
+        subunit=False,
+        verbosity=1,
+        debug=False,
+        **kwargs
     ):
+        reporter_decorators = []
+        if one:
+            reporter_decorators.append(StopOnFailureDecorator)
+        if logs_on_failure:
+            reporter_decorators.append(LogsOnFailureDecorator)
+
+        def factory(*args, **kwargs):
+            """Custom factory tha apply the decorators to the TreeReporter"""
+            if subunit:
+                return SubunitReporter(*args, **kwargs)
+            else:
+                result = TreeReporter(*args, **kwargs)
+                for decorator in reporter_decorators:
+                    result = decorator(result)
+                return result
+
+        include_re = None
+        if test:
+            include_re = re.compile('.*%s.*' % test)
+
+        exclude_re = None
+        if ignore:
+            exclude_re = re.compile('.*%s.*' % ignore)
+
+        def filter_test(t):
+            result = True
+            try:
+                test_id = t.id()
+            except AttributeError:
+                pass  # not a test, keep looking
+            else:
+                if include_re and not include_re.match(test_id):
+                    result = False
+                if exclude_re and exclude_re.match(test_id):
+                    result = False
+            return result
+
         self.factory = factory
         self.loader = RegexTestLoader(filter_test)
         self.server_suite = TestSuite()
@@ -290,49 +376,9 @@ def test_with_trial(options, topdir, testdirs, testpaths):
     observer = log.PythonLoggingObserver('twisted')
     observer.start()
 
-    # parse arguments
-    reporter_decorators = []
-    if options.one:
-        reporter_decorators.append(StopOnFailureDecorator)
-    if options.logs_on_failure:
-        reporter_decorators.append(LogsOnFailureDecorator)
-
-    def factory(*args, **kwargs):
-        """Custom factory tha apply the decorators to the TreeReporter"""
-        if options.subunit:
-            return SubunitReporter(*args, **kwargs)
-        else:
-            result = TreeReporter(*args, **kwargs)
-            for decorator in reporter_decorators:
-                result = decorator(result)
-            return result
-
-    include_re = None
-    if options.test:
-        include_re = re.compile('.*%s.*' % options.test)
-
-    exclude_re = None
-    if options.ignore:
-        exclude_re = re.compile('.*%s.*' % options.ignore)
-
-    def filter_test(t):
-        result = True
-        try:
-            test_id = t.id()
-        except AttributeError:
-            pass  # not a test, keep looking
-        else:
-            if include_re and not include_re.match(test_id):
-                result = False
-            if exclude_re and exclude_re.match(test_id):
-                result = False
-        return result
-
     django.setup()
 
-    runner = MagicicadaRunner(
-        factory, filter_test, verbosity=options.verbosity, debug=options.debug
-    )
+    runner = MagicicadaRunner(**options.__dict__)
     result = runner.run_tests(test_labels=(topdir, testdirs, testpaths))
     failed = not result.wasSuccessful()
     return failed

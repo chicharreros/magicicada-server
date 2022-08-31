@@ -163,6 +163,9 @@ AUTH_USER_MODEL = 'filesync.StorageUser'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
 
+# We are not ready for this yet, but ideally we should work towards using it.
+# TEST_RUNNER = 'utilities.testlib.MagicicadaRunner'
+
 # define the TRACE level
 TRACE = 5
 logging.addLevelName(TRACE, 'TRACE')
