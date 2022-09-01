@@ -20,6 +20,7 @@ ENV = $(CURDIR)/.env
 PYTHON = $(ENV)/bin/python
 SRC_DIR = $(CURDIR)/magicicada
 LIB_DIR = $(CURDIR)/lib
+TMP_DIR = $(CURDIR)/tmp
 PATH := $(ENV)/bin:$(PATH)
 PYTHONPATH := $(SRC_DIR):$(LIB_DIR):$(CURDIR):$(PYTHONPATH)
 DJANGO_ADMIN = $(LIB_DIR)/django/bin/django-admin.py
@@ -39,7 +40,7 @@ SOURCEDEPS_TAG = .sourcecode/sourcedeps-tag
 TARGET_SOURCECODE_DIR = $(CURDIR)/.sourcecode
 TESTFLAGS=
 
-TAR_EXTRA = --exclude 'tmp/*' --exclude tags
+TAR_EXTRA = --exclude '$(TMP_DIR)/*' --exclude tags
 
 include Makefile.db
 
@@ -66,7 +67,7 @@ bootstrap:
 	$(MAKE) $(ENV)
 	$(MAKE) sourcedeps build-clientdefs
 	$(ENV)/bin/pip install -r $(TARGET_SOURCECODE_DIR)/magicicada-client/requirements.txt
-	mkdir -p tmp
+	mkdir -p $(TMP_DIR)
 
 $(ENV): $(ENV)/bin/activate
 
@@ -86,7 +87,7 @@ ci-test:
 	$(MAKE) test TESTFLAGS="-1 $(TESTFLAGS)"
 
 clean:
-	rm -rf tmp/* _trial_temp $(ENV)
+	rm -rf $(TMP_DIR)/* _trial_temp $(ENV)
 
 black:
 	$(ENV)/bin/black .
@@ -118,24 +119,22 @@ start-supervisor:
 	-@$(START_SUPERVISORD) dev-scripts/supervisor-dev.conf.tpl
 
 stop-supervisor:
-	$(SUPERVISOR_CTL) -c $(CURDIR)/tmp/supervisor-dev.conf shutdown
+	$(SUPERVISOR_CTL) -c $(TMP_DIR)/supervisor-dev.conf shutdown
 
 start-%-group:
-	$(SUPERVISOR_CTL) -c $(CURDIR)/tmp/supervisor-dev.conf start $*:
+	$(SUPERVISOR_CTL) -c $(TMP_DIR)/supervisor-dev.conf start $*:
 
 stop-%-group:
-	$(SUPERVISOR_CTL) -c $(CURDIR)/tmp/supervisor-dev.conf stop $*:
+	$(SUPERVISOR_CTL) -c $(TMP_DIR)/supervisor-dev.conf stop $*:
 
 start-%:
-	$(SUPERVISOR_CTL) -c $(CURDIR)/tmp/supervisor-dev.conf start $*
+	$(SUPERVISOR_CTL) -c $(TMP_DIR)/supervisor-dev.conf start $*
 
 stop-%:
-	$(SUPERVISOR_CTL) -c $(CURDIR)/tmp/supervisor-dev.conf stop $*
+	$(SUPERVISOR_CTL) -c $(TMP_DIR)/supervisor-dev.conf stop $*
 
 publish-api-port:
-	$(PYTHON) -c 'from magicicada import settings; print >> file("tmp/filesyncserver.port", "w"), settings.TCP_PORT'
-	$(PYTHON) -c 'from magicicada import settings; print >> file("tmp/filesyncserver.port.ssl", "w"), settings.SSL_PORT'
-	$(PYTHON) -c 'from magicicada import settings; print >> file("tmp/filesyncserver-status.port", "w"), settings.API_STATUS_PORT'
+	$(DJANGO_MANAGE) publish_api_port -d $(TMP_DIR)
 
 shell:
 	$(DJANGO_MANAGE) shell
