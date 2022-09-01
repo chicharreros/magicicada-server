@@ -391,6 +391,64 @@ class StorageObjectTestCase(BaseTestCase):
         self.assertEqual(node.generation, 0)
         self.assertEqual(node.generation_created, 0)
 
+    def test_unique_volume_generation_for_root_volume(self):
+        user = self.factory.make_user()
+        # create two objects with the same volume and the same generation
+        file1 = self.factory.make_file(owner=user, parent=None)
+        file2 = self.factory.make_file(owner=user, parent=None)
+
+        with self.assertRaises(IntegrityError) as ctx:
+            file1.generation = file2.generation
+            file1.save()
+
+        self.assertIn(
+            'duplicate key value violates unique constraint '
+            '"filesync_storageobject_volume_id_generation_',
+            str(ctx.exception),
+        )
+
+    def test_unique_volume_generation_for_non_root(self):
+        volume = self.factory.make_user_volume(generation=5)
+        # create two objects with the same volume and the same generation
+        file1 = self.factory.make_file(parent=volume.root_node)
+        file2 = self.factory.make_file(parent=volume.root_node)
+
+        with self.assertRaises(IntegrityError) as ctx:
+            file1.generation = file2.generation
+            file1.save()
+
+        self.assertIn(
+            'duplicate key value violates unique constraint '
+            '"filesync_storageobject_volume_id_generation_',
+            str(ctx.exception),
+        )
+
+    def test_unique_parent_name_when_live(self):
+        name = 'foo'
+        file1 = self.factory.make_file(name=name)
+        parent = file1.parent
+        with self.assertRaises(IntegrityError) as ctx:
+            self.factory.make_file(name=name, parent=parent)
+
+        self.assertIn(
+            'duplicate key value violates unique constraint '
+            '"filesync_storageobject_parent_name_uniq"\nDETAIL:  '
+            f'Key (parent_id, name)=({parent.id}, {name}) already exists.\n',
+            str(ctx.exception),
+        )
+
+    def test_unique_parent_name_when_dead(self):
+        name = 'foo'
+        file1 = self.factory.make_file(name=name)
+        parent = file1.parent
+        file1.unlink()
+
+        file2 = self.factory.make_file(name=name, parent=parent)
+        self.assertIsNotNone(file2.pk)
+        self.assertEqual(
+            StorageObject.objects.filter(name=name, parent=parent).count(), 2
+        )
+
     def test_make_with_no_name(self):
         """Test make_file and make_directory with no name."""
         user = self.factory.make_user()
@@ -2002,6 +2060,32 @@ class UserVolumeTestCase(BaseTestCase):
             volume.root_node,
         )
         self.assertTrue(volume.root_node.kind, StorageObject.DIRECTORY)
+
+    def test_unique_owner_path_when_live(self):
+        user = self.factory.make_user()
+        path = '~/foo'
+        self.factory.make_user_volume(owner=user, path=path)
+        with self.assertRaises(IntegrityError) as ctx:
+            self.factory.make_user_volume(owner=user, path=path)
+
+        self.assertIn(
+            'duplicate key value violates unique constraint '
+            '"filesync_uservolume_owner_path_uniq"\nDETAIL:  '
+            f'Key (owner_id, path)=({user.id}, {path}) already exists.\n',
+            str(ctx.exception),
+        )
+
+    def test_unique_owner_path_when_dead(self):
+        user = self.factory.make_user()
+        path = '~/foo'
+        udf1 = self.factory.make_user_volume(owner=user, path=path)
+        udf1.kill()
+
+        udf2 = self.factory.make_user_volume(owner=user, path=path)
+        self.assertIsNotNone(udf2.pk)
+        self.assertEqual(
+            UserVolume.objects.filter(path=path, owner=user).count(), 2
+        )
 
     def test_increment_generation(self):
         """Test increment_generation."""
