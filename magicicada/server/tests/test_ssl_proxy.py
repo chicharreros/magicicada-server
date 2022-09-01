@@ -20,7 +20,7 @@
 
 import logging
 import re
-from io import StringIO
+from io import BytesIO
 from unittest import SkipTest, mock
 
 from magicicadaprotocol.client import StorageClientFactory, StorageClient
@@ -197,7 +197,7 @@ class SSLProxyHeartbeatTestCase(SSLProxyTestCase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        self.stdout = StringIO()
+        self.stdout = BytesIO()
         send_heartbeat = supervisor_utils.send_heartbeat
         self.patch(
             supervisor_utils,
@@ -212,8 +212,8 @@ class SSLProxyHeartbeatTestCase(SSLProxyTestCase):
         d = defer.Deferred()
         reactor.callLater(0.2, d.callback, None)
         yield d
-        self.assertIn('<!--XSUPERVISOR:BEGIN-->', self.stdout.getvalue())
-        self.assertIn('<!--XSUPERVISOR:END-->', self.stdout.getvalue())
+        self.assertIn(b'<!--XSUPERVISOR:BEGIN-->', self.stdout.getvalue())
+        self.assertIn(b'<!--XSUPERVISOR:END-->', self.stdout.getvalue())
 
 
 class ProxyServerTest(TestCase):

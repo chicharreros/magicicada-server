@@ -29,10 +29,12 @@ from twisted.protocols import basic
 
 def send_heartbeat(out=sys.stdout, time=time.time, flush=True):
     """Write the heartbeat event to stdout."""
-    out.write(ProcessCommunicationEvent.BEGIN_TOKEN.decode('utf-8'))
+    out.write(ProcessCommunicationEvent.BEGIN_TOKEN)
     timestamp = time()
-    out.write(json.dumps({"type": "heartbeat", "time": timestamp}))
-    out.write(ProcessCommunicationEvent.END_TOKEN.decode('utf-8'))
+    out.write(
+        json.dumps({"type": "heartbeat", "time": timestamp}).encode('utf-8')
+    )
+    out.write(ProcessCommunicationEvent.END_TOKEN)
     if flush:
         out.flush()
 

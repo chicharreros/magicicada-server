@@ -24,7 +24,7 @@ import os
 import shutil
 import struct
 import sys
-from io import StringIO
+from io import BytesIO
 from unittest import mock
 
 from django.conf import settings
@@ -524,7 +524,7 @@ class TestServerHeartbeat(TestWithDatabase):
 
     @defer.inlineCallbacks
     def setUp(self):
-        self.stdout = StringIO()
+        self.stdout = BytesIO()
         send_heartbeat = supervisor_utils.send_heartbeat
         self.patch(
             supervisor_utils,
@@ -539,5 +539,5 @@ class TestServerHeartbeat(TestWithDatabase):
         d = defer.Deferred()
         reactor.callLater(0.2, d.callback, None)
         yield d
-        self.assertIn('<!--XSUPERVISOR:BEGIN-->', self.stdout.getvalue())
-        self.assertIn('<!--XSUPERVISOR:END-->', self.stdout.getvalue())
+        self.assertIn(b'<!--XSUPERVISOR:BEGIN-->', self.stdout.getvalue())
+        self.assertIn(b'<!--XSUPERVISOR:END-->', self.stdout.getvalue())
