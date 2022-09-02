@@ -107,9 +107,7 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         subparsers = parser.add_subparsers(help='User Management operations')
 
-        p_create = subparsers.add_parser(
-            'create', help='Create a user.', cmd=self
-        )
+        p_create = subparsers.add_parser('create', help='Create a user.')
         p_create.set_defaults(func=self.create)
         p_create.add_argument('username', type=str)
         p_create.add_argument('firstname', type=str)
@@ -118,7 +116,7 @@ class Command(BaseCommand):
         p_create.add_argument('password', type=str)
 
         p_update = subparsers.add_parser(
-            'update', help='Change information for a user.', cmd=self
+            'update', help='Change information for a user.'
         )
         p_update.add_argument('username')
         p_update.set_defaults(func=self.update)
@@ -128,13 +126,13 @@ class Command(BaseCommand):
         p_update.add_argument('--password', type=str)
 
         p_delete = subparsers.add_parser(
-            'delete', help='Remove a user from the system.', cmd=self
+            'delete', help='Remove a user from the system.'
         )
         p_delete.set_defaults(func=self.delete)
         p_delete.add_argument('username', type=str)
 
         p_show = subparsers.add_parser(
-            'show', help='Show information about an user.', cmd=self
+            'show', help='Show information about an user.'
         )
         p_show.set_defaults(func=self.show)
         p_show.add_argument('username', type=str)

@@ -16,7 +16,7 @@
 #
 # For further info, check  http://launchpad.net/filesync-server
 
-"""Script to manage the users in the system."""
+"""Script to publish the API ports in specific files."""
 
 import os
 
