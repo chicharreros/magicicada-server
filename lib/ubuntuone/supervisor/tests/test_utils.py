@@ -21,7 +21,7 @@
 import json
 import time
 import logging
-from io import StringIO
+from io import BytesIO
 
 from supervisor.events import ProcessCommunicationEvent
 from twisted.internet import defer, task, protocol
@@ -33,8 +33,8 @@ from ubuntuone.supervisor.utils import (
     HeartbeatWriter,
 )
 
-BEGIN_TOKEN = ProcessCommunicationEvent.BEGIN_TOKEN.decode('utf-8')
-END_TOKEN = ProcessCommunicationEvent.END_TOKEN.decode('utf-8')
+BEGIN_TOKEN = ProcessCommunicationEvent.BEGIN_TOKEN
+END_TOKEN = ProcessCommunicationEvent.END_TOKEN
 
 
 def wait_for(func, sleep=0.1, retries=10):
@@ -53,8 +53,41 @@ class HeartbeatTestCase(BaseTestCase):
     """Tests for heartbeat related utilities."""
 
     def test_send_heartbeat(self):
-        """test send_heartbeat function."""
-        out = StringIO()
+        """Test send_heartbeat function.
+
+        This function is going to be called from Twisted, so we need to ensure
+        that bytes are written to `out`, otherwise we'd get a traceback similar
+        to this one:
+
+        [twisted.internet.defer#critical] Unhandled error in Deferred:
+        Traceback (most recent call last):
+          File "/?/twisted/internet/protocol.py", line 509, in makeConnection
+            self.connectionMade()
+          File "/?/ubuntuone/supervisor/utils.py", line 78, in connectionMade
+            self.loop.start(self.interval)
+          File "/?/twisted/internet/task.py", line 206, in start
+            self()
+          File "/?/twisted/internet/task.py", line 251, in __call__
+            d = maybeDeferred(self.f, *self.a, **self.kw)
+        --- <exception caught here> ---
+          File "/?/twisted/internet/defer.py", line 190, in maybeDeferred
+            result = f(*args, **kwargs)
+          File "/?/ubuntuone/supervisor/utils.py", line 71, in send
+            send_heartbeat(
+          File "/?/ubuntuone/supervisor/utils.py", line 32, in send_heartbeat
+            out.write(ProcessCommunicationEvent.BEGIN_TOKEN.decode('utf-8'))
+          File "/?/twisted/internet/_posixstdio.py", line 57, in write
+            self._writer.write(data)
+          File "/?/twisted/internet/process.py", line 177, in write
+            abstract.FileDescriptor.write(self, data)
+          File "/?/twisted/internet/abstract.py", line 356, in write
+            _dataMustBeBytes(data)
+          File "/?/twisted/internet/abstract.py", line 24, in _dataMustBeBytes
+            raise TypeError("Data must be bytes")
+        builtins.TypeError: Data must be bytes
+
+        """
+        out = BytesIO()
         send_heartbeat(out=out)
         raw_event = out.getvalue()
         self.assertTrue(raw_event.startswith(BEGIN_TOKEN))
@@ -84,40 +117,40 @@ class HeartbeatGeneratorTestCase(BaseTestCase):
 
     def setUp(self):
         super(HeartbeatGeneratorTestCase, self).setUp()
-        self.stdout = StringIO()
+        self.out = BytesIO()
         self.timer = Timer()
 
     def test_send_heartbeat_on_interval(self):
         """Test that we actually send the heartbeat."""
-        gen = heartbeat_generator(2, out=self.stdout, time=self.timer)
+        gen = heartbeat_generator(2, out=self.out, time=self.timer)
         next(gen)
-        self.assertFalse(self.stdout.getvalue())
+        self.assertFalse(self.out.getvalue())
         self.timer.advance(2)
         next(gen)
-        output = self.stdout.getvalue()
-        self.assertTrue('<!--XSUPERVISOR:BEGIN-->' in output)
-        self.assertTrue('<!--XSUPERVISOR:END-->' in output)
+        output = self.out.getvalue()
+        self.assertTrue(b'<!--XSUPERVISOR:BEGIN-->' in output)
+        self.assertTrue(b'<!--XSUPERVISOR:END-->' in output)
 
     def test_not_send_heartbeat(self):
         """Test that we don't send the heartbeat."""
-        gen = heartbeat_generator(2, out=self.stdout, time=self.timer)
+        gen = heartbeat_generator(2, out=self.out, time=self.timer)
         next(gen)
-        self.assertFalse(self.stdout.getvalue())
+        self.assertFalse(self.out.getvalue())
         self.timer.advance(0.5)
         next(gen)
-        self.assertFalse(self.stdout.getvalue())
+        self.assertFalse(self.out.getvalue())
         self.timer.advance(0.5)
         next(gen)
-        self.assertFalse(self.stdout.getvalue())
+        self.assertFalse(self.out.getvalue())
 
     def test_interval_None(self):
         """Test generator with interval=None"""
-        gen = heartbeat_generator(None, out=self.stdout, time=self.timer)
+        gen = heartbeat_generator(None, out=self.out, time=self.timer)
         next(gen)
-        self.assertFalse(self.stdout.getvalue())
+        self.assertFalse(self.out.getvalue())
         self.timer.advance(5)
         next(gen)
-        self.assertFalse(self.stdout.getvalue())
+        self.assertFalse(self.out.getvalue())
         self.timer.advance(5)
 
 
@@ -144,7 +177,7 @@ class HeartbeatWriterTest(BaseTestCase):
     def test_send_loop(self):
         """Send heartbeats in the LoopingCall."""
         # first connect to something
-        transport = StringIO()
+        transport = BytesIO()
         self.clock.advance(2)
         self.hw.makeConnection(transport)
         self.clock.advance(5)
@@ -163,7 +196,7 @@ class HeartbeatWriterTest(BaseTestCase):
     def test_send_on_connectionMade(self):
         """On connectionMade start the loop and send."""
         # first connect to something
-        transport = StringIO()
+        transport = BytesIO()
         self.clock.advance(0.1)
         self.hw.makeConnection(transport)
         self.assertTrue(self.hw.loop.running)

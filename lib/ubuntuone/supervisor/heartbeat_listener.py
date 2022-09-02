@@ -277,8 +277,8 @@ if __name__ == '__main__':
 
     rpc = childutils.getRPCInterface(os.environ)
     hbl = HeartbeatListener(
-        options.timeout,
-        options.interval,
+        int(options.timeout),
+        int(options.interval),
         options.groups,
         options.processes,
         rpc,

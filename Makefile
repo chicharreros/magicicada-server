@@ -121,6 +121,9 @@ start-supervisor:
 stop-supervisor:
 	$(SUPERVISOR_CTL) -c $(TMP_DIR)/supervisor-dev.conf shutdown
 
+status-supervisor:
+	$(SUPERVISOR_CTL) -c $(TMP_DIR)/supervisor-dev.conf status
+
 start-%-group:
 	$(SUPERVISOR_CTL) -c $(TMP_DIR)/supervisor-dev.conf start $*:
 
