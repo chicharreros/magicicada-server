@@ -204,6 +204,9 @@ LOGGING = {
         },
     },
     'handlers': {
+        'null': {
+            'class': 'logging.NullHandler',
+        },
         'console': {
             'level': 'TRACE',
             'class': 'logging.StreamHandler',
