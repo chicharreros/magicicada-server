@@ -15,12 +15,14 @@
 #
 # For further info, check  http://launchpad.net/magicicada-server
 
+import logging
 import os
 
 from twisted.internet import defer, reactor
 
 # the levels of directories for the tree where will store all nodes
 DIRS_LEVELS = 3
+logger = logging.getLogger(__name__)
 
 
 class FileReaderProducer(object):
@@ -154,6 +156,9 @@ class DiskStorage(object):
         """Get a consumer that will store bytes in disk."""
         path = self._get_treepath(node_id)
         if not os.path.exists(path):
-            os.makedirs(path)
+            try:
+                os.makedirs(path)
+            except Exception:
+                logger.exception('Could not to create path %r', path)
         fpath = os.path.join(path, node_id)
         return FileWriterConsumer(fpath, offset)
